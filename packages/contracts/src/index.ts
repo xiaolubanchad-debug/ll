@@ -7,11 +7,21 @@ import type {
 } from './generated/types.js';
 export type { TestConfiguration, AgentMessage, LoginInput, PasswordChangeInput };
 export type { SessionView, NodeList, RunList, AuditList } from './generated/types.js';
+export type {
+  NodeInput,
+  SecretInput,
+  HostKeyInput,
+  DeploymentInput,
+  ReasonInput,
+  ReconcileInput,
+  ReleaseInput,
+} from './generated/types.js';
+export type { NodeView } from './generated/types.js';
 export interface Issue {
   path: string;
   message: string;
 }
-function schemaIssues(name: keyof typeof validators, value: unknown): Issue[] {
+export function schemaIssues(name: keyof typeof validators, value: unknown): Issue[] {
   const validate = validators[name];
   const labels: Record<string, string> = {
     required: '缺少必填字段',

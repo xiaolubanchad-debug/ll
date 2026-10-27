@@ -13,9 +13,16 @@ import { AuthController, ConsoleController } from './controllers.js';
 import { Database } from './database.js';
 import { ErrorFilter } from './errors.js';
 import { settings } from './settings.js';
+import { NodesController, DeploymentController, AgentController } from './p1-controllers.js';
 
 @Module({
-  controllers: [AuthController, ConsoleController],
+  controllers: [
+    AuthController,
+    ConsoleController,
+    NodesController,
+    DeploymentController,
+    AgentController,
+  ],
   providers: [Database, AuthService, { provide: APP_GUARD, useClass: SessionGuard }],
 })
 export class AppModule {}

@@ -18,7 +18,7 @@ const cookieOptions = () => ({
 function setSession(res: Response, token: string) {
   res.cookie(COOKIE, token, { ...cookieOptions(), maxAge: 12 * 60 * 60 * 1000 });
 }
-function pageArgs(query: Record<string, unknown>) {
+export function pageArgs(query: Record<string, unknown>) {
   if (Object.keys(query).some((k) => !['limit', 'cursor'].includes(k)))
     throw new ApiError(422, 'VALIDATION_FAILED', '列表参数无效');
   const limit = query.limit === undefined ? 20 : Number(query.limit),
@@ -39,7 +39,7 @@ function pageArgs(query: Record<string, unknown>) {
     ...(typeof cursor === 'string' ? { cursor: { id: cursor }, skip: 1 } : {}),
   };
 }
-function page<T extends { id: string }>(items: T[], limit: number) {
+export function page<T extends { id: string }>(items: T[], limit: number) {
   return {
     items: items.slice(0, limit),
     nextCursor: items.length > limit ? items[limit - 1].id : null,
@@ -106,17 +106,6 @@ export class AuthController {
 @Controller()
 export class ConsoleController {
   constructor(private readonly db: Database) {}
-  @Get('nodes') async nodes(@Query() query: Record<string, unknown>) {
-    const { limit, ...args } = pageArgs(query);
-    return page(
-      await this.db.node.findMany({
-        ...args,
-        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-        select: { id: true, name: true, host: true, createdAt: true },
-      }),
-      limit,
-    );
-  }
   @Get('runs') async runs(@Query() query: Record<string, unknown>) {
     const { limit, ...args } = pageArgs(query);
     return page(

@@ -25,7 +25,12 @@ let csrfToken = '';
 export function useSession(session: SessionView | null) {
   csrfToken = session?.csrfToken ?? '';
 }
-export async function api<T>(path: string, method = 'GET', body?: unknown): Promise<T> {
+export async function api<T>(
+  path: string,
+  method = 'GET',
+  body?: unknown,
+  headers: Record<string, string> = {},
+): Promise<T> {
   let response: Response;
   try {
     response = await fetch('/api/v1' + path, {
@@ -35,6 +40,7 @@ export async function api<T>(path: string, method = 'GET', body?: unknown): Prom
         ...(method !== 'GET'
           ? { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken }
           : {}),
+        ...headers,
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });

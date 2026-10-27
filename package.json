@@ -14,15 +14,19 @@
   "scripts": {
     "generate:contracts": "node scripts/generate-contracts.mjs",
     "check:contracts": "node scripts/generate-contracts.mjs --check && npm run build -w @apk/contracts && node scripts/check-contracts.mjs",
-    "build": "npm run build -w @apk/contracts && npm run build -w @apk/control-api && npm run build -w @apk/web",
-    "typecheck": "npm run build -w @apk/contracts && npm run typecheck --workspaces --if-present",
+    "build": "npm run build -w @apk/contracts && npm run build -w @apk/platform && npm run build -w @apk/control-api && npm run build -w @apk/deploy-worker && npm run build -w @apk/agent && npm run build -w @apk/web",
+    "typecheck": "npm run build -w @apk/contracts && npm run build -w @apk/platform && npm run typecheck --workspaces --if-present",
     "lint": "eslint apps packages scripts tests --max-warnings=0",
     "test": "npm run build && node scripts/test-p0.mjs",
     "dev": "node --env-file=.env scripts/dev.mjs",
     "setup:env": "node scripts/setup-env.mjs",
     "db:generate": "prisma generate --schema apps/control-api/prisma/schema.prisma",
     "db:migrate": "prisma migrate deploy --schema apps/control-api/prisma/schema.prisma",
-    "admin:init": "node --env-file=.env apps/control-api/dist/admin-cli.js"
+    "admin:init": "node --env-file=.env apps/control-api/dist/admin-cli.js",
+    "worker": "node --env-file=data/keys/worker.env --env-file=data/keys/worker-url.env apps/deploy-worker/dist/main.js",
+    "db:worker": "node --env-file=.env scripts/setup-worker-db.mjs",
+    "setup:deployment": "node scripts/setup-deployment.mjs",
+    "release:agent": "node --env-file=.env scripts/release-agent.mjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
@@ -30,6 +34,10 @@
     "@types/cookie-parser": "1.4.10",
     "@types/express": "5.0.5",
     "@types/node": "24.10.1",
+    "@types/ssh2": "1.15.6",
+    "ssh2": "1.17.0",
+    "tar": "7.5.22",
+    "fast-xml-parser": "5.11.2",
     "ajv": "8.20.0",
     "ajv-formats": "3.0.1",
     "embedded-postgres": "17.6.0-beta.15",

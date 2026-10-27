@@ -1,8 +1,8 @@
 # HTTP 接口契约
 
-版本 1.0.1，前缀 /api/v1。P0 已实现的路由列在 p0.http.json 并生成 openapi.json，其余路由仍是后续阶段设计。CI 比较已实现 Controller、P0 清单和 OpenAPI，防止把设计接口误报为已完成。
+版本 1.1.0，前缀 /api/v1。已实现路由由 p0.http.json 和 p1.http.json 合并生成 openapi.json，CI 比较 Controller、清单和 OpenAPI。下表保留后续阶段设计，以两份机器清单判定实现范围。
 
-P0 范围为 auth 四个接口、nodes/runs/audit-events 的只读分页、configs/validate、openapi.json 和健康检查。列表当前只支持 cursor 和 limit；后续的 nodeId/status 筛选随对应阶段实现。P0 不保存配置版本，也不提供节点写入、部署或实际任务执行。
+P0 提供登录、只读基础、配置校验与健康检查。P1 增加服务器、秘密版本、发布、部署操作、Agent 注册及心跳；部署列表支持 nodeId/status 筛选。P1 输入和节点视图定义于 p1.schema.json，细节见 [P1 契约](../docs/P1_CONTRACT.md)。配置保存、任务执行及其节点接口仍待 P2/P3。
 
 ## 通用规则
 
@@ -16,50 +16,50 @@ POST 创建批次、部署、配置版本、停止和核验必须带 Idempotency
 
 ## 管理接口
 
-| 方法与路径 | 输入要点 | 返回与规则 |
-| --- | --- | --- |
-| POST /auth/login | username,password | 安全会话 Cookie，通用失败提示及限流 |
-| POST /auth/logout | 无 | 204，撤销会话 |
-| GET /auth/me | 无 | 管理员摘要，不返回密码摘要 |
-| PUT /auth/password | currentPassword,newPassword | 撤销其他会话，记录审计 |
-| GET /nodes | cursor,limit | 节点摘要，在线/能力/占用分开返回 |
-| POST /nodes | name,host,port,username,credentialVersionId | Node，初始无可信指纹、不可部署 |
-| GET /nodes/{id} | 无 | 节点信息、最新能力和部署摘要 |
-| PATCH /nodes/{id} | name,连接资料，If-Match | 新资产版本；忙节点禁止修改连接 |
-| DELETE /nodes/{id} | If-Match | 归档资产并吊销节点身份；先确保节点已停止，不卸载整机 |
-| POST /nodes/{id}/fingerprint-probes | 无 | 异步探测，返回 observedFingerprint；不自动信任 |
-| PUT /nodes/{id}/host-key | expectedFingerprint,If-Match | 保存管理员核验的值并审计 |
-| POST /nodes/{id}/checks | 无 | 异步连接和能力检查，严格核对已保存主机指纹 |
-| POST /nodes/{id}/reconciliations | decision,reason,evidenceIds | 记录核验；释放槽前确认旧进程终止，拒绝仅凭在线心跳释放 |
-| GET /releases | cursor,limit | 已发布、签名验证的固定版本 |
-| POST /releases | 受信构件清单及签名 | 验证成功才登记为固定发布，不接受任意 Shell 或未经核验的下载地址 |
-| POST /deployments | nodeId,releaseId | 202，预留独占槽；拒绝 NODE_BUSY |
-| GET /deployments | nodeId,status,cursor,limit | 部署任务列表 |
-| GET /deployments/{id} | 无 | 状态、步骤、发布与最近错误 |
-| POST /deployments/{id}/stop | reason | 202 或终态原结果，取消请求不等于已回滚 |
-| GET /deployments/{id}/events | afterSequence,limit | 可补读事件列表 |
-| GET /configs | cursor,limit | 配置摘要及最新版本号 |
-| POST /configs/validate | 符合 config.schema.json 的草稿 | P0 已实现，只校验无持久化，返回 {valid:true}，要求会话和 CSRF |
-| POST /configs | name | 配置容器，尚不可执行 |
-| POST /configs/{id}/versions | 符合 config.schema.json 的正文 | 不可变版本、configVersionId、configHash |
-| GET /configs/{id}/versions/{versionId} | 无 | 非敏感完整配置，不解密代理口令 |
-| POST /secrets/versions | type 与 secretValue；私钥可用专用上传字段 | 仅返回 secretVersionId、type、createdAt；禁止记录请求体 |
-| GET /secrets | type,cursor,limit | 秘密元数据，不返回值 |
-| POST /secrets/{versionId}/revoke | reason | 吊销，保留引用及审计，不原地替换 |
-| POST /runs | nodeId,configVersionId,releaseId；可选 supersedesRunId | 202，固定版本、占用节点、生成 runId |
-| GET /runs | nodeId,status,cursor,limit | 批次摘要，状态原样返回 |
-| GET /runs/{id} | 无 | 摘要、配置引用、停止意图、任务计数 |
-| POST /runs/{id}/stop | reason | STOP_REQUESTED；排队时可直接 CANCELLED |
-| GET /runs/{id}/tasks | cursor,limit | 任务状态和非敏感详情 |
-| GET /runs/{id}/events | afterSequence,limit | 持久事件补读 |
-| GET /runs/{id}/stream | Last-Event-ID | SSE，仅摘要和脱敏日志 |
-| POST /tasks/{id}/reconciliations | outcome,reason,evidenceIds | 不改变原始 UNKNOWN 记录，追加人工核验决议 |
-| POST /tasks/{id}/account-view | reason | 显式授权查看测试账户，短期响应且审计，Cache-Control:no-store |
-| GET /artifacts/{id}/content | 无 | 鉴权下载，Content-Disposition，无磁盘路径透传 |
-| GET /audit-events | cursor,limit | 管理操作审计 |
-| GET /health/live | 无，公开 | 进程存活，不返回内部地址或配置 |
-| GET /health/ready | 无，内部 | 数据库和关键依赖就绪，供部署系统使用 |
-| GET /openapi.json | 管理员会话 | P0 已实现路由的生成文档 |
+| 方法与路径                             | 输入要点                                                    | 返回与规则                                                      |
+| -------------------------------------- | ----------------------------------------------------------- | --------------------------------------------------------------- |
+| POST /auth/login                       | username,password                                           | 安全会话 Cookie，通用失败提示及限流                             |
+| POST /auth/logout                      | 无                                                          | 204，撤销会话                                                   |
+| GET /auth/me                           | 无                                                          | 管理员摘要，不返回密码摘要                                      |
+| PUT /auth/password                     | currentPassword,newPassword                                 | 撤销其他会话，记录审计                                          |
+| GET /nodes                             | cursor,limit                                                | 节点摘要，在线/能力/占用分开返回                                |
+| POST /nodes                            | name,host,port,username,credentialVersionId                 | Node，初始无可信指纹、不可部署                                  |
+| GET /nodes/{id}                        | 无                                                          | 节点信息、最新能力和部署摘要                                    |
+| PATCH /nodes/{id}                      | name,连接资料，If-Match                                     | 新资产版本；忙节点禁止修改连接                                  |
+| DELETE /nodes/{id}                     | If-Match                                                    | 归档资产并吊销节点身份；先确保节点已停止，不卸载整机            |
+| POST /nodes/{id}/fingerprint-probes    | 无                                                          | 异步探测，返回 observedFingerprint；不自动信任                  |
+| PUT /nodes/{id}/host-key               | probeId,expectedFingerprint,If-Match                        | 保存与本资产版本成功探测一致、由管理员核验的主机公钥并审计      |
+| POST /nodes/{id}/checks                | 无                                                          | 异步连接和能力检查，严格核对已保存主机指纹                      |
+| POST /nodes/{id}/reconciliations       | checkId,reason                                              | 新检查确认无安装标记且无活动占用，人工解除隔离；心跳不能释放    |
+| GET /releases                          | cursor,limit                                                | 已发布、签名验证的固定版本                                      |
+| POST /releases                         | 受信构件清单及签名                                          | 验证成功才登记为固定发布，不接受任意 Shell 或未经核验的下载地址 |
+| POST /deployments                      | nodeId,releaseId                                            | 202，预留独占槽；拒绝 NODE_BUSY                                 |
+| GET /deployments                       | nodeId,status,cursor,limit                                  | 部署任务列表                                                    |
+| GET /deployments/{id}                  | 无                                                          | 状态、步骤、发布与最近错误                                      |
+| POST /deployments/{id}/stop            | reason                                                      | 202 或终态原结果，取消请求不等于已回滚                          |
+| GET /deployments/{id}/events           | afterSequence,limit                                         | 可补读事件列表                                                  |
+| GET /configs                           | cursor,limit                                                | 配置摘要及最新版本号                                            |
+| POST /configs/validate                 | 符合 config.schema.json 的草稿                              | P0 已实现，只校验无持久化，返回 {valid:true}，要求会话和 CSRF   |
+| POST /configs                          | name                                                        | 配置容器，尚不可执行                                            |
+| POST /configs/{id}/versions            | 符合 config.schema.json 的正文                              | 不可变版本、configVersionId、configHash                         |
+| GET /configs/{id}/versions/{versionId} | 无                                                          | 非敏感完整配置，不解密代理口令                                  |
+| POST /secrets/versions                 | type 与 secretValue；页面文件读取后作为 privateKey 字段上传 | 仅返回 id、type、createdAt；禁止记录请求体                      |
+| GET /secrets                           | type,cursor,limit                                           | 秘密元数据，不返回值                                            |
+| POST /secrets/{versionId}/revoke       | reason                                                      | 吊销，保留引用及审计，不原地替换                                |
+| POST /runs                             | nodeId,configVersionId,releaseId；可选 supersedesRunId      | 202，固定版本、占用节点、生成 runId                             |
+| GET /runs                              | nodeId,status,cursor,limit                                  | 批次摘要，状态原样返回                                          |
+| GET /runs/{id}                         | 无                                                          | 摘要、配置引用、停止意图、任务计数                              |
+| POST /runs/{id}/stop                   | reason                                                      | STOP_REQUESTED；排队时可直接 CANCELLED                          |
+| GET /runs/{id}/tasks                   | cursor,limit                                                | 任务状态和非敏感详情                                            |
+| GET /runs/{id}/events                  | afterSequence,limit                                         | 持久事件补读                                                    |
+| GET /runs/{id}/stream                  | Last-Event-ID                                               | SSE，仅摘要和脱敏日志                                           |
+| POST /tasks/{id}/reconciliations       | outcome,reason,evidenceIds                                  | 不改变原始 UNKNOWN 记录，追加人工核验决议                       |
+| POST /tasks/{id}/account-view          | reason                                                      | 显式授权查看测试账户，短期响应且审计，Cache-Control:no-store    |
+| GET /artifacts/{id}/content            | 无                                                          | 鉴权下载，Content-Disposition，无磁盘路径透传                   |
+| GET /audit-events                      | cursor,limit                                                | 管理操作审计                                                    |
+| GET /health/live                       | 无，公开                                                    | 进程存活，不返回内部地址或配置                                  |
+| GET /health/ready                      | 无，内部                                                    | 数据库和关键依赖就绪，供部署系统使用                            |
+| GET /openapi.json                      | 管理员会话                                                  | P0/P1 已实现路由的生成文档                                      |
 
 登录及 me 返回 SessionView，包括 admin 摘要和 csrfToken。改密成功也返回 SessionView，并轮换当前 Cookie、撤销旧会话。密码修改和配置校验请求使用 JSON，Header 包含精确 Origin 与 X-CSRF-Token。会话最长 12 小时，非滑动续期。P0 管理员密码为 12–128 个字符，不采用 APK 测试账户的 8–12 位规则。
 
@@ -69,18 +69,18 @@ NodeConnection 凭据上传上限 64 KiB；普通配置正文上限 256 KiB；�
 
 以下业务正文采用 agent.schema.json 中的消息变体。认证仍通过 HTTP Header，节点 ID 同时校验令牌绑定关系。
 
-| 方法与路径 | 消息或输入 | 返回与约束 |
-| --- | --- | --- |
-| POST /agent/enroll | kind=enroll，一次性 Bootstrap Bearer | nodeId、独立凭据、protocolVersion、轮换时间；no-store |
-| POST /agent/heartbeats | kind=heartbeat | serverTime、desiredControl、租约到期及事件确认位置 |
-| POST /agent/claims | kind=claim | 204 无任务；否则 Delivery，不分配其他节点任务 |
-| POST /agent/deliveries/{id}/accept | kind=accept | 接收确认、有效租约；持久化后才能调用 |
-| GET /agent/deliveries/{id}/config | 当前 fence | 固定配置与本任务 secrets；只有有效租约且未吊销身份可取 |
-| POST /agent/events | kind=events | ackedEventIds、appliedThroughSequence、recordedForReview；持久化后响应 |
-| PUT /agent/tasks/{taskId}/account | kind=account | 按 accountRef 幂等保存生成账户，重复内容不同则冲突；写入后不回显密码 |
-| POST /agent/artifacts | multipart 文件、deliveryId、fence、taskId、kind、sha256 | artifactId，类型及归属校验，不接收任意文件路径 |
-| POST /agent/reconcile | nodeId、bootId、未确认 delivery 和提交记录摘要 | 继续核验、停止或隔离决策；不自动重跑注册 |
-| POST /agent/credentials/rotate | 旧身份认证 | 新节点凭据和过渡时间，旧凭据按规则失效 |
+| 方法与路径                         | 消息或输入                                                  | 返回与约束                                                               |
+| ---------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------ |
+| POST /agent/enroll                 | kind=enroll，一次性 Bootstrap Bearer                        | nodeId、credential、protocolVersion、heartbeatIntervalSeconds；no-store  |
+| POST /agent/heartbeats             | kind=heartbeat，可选 report，P1 currentDelivery 必须为 null | serverTime、desiredControl、heartbeatIntervalSeconds；执行租约随 P2 扩展 |
+| POST /agent/claims                 | kind=claim                                                  | 204 无任务；否则 Delivery，不分配其他节点任务                            |
+| POST /agent/deliveries/{id}/accept | kind=accept                                                 | 接收确认、有效租约；持久化后才能调用                                     |
+| GET /agent/deliveries/{id}/config  | 当前 fence                                                  | 固定配置与本任务 secrets；只有有效租约且未吊销身份可取                   |
+| POST /agent/events                 | kind=events                                                 | ackedEventIds、appliedThroughSequence、recordedForReview；持久化后响应   |
+| PUT /agent/tasks/{taskId}/account  | kind=account                                                | 按 accountRef 幂等保存生成账户，重复内容不同则冲突；写入后不回显密码     |
+| POST /agent/artifacts              | multipart 文件、deliveryId、fence、taskId、kind、sha256     | artifactId，类型及归属校验，不接收任意文件路径                           |
+| POST /agent/reconcile              | nodeId、bootId、未确认 delivery 和提交记录摘要              | 继续核验、停止或隔离决策；不自动重跑注册                                 |
+| POST /agent/credentials/rotate     | 旧身份认证                                                  | 新节点凭据和过渡时间，旧凭据按规则失效                                   |
 
 Delivery 包含 kind=delivery、protocolVersion、deliveryId、runId、nodeId、fence、configVersionId、configHash、releaseId、issuedAt、ackDeadline、leaseExpiresAt。任务领取结果不直接携带全部秘密，Agent 接收后通过受保护配置接口获取。响应有 Cache-Control:no-store。
 
@@ -100,22 +100,22 @@ SSE 使用 event:run-status、task-status、log、heartbeat；data 为非敏感 
 
 ## 错误码基线
 
-| 错误码 | 含义 | 默认重试 |
-| --- | --- | --- |
-| VALIDATION_FAILED | 字段或流程校验失败 | 修正后再试 |
-| NODE_BUSY | 部署或任务已占用节点 | 等待，不自动复制任务 |
-| NODE_OFFLINE | 未收到有效心跳 | 检查节点 |
-| NODE_NOT_READY | 能力、协议或版本不满足 | 修复环境 |
-| HOST_KEY_MISMATCH | SSH 主机身份不符 | 不自动忽略 |
-| IDEMPOTENCY_CONFLICT | 同键不同请求体 | 使用原请求或明确新建 |
-| STALE_VERSION | 编辑版本过期 | 刷新再编辑 |
-| LEASE_EXPIRED / STALE_FENCE | 执行权失效 | 核验，不重跑注册 |
-| SECRET_REVOKED | 引用凭据版本已吊销 | 新建配置版本 |
-| NO_TARGETS | XPath 无匹配 | 修正配置 |
-| APK_INVALID / ABI_UNSUPPORTED | 文件无效或架构不兼容 | 更换包或镜像 |
-| FLOW_NOT_CONFIGURED | 包名无启用的注册流程 | SKIPPED，添加适配 |
-| REGISTRATION_UNKNOWN | 提交后未获得确定结果 | 人工核验 |
-| CLEANUP_INCOMPLETE | 无法证明执行环境已清理 | 隔离节点 |
+| 错误码                        | 含义                   | 默认重试             |
+| ----------------------------- | ---------------------- | -------------------- |
+| VALIDATION_FAILED             | 字段或流程校验失败     | 修正后再试           |
+| NODE_BUSY                     | 部署或任务已占用节点   | 等待，不自动复制任务 |
+| NODE_OFFLINE                  | 未收到有效心跳         | 检查节点             |
+| NODE_NOT_READY                | 能力、协议或版本不满足 | 修复环境             |
+| HOST_KEY_MISMATCH             | SSH 主机身份不符       | 不自动忽略           |
+| IDEMPOTENCY_CONFLICT          | 同键不同请求体         | 使用原请求或明确新建 |
+| STALE_VERSION                 | 编辑版本过期           | 刷新再编辑           |
+| LEASE_EXPIRED / STALE_FENCE   | 执行权失效             | 核验，不重跑注册     |
+| SECRET_REVOKED                | 引用凭据版本已吊销     | 新建配置版本         |
+| NO_TARGETS                    | XPath 无匹配           | 修正配置             |
+| APK_INVALID / ABI_UNSUPPORTED | 文件无效或架构不兼容   | 更换包或镜像         |
+| FLOW_NOT_CONFIGURED           | 包名无启用的注册流程   | SKIPPED，添加适配    |
+| REGISTRATION_UNKNOWN          | 提交后未获得确定结果   | 人工核验             |
+| CLEANUP_INCOMPLETE            | 无法证明执行环境已清理 | 隔离节点             |
 
 创建批次响应示例：
 

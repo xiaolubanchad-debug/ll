@@ -4,7 +4,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Ajv2020 from 'ajv/dist/2020.js';
 import addFormats from 'ajv-formats';
-import { configurationIssues, agentIssues } from '../packages/contracts/dist/index.js';
+import {
+  configurationIssues,
+  agentIssues,
+  schemaIssues,
+} from '../packages/contracts/dist/index.js';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const read = (name) => JSON.parse(fs.readFileSync(path.join(root, name), 'utf8'));
@@ -243,9 +247,55 @@ reject(
   semanticAgent,
 );
 
+const p1 = read('contracts/fixtures/p1.valid.json');
+for (const [name, value] of Object.entries(p1))
+  test('P1 valid ' + name, () => assert.deepEqual(schemaIssues(name, value), []));
+const p1Reject = (name, type, mutate) =>
+  test('P1 ' + name, () => {
+    const value = structuredClone(p1[type]);
+    mutate(value);
+    assert.ok(schemaIssues(type, value).length);
+  });
+p1Reject('host cannot contain shell syntax', 'NodeInput', (v) => {
+  v.host = 'host;id';
+});
+p1Reject('SSH user cannot contain options', 'NodeInput', (v) => {
+  v.username = '-oProxyCommand=id';
+});
+p1Reject('unknown node fields rejected', 'NodeInput', (v) => {
+  v.command = 'id';
+});
+p1Reject('port range checked', 'NodeInput', (v) => {
+  v.port = 65536;
+});
+p1Reject('wrong secret variant rejected', 'SecretInput', (v) => {
+  v.type = 'SSH_KEY';
+});
+p1Reject('plaintext secret cannot enter node', 'NodeInput', (v) => {
+  v.password = 'fixture';
+});
+p1Reject('license consent required', 'DeploymentInput', (v) => {
+  v.licenseAccepted = false;
+});
+p1Reject('fingerprint format required', 'HostKeyInput', (v) => {
+  v.expectedFingerprint = 'skip';
+});
+p1Reject('negative health disk rejected', 'HealthReport', (v) => {
+  v.freeDiskBytes = -1;
+});
+p1Reject('arbitrary health details rejected', 'HealthReport', (v) => {
+  v.password = 'fixture';
+});
+test('P1 heartbeat health shape matches shared report', () =>
+  assert.deepEqual(
+    read('contracts/agent.schema.json').$defs.heartbeat.properties.report,
+    read('contracts/p1.schema.json').$defs.HealthReport,
+  ));
+
 function markdownFiles(dir) {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-    if (['.git', '.venv', '.tmp', 'node_modules', 'archive'].includes(entry.name)) return [];
+    if (['.git', '.venv', '.venv-deploy', '.tmp', 'node_modules', 'archive'].includes(entry.name))
+      return [];
     const full = path.join(dir, entry.name);
     return entry.isDirectory() ? markdownFiles(full) : full.endsWith('.md') ? [full] : [];
   });

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "APK 部署中台 P0 API",
-    "version": "1.0.1"
+    "version": "1.1.0"
   },
   "paths": {
     "/api/v1/auth/login": {
@@ -84,7 +84,8 @@
               }
             }
           }
-        }
+        },
+        "parameters": []
       }
     },
     "/api/v1/auth/logout": {
@@ -240,6 +241,58 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          }
+        ]
+      },
+      "post": {
+        "operationId": "createNode",
+        "x-phase": "P1",
+        "security": [
+          {
+            "AdminSession": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "成功"
+          },
+          "default": {
+            "description": "统一错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NodeInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "required": true,
+            "schema": {
+              "type": "string"
             }
           }
         ]
@@ -435,7 +488,8 @@
               }
             }
           }
-        }
+        },
+        "parameters": []
       }
     },
     "/api/v1/health/live": {
@@ -457,7 +511,8 @@
               }
             }
           }
-        }
+        },
+        "parameters": []
       }
     },
     "/api/v1/health/ready": {
@@ -480,7 +535,976 @@
             }
           }
         },
-        "x-network-scope": "loopback"
+        "x-network-scope": "loopback",
+        "parameters": []
+      }
+    },
+    "/api/v1/nodes/{id}": {
+      "get": {
+        "operationId": "getNode",
+        "x-phase": "P1",
+        "security": [
+          {
+            "AdminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "default": {
+            "description": "统一错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      },
+      "patch": {
+        "operationId": "updateNode",
+        "x-phase": "P1",
+        "security": [
+          {
+            "AdminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "default": {
+            "description": "统一错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NodeInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "archiveNode",
+        "x-phase": "P1",
+        "security": [
+          {
+            "AdminSession": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "成功"
+          },
+          "default": {
+            "description": "统一错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/nodes/{id}/fingerprint-probes": {
+      "post": {
+        "operationId": "probeNode",
+        "x-phase": "P1",
+        "security": [
+          {
+            "AdminSession": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "成功"
+          },
+          "default": {
+            "description": "统一错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/nodes/{id}/host-key": {
+      "put": {
+        "operationId": "trustNode",
+        "x-phase": "P1",
+        "security": [
+          {
+            "AdminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "default": {
+            "description": "统一错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HostKeyInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/nodes/{id}/checks": {
+      "post": {
+        "operationId": "checkNode",
+        "x-phase": "P1",
+        "security": [
+          {
+            "AdminSession": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "成功"
+          },
+          "default": {
+            "description": "统一错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/nodes/{id}/reconciliations": {
+      "post": {
+        "operationId": "reconcileNode",
+        "x-phase": "P1",
+        "security": [
+          {
+            "AdminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "default": {
+            "description": "统一错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReconcileInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/secrets/versions": {
+      "post": {
+        "operationId": "createSecret",
+        "x-phase": "P1",
+        "security": [
+          {
+            "AdminSession": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "成功"
+          },
+          "default": {
+            "description": "统一错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SecretInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/secrets": {
+      "get": {
+        "operationId": "secrets",
+        "x-phase": "P1",
+        "security": [
+          {
+            "AdminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "default": {
+            "description": "统一错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": []
+      }
+    },
+    "/api/v1/secrets/{id}/revoke": {
+      "post": {
+        "operationId": "revokeSecret",
+        "x-phase": "P1",
+        "security": [
+          {
+            "AdminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "default": {
+            "description": "统一错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasonInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/releases": {
+      "post": {
+        "operationId": "createRelease",
+        "x-phase": "P1",
+        "security": [
+          {
+            "AdminSession": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "成功"
+          },
+          "default": {
+            "description": "统一错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReleaseInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "get": {
+        "operationId": "releases",
+        "x-phase": "P1",
+        "security": [
+          {
+            "AdminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "default": {
+            "description": "统一错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": []
+      }
+    },
+    "/api/v1/deployments": {
+      "post": {
+        "operationId": "deploy",
+        "x-phase": "P1",
+        "security": [
+          {
+            "AdminSession": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "成功"
+          },
+          "default": {
+            "description": "统一错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeploymentInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ]
+      },
+      "get": {
+        "operationId": "deployments",
+        "x-phase": "P1",
+        "security": [
+          {
+            "AdminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "default": {
+            "description": "统一错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": []
+      }
+    },
+    "/api/v1/deployments/{id}": {
+      "get": {
+        "operationId": "getDeployment",
+        "x-phase": "P1",
+        "security": [
+          {
+            "AdminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "default": {
+            "description": "统一错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/deployments/{id}/events": {
+      "get": {
+        "operationId": "deploymentEvents",
+        "x-phase": "P1",
+        "security": [
+          {
+            "AdminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "default": {
+            "description": "统一错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/deployments/{id}/stop": {
+      "post": {
+        "operationId": "stopDeployment",
+        "x-phase": "P1",
+        "security": [
+          {
+            "AdminSession": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "成功"
+          },
+          "default": {
+            "description": "统一错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasonInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/agent/enroll": {
+      "post": {
+        "operationId": "enrollAgent",
+        "x-phase": "P1",
+        "security": [
+          {
+            "NodeBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "default": {
+            "description": "统一错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentMessage"
+              }
+            }
+          }
+        },
+        "parameters": []
+      }
+    },
+    "/api/v1/agent/heartbeats": {
+      "post": {
+        "operationId": "heartbeat",
+        "x-phase": "P1",
+        "security": [
+          {
+            "NodeBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "default": {
+            "description": "统一错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentMessage"
+              }
+            }
+          }
+        },
+        "parameters": []
       }
     }
   },
@@ -490,6 +1514,10 @@
         "type": "apiKey",
         "in": "cookie",
         "name": "apk_session"
+      },
+      "NodeBearer": {
+        "type": "http",
+        "scheme": "bearer"
       }
     },
     "schemas": {
@@ -1080,6 +2108,101 @@
                     "$ref": "#/components/schemas/AgentMessage/$defs/currentDelivery"
                   }
                 ]
+              },
+              "report": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "ubuntu",
+                  "arch",
+                  "memoryKiB",
+                  "freeDiskBytes",
+                  "kvm",
+                  "sudo",
+                  "markerPresent",
+                  "android",
+                  "download",
+                  "versions",
+                  "errors"
+                ],
+                "properties": {
+                  "ubuntu": {
+                    "type": "string",
+                    "maxLength": 32
+                  },
+                  "arch": {
+                    "type": "string",
+                    "maxLength": 32
+                  },
+                  "memoryKiB": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "freeDiskBytes": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "kvm": {
+                    "type": "boolean"
+                  },
+                  "sudo": {
+                    "type": "boolean"
+                  },
+                  "markerPresent": {
+                    "type": "boolean"
+                  },
+                  "android": {
+                    "type": "boolean"
+                  },
+                  "download": {
+                    "type": "boolean"
+                  },
+                  "versions": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "node": {
+                        "type": "string",
+                        "maxLength": 100
+                      },
+                      "adb": {
+                        "type": "string",
+                        "maxLength": 100
+                      },
+                      "emulator": {
+                        "type": "string",
+                        "maxLength": 100
+                      },
+                      "appium": {
+                        "type": "string",
+                        "maxLength": 100
+                      },
+                      "playwright": {
+                        "type": "string",
+                        "maxLength": 100
+                      },
+                      "systemImage": {
+                        "type": "string",
+                        "maxLength": 100
+                      }
+                    }
+                  },
+                  "errors": {
+                    "type": "array",
+                    "maxItems": 20,
+                    "items": {
+                      "enum": [
+                        "NO_KVM",
+                        "DISK_LOW",
+                        "UNSUPPORTED_OS",
+                        "UNSUPPORTED_ARCH",
+                        "SUDO_REQUIRED",
+                        "ANDROID_NOT_READY",
+                        "INSTALL_IN_PROGRESS"
+                      ]
+                    }
+                  }
+                }
               }
             }
           },
@@ -1782,6 +2905,640 @@
           }
         }
       },
+      "NodeInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "host",
+          "port",
+          "username",
+          "credentialVersionId"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "host": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 253,
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9.:-]*$"
+          },
+          "port": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65535
+          },
+          "username": {
+            "type": "string",
+            "pattern": "^[a-z_][a-z0-9_-]{0,63}$"
+          },
+          "credentialVersionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sudoCredentialVersionId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
+      "SecretInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "type",
+          "secretValue"
+        ],
+        "properties": {
+          "type": {
+            "enum": [
+              "SSH_KEY",
+              "SSH_PASSWORD",
+              "SUDO_PASSWORD",
+              "HTTP_PROXY"
+            ]
+          },
+          "secretValue": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "privateKey": {
+                "type": "string",
+                "minLength": 32,
+                "maxLength": 65536
+              },
+              "passphrase": {
+                "type": "string",
+                "maxLength": 1024
+              },
+              "password": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1024
+              },
+              "host": {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9][a-zA-Z0-9.:-]*$",
+                "maxLength": 253
+              },
+              "port": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535
+              },
+              "username": {
+                "type": "string",
+                "maxLength": 1024
+              }
+            }
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "SSH_KEY"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "secretValue": {
+                  "required": [
+                    "privateKey"
+                  ],
+                  "not": {
+                    "anyOf": [
+                      {
+                        "required": [
+                          "password"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "host"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "port"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "username"
+                        ]
+                      }
+                    ]
+                  },
+                  "type": "object"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "enum": [
+                    "SSH_PASSWORD",
+                    "SUDO_PASSWORD"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "secretValue": {
+                  "required": [
+                    "password"
+                  ],
+                  "not": {
+                    "anyOf": [
+                      {
+                        "required": [
+                          "privateKey"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "passphrase"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "host"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "port"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "username"
+                        ]
+                      }
+                    ]
+                  },
+                  "type": "object"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "HTTP_PROXY"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "secretValue": {
+                  "required": [
+                    "host",
+                    "port",
+                    "username",
+                    "password"
+                  ],
+                  "not": {
+                    "anyOf": [
+                      {
+                        "required": [
+                          "privateKey"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "passphrase"
+                        ]
+                      }
+                    ]
+                  },
+                  "type": "object"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "HostKeyInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "probeId",
+          "expectedFingerprint"
+        ],
+        "properties": {
+          "probeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedFingerprint": {
+            "type": "string",
+            "pattern": "^SHA256:[A-Za-z0-9+/]{43}$"
+          }
+        }
+      },
+      "DeploymentInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "nodeId",
+          "releaseId",
+          "licenseAccepted"
+        ],
+        "properties": {
+          "nodeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "releaseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "licenseAccepted": {
+            "const": true
+          }
+        }
+      },
+      "ReasonInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "reason"
+        ],
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          }
+        }
+      },
+      "ReconcileInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "checkId",
+          "reason"
+        ],
+        "properties": {
+          "checkId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          }
+        }
+      },
+      "ReleaseInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "gitCommit",
+          "agentVersion",
+          "protocolVersion",
+          "artifactName",
+          "sha256",
+          "playbookSha256",
+          "toolchain",
+          "signature"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "gitCommit": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{40}$"
+          },
+          "agentVersion": {
+            "type": "string",
+            "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+          },
+          "protocolVersion": {
+            "const": "1.0"
+          },
+          "artifactName": {
+            "type": "string",
+            "pattern": "^agent-[a-f0-9]{64}\\.tgz$"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "playbookSha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "signature": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9+/]{86}==$"
+          },
+          "toolchain": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "nodeVersion",
+              "nodeUrl",
+              "nodeSha256",
+              "playwrightVersion",
+              "appiumVersion",
+              "uiautomator2Version",
+              "systemImage",
+              "archives",
+              "npmLockSha256"
+            ],
+            "properties": {
+              "nodeVersion": {
+                "const": "24.18.0"
+              },
+              "nodeUrl": {
+                "const": "https://nodejs.org/dist/v24.18.0/node-v24.18.0-linux-x64.tar.xz"
+              },
+              "nodeSha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "playwrightVersion": {
+                "type": "string",
+                "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+              },
+              "appiumVersion": {
+                "type": "string",
+                "pattern": "^3\\.[0-9]+\\.[0-9]+$"
+              },
+              "uiautomator2Version": {
+                "type": "string",
+                "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+              },
+              "systemImage": {
+                "const": "system-images;android-35;google_apis;x86_64"
+              },
+              "archives": {
+                "type": "array",
+                "minItems": 4,
+                "maxItems": 4,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "role",
+                    "url",
+                    "checksum",
+                    "revision"
+                  ],
+                  "properties": {
+                    "role": {
+                      "enum": [
+                        "cmdlineTools",
+                        "emulator",
+                        "platformTools",
+                        "systemImage"
+                      ]
+                    },
+                    "url": {
+                      "type": "string",
+                      "pattern": "^https://dl\\.google\\.com/android/repository/[A-Za-z0-9_./-]+\\.zip$",
+                      "maxLength": 600
+                    },
+                    "checksum": {
+                      "type": "string",
+                      "pattern": "^(sha256:[a-f0-9]{64}|sha1:[a-f0-9]{40})$"
+                    },
+                    "revision": {
+                      "type": "string",
+                      "maxLength": 64,
+                      "minLength": 1
+                    }
+                  }
+                }
+              },
+              "npmLockSha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          }
+        }
+      },
+      "HealthReport": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "ubuntu",
+          "arch",
+          "memoryKiB",
+          "freeDiskBytes",
+          "kvm",
+          "sudo",
+          "markerPresent",
+          "android",
+          "download",
+          "versions",
+          "errors"
+        ],
+        "properties": {
+          "ubuntu": {
+            "type": "string",
+            "maxLength": 32
+          },
+          "arch": {
+            "type": "string",
+            "maxLength": 32
+          },
+          "memoryKiB": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "freeDiskBytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "kvm": {
+            "type": "boolean"
+          },
+          "sudo": {
+            "type": "boolean"
+          },
+          "markerPresent": {
+            "type": "boolean"
+          },
+          "android": {
+            "type": "boolean"
+          },
+          "download": {
+            "type": "boolean"
+          },
+          "versions": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "node": {
+                "type": "string",
+                "maxLength": 100
+              },
+              "adb": {
+                "type": "string",
+                "maxLength": 100
+              },
+              "emulator": {
+                "type": "string",
+                "maxLength": 100
+              },
+              "appium": {
+                "type": "string",
+                "maxLength": 100
+              },
+              "playwright": {
+                "type": "string",
+                "maxLength": 100
+              },
+              "systemImage": {
+                "type": "string",
+                "maxLength": 100
+              }
+            }
+          },
+          "errors": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "enum": [
+                "NO_KVM",
+                "DISK_LOW",
+                "UNSUPPORTED_OS",
+                "UNSUPPORTED_ARCH",
+                "SUDO_REQUIRED",
+                "ANDROID_NOT_READY",
+                "INSTALL_IN_PROGRESS"
+              ]
+            }
+          }
+        }
+      },
+      "NodeView": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "host",
+          "port",
+          "username",
+          "version",
+          "credentialVersionId",
+          "sudoCredentialVersionId",
+          "expectedFingerprint",
+          "deploymentStatus",
+          "connection",
+          "occupancy",
+          "lastSeenAt",
+          "agentVersion",
+          "agentReleaseId",
+          "health",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "host": {
+            "type": "string"
+          },
+          "port": {
+            "type": "integer"
+          },
+          "username": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "credentialVersionId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sudoCredentialVersionId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "expectedFingerprint": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "deploymentStatus": {
+            "type": "string"
+          },
+          "connection": {
+            "enum": [
+              "ONLINE",
+              "OFFLINE"
+            ]
+          },
+          "occupancy": {
+            "enum": [
+              "IDLE",
+              "BUSY",
+              "QUARANTINED"
+            ]
+          },
+          "lastSeenAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "agentVersion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "agentReleaseId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "health": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        }
+      },
       "SessionView": {
         "type": "object",
         "additionalProperties": false,
@@ -1841,9 +3598,29 @@
             "items": {
               "type": "object",
               "additionalProperties": false,
+              "required": [
+                "id",
+                "name",
+                "host",
+                "port",
+                "username",
+                "version",
+                "credentialVersionId",
+                "sudoCredentialVersionId",
+                "expectedFingerprint",
+                "deploymentStatus",
+                "connection",
+                "occupancy",
+                "lastSeenAt",
+                "agentVersion",
+                "agentReleaseId",
+                "health",
+                "createdAt"
+              ],
               "properties": {
                 "id": {
-                  "type": "string"
+                  "type": "string",
+                  "format": "uuid"
                 },
                 "name": {
                   "type": "string"
@@ -1851,17 +3628,77 @@
                 "host": {
                   "type": "string"
                 },
+                "port": {
+                  "type": "integer"
+                },
+                "username": {
+                  "type": "string"
+                },
+                "version": {
+                  "type": "integer"
+                },
+                "credentialVersionId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "sudoCredentialVersionId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "expectedFingerprint": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "deploymentStatus": {
+                  "type": "string"
+                },
+                "connection": {
+                  "enum": [
+                    "ONLINE",
+                    "OFFLINE"
+                  ]
+                },
+                "occupancy": {
+                  "enum": [
+                    "IDLE",
+                    "BUSY",
+                    "QUARANTINED"
+                  ]
+                },
+                "lastSeenAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "agentVersion": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "agentReleaseId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "health": {
+                  "type": [
+                    "object",
+                    "null"
+                  ]
+                },
                 "createdAt": {
-                  "type": "string",
-                  "format": "date-time"
+                  "type": "string"
                 }
-              },
-              "required": [
-                "id",
-                "name",
-                "host",
-                "createdAt"
-              ]
+              }
             }
           },
           "nextCursor": {

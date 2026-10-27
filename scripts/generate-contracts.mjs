@@ -13,11 +13,18 @@ const config = await json('contracts/config.schema.json');
 const agent = await json('contracts/agent.schema.json');
 const auth = await json('contracts/auth.schema.json');
 const manifest = await json('contracts/p0.http.json');
+const p1 = await json('contracts/p1.schema.json');
+const p1Http = await json('contracts/p1.http.json');
+manifest.routes.push(...p1Http.routes);
+manifest.version = p1Http.version;
 const schemas = {
   TestConfiguration: config,
   AgentMessage: agent,
   LoginInput: { ...auth.$defs.login, $id: auth.$id + '/login' },
   PasswordChangeInput: { ...auth.$defs.passwordChange, $id: auth.$id + '/passwordChange' },
+  ...Object.fromEntries(
+    Object.entries(p1.$defs).map(([name, value]) => [name, { ...value, $id: p1.$id + '/' + name }]),
+  ),
 };
 const ajv = new Ajv({
   strict: true,
@@ -109,9 +116,7 @@ const apiSchemas = {
     csrfToken: str,
   }),
   ValidationResult: fields({ valid: { const: true } }),
-  NodeList: list(
-    fields({ id: str, name: str, host: str, createdAt: { type: 'string', format: 'date-time' } }),
-  ),
+  NodeList: list(normalize(p1.$defs.NodeView, 'NodeView')),
   RunList: list(
     fields({
       id: str,
@@ -148,8 +153,12 @@ const paths = {};
 for (const route of manifest.routes) {
   const operation = {
     operationId: route.operationId,
-    'x-phase': 'P0',
-    security: route.public || route.internal ? [] : [{ AdminSession: [] }],
+    'x-phase': p1Http.routes.some((r) => r.operationId === route.operationId) ? 'P1' : 'P0',
+    security: route.node
+      ? [{ NodeBearer: [] }]
+      : route.public || route.internal
+        ? []
+        : [{ AdminSession: [] }],
     responses: {
       [route.status]: {
         description: '成功',
@@ -174,7 +183,7 @@ for (const route of manifest.routes) {
         'application/json': { schema: { $ref: `#/components/schemas/${route.request}` } },
       },
     };
-  if (['post', 'put'].includes(route.method))
+  if (['post', 'put', 'patch', 'delete'].includes(route.method) && !route.node)
     operation.parameters = [
       { in: 'header', name: 'Origin', required: true, schema: { type: 'string' } },
       ...(!route.public
@@ -191,6 +200,28 @@ for (const route of manifest.routes) {
       { in: 'query', name: 'cursor', schema: { type: 'string', format: 'uuid' } },
     ];
   if (route.internal) operation['x-network-scope'] = 'loopback';
+  operation.parameters ??= [];
+  if (route.path.includes('{id}'))
+    operation.parameters.push({
+      in: 'path',
+      name: 'id',
+      required: true,
+      schema: { type: 'string', format: 'uuid' },
+    });
+  if (route.idempotent)
+    operation.parameters.push({
+      in: 'header',
+      name: 'Idempotency-Key',
+      required: true,
+      schema: { type: 'string', minLength: 8, maxLength: 128 },
+    });
+  if (route.ifMatch)
+    operation.parameters.push({
+      in: 'header',
+      name: 'If-Match',
+      required: true,
+      schema: { type: 'string' },
+    });
   (paths['/api/v1' + route.path] ??= {})[route.method] = operation;
 }
 const openapi = {
@@ -198,7 +229,10 @@ const openapi = {
   info: { title: 'APK 部署中台 P0 API', version: manifest.version },
   paths,
   components: {
-    securitySchemes: { AdminSession: { type: 'apiKey', in: 'cookie', name: 'apk_session' } },
+    securitySchemes: {
+      AdminSession: { type: 'apiKey', in: 'cookie', name: 'apk_session' },
+      NodeBearer: { type: 'http', scheme: 'bearer' },
+    },
     schemas: apiSchemas,
   },
 };
@@ -207,8 +241,11 @@ const outputs = {
     '// Generated. Run npm run generate:contracts.\n' + types + '\n' + responseTypes,
   'packages/contracts/src/generated/validators.js':
     '// Generated standalone validators; no runtime eval.\n' + bundle.outputFiles[0].text,
-  'packages/contracts/src/generated/validators.d.ts':
-    "import type { ValidateFunction } from 'ajv';\ndeclare const validators: Record<'TestConfiguration' | 'AgentMessage' | 'LoginInput' | 'PasswordChangeInput', ValidateFunction>;\nexport default validators;\n",
+  'packages/contracts/src/generated/validators.d.ts': `import type { ValidateFunction } from 'ajv';\ndeclare const validators: Record<${Object.keys(
+    schemas,
+  )
+    .map((x) => JSON.stringify(x))
+    .join(' | ')}, ValidateFunction>;\nexport default validators;\n`,
   'contracts/openapi.json': JSON.stringify(openapi, null, 2) + '\n',
 };
 let drift = false;

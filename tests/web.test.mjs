@@ -28,6 +28,38 @@ test('browser login, config checks, refresh, password change and logout', async 
     await expect(page.getByRole('heading', { name: '工作台', exact: true })).toBeVisible();
     await page.getByRole('button', { name: '服务器', exact: false }).first().click();
     await expect(page.getByText('尚未接入服务器')).toBeVisible();
+    await page.getByRole('button', { name: '添加服务器', exact: true }).click();
+    await page.getByLabel('服务器名称', { exact: true }).fill('浏览器测试节点');
+    await page.getByLabel('IP 或域名', { exact: true }).fill('host;unsafe');
+    await page.getByLabel('连接方式', { exact: true }).selectOption('SSH_PASSWORD');
+    await page.getByLabel('SSH 密码', { exact: true }).fill('FixtureOnlySshPassword123');
+    await page.getByRole('button', { name: '保存服务器', exact: true }).click();
+    await expect(page.getByText('请检查服务器名称、地址、端口和 SSH 用户名')).toBeVisible();
+    await page.getByLabel('IP 或域名', { exact: true }).fill('203.0.113.12');
+    await page.getByRole('button', { name: '保存服务器', exact: true }).click();
+    await expect(page.getByText('服务器资料已保存，凭据不会回显')).toBeVisible();
+    await expect(page.getByRole('cell', { name: '203.0.113.12', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: '一键部署', exact: true })).toBeDisabled();
+    await page.getByRole('button', { name: '探测主机指纹', exact: true }).click();
+    await expect(page.getByRole('cell', { name: '等待 Worker', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: '编辑资料', exact: true })).toBeDisabled();
+    await page.getByRole('button', { name: '停止', exact: true }).click();
+    await expect(page.getByRole('cell', { name: '已停止', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: '编辑资料', exact: true })).toBeEnabled();
+    await page.getByRole('button', { name: '步骤', exact: true }).click();
+    await expect(page.locator('.operation-events')).toContainText('已停止');
+    await page.screenshot({
+      path: path.join(process.env.P0_SCREENSHOT_DIR, 'p1-servers.png'),
+      fullPage: true,
+    });
+    assert.ok(
+      !(await page.evaluate(() => JSON.stringify(window.localStorage))).includes(
+        'FixtureOnlySshPassword123',
+      ),
+    );
+    await page.getByText('归档服务器', { exact: true }).click();
+    await page.getByRole('button', { name: '确认归档服务器', exact: true }).click();
+    await expect(page.getByText('尚未接入服务器')).toBeVisible();
     await page.getByRole('button', { name: '配置校验', exact: false }).first().click();
     let validateRequests = 0;
     page.on('request', (r) => {

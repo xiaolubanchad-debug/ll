@@ -4,6 +4,7 @@ import { configurationIssues, loginIssues, passwordChangeIssues } from '@apk/con
 import example from '../../../contracts/fixtures/config.valid.json';
 import { api, RequestError, useSession } from './api';
 import type { SessionView, Row, Page } from './api';
+import ServerManager from './ServerManager.vue';
 
 type Section = 'overview' | 'nodes' | 'runs' | 'config' | 'security';
 const session = ref<SessionView | null>(null),
@@ -295,7 +296,7 @@ onMounted(async () => {
       </nav>
       <div class="sidebar-bottom">
         <span class="status-dot"></span> 工程基础已就绪
-        <p>P0 · 部署与执行待后续阶段接入</p>
+        <p>P1 · 服务器与部署管理</p>
       </div>
     </aside>
     <div class="main-area">
@@ -322,7 +323,7 @@ onMounted(async () => {
               }}
             </p>
           </div>
-          <span class="phase-tag">P0 工程基础</span>
+          <span class="phase-tag">P1 部署管理</span>
         </div>
         <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon />
         <el-alert v-if="notice" :title="notice" type="success" :closable="false" show-icon />
@@ -343,13 +344,14 @@ onMounted(async () => {
           </div>
           <section class="surface next-step">
             <div>
-              <span class="phase-tag">接下来的阶段</span>
+              <span class="phase-tag">服务器接入</span>
               <h2>连接你的第一台执行服务器</h2>
               <p>
-                服务器接入与一键部署将在 P1 提供。当前可检查配置格式、管理登录安全，并查看操作记录。
+                添加 SSH 连接信息，核验主机身份后检查环境并部署固定版本。APK
+                下载与注册将在后续阶段接入。
               </p>
             </div>
-            <el-button @click="section = 'config'">检查测试配置 →</el-button>
+            <el-button @click="section = 'nodes'">管理服务器 →</el-button>
           </section>
           <section class="surface">
             <h2>最近操作</h2>
@@ -366,13 +368,7 @@ onMounted(async () => {
             >
           </section>
         </template>
-        <section v-else-if="section === 'nodes'" class="surface">
-          <h2>服务器列表</h2>
-          <p class="muted">服务器录入、SSH 连接和部署将在 P1 接入。</p>
-          <el-table :data="nodes" empty-text="尚未接入服务器"
-            ><el-table-column prop="name" label="名称" /><el-table-column prop="host" label="地址"
-          /></el-table>
-        </section>
+        <ServerManager v-else-if="section === 'nodes'" @changed="refresh" />
         <section v-else-if="section === 'runs'" class="surface">
           <h2>测试任务列表</h2>
           <p class="muted">任务创建和执行将在后续阶段开放。</p>

@@ -1,0 +1,30 @@
+[Unit]
+Description=APK platform execution agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=apk-runner
+Group=apk-runner
+SupplementaryGroups=kvm
+WorkingDirectory=/var/lib/apk-platform/home
+Environment=AGENT_CONFIG=/var/lib/apk-platform/agent-config.json
+Environment=AGENT_STATE_DIR=/var/lib/apk-platform/identities/{{ deployment_id }}
+Environment=ANDROID_HOME={{ agent_config.sdkRoot }}
+Environment=JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+Environment=APPIUM_HOME={{ agent_config.toolsRoot }}/appium-home
+Environment=PLAYWRIGHT_BROWSERS_PATH={{ agent_config.toolsRoot }}/browsers
+ExecStart=/opt/apk-platform/runtime/node/bin/node /opt/apk-platform/current/agent.js
+Restart=on-failure
+RestartSec=8
+RestartPreventExitStatus=78
+TimeoutStopSec=45
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/apk-platform {{ agent_config.toolsRoot }}
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

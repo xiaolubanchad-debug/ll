@@ -8,13 +8,13 @@ datasource db {
 }
 
 model Admin {
-  id                String    @id @default(uuid()) @db.Uuid
-  singleton         Int       @unique @default(1)
-  username          String    @unique @db.VarChar(64)
-  passwordHash      String    @db.VarChar(512)
-  credentialVersion Int       @default(1)
-  createdAt         DateTime  @default(now()) @db.Timestamptz(3)
-  updatedAt         DateTime  @updatedAt @db.Timestamptz(3)
+  id                String       @id @default(uuid()) @db.Uuid
+  singleton         Int          @unique @default(1)
+  username          String       @unique @db.VarChar(64)
+  passwordHash      String       @db.VarChar(512)
+  credentialVersion Int          @default(1)
+  createdAt         DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime     @updatedAt @db.Timestamptz(3)
   sessions          Session[]
   auditEvents       AuditEvent[]
 }
@@ -51,19 +51,137 @@ model LoginBucket {
 }
 
 model Node {
-  id        String   @id @default(uuid()) @db.Uuid
-  name      String   @db.VarChar(100)
-  host      String   @db.VarChar(253)
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
-  runs      Run[]
+  id                      String           @id @default(uuid()) @db.Uuid
+  name                    String           @db.VarChar(100)
+  host                    String           @db.VarChar(253)
+  createdAt               DateTime         @default(now()) @db.Timestamptz(3)
+  runs                    Run[]
+  port                    Int              @default(22)
+  username                String           @default("ubuntu") @db.VarChar(64)
+  credentialVersionId     String?          @db.Uuid
+  credential              SecretVersion?   @relation("sshCredential", fields: [credentialVersionId], references: [id], onDelete: Restrict)
+  sudoCredentialVersionId String?          @db.Uuid
+  sudoCredential          SecretVersion?   @relation("sudoCredential", fields: [sudoCredentialVersionId], references: [id], onDelete: Restrict)
+  version                 Int              @default(1)
+  archivedAt              DateTime?        @db.Timestamptz(3)
+  expectedFingerprint     String?          @db.VarChar(100)
+  hostKey                 String?
+  deploymentStatus        String           @default("NOT_INSTALLED") @db.VarChar(32)
+  lastSeenAt              DateTime?        @db.Timestamptz(3)
+  health                  Json?
+  agentVersion            String?          @db.VarChar(32)
+  agentReleaseId          String?          @db.Uuid
+  slot                    NodeSlot?
+  operations              Deployment[]
+  enrollments             Enrollment[]
+  agentCredential         AgentCredential?
+}
+
+model SecretVersion {
+  id        String    @id @default(uuid()) @db.Uuid
+  type      String    @db.VarChar(32)
+  keyId     String    @db.VarChar(64)
+  encrypted Json
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+  revokedAt DateTime? @db.Timestamptz(3)
+  createdBy String    @db.Uuid
+  sshNodes  Node[]    @relation("sshCredential")
+  sudoNodes Node[]    @relation("sudoCredential")
+}
+
+model Release {
+  id           String       @id @db.Uuid
+  manifest     Json
+  artifactName String       @unique @db.VarChar(160)
+  sha256       String       @unique @db.Char(64)
+  createdAt    DateTime     @default(now()) @db.Timestamptz(3)
+  deployments  Deployment[]
+}
+
+model NodeSlot {
+  nodeId      String  @id @db.Uuid
+  node        Node    @relation(fields: [nodeId], references: [id], onDelete: Restrict)
+  operationId String? @unique @db.Uuid
+  quarantined Boolean @default(false)
+  fence       Int     @default(0)
+}
+
+model Deployment {
+  id                String            @id @default(uuid()) @db.Uuid
+  nodeId            String            @db.Uuid
+  node              Node              @relation(fields: [nodeId], references: [id], onDelete: Restrict)
+  nodeVersion       Int
+  kind              String            @db.VarChar(20)
+  status            String            @default("QUEUED") @db.VarChar(32)
+  releaseId         String?           @db.Uuid
+  release           Release?          @relation(fields: [releaseId], references: [id], onDelete: Restrict)
+  createdBy         String            @db.Uuid
+  createdAt         DateTime          @default(now()) @db.Timestamptz(3)
+  finishedAt        DateTime?         @db.Timestamptz(3)
+  stopRequested     Boolean           @default(false)
+  licenseAcceptedAt DateTime?         @db.Timestamptz(3)
+  workerId          String?           @db.Uuid
+  fence             Int               @default(0)
+  leaseExpiresAt    DateTime?         @db.Timestamptz(3)
+  result            Json?
+  errorCode         String?           @db.VarChar(64)
+  events            DeploymentEvent[]
+  enrollment        Enrollment?
+
+  @@index([status, createdAt])
+}
+
+model DeploymentEvent {
+  id           String     @id @default(uuid()) @db.Uuid
+  deploymentId String     @db.Uuid
+  deployment   Deployment @relation(fields: [deploymentId], references: [id], onDelete: Restrict)
+  sequence     Int
+  status       String     @db.VarChar(32)
+  code         String     @db.VarChar(64)
+  createdAt    DateTime   @default(now()) @db.Timestamptz(3)
+
+  @@unique([deploymentId, sequence])
+}
+
+model Enrollment {
+  id           String     @id @default(uuid()) @db.Uuid
+  nodeId       String     @db.Uuid
+  node         Node       @relation(fields: [nodeId], references: [id], onDelete: Restrict)
+  deploymentId String     @unique @db.Uuid
+  deployment   Deployment @relation(fields: [deploymentId], references: [id], onDelete: Restrict)
+  tokenHash    String     @unique @db.Char(64)
+  expiresAt    DateTime   @db.Timestamptz(3)
+  consumedAt   DateTime?  @db.Timestamptz(3)
+  bootId       String?    @db.Uuid
+}
+
+model AgentCredential {
+  nodeId    String    @id @db.Uuid
+  node      Node      @relation(fields: [nodeId], references: [id], onDelete: Restrict)
+  tokenHash String    @unique @db.Char(64)
+  releaseId String    @db.Uuid
+  bootId    String    @db.Uuid
+  revokedAt DateTime? @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+}
+
+model IdempotencyRecord {
+  scope       String   @db.VarChar(200)
+  key         String   @db.VarChar(128)
+  actorId     String   @db.Uuid
+  requestHash String   @db.Char(64)
+  response    Json
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+
+  @@id([actorId, scope, key])
 }
 
 model Run {
-  id        String   @id @default(uuid()) @db.Uuid
-  nodeId    String   @db.Uuid
-  node      Node     @relation(fields: [nodeId], references: [id], onDelete: Restrict)
+  id        String    @id @default(uuid()) @db.Uuid
+  nodeId    String    @db.Uuid
+  node      Node      @relation(fields: [nodeId], references: [id], onDelete: Restrict)
   status    RunStatus @default(QUEUED)
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
 
   @@index([createdAt, id])
 }

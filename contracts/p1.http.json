@@ -1,0 +1,122 @@
+{
+  "version": "1.1.0",
+  "routes": [
+    {
+      "method": "post",
+      "path": "/nodes",
+      "operationId": "createNode",
+      "request": "NodeInput",
+      "status": 201
+    },
+    { "method": "get", "path": "/nodes/{id}", "operationId": "getNode", "status": 200 },
+    {
+      "method": "patch",
+      "path": "/nodes/{id}",
+      "operationId": "updateNode",
+      "request": "NodeInput",
+      "ifMatch": true,
+      "status": 200
+    },
+    {
+      "method": "delete",
+      "path": "/nodes/{id}",
+      "operationId": "archiveNode",
+      "ifMatch": true,
+      "status": 204
+    },
+    {
+      "method": "post",
+      "path": "/nodes/{id}/fingerprint-probes",
+      "operationId": "probeNode",
+      "idempotent": true,
+      "status": 202
+    },
+    {
+      "method": "put",
+      "path": "/nodes/{id}/host-key",
+      "operationId": "trustNode",
+      "request": "HostKeyInput",
+      "ifMatch": true,
+      "status": 200
+    },
+    {
+      "method": "post",
+      "path": "/nodes/{id}/checks",
+      "operationId": "checkNode",
+      "idempotent": true,
+      "status": 202
+    },
+    {
+      "method": "post",
+      "path": "/nodes/{id}/reconciliations",
+      "operationId": "reconcileNode",
+      "request": "ReconcileInput",
+      "idempotent": true,
+      "status": 200
+    },
+    {
+      "method": "post",
+      "path": "/secrets/versions",
+      "operationId": "createSecret",
+      "request": "SecretInput",
+      "status": 201
+    },
+    { "method": "get", "path": "/secrets", "operationId": "secrets", "status": 200 },
+    {
+      "method": "post",
+      "path": "/secrets/{id}/revoke",
+      "operationId": "revokeSecret",
+      "request": "ReasonInput",
+      "status": 200
+    },
+    {
+      "method": "post",
+      "path": "/releases",
+      "operationId": "createRelease",
+      "request": "ReleaseInput",
+      "status": 201
+    },
+    { "method": "get", "path": "/releases", "operationId": "releases", "status": 200 },
+    {
+      "method": "post",
+      "path": "/deployments",
+      "operationId": "deploy",
+      "request": "DeploymentInput",
+      "idempotent": true,
+      "status": 202
+    },
+    { "method": "get", "path": "/deployments", "operationId": "deployments", "status": 200 },
+    { "method": "get", "path": "/deployments/{id}", "operationId": "getDeployment", "status": 200 },
+    {
+      "method": "get",
+      "path": "/deployments/{id}/events",
+      "operationId": "deploymentEvents",
+      "status": 200
+    },
+    {
+      "method": "post",
+      "path": "/deployments/{id}/stop",
+      "operationId": "stopDeployment",
+      "request": "ReasonInput",
+      "idempotent": true,
+      "status": 202
+    },
+    {
+      "method": "post",
+      "path": "/agent/enroll",
+      "operationId": "enrollAgent",
+      "node": true,
+      "bootstrap": true,
+      "request": "AgentMessage",
+      "status": 200
+    },
+    {
+      "method": "post",
+      "path": "/agent/heartbeats",
+      "operationId": "heartbeat",
+      "node": true,
+      "request": "AgentMessage",
+      "status": 200
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-name: P0 checks
+name: Platform checks
 on: [push, pull_request]
 permissions:
   contents: read
@@ -12,7 +12,7 @@ jobs:
           POSTGRES_USER: p0test
           POSTGRES_PASSWORD: p0_ci_ephemeral_only
           POSTGRES_DB: apk_test_p0
-        ports: ["5432:5432"]
+        ports: ['5432:5432']
         options: >-
           --health-cmd "pg_isready -U p0test -d apk_test_p0"
           --health-interval 5s --health-timeout 3s --health-retries 20
@@ -30,5 +30,7 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm audit --omit=dev --audit-level=high
+      - run: python3 -m venv .venv-deploy && .venv-deploy/bin/pip install -r deploy/requirements.txt
+      - run: .venv-deploy/bin/ansible-playbook -i 'target,' --syntax-check deploy/ansible/install.yml deploy/ansible/activate.yml
       - run: npx playwright install --with-deps chromium --only-shell
       - run: npm test

@@ -3,177 +3,804 @@
   "$id": "https://contracts.apk-platform.example/v1/agent.schema.json",
   "title": "APK node protocol 1.0 messages",
   "oneOf": [
-    {"$ref": "#/$defs/enroll"}, {"$ref": "#/$defs/heartbeat"},
-    {"$ref": "#/$defs/claim"}, {"$ref": "#/$defs/delivery"},
-    {"$ref": "#/$defs/accept"}, {"$ref": "#/$defs/events"}, {"$ref": "#/$defs/account"}
+    {
+      "$ref": "#/$defs/enroll"
+    },
+    {
+      "$ref": "#/$defs/heartbeat"
+    },
+    {
+      "$ref": "#/$defs/claim"
+    },
+    {
+      "$ref": "#/$defs/delivery"
+    },
+    {
+      "$ref": "#/$defs/accept"
+    },
+    {
+      "$ref": "#/$defs/events"
+    },
+    {
+      "$ref": "#/$defs/account"
+    }
   ],
   "$defs": {
-    "uuid": {"type": "string", "format": "uuid"},
-    "time": {"type": "string", "format": "date-time"},
-    "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
-    "hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "uuid": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "time": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
     "enroll": {
-      "type": "object", "additionalProperties": false,
+      "type": "object",
+      "additionalProperties": false,
       "required": ["kind", "protocolVersion", "nodeId", "bootId", "agentVersion", "releaseId"],
       "properties": {
-        "kind": {"const": "enroll"}, "protocolVersion": {"const": "1.0"},
-        "nodeId": {"$ref": "#/$defs/uuid"}, "bootId": {"$ref": "#/$defs/uuid"},
-        "agentVersion": {"$ref": "#/$defs/version"}, "releaseId": {"$ref": "#/$defs/uuid"}
+        "kind": {
+          "const": "enroll"
+        },
+        "protocolVersion": {
+          "const": "1.0"
+        },
+        "nodeId": {
+          "$ref": "#/$defs/uuid"
+        },
+        "bootId": {
+          "$ref": "#/$defs/uuid"
+        },
+        "agentVersion": {
+          "$ref": "#/$defs/version"
+        },
+        "releaseId": {
+          "$ref": "#/$defs/uuid"
+        }
       }
     },
     "currentDelivery": {
-      "type": "object", "additionalProperties": false,
+      "type": "object",
+      "additionalProperties": false,
       "required": ["deliveryId", "runId", "fence"],
       "properties": {
-        "deliveryId": {"$ref": "#/$defs/uuid"}, "runId": {"$ref": "#/$defs/uuid"},
-        "fence": {"type": "integer", "minimum": 1}
+        "deliveryId": {
+          "$ref": "#/$defs/uuid"
+        },
+        "runId": {
+          "$ref": "#/$defs/uuid"
+        },
+        "fence": {
+          "type": "integer",
+          "minimum": 1
+        }
       }
     },
     "heartbeat": {
-      "type": "object", "additionalProperties": false,
-      "required": ["kind", "protocolVersion", "nodeId", "bootId", "agentVersion", "releaseId", "sentAt", "capabilities", "currentDelivery"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "protocolVersion",
+        "nodeId",
+        "bootId",
+        "agentVersion",
+        "releaseId",
+        "sentAt",
+        "capabilities",
+        "currentDelivery"
+      ],
       "properties": {
-        "kind": {"const": "heartbeat"}, "protocolVersion": {"const": "1.0"},
-        "nodeId": {"$ref": "#/$defs/uuid"}, "bootId": {"$ref": "#/$defs/uuid"},
-        "agentVersion": {"$ref": "#/$defs/version"}, "releaseId": {"$ref": "#/$defs/uuid"},
-        "sentAt": {"$ref": "#/$defs/time"},
+        "kind": {
+          "const": "heartbeat"
+        },
+        "protocolVersion": {
+          "const": "1.0"
+        },
+        "nodeId": {
+          "$ref": "#/$defs/uuid"
+        },
+        "bootId": {
+          "$ref": "#/$defs/uuid"
+        },
+        "agentVersion": {
+          "$ref": "#/$defs/version"
+        },
+        "releaseId": {
+          "$ref": "#/$defs/uuid"
+        },
+        "sentAt": {
+          "$ref": "#/$defs/time"
+        },
         "capabilities": {
-          "type": "object", "additionalProperties": false,
+          "type": "object",
+          "additionalProperties": false,
           "required": ["download", "android", "kvm", "freeDiskBytes"],
           "properties": {
-            "download": {"type": "boolean"}, "android": {"type": "boolean"}, "kvm": {"type": "boolean"},
-            "freeDiskBytes": {"type": "integer", "minimum": 0}
+            "download": {
+              "type": "boolean"
+            },
+            "android": {
+              "type": "boolean"
+            },
+            "kvm": {
+              "type": "boolean"
+            },
+            "freeDiskBytes": {
+              "type": "integer",
+              "minimum": 0
+            }
           }
         },
-        "currentDelivery": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/currentDelivery"}]}
+        "currentDelivery": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/currentDelivery"
+            }
+          ]
+        },
+        "report": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "ubuntu",
+            "arch",
+            "memoryKiB",
+            "freeDiskBytes",
+            "kvm",
+            "sudo",
+            "markerPresent",
+            "android",
+            "download",
+            "versions",
+            "errors"
+          ],
+          "properties": {
+            "ubuntu": {
+              "type": "string",
+              "maxLength": 32
+            },
+            "arch": {
+              "type": "string",
+              "maxLength": 32
+            },
+            "memoryKiB": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "freeDiskBytes": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "kvm": {
+              "type": "boolean"
+            },
+            "sudo": {
+              "type": "boolean"
+            },
+            "markerPresent": {
+              "type": "boolean"
+            },
+            "android": {
+              "type": "boolean"
+            },
+            "download": {
+              "type": "boolean"
+            },
+            "versions": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "node": {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                "adb": {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                "emulator": {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                "appium": {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                "playwright": {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                "systemImage": {
+                  "type": "string",
+                  "maxLength": 100
+                }
+              }
+            },
+            "errors": {
+              "type": "array",
+              "maxItems": 20,
+              "items": {
+                "enum": [
+                  "NO_KVM",
+                  "DISK_LOW",
+                  "UNSUPPORTED_OS",
+                  "UNSUPPORTED_ARCH",
+                  "SUDO_REQUIRED",
+                  "ANDROID_NOT_READY",
+                  "INSTALL_IN_PROGRESS"
+                ]
+              }
+            }
+          }
+        }
       }
     },
     "claim": {
-      "type": "object", "additionalProperties": false,
+      "type": "object",
+      "additionalProperties": false,
       "required": ["kind", "protocolVersion", "nodeId", "bootId"],
       "properties": {
-        "kind": {"const": "claim"}, "protocolVersion": {"const": "1.0"},
-        "nodeId": {"$ref": "#/$defs/uuid"}, "bootId": {"$ref": "#/$defs/uuid"}
+        "kind": {
+          "const": "claim"
+        },
+        "protocolVersion": {
+          "const": "1.0"
+        },
+        "nodeId": {
+          "$ref": "#/$defs/uuid"
+        },
+        "bootId": {
+          "$ref": "#/$defs/uuid"
+        }
       }
     },
     "delivery": {
-      "type": "object", "additionalProperties": false,
-      "required": ["kind", "protocolVersion", "nodeId", "deliveryId", "runId", "fence", "configVersionId", "configHash", "releaseId", "issuedAt", "ackDeadline", "leaseExpiresAt"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "protocolVersion",
+        "nodeId",
+        "deliveryId",
+        "runId",
+        "fence",
+        "configVersionId",
+        "configHash",
+        "releaseId",
+        "issuedAt",
+        "ackDeadline",
+        "leaseExpiresAt"
+      ],
       "properties": {
-        "kind": {"const": "delivery"}, "protocolVersion": {"const": "1.0"},
-        "nodeId": {"$ref": "#/$defs/uuid"}, "deliveryId": {"$ref": "#/$defs/uuid"}, "runId": {"$ref": "#/$defs/uuid"},
-        "fence": {"type": "integer", "minimum": 1},
-        "configVersionId": {"$ref": "#/$defs/uuid"}, "configHash": {"$ref": "#/$defs/hash"},
-        "releaseId": {"$ref": "#/$defs/uuid"}, "issuedAt": {"$ref": "#/$defs/time"},
-        "ackDeadline": {"$ref": "#/$defs/time"}, "leaseExpiresAt": {"$ref": "#/$defs/time"}
+        "kind": {
+          "const": "delivery"
+        },
+        "protocolVersion": {
+          "const": "1.0"
+        },
+        "nodeId": {
+          "$ref": "#/$defs/uuid"
+        },
+        "deliveryId": {
+          "$ref": "#/$defs/uuid"
+        },
+        "runId": {
+          "$ref": "#/$defs/uuid"
+        },
+        "fence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "configVersionId": {
+          "$ref": "#/$defs/uuid"
+        },
+        "configHash": {
+          "$ref": "#/$defs/hash"
+        },
+        "releaseId": {
+          "$ref": "#/$defs/uuid"
+        },
+        "issuedAt": {
+          "$ref": "#/$defs/time"
+        },
+        "ackDeadline": {
+          "$ref": "#/$defs/time"
+        },
+        "leaseExpiresAt": {
+          "$ref": "#/$defs/time"
+        }
       }
     },
     "accept": {
-      "type": "object", "additionalProperties": false,
+      "type": "object",
+      "additionalProperties": false,
       "required": ["kind", "protocolVersion", "nodeId", "bootId", "deliveryId", "fence"],
       "properties": {
-        "kind": {"const": "accept"}, "protocolVersion": {"const": "1.0"},
-        "nodeId": {"$ref": "#/$defs/uuid"}, "bootId": {"$ref": "#/$defs/uuid"},
-        "deliveryId": {"$ref": "#/$defs/uuid"}, "fence": {"type": "integer", "minimum": 1}
+        "kind": {
+          "const": "accept"
+        },
+        "protocolVersion": {
+          "const": "1.0"
+        },
+        "nodeId": {
+          "$ref": "#/$defs/uuid"
+        },
+        "bootId": {
+          "$ref": "#/$defs/uuid"
+        },
+        "deliveryId": {
+          "$ref": "#/$defs/uuid"
+        },
+        "fence": {
+          "type": "integer",
+          "minimum": 1
+        }
       }
     },
     "events": {
-      "type": "object", "additionalProperties": false,
+      "type": "object",
+      "additionalProperties": false,
       "required": ["kind", "protocolVersion", "nodeId", "deliveryId", "fence", "events"],
       "properties": {
-        "kind": {"const": "events"}, "protocolVersion": {"const": "1.0"},
-        "nodeId": {"$ref": "#/$defs/uuid"}, "deliveryId": {"$ref": "#/$defs/uuid"},
-        "fence": {"type": "integer", "minimum": 1},
-        "events": {"type": "array", "minItems": 1, "maxItems": 100, "items": {"$ref": "#/$defs/event"}}
+        "kind": {
+          "const": "events"
+        },
+        "protocolVersion": {
+          "const": "1.0"
+        },
+        "nodeId": {
+          "$ref": "#/$defs/uuid"
+        },
+        "deliveryId": {
+          "$ref": "#/$defs/uuid"
+        },
+        "fence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "events": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "items": {
+            "$ref": "#/$defs/event"
+          }
+        }
       }
     },
     "account": {
-      "type": "object", "additionalProperties": false,
-      "required": ["kind", "protocolVersion", "nodeId", "deliveryId", "fence", "taskId", "accountRef", "username", "password"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "protocolVersion",
+        "nodeId",
+        "deliveryId",
+        "fence",
+        "taskId",
+        "accountRef",
+        "username",
+        "password"
+      ],
       "properties": {
-        "kind": {"const": "account"}, "protocolVersion": {"const": "1.0"},
-        "nodeId": {"$ref": "#/$defs/uuid"}, "deliveryId": {"$ref": "#/$defs/uuid"},
-        "fence": {"type": "integer", "minimum": 1}, "taskId": {"$ref": "#/$defs/uuid"},
-        "accountRef": {"$ref": "#/$defs/uuid"},
-        "username": {"type": "string", "pattern": "^[a-zA-Z]{6,10}$"},
-        "password": {"type": "string", "minLength": 8, "maxLength": 12, "pattern": "^(?=.*[a-zA-Z])(?=.*[0-9])[a-zA-Z0-9]+$"}
+        "kind": {
+          "const": "account"
+        },
+        "protocolVersion": {
+          "const": "1.0"
+        },
+        "nodeId": {
+          "$ref": "#/$defs/uuid"
+        },
+        "deliveryId": {
+          "$ref": "#/$defs/uuid"
+        },
+        "fence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "taskId": {
+          "$ref": "#/$defs/uuid"
+        },
+        "accountRef": {
+          "$ref": "#/$defs/uuid"
+        },
+        "username": {
+          "type": "string",
+          "pattern": "^[a-zA-Z]{6,10}$"
+        },
+        "password": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 12,
+          "pattern": "^(?=.*[a-zA-Z])(?=.*[0-9])[a-zA-Z0-9]+$"
+        }
       }
     },
     "event": {
-      "type": "object", "additionalProperties": false,
+      "type": "object",
+      "additionalProperties": false,
       "required": ["eventId", "runId", "sequence", "occurredAt", "type", "payload"],
       "properties": {
-        "eventId": {"$ref": "#/$defs/uuid"}, "runId": {"$ref": "#/$defs/uuid"}, "taskId": {"$ref": "#/$defs/uuid"},
-        "sequence": {"type": "integer", "minimum": 1}, "occurredAt": {"$ref": "#/$defs/time"},
-        "type": {"enum": ["RUN_STARTED", "TARGETS_DISCOVERED", "TASK_STAGE", "SUBMISSION_INTENT", "TASK_FINISHED", "RUN_FINISHED", "STOP_ACK", "LOG"]},
-        "payload": {"type": "object"}
+        "eventId": {
+          "$ref": "#/$defs/uuid"
+        },
+        "runId": {
+          "$ref": "#/$defs/uuid"
+        },
+        "taskId": {
+          "$ref": "#/$defs/uuid"
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "occurredAt": {
+          "$ref": "#/$defs/time"
+        },
+        "type": {
+          "enum": [
+            "RUN_STARTED",
+            "TARGETS_DISCOVERED",
+            "TASK_STAGE",
+            "SUBMISSION_INTENT",
+            "TASK_FINISHED",
+            "RUN_FINISHED",
+            "STOP_ACK",
+            "LOG"
+          ]
+        },
+        "payload": {
+          "type": "object"
+        }
       },
       "allOf": [
-        {"if": {"properties": {"type": {"const": "RUN_STARTED"}}, "required": ["type"]}, "then": {"properties": {"payload": {"$ref": "#/$defs/runStarted"}}}},
-        {"if": {"properties": {"type": {"const": "TARGETS_DISCOVERED"}}, "required": ["type"]}, "then": {"properties": {"payload": {"$ref": "#/$defs/targets"}}}},
-        {"if": {"properties": {"type": {"const": "TASK_STAGE"}}, "required": ["type"]}, "then": {"required": ["taskId"], "properties": {"payload": {"$ref": "#/$defs/taskStage"}}}},
-        {"if": {"properties": {"type": {"const": "SUBMISSION_INTENT"}}, "required": ["type"]}, "then": {"required": ["taskId"], "properties": {"payload": {"$ref": "#/$defs/submission"}}}},
-        {"if": {"properties": {"type": {"const": "TASK_FINISHED"}}, "required": ["type"]}, "then": {"required": ["taskId"], "properties": {"payload": {"$ref": "#/$defs/taskFinished"}}}},
-        {"if": {"properties": {"type": {"const": "RUN_FINISHED"}}, "required": ["type"]}, "then": {"properties": {"payload": {"$ref": "#/$defs/runFinished"}}}},
-        {"if": {"properties": {"type": {"const": "STOP_ACK"}}, "required": ["type"]}, "then": {"properties": {"payload": {"$ref": "#/$defs/stopAck"}}}},
-        {"if": {"properties": {"type": {"const": "LOG"}}, "required": ["type"]}, "then": {"properties": {"payload": {"$ref": "#/$defs/log"}}}}
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "RUN_STARTED"
+              }
+            },
+            "required": ["type"]
+          },
+          "then": {
+            "properties": {
+              "payload": {
+                "$ref": "#/$defs/runStarted"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "TARGETS_DISCOVERED"
+              }
+            },
+            "required": ["type"]
+          },
+          "then": {
+            "properties": {
+              "payload": {
+                "$ref": "#/$defs/targets"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "TASK_STAGE"
+              }
+            },
+            "required": ["type"]
+          },
+          "then": {
+            "required": ["taskId"],
+            "properties": {
+              "payload": {
+                "$ref": "#/$defs/taskStage"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "SUBMISSION_INTENT"
+              }
+            },
+            "required": ["type"]
+          },
+          "then": {
+            "required": ["taskId"],
+            "properties": {
+              "payload": {
+                "$ref": "#/$defs/submission"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "TASK_FINISHED"
+              }
+            },
+            "required": ["type"]
+          },
+          "then": {
+            "required": ["taskId"],
+            "properties": {
+              "payload": {
+                "$ref": "#/$defs/taskFinished"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "RUN_FINISHED"
+              }
+            },
+            "required": ["type"]
+          },
+          "then": {
+            "properties": {
+              "payload": {
+                "$ref": "#/$defs/runFinished"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "STOP_ACK"
+              }
+            },
+            "required": ["type"]
+          },
+          "then": {
+            "properties": {
+              "payload": {
+                "$ref": "#/$defs/stopAck"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "LOG"
+              }
+            },
+            "required": ["type"]
+          },
+          "then": {
+            "properties": {
+              "payload": {
+                "$ref": "#/$defs/log"
+              }
+            }
+          }
+        }
       ]
     },
     "runStarted": {
-      "type": "object", "additionalProperties": false,
+      "type": "object",
+      "additionalProperties": false,
       "required": ["configHash", "releaseId"],
-      "properties": {"configHash": {"$ref": "#/$defs/hash"}, "releaseId": {"$ref": "#/$defs/uuid"}}
+      "properties": {
+        "configHash": {
+          "$ref": "#/$defs/hash"
+        },
+        "releaseId": {
+          "$ref": "#/$defs/uuid"
+        }
+      }
     },
     "targets": {
-      "type": "object", "additionalProperties": false, "required": ["targets"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["targets"],
       "properties": {
-        "targets": {"type": "array", "maxItems": 1000, "items": {
-          "type": "object", "additionalProperties": false, "required": ["taskId", "targetKey", "label", "sourceUrl"],
-          "properties": {
-            "taskId": {"$ref": "#/$defs/uuid"}, "targetKey": {"$ref": "#/$defs/hash"},
-            "label": {"type": "string", "maxLength": 200},
-            "sourceUrl": {"type": "string", "format": "uri", "pattern": "^https?://", "maxLength": 4096}
+        "targets": {
+          "type": "array",
+          "maxItems": 1000,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["taskId", "targetKey", "label", "sourceUrl"],
+            "properties": {
+              "taskId": {
+                "$ref": "#/$defs/uuid"
+              },
+              "targetKey": {
+                "$ref": "#/$defs/hash"
+              },
+              "label": {
+                "type": "string",
+                "maxLength": 200
+              },
+              "sourceUrl": {
+                "type": "string",
+                "format": "uri",
+                "pattern": "^https?://",
+                "maxLength": 4096
+              }
+            }
           }
-        }}
+        }
       }
     },
     "taskStage": {
-      "type": "object", "additionalProperties": false, "required": ["stage"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stage"],
       "properties": {
-        "stage": {"enum": ["QUEUED", "DOWNLOADING", "DOWNLOADED", "PREPARING", "INSTALLING", "LAUNCHING", "REGISTERING", "VERIFYING"]},
-        "cacheHit": {"type": "boolean"},
-        "packageName": {"type": "string", "maxLength": 256}, "apkSha256": {"$ref": "#/$defs/hash"},
-        "deviceProfileId": {"type": "string", "maxLength": 64}
+        "stage": {
+          "enum": [
+            "QUEUED",
+            "DOWNLOADING",
+            "DOWNLOADED",
+            "PREPARING",
+            "INSTALLING",
+            "LAUNCHING",
+            "REGISTERING",
+            "VERIFYING"
+          ]
+        },
+        "cacheHit": {
+          "type": "boolean"
+        },
+        "packageName": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "apkSha256": {
+          "$ref": "#/$defs/hash"
+        },
+        "deviceProfileId": {
+          "type": "string",
+          "maxLength": 64
+        }
       }
     },
     "submission": {
-      "type": "object", "additionalProperties": false, "required": ["submissionId", "accountRef"],
-      "properties": {"submissionId": {"$ref": "#/$defs/uuid"}, "accountRef": {"$ref": "#/$defs/uuid"}}
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["submissionId", "accountRef"],
+      "properties": {
+        "submissionId": {
+          "$ref": "#/$defs/uuid"
+        },
+        "accountRef": {
+          "$ref": "#/$defs/uuid"
+        }
+      }
     },
     "taskFinished": {
-      "type": "object", "additionalProperties": false, "required": ["status", "proof", "artifactIds"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "proof", "artifactIds"],
       "properties": {
-        "status": {"enum": ["SUCCEEDED", "FAILED", "SKIPPED", "CANCELLED", "UNKNOWN"]},
-        "proof": {"enum": ["APP_UI", "FILE_VALIDATION", "NONE"]},
-        "artifactIds": {"type": "array", "maxItems": 100, "uniqueItems": true, "items": {"$ref": "#/$defs/uuid"}},
-        "accountRef": {"$ref": "#/$defs/uuid"}, "errorCode": {"type": "string", "pattern": "^[A-Z_]+$", "maxLength": 100}
+        "status": {
+          "enum": ["SUCCEEDED", "FAILED", "SKIPPED", "CANCELLED", "UNKNOWN"]
+        },
+        "proof": {
+          "enum": ["APP_UI", "FILE_VALIDATION", "NONE"]
+        },
+        "artifactIds": {
+          "type": "array",
+          "maxItems": 100,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/uuid"
+          }
+        },
+        "accountRef": {
+          "$ref": "#/$defs/uuid"
+        },
+        "errorCode": {
+          "type": "string",
+          "pattern": "^[A-Z_]+$",
+          "maxLength": 100
+        }
       },
       "allOf": [
-        {"if": {"properties": {"status": {"const": "SUCCEEDED"}}, "required": ["status"]}, "then": {"properties": {"proof": {"enum": ["APP_UI", "FILE_VALIDATION"]}}}},
-        {"if": {"properties": {"proof": {"const": "APP_UI"}}, "required": ["proof"]}, "then": {"required": ["accountRef"], "properties": {"artifactIds": {"type": "array", "minItems": 1}}}}
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "SUCCEEDED"
+              }
+            },
+            "required": ["status"]
+          },
+          "then": {
+            "properties": {
+              "proof": {
+                "enum": ["APP_UI", "FILE_VALIDATION"]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "proof": {
+                "const": "APP_UI"
+              }
+            },
+            "required": ["proof"]
+          },
+          "then": {
+            "required": ["accountRef"],
+            "properties": {
+              "artifactIds": {
+                "type": "array",
+                "minItems": 1
+              }
+            }
+          }
+        }
       ]
     },
     "runFinished": {
-      "type": "object", "additionalProperties": false, "required": ["status"],
-      "properties": {"status": {"enum": ["SUCCEEDED", "PARTIAL_FAILED", "FAILED", "CANCELLED", "NEEDS_REVIEW"]}}
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": {
+          "enum": ["SUCCEEDED", "PARTIAL_FAILED", "FAILED", "CANCELLED", "NEEDS_REVIEW"]
+        }
+      }
     },
     "stopAck": {
-      "type": "object", "additionalProperties": false, "required": ["cleanupComplete"],
-      "properties": {"cleanupComplete": {"type": "boolean"}}
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cleanupComplete"],
+      "properties": {
+        "cleanupComplete": {
+          "type": "boolean"
+        }
+      }
     },
     "log": {
-      "type": "object", "additionalProperties": false, "required": ["level", "message"],
-      "properties": {"level": {"enum": ["INFO", "WARN", "ERROR"]}, "message": {"type": "string", "maxLength": 4000}}
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["level", "message"],
+      "properties": {
+        "level": {
+          "enum": ["INFO", "WARN", "ERROR"]
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 4000
+        }
+      }
     }
   }
 }

@@ -9,6 +9,11 @@ import { PATH_METADATA, METHOD_METADATA } from '@nestjs/common/constants.js';
 import { createApp } from '../apps/control-api/dist/app.js';
 import { initializeAdmin } from '../apps/control-api/dist/admin.js';
 import { AuthController, ConsoleController } from '../apps/control-api/dist/controllers.js';
+import {
+  NodesController,
+  DeploymentController,
+  AgentController,
+} from '../apps/control-api/dist/p1-controllers.js';
 import { settings } from '../apps/control-api/dist/settings.js';
 import { configurationIssues } from '@apk/contracts';
 
@@ -313,8 +318,15 @@ test('P0 real PostgreSQL acceptance', async (t) => {
     });
     await t.test('route implementation, manifest and generated OpenAPI agree', async () => {
       const manifest = JSON.parse(fs.readFileSync('contracts/p0.http.json', 'utf8'));
+      manifest.routes.push(...JSON.parse(fs.readFileSync('contracts/p1.http.json', 'utf8')).routes);
       const actual = [];
-      for (const C of [AuthController, ConsoleController])
+      for (const C of [
+        AuthController,
+        ConsoleController,
+        NodesController,
+        DeploymentController,
+        AgentController,
+      ])
         for (const key of Object.getOwnPropertyNames(C.prototype)) {
           const handler = C.prototype[key];
           if (typeof handler !== 'function' || !Reflect.hasMetadata(METHOD_METADATA, handler))
@@ -327,6 +339,8 @@ test('P0 real PostgreSQL acceptance', async (t) => {
                 .join('/'),
           );
         }
+      for (let i = 0; i < actual.length; i++)
+        actual[i] = actual[i].replace(/:([a-zA-Z]+)/g, '{$1}');
       assert.deepEqual(actual.sort(), manifest.routes.map((r) => r.method + ' ' + r.path).sort());
       const spec = JSON.parse(fs.readFileSync('contracts/openapi.json', 'utf8'));
       assert.deepEqual(

@@ -1,0 +1,53 @@
+---
+- name: Activate and register pinned Agent
+  hosts: target
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Create traversable protected identities parent
+      ansible.builtin.file:
+        path: /var/lib/apk-platform/identities
+        state: directory
+        owner: root
+        mode: '0755'
+    - name: Create per-deployment identity directory
+      ansible.builtin.file:
+        path: '/var/lib/apk-platform/identities/{{ deployment_id }}'
+        state: directory
+        owner: apk-runner
+        mode: '0700'
+    - name: Install protected Agent configuration
+      ansible.builtin.copy:
+        dest: /var/lib/apk-platform/agent-config.json
+        content: '{{ agent_config | to_json }}'
+        owner: apk-runner
+        mode: '0600'
+      no_log: true
+    - name: Select installed release
+      ansible.builtin.file:
+        src: '/opt/apk-platform/releases/{{ release_id }}'
+        dest: /opt/apk-platform/current
+        state: link
+        force: true
+    - name: Record node ownership
+      ansible.builtin.copy:
+        dest: /var/lib/apk-platform/node-id
+        content: '{{ agent_config.nodeId }}'
+        owner: root
+        mode: '0644'
+    - name: Install Agent service
+      ansible.builtin.template:
+        src: apk-agent.service.j2
+        dest: /etc/systemd/system/apk-agent.service
+        mode: '0644'
+    - name: Start isolated Agent
+      ansible.builtin.systemd_service:
+        daemon_reload: true
+        name: apk-agent
+        enabled: true
+        state: restarted
+    - name: Clear successful installation marker
+      ansible.builtin.file:
+        path: '{{ item }}'
+        state: absent
+      loop: [/var/lib/apk-platform/install.lock, /var/lib/apk-platform/install.lock.d]

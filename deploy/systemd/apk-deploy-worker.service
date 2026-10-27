@@ -1,0 +1,21 @@
+[Unit]
+Description=APK platform deployment worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=apk-hub
+Group=apk-hub
+WorkingDirectory=/opt/apk-platform-hub
+Environment=PATH=/opt/apk-platform-hub/.venv-deploy/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/node --env-file=data/keys/worker.env --env-file=data/keys/worker-url.env apps/deploy-worker/dist/main.js
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=90
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

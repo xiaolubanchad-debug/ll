@@ -1,6 +1,7 @@
-import { randomBytes, randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID, generateKeyPairSync } from 'node:crypto';
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
@@ -117,7 +118,24 @@ try {
     APP_ORIGIN: `http://127.0.0.1:${await freePort()}`,
     SESSION_CSRF_KEY: randomBytes(32).toString('base64'),
     P0_TEST_PASSWORD: randomBytes(20).toString('base64url'),
+    MASTER_KEY_FILE: join(dir, 'master.key'),
+    RELEASE_PUBLIC_KEY_FILE: join(dir, 'release-public.key'),
+    RELEASE_DIR: join(dir, 'releases'),
+    P1_TEST_DIR: dir,
   };
+  const keys = generateKeyPairSync('ed25519');
+  await writeFile(env.MASTER_KEY_FILE, randomBytes(32), { mode: 0o600 });
+  await writeFile(
+    env.RELEASE_PUBLIC_KEY_FILE,
+    keys.publicKey.export({ type: 'spki', format: 'pem' }),
+    { mode: 0o600 },
+  );
+  await writeFile(
+    join(dir, 'release-private.key'),
+    keys.privateKey.export({ type: 'pkcs8', format: 'pem' }),
+    { mode: 0o600 },
+  );
+  await mkdir(env.RELEASE_DIR);
   await run(
     [
       'node_modules/prisma/build/index.js',
@@ -142,6 +160,7 @@ try {
   const version = await db.$queryRawUnsafe('SHOW server_version');
   console.log('Real PostgreSQL version:', version[0].server_version);
   await run(['--test', '--test-concurrency=1', 'tests/api.test.mjs'], env);
+  await run(['--test', '--test-concurrency=1', 'tests/p1.test.mjs'], env);
   const { initializeAdmin } = await import('../apps/control-api/dist/admin.js');
   const { passwordHash } = await import('../apps/control-api/dist/auth.js');
   const admin = await db.admin.findFirst();
@@ -169,7 +188,7 @@ try {
   );
   await waitFor(env.APP_ORIGIN, ui);
   await run(['--test', 'tests/web.test.mjs'], { ...env, P0_SCREENSHOT_DIR: dir });
-  console.log('P0 integration and browser tests passed.');
+  console.log('P0/P1 integration and browser tests passed (remote installer simulated).');
 } catch (error) {
   console.error(error instanceof Error ? error.message : 'P0 tests failed');
   process.exitCode = 1;

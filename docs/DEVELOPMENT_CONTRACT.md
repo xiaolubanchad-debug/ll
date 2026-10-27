@@ -1,18 +1,18 @@
 # 开发契约
 
-版本 1.0.1，日期 2026 年 10 月 27 日。MUST 表示发布必须满足，SHOULD 表示偏离时必须记录原因，MAY 表示可选。P0 实现范围见 P0_SETUP.md；其他阶段的契约不表示已完成能力。
+版本 1.1.0，日期 2026 年 10 月 27 日。MUST 表示发布必须满足，SHOULD 表示偏离时必须记录原因，MAY 表示可选。P0 实现范围见 P0_SETUP.md；P1 增量行为由 [P1_CONTRACT.md](P1_CONTRACT.md) 细化，安装验证边界见 [P1_SETUP.md](P1_SETUP.md)。其他阶段的契约不表示已完成能力。
 
 ## 契约权威与变更
 
 优先级为用户最新明确要求、带版本的本契约与接口契约、JSON Schema、实施方案、实现代码。发现相互冲突必须在同一变更中修正，不允许通过实现悄悄改变接口含义。
 
-contracts/ 下的 JSON Schema 是线上数据结构校验来源，HTTP_API.md 定义路由和行为。P0 从这些结构及 p0.http.json 生成共享 TypeScript 类型、静态校验器与 OpenAPI，并纳入漂移检查。类型生成对 if/then/else 只表达结构，跨字段约束由公共运行时校验器负责，不能仅依赖 TypeScript 编译来验证外部请求。
+contracts/ 下的 JSON Schema 是线上数据结构校验来源，HTTP_API.md 定义路由和行为。从这些结构及 p0.http.json、p1.http.json 生成共享 TypeScript 类型、静态校验器与 OpenAPI，并纳入漂移检查。类型生成对 if/then/else 只表达结构，跨字段约束由公共运行时校验器负责，不能仅依赖 TypeScript 编译来验证外部请求。
 
 接口前缀为 /api/v1，节点协议 protocolVersion 为 1.0，配置 schemaVersion 为 1.0。新增可选字段必须保留默认行为；改变必填项、字段类型、状态含义、重试或提交规则属于破坏性变更，必须升级契约版本并提供迁移及兼容测试。不兼容节点拒绝接收任务，界面显示需升级。
 
 ## 模块与进程边界
 
-1. web 只能调用 control-api。页面不持有 SSH 私钥、数据库密码或节点令牌，不直接连接服务器。
+1. web 只能调用 control-api。页面仅在管理员上传时短暂持有 SSH 凭据，保存或退出表单后清除；不持久保存凭据，不接收已保存秘密的明文，不持有数据库密码或节点令牌，不直接连接服务器。
 2. control-api 接受管理及节点业务请求；deploy-worker 使用受限数据库账号领取部署任务和写入部署事件。两者的状态更新通过共享领域服务及事务规则完成，不能各写一套规则。Agent 无中台数据库访问权限。
 3. deploy-worker 只执行固定发布的 Playbook。不得把 URL、XPath、标签或凭据拼接成 Shell，不提供任意远程命令接口。
 4. agent 通过 HTTPS 调用中台，不能访问中台数据库。automation 包只接受已验证的任务输入，通过回调输出事件，不读取管理端会话和 SSH 凭据。

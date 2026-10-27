@@ -3,6 +3,7 @@ dist/
 **/dist/
 .tmp/
 .venv/
+.venv-deploy/
 archive/
 **/generated/
 package-lock.json

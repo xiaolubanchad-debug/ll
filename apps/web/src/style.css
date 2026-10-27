@@ -489,3 +489,95 @@ button:focus-visible {
 .validation-result.validation-error {
   color: #b94a40;
 }
+.server-toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: flex-start;
+}
+.server-facts {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: #6d8074;
+  margin: 18px 0;
+}
+.fingerprint {
+  font:
+    12px/1.8 Consolas,
+    monospace;
+  overflow-wrap: anywhere;
+  color: #476957;
+}
+.trust-panel,
+.deploy-panel,
+.inspection {
+  border-top: 1px solid #e7ede9;
+  margin-top: 25px;
+  padding-top: 20px;
+}
+.trust-button {
+  margin-top: 16px;
+}
+.secret-editor {
+  width: 100%;
+  min-height: 100px;
+  border: 1px solid #dce2eb;
+  border-radius: 7px;
+  padding: 12px;
+  font:
+    12px/1.6 Consolas,
+    monospace;
+}
+.server-manager select {
+  width: 100%;
+  max-width: 600px;
+  border: 1px solid #dce2eb;
+  border-radius: 7px;
+  padding: 10px;
+  color: #40566a;
+  background: #fff;
+}
+.license-label {
+  font-weight: 400;
+  line-height: 1.8;
+}
+.license-label a {
+  color: #326b58;
+}
+.archive-details {
+  margin-top: 28px;
+}
+.archive-details summary {
+  color: #8b6970;
+  font-size: 12px;
+}
+.operation-events {
+  font-size: 13px;
+  line-height: 2;
+  color: #5d7368;
+}
+.inspection p {
+  font-size: 13px;
+}
+summary {
+  cursor: pointer;
+}
+h3 {
+  font-size: 15px;
+}
+@media (max-width: 640px) {
+  .server-toolbar {
+    flex-direction: column;
+  }
+  .server-manager .form-actions {
+    align-items: stretch;
+  }
+  .server-facts {
+    gap: 10px;
+  }
+  .server-manager .el-table {
+    font-size: 11px;
+  }
+}

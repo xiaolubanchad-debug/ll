@@ -1,0 +1,291 @@
+---
+- name: Install pinned APK execution environment
+  hosts: target
+  gather_facts: true
+  become: true
+  vars:
+    runtime_root: /opt/apk-platform/runtime
+    runtime_dir: '/opt/apk-platform/runtime/{{ toolchain.nodeSha256 }}'
+    tool_root: '/opt/apk-platform/toolchains/{{ toolchain_hash }}'
+    sdk_root: '{{ tool_root }}/android'
+    tools_root: '{{ tool_root }}/tools'
+    release_root: '/opt/apk-platform/releases/{{ release_id }}'
+  tasks:
+    - name: Verify Ubuntu platform
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.distribution == 'Ubuntu'
+          - ansible_facts.distribution_version == '24.04'
+          - ansible_facts.architecture == 'x86_64'
+        fail_msg: UNSUPPORTED_OS
+    - name: Check KVM device
+      ansible.builtin.stat:
+        path: /dev/kvm
+      register: kvm_device
+    - name: Require KVM
+      ansible.builtin.assert:
+        that: kvm_device.stat.exists
+        fail_msg: NO_KVM
+    - name: Create protected data directory
+      ansible.builtin.file:
+        path: /var/lib/apk-platform
+        state: directory
+        owner: root
+        mode: '0755'
+    - name: Acquire remote installation lock
+      ansible.builtin.command:
+        argv: [/usr/bin/mkdir, /var/lib/apk-platform/install.lock.d]
+      changed_when: true
+    - name: Record installation owner
+      ansible.builtin.copy:
+        dest: /var/lib/apk-platform/install.lock
+        content: "{{ deployment_id }}\n"
+        mode: '0600'
+    - name: Discover existing service
+      ansible.builtin.service_facts:
+    - name: Stop previous Agent before changing its runtime
+      ansible.builtin.systemd_service:
+        name: apk-agent
+        state: stopped
+      when: "'apk-agent.service' in ansible_facts.services"
+    - name: Install system prerequisites
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+        name:
+          [
+            ca-certificates,
+            acl,
+            curl,
+            unzip,
+            xz-utils,
+            openjdk-17-jre-headless,
+            libnss3,
+            libx11-6,
+            libxcb1,
+            libxcomposite1,
+            libxcursor1,
+            libxi6,
+            libxtst6,
+            libasound2t64,
+            libxrandr2,
+            libglu1-mesa,
+            libgbm1,
+            libpulse0,
+          ]
+        state: present
+    - name: Ensure KVM group
+      ansible.builtin.group:
+        name: kvm
+        state: present
+    - name: Create isolated Agent user
+      ansible.builtin.user:
+        name: apk-runner
+        system: true
+        create_home: true
+        home: /var/lib/apk-platform/home
+        groups: [kvm]
+        append: true
+        shell: /usr/sbin/nologin
+    - name: Create versioned runtime directories
+      ansible.builtin.file:
+        path: '{{ item }}'
+        state: directory
+        owner: root
+        mode: '0755'
+      loop:
+        [
+          '{{ runtime_dir }}',
+          '{{ release_root }}',
+          '{{ sdk_root }}',
+          '{{ sdk_root }}/cmdline-tools/archive',
+          '{{ sdk_root }}/system-images/android-35/google_apis',
+        ]
+    - name: Download pinned Node archive
+      ansible.builtin.get_url:
+        url: '{{ toolchain.nodeUrl }}'
+        dest: '{{ runtime_dir }}/node.tar.xz'
+        checksum: 'sha256:{{ toolchain.nodeSha256 }}'
+        mode: '0644'
+    - name: Extract pinned Node
+      ansible.builtin.unarchive:
+        src: '{{ runtime_dir }}/node.tar.xz'
+        dest: '{{ runtime_dir }}'
+        remote_src: true
+        creates: '{{ runtime_dir }}/node-v{{ toolchain.nodeVersion }}-linux-x64/bin/node'
+    - name: Select Node runtime
+      ansible.builtin.file:
+        src: '{{ runtime_dir }}/node-v{{ toolchain.nodeVersion }}-linux-x64'
+        dest: '{{ runtime_root }}/node'
+        state: link
+        force: true
+    - name: Copy signed Agent archive
+      ansible.builtin.copy:
+        src: agent.tgz
+        dest: '{{ release_root }}/agent.tgz'
+        mode: '0644'
+    - name: Verify Agent bytes on the server
+      ansible.builtin.stat:
+        path: '{{ release_root }}/agent.tgz'
+        checksum_algorithm: sha256
+      register: agent_archive
+    - name: Require expected Agent checksum
+      ansible.builtin.assert:
+        that: agent_archive.stat.checksum == artifact_sha256
+        fail_msg: RELEASE_INVALID
+    - name: Extract Agent and npm lock
+      ansible.builtin.unarchive:
+        src: '{{ release_root }}/agent.tgz'
+        dest: '{{ release_root }}'
+        remote_src: true
+        creates: '{{ release_root }}/agent.js'
+    - name: Verify frozen npm lock on server
+      ansible.builtin.stat:
+        path: '{{ release_root }}/npm/package-lock.json'
+        checksum_algorithm: sha256
+      register: npm_lock
+    - name: Require expected npm lock checksum
+      ansible.builtin.assert:
+        that: npm_lock.stat.checksum == toolchain.npmLockSha256
+        fail_msg: TOOLCHAIN_MISMATCH
+    - name: Download pinned Android archives
+      ansible.builtin.get_url:
+        url: '{{ item.url }}'
+        dest: '{{ tool_root }}/{{ item.role }}.zip'
+        checksum: '{{ item.checksum }}'
+        mode: '0644'
+      loop: '{{ toolchain.archives }}'
+    - name: Extract pinned Android packages
+      ansible.builtin.unarchive:
+        src: '{{ tool_root }}/{{ item.role }}.zip'
+        dest: "{{ sdk_root + '/cmdline-tools/archive' if item.role == 'cmdlineTools' else sdk_root + '/system-images/android-35/google_apis' if item.role == 'systemImage' else sdk_root }}"
+        remote_src: true
+        creates: '{{ tool_root }}/.extracted-{{ item.role }}'
+      loop: '{{ toolchain.archives }}'
+    - name: Mark extracted immutable archives
+      ansible.builtin.copy:
+        dest: '{{ tool_root }}/.extracted-{{ item.role }}'
+        content: '{{ item.checksum }}'
+        mode: '0644'
+      loop: '{{ toolchain.archives }}'
+    - name: Select command line tools
+      ansible.builtin.file:
+        src: '{{ sdk_root }}/cmdline-tools/archive/cmdline-tools'
+        dest: '{{ sdk_root }}/cmdline-tools/current'
+        state: link
+    - name: Create tools directory owned by Agent
+      ansible.builtin.file:
+        path: '{{ tools_root }}'
+        state: directory
+        owner: apk-runner
+        mode: '0755'
+    - name: Copy frozen npm package metadata
+      ansible.builtin.copy:
+        src: '{{ release_root }}/npm/{{ item }}'
+        dest: '{{ tools_root }}/{{ item }}'
+        remote_src: true
+        owner: apk-runner
+        mode: '0644'
+      loop: [package.json, package-lock.json]
+    - name: Install locked automation tools without root permissions
+      become_user: apk-runner
+      ansible.builtin.command:
+        argv:
+          [
+            '{{ runtime_root }}/node/bin/node',
+            '{{ runtime_root }}/node/lib/node_modules/npm/bin/npm-cli.js',
+            ci,
+            --prefix,
+            '{{ tools_root }}',
+            --no-audit,
+            --no-fund,
+          ]
+        creates: '{{ tools_root }}/.npm-installed'
+      environment:
+        PATH: '{{ runtime_root }}/node/bin:/usr/bin:/bin'
+    - name: Mark npm install complete
+      ansible.builtin.copy:
+        dest: '{{ tools_root }}/.npm-installed'
+        content: '{{ release_id }}'
+        owner: apk-runner
+        mode: '0644'
+    - name: Install browser system dependencies
+      ansible.builtin.command:
+        argv:
+          [
+            '{{ runtime_root }}/node/bin/node',
+            '{{ tools_root }}/node_modules/playwright/cli.js',
+            install-deps,
+            chromium,
+          ]
+      changed_when: false
+    - name: Install pinned browser as isolated user
+      become_user: apk-runner
+      ansible.builtin.command:
+        argv:
+          [
+            '{{ runtime_root }}/node/bin/node',
+            '{{ tools_root }}/node_modules/playwright/cli.js',
+            install,
+            chromium,
+            --only-shell,
+          ]
+      environment:
+        PLAYWRIGHT_BROWSERS_PATH: '{{ tools_root }}/browsers'
+      changed_when: false
+    - name: Register locked local Appium driver
+      become_user: apk-runner
+      ansible.builtin.command:
+        argv:
+          [
+            '{{ runtime_root }}/node/bin/node',
+            '{{ tools_root }}/node_modules/appium/build/lib/main.js',
+            driver,
+            install,
+            --source=local,
+            '{{ tools_root }}/node_modules/appium-uiautomator2-driver',
+          ]
+        creates: '{{ tools_root }}/appium-home/.driver-installed'
+      environment:
+        PATH: '{{ runtime_root }}/node/bin:/usr/bin:/bin'
+        APPIUM_HOME: '{{ tools_root }}/appium-home'
+    - name: Mark driver registration complete
+      ansible.builtin.copy:
+        dest: '{{ tools_root }}/appium-home/.driver-installed'
+        content: '{{ toolchain.uiautomator2Version }}'
+        owner: apk-runner
+        mode: '0644'
+    - name: Accept licenses explicitly acknowledged by administrator
+      ansible.builtin.command:
+        argv:
+          [
+            '{{ sdk_root }}/cmdline-tools/current/bin/sdkmanager',
+            '--sdk_root={{ sdk_root }}',
+            --licenses,
+          ]
+        stdin: "y\ny\ny\ny\ny\ny\ny\ny\ny\ny\n"
+      environment:
+        JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+      changed_when: false
+      no_log: true
+    - name: Create health-check workspace
+      ansible.builtin.file:
+        path: /var/lib/apk-platform/health-check
+        state: directory
+        owner: apk-runner
+        mode: '0700'
+    - name: Boot a clean emulator and verify Android
+      become_user: apk-runner
+      ansible.builtin.command:
+        argv: ['{{ runtime_root }}/node/bin/node', '{{ release_root }}/boot-check.js']
+      environment:
+        ANDROID_HOME: '{{ sdk_root }}'
+        JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+      register: boot_check
+      changed_when: false
+    - name: Record actual Android boot proof
+      ansible.builtin.copy:
+        dest: /var/lib/apk-platform/health.json
+        content: "{{ {'releaseId': release_id, 'bootSucceeded': true} | to_json }}"
+        owner: root
+        mode: '0644'

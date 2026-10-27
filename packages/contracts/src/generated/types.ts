@@ -146,6 +146,1958 @@ export interface Heartbeat {
     freeDiskBytes: number;
   };
   currentDelivery: null | CurrentDelivery;
+  report?: {
+    ubuntu: string;
+    arch: string;
+    memoryKiB: number;
+    freeDiskBytes: number;
+    kvm: boolean;
+    sudo: boolean;
+    markerPresent: boolean;
+    android: boolean;
+    download: boolean;
+    versions: {
+      node?: string;
+      adb?: string;
+      emulator?: string;
+      appium?: string;
+      playwright?: string;
+      systemImage?: string;
+    };
+    /**
+     * @maxItems 20
+     */
+    errors:
+      | []
+      | [
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ]
+      | [
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          )
+        ]
+      | [
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          )
+        ]
+      | [
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          )
+        ]
+      | [
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          )
+        ]
+      | [
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          )
+        ]
+      | [
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          )
+        ]
+      | [
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          )
+        ]
+      | [
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          )
+        ]
+      | [
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          )
+        ]
+      | [
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          )
+        ]
+      | [
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          )
+        ]
+      | [
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          )
+        ]
+      | [
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          )
+        ]
+      | [
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          )
+        ]
+      | [
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          )
+        ]
+      | [
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          )
+        ]
+      | [
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          )
+        ]
+      | [
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          )
+        ]
+      | [
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          ),
+          (
+            | 'NO_KVM'
+            | 'DISK_LOW'
+            | 'UNSUPPORTED_OS'
+            | 'UNSUPPORTED_ARCH'
+            | 'SUDO_REQUIRED'
+            | 'ANDROID_NOT_READY'
+            | 'INSTALL_IN_PROGRESS'
+          )
+        ];
+  };
 }
 export interface CurrentDelivery {
   deliveryId: Uuid;
@@ -233,6 +2185,2073 @@ export interface PasswordChangeInput {
   newPassword: string;
 }
 
+export interface NodeInput {
+  name: string;
+  host: string;
+  port: number;
+  username: string;
+  credentialVersionId: string;
+  sudoCredentialVersionId?: string | null;
+}
+
+export interface SecretInput {
+  type: 'SSH_KEY' | 'SSH_PASSWORD' | 'SUDO_PASSWORD' | 'HTTP_PROXY';
+  secretValue: {
+    privateKey?: string;
+    passphrase?: string;
+    password?: string;
+    host?: string;
+    port?: number;
+    username?: string;
+  };
+}
+
+export interface HostKeyInput {
+  probeId: string;
+  expectedFingerprint: string;
+}
+
+export interface DeploymentInput {
+  nodeId: string;
+  releaseId: string;
+  licenseAccepted: true;
+}
+
+export interface ReasonInput {
+  reason: string;
+}
+
+export interface ReconcileInput {
+  checkId: string;
+  reason: string;
+}
+
+export interface ReleaseInput {
+  id: string;
+  gitCommit: string;
+  agentVersion: string;
+  protocolVersion: '1.0';
+  artifactName: string;
+  sha256: string;
+  playbookSha256: string;
+  signature: string;
+  toolchain: {
+    nodeVersion: '24.18.0';
+    nodeUrl: 'https://nodejs.org/dist/v24.18.0/node-v24.18.0-linux-x64.tar.xz';
+    nodeSha256: string;
+    playwrightVersion: string;
+    appiumVersion: string;
+    uiautomator2Version: string;
+    systemImage: 'system-images;android-35;google_apis;x86_64';
+    /**
+     * @minItems 4
+     * @maxItems 4
+     */
+    archives: [
+      {
+        role: 'cmdlineTools' | 'emulator' | 'platformTools' | 'systemImage';
+        url: string;
+        checksum: string;
+        revision: string;
+      },
+      {
+        role: 'cmdlineTools' | 'emulator' | 'platformTools' | 'systemImage';
+        url: string;
+        checksum: string;
+        revision: string;
+      },
+      {
+        role: 'cmdlineTools' | 'emulator' | 'platformTools' | 'systemImage';
+        url: string;
+        checksum: string;
+        revision: string;
+      },
+      {
+        role: 'cmdlineTools' | 'emulator' | 'platformTools' | 'systemImage';
+        url: string;
+        checksum: string;
+        revision: string;
+      }
+    ];
+    npmLockSha256: string;
+  };
+}
+
+export interface HealthReport {
+  ubuntu: string;
+  arch: string;
+  memoryKiB: number;
+  freeDiskBytes: number;
+  kvm: boolean;
+  sudo: boolean;
+  markerPresent: boolean;
+  android: boolean;
+  download: boolean;
+  versions: {
+    node?: string;
+    adb?: string;
+    emulator?: string;
+    appium?: string;
+    playwright?: string;
+    systemImage?: string;
+  };
+  /**
+   * @maxItems 20
+   */
+  errors:
+    | []
+    | [
+        | 'NO_KVM'
+        | 'DISK_LOW'
+        | 'UNSUPPORTED_OS'
+        | 'UNSUPPORTED_ARCH'
+        | 'SUDO_REQUIRED'
+        | 'ANDROID_NOT_READY'
+        | 'INSTALL_IN_PROGRESS'
+      ]
+    | [
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        )
+      ]
+    | [
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        )
+      ]
+    | [
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        )
+      ]
+    | [
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        )
+      ]
+    | [
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        )
+      ]
+    | [
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        )
+      ]
+    | [
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        )
+      ]
+    | [
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        )
+      ]
+    | [
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        )
+      ]
+    | [
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        )
+      ]
+    | [
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        )
+      ]
+    | [
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        )
+      ]
+    | [
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        )
+      ]
+    | [
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        )
+      ]
+    | [
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        )
+      ]
+    | [
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        )
+      ]
+    | [
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        )
+      ]
+    | [
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        )
+      ]
+    | [
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        ),
+        (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        )
+      ];
+}
+
+export interface NodeView {
+  id: string;
+  name: string;
+  host: string;
+  port: number;
+  username: string;
+  version: number;
+  credentialVersionId: string | null;
+  sudoCredentialVersionId: string | null;
+  expectedFingerprint: string | null;
+  deploymentStatus: string;
+  connection: 'ONLINE' | 'OFFLINE';
+  occupancy: 'IDLE' | 'BUSY' | 'QUARANTINED';
+  lastSeenAt: string | null;
+  agentVersion: string | null;
+  agentReleaseId: string | null;
+  health: {
+    [k: string]: unknown;
+  } | null;
+  createdAt: string;
+}
+
 export interface SessionView {
   admin: {
     id: string;
@@ -251,6 +4270,21 @@ export interface NodeList {
     id: string;
     name: string;
     host: string;
+    port: number;
+    username: string;
+    version: number;
+    credentialVersionId: string | null;
+    sudoCredentialVersionId: string | null;
+    expectedFingerprint: string | null;
+    deploymentStatus: string;
+    connection: 'ONLINE' | 'OFFLINE';
+    occupancy: 'IDLE' | 'BUSY' | 'QUARANTINED';
+    lastSeenAt: string | null;
+    agentVersion: string | null;
+    agentReleaseId: string | null;
+    health: {
+      [k: string]: unknown;
+    } | null;
     createdAt: string;
   }[];
   nextCursor: string | null;
