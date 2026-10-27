@@ -36,7 +36,12 @@ test('browser login, config checks, refresh, password change and logout', async 
     await page.getByRole('button', { name: '保存服务器', exact: true }).click();
     await expect(page.getByText('请检查服务器名称、地址、端口和 SSH 用户名')).toBeVisible();
     await page.getByLabel('IP 或域名', { exact: true }).fill('203.0.113.12');
+    const saved = page.waitForResponse(
+      (r) => r.url().endsWith('/api/v1/nodes') && r.request().method() === 'POST',
+    );
     await page.getByRole('button', { name: '保存服务器', exact: true }).click();
+    const savedResponse = await saved;
+    assert.equal(savedResponse.status(), 201, JSON.stringify(await savedResponse.json()));
     await expect(page.getByText('服务器资料已保存，凭据不会回显')).toBeVisible();
     await expect(page.getByRole('cell', { name: '203.0.113.12', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: '一键部署', exact: true })).toBeDisabled();
@@ -73,6 +78,24 @@ test('browser login, config checks, refresh, password change and logout', async 
     await page.getByRole('button', { name: '校验配置', exact: true }).click();
     await expect(page.getByRole('status')).toContainText('前端与服务端校验通过');
     assert.equal(validateRequests, 1);
+    await page.getByLabel('配置名称', { exact: true }).fill('浏览器配置版本');
+    await page.getByRole('button', { name: '新建配置', exact: true }).click();
+    await expect(page.getByText('配置已建立，可保存当前草稿为第一个版本')).toBeVisible();
+    await page.getByRole('button', { name: '保存草稿为新版本', exact: true }).click();
+    await expect(page.getByText('已保存不可变版本，运行中的任务不会改变')).toBeVisible();
+    await expect(page.getByRole('button', { name: '载入版本', exact: true })).toHaveCount(1);
+    await page.getByLabel('网站 URL').fill('https://second.example.test/');
+    await page.getByRole('button', { name: '保存草稿为新版本', exact: true }).click();
+    await expect(page.getByRole('button', { name: '载入版本', exact: true })).toHaveCount(2);
+    await page.getByRole('button', { name: '载入版本', exact: true }).last().click();
+    await expect(page.getByLabel('网站 URL')).toHaveValue('https://downloads.example.test/');
+    await page.screenshot({
+      path: path.join(process.env.P0_SCREENSHOT_DIR, 'p2-configs.png'),
+      fullPage: true,
+    });
+    await page.getByRole('button', { name: '测试任务', exact: false }).first().click();
+    await expect(page.getByRole('heading', { name: '开始下载任务', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: '开始下载', exact: true })).toBeDisabled();
     await page.getByRole('button', { name: '账户安全', exact: false }).first().click();
     await page.getByLabel('当前密码', { exact: true }).fill(process.env.P0_TEST_PASSWORD);
     await page.getByLabel('新密码', { exact: true }).fill('BrowserChangedPassword123');

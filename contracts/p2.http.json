@@ -1,0 +1,128 @@
+{
+  "version": "1.2.0",
+  "routes": [
+    {
+      "method": "get",
+      "path": "/configs",
+      "operationId": "configs",
+      "status": 200
+    },
+    {
+      "method": "post",
+      "path": "/configs",
+      "operationId": "createConfig",
+      "request": "ConfigInput",
+      "status": 201,
+      "idempotent": true
+    },
+    {
+      "method": "get",
+      "path": "/configs/{id}",
+      "operationId": "getConfig",
+      "status": 200
+    },
+    {
+      "method": "get",
+      "path": "/configs/{id}/versions",
+      "operationId": "configVersions",
+      "status": 200
+    },
+    {
+      "method": "post",
+      "path": "/configs/{id}/versions",
+      "operationId": "saveConfigVersion",
+      "request": "TestConfiguration",
+      "status": 201,
+      "idempotent": true,
+      "ifMatch": true
+    },
+    {
+      "method": "get",
+      "path": "/configs/{id}/versions/{versionId}",
+      "operationId": "getConfigVersion",
+      "status": 200
+    },
+    {
+      "method": "post",
+      "path": "/runs",
+      "operationId": "createRun",
+      "request": "RunInput",
+      "status": 202,
+      "idempotent": true
+    },
+    {
+      "method": "get",
+      "path": "/runs/{id}",
+      "operationId": "getRun",
+      "status": 200
+    },
+    {
+      "method": "get",
+      "path": "/runs/{id}/tasks",
+      "operationId": "runTasks",
+      "status": 200
+    },
+    {
+      "method": "get",
+      "path": "/runs/{id}/events",
+      "operationId": "runEvents",
+      "status": 200
+    },
+    {
+      "method": "post",
+      "path": "/runs/{id}/stop",
+      "operationId": "stopRun",
+      "request": "ReasonInput",
+      "status": 202,
+      "idempotent": true
+    },
+    {
+      "method": "post",
+      "path": "/runs/{id}/reconciliations",
+      "operationId": "reconcileRun",
+      "request": "RunReconcileInput",
+      "status": 200,
+      "idempotent": true
+    },
+    {
+      "method": "post",
+      "path": "/agent/claims",
+      "operationId": "claimRun",
+      "request": "AgentMessage",
+      "status": 200,
+      "node": true
+    },
+    {
+      "method": "post",
+      "path": "/agent/deliveries/{id}/accept",
+      "operationId": "acceptRun",
+      "request": "AgentMessage",
+      "status": 200,
+      "node": true
+    },
+    {
+      "method": "post",
+      "path": "/agent/deliveries/{id}/config",
+      "operationId": "deliveryConfig",
+      "request": "DeliveryConfigInput",
+      "status": 200,
+      "node": true
+    },
+    {
+      "method": "post",
+      "path": "/agent/events",
+      "operationId": "runAgentEvents",
+      "request": "AgentMessage",
+      "status": 200,
+      "node": true
+    },
+    {
+      "method": "post",
+      "path": "/agent/reconcile",
+      "operationId": "agentReconcile",
+      "request": "AgentReconcileInput",
+      "status": 200,
+      "node": true
+    }
+  ]
+}

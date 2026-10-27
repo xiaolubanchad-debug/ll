@@ -14,6 +14,7 @@ import { Database } from './database.js';
 import { ErrorFilter } from './errors.js';
 import { settings } from './settings.js';
 import { NodesController, DeploymentController, AgentController } from './p1-controllers.js';
+import { P2Controller, P2AgentController } from './p2-controllers.js';
 
 @Module({
   controllers: [
@@ -22,6 +23,8 @@ import { NodesController, DeploymentController, AgentController } from './p1-con
     NodesController,
     DeploymentController,
     AgentController,
+    P2Controller,
+    P2AgentController,
   ],
   providers: [Database, AuthService, { provide: APP_GUARD, useClass: SessionGuard }],
 })

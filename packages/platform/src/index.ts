@@ -2,6 +2,8 @@ export * from './errors.js';
 export * from './security.js';
 export * from './secrets.js';
 export * from './types.js';
+export * from './configurations.js';
+export * from './runs.js';
 export * from './nodes.js';
 export * from './jobs.js';
 export * from './ssh.js';

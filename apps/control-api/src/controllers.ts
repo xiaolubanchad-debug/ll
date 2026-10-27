@@ -8,6 +8,7 @@ import type { AuthedRequest } from './auth.js';
 import { Database } from './database.js';
 import { settings } from './settings.js';
 import { ApiError, validated } from './errors.js';
+import { expireRuns } from '@apk/platform';
 
 const cookieOptions = () => ({
   httpOnly: true,
@@ -107,6 +108,7 @@ export class AuthController {
 export class ConsoleController {
   constructor(private readonly db: Database) {}
   @Get('runs') async runs(@Query() query: Record<string, unknown>) {
+    await expireRuns(this.db);
     const { limit, ...args } = pageArgs(query);
     return page(
       await this.db.run.findMany({

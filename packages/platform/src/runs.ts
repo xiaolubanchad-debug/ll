@@ -1,0 +1,569 @@
+import { Prisma } from '@prisma/client';
+import type { PrismaClient, Run, Delivery, Prisma as P } from '@prisma/client';
+import type {
+  AgentMessage,
+  RunInput,
+  AgentReconcileInput,
+  TestConfiguration,
+} from '@apk/contracts';
+import { agentIssues, schemaIssues } from '@apk/contracts';
+import { checked } from './secrets.js';
+import { digest, canonical } from './security.js';
+import { lockNode, idle } from './nodes.js';
+import { idempotent } from './jobs.js';
+import { configSecrets } from './configurations.js';
+import { fault } from './errors.js';
+type Tx = P.TransactionClient;
+export const ACTIVE_RUNS = ['ASSIGNED', 'RUNNING', 'STOP_REQUESTED'] as const;
+export const RUN_END = ['SUCCEEDED', 'PARTIAL_FAILED', 'FAILED', 'CANCELLED', 'NEEDS_REVIEW'];
+export async function nodeAuth(tx: Tx, token: string, nodeId: string, bootId?: string) {
+  const auth = await tx.agentCredential.findUnique({ where: { nodeId } });
+  if (!auth || auth.revokedAt || auth.tokenHash !== digest(token))
+    fault('UNAUTHENTICATED', '节点身份无效', 401);
+  if (bootId && auth.bootId !== bootId) fault('AGENT_RECONCILE_REQUIRED', '节点重启后必须先核验');
+  return auth;
+}
+export async function reviewRun(tx: Tx, run: Run, code: string) {
+  if (RUN_END.includes(run.status)) return;
+  await tx.run.update({
+    where: { id: run.id },
+    data: { status: 'NEEDS_REVIEW', finishedAt: new Date(), errorCode: code },
+  });
+  await tx.nodeSlot.updateMany({
+    where: { nodeId: run.nodeId, runId: run.id },
+    data: { quarantined: true },
+  });
+}
+export async function expireNodeRun(tx: Tx, nodeId: string) {
+  const slot = await tx.nodeSlot.findUnique({ where: { nodeId } });
+  if (!slot?.runId) return;
+  const run = await tx.run.findUnique({ where: { id: slot.runId }, include: { delivery: true } });
+  if (!run || !ACTIVE_RUNS.includes(run.status as (typeof ACTIVE_RUNS)[number])) return;
+  const d = run.delivery;
+  if (
+    !d ||
+    d.leaseExpiresAt.getTime() <= Date.now() ||
+    (!d.acceptedAt && d.ackDeadline.getTime() <= Date.now())
+  )
+    await reviewRun(tx, run, 'LEASE_EXPIRED');
+}
+export async function expireRuns(db: PrismaClient) {
+  const candidates = await db.delivery.findMany({
+    where: {
+      run: { status: { in: [...ACTIVE_RUNS] } },
+      OR: [
+        { leaseExpiresAt: { lt: new Date() } },
+        { acceptedAt: null, ackDeadline: { lt: new Date() } },
+      ],
+    },
+    select: { run: { select: { nodeId: true } } },
+    take: 100,
+  });
+  for (const { run } of candidates)
+    await db.$transaction(async (tx) => {
+      await lockNode(tx, run.nodeId);
+      await expireNodeRun(tx, run.nodeId);
+    });
+}
+export async function createRun(
+  db: PrismaClient,
+  body: unknown,
+  actor: string,
+  requestId: string,
+  key: string,
+) {
+  const input = checked<RunInput>('RunInput', body);
+  return idempotent(db, actor, 'POST:/runs', key, input, async (tx) => {
+    const node = await lockNode(tx, input.nodeId);
+    await expireNodeRun(tx, node.id);
+    await idle(tx, node.id);
+    if (!node.lastSeenAt || node.lastSeenAt.getTime() < Date.now() - 45000)
+      fault('NODE_OFFLINE', '节点尚未在线');
+    if (node.agentReleaseId !== input.releaseId || node.deploymentStatus !== 'INSTALLED')
+      fault('NODE_NOT_READY', '节点发布版本不匹配');
+    const release = await tx.release.findUnique({ where: { id: input.releaseId } });
+    const manifest = release?.manifest as { features?: string[] } | undefined;
+    const health = node.health as { download?: boolean } | null;
+    if (
+      !manifest?.features?.includes('DOWNLOAD_V1') ||
+      node.downloadProtocol !== '1.0' ||
+      !health?.download
+    )
+      fault('NODE_UPGRADE_REQUIRED', '请部署支持下载任务的 Agent 版本');
+    const config = await tx.configVersion.findUnique({ where: { id: input.configVersionId } });
+    if (!config) fault('NOT_FOUND', '配置版本不存在', 404);
+    const configuration = config.body as unknown as TestConfiguration;
+    await configSecrets(tx, configuration);
+    if (configuration.execution.mode !== 'DOWNLOAD_ONLY')
+      fault('FEATURE_UNAVAILABLE', 'P2 仅支持下载模式，安装注册尚未开放', 422);
+    if (input.supersedesRunId) {
+      const old = await tx.run.findUnique({ where: { id: input.supersedesRunId } });
+      if (!old || !RUN_END.includes(old.status) || old.nodeId !== node.id)
+        fault('VALIDATION_FAILED', '关联批次无效', 422);
+    }
+    const run = await tx.run.create({
+      data: { ...input, configHash: config.configHash, createdBy: actor },
+    });
+    await tx.nodeSlot.update({
+      where: { nodeId: node.id },
+      data: { runId: run.id, fence: { increment: 1 } },
+    });
+    await tx.auditEvent.create({ data: { adminId: actor, action: 'RUN_CREATED', requestId } });
+    return { operationId: run.id, resourceId: run.id, status: run.status };
+  });
+}
+function message<K extends AgentMessage['kind']>(body: unknown, kind: K) {
+  if (agentIssues(body).length || (body as { kind?: unknown })?.kind !== kind)
+    fault('VALIDATION_FAILED', '节点消息无效', 422);
+  return body as Extract<AgentMessage, { kind: K }>;
+}
+function deliveryView(run: Run, d: Delivery) {
+  return {
+    kind: 'delivery',
+    protocolVersion: '1.0',
+    nodeId: run.nodeId,
+    deliveryId: d.id,
+    runId: run.id,
+    fence: d.fence,
+    configVersionId: run.configVersionId,
+    configHash: run.configHash,
+    releaseId: run.releaseId,
+    issuedAt: d.issuedAt.toISOString(),
+    ackDeadline: d.ackDeadline.toISOString(),
+    leaseExpiresAt: d.leaseExpiresAt.toISOString(),
+  };
+}
+export async function claimRun(db: PrismaClient, token: string, body: unknown) {
+  const input = message(body, 'claim');
+  return db.$transaction(async (tx) => {
+    const node = await lockNode(tx, input.nodeId);
+    const auth = await nodeAuth(tx, token, node.id, input.bootId);
+    await expireNodeRun(tx, node.id);
+    const slot = await tx.nodeSlot.findUnique({ where: { nodeId: node.id } });
+    if (slot?.quarantined) fault('NODE_QUARANTINED', '节点待核验');
+    if (!slot?.runId) return null;
+    const run = await tx.run.findUniqueOrThrow({
+      where: { id: slot.runId },
+      include: { delivery: true },
+    });
+    if (
+      run.releaseId !== auth.releaseId ||
+      run.releaseId !== node.agentReleaseId ||
+      node.downloadProtocol !== '1.0'
+    )
+      fault('NODE_NOT_READY', '节点不满足固定任务版本');
+    if (run.delivery) {
+      if (run.delivery.bootId !== input.bootId) fault('AGENT_RECONCILE_REQUIRED', '旧任务需要核验');
+      if (RUN_END.includes(run.status)) return null;
+      return deliveryView(run, run.delivery);
+    }
+    if (run.status !== 'QUEUED') return null;
+    const d = await tx.delivery.create({
+      data: {
+        runId: run.id,
+        bootId: input.bootId,
+        fence: slot.fence,
+        ackDeadline: new Date(Date.now() + 30000),
+        leaseExpiresAt: new Date(Date.now() + 120000),
+      },
+    });
+    await tx.run.update({ where: { id: run.id }, data: { status: 'ASSIGNED' } });
+    return deliveryView(run, d);
+  });
+}
+async function bound(
+  tx: Tx,
+  token: string,
+  nodeId: string,
+  id: string,
+  fence: number,
+  bootId?: string,
+) {
+  await lockNode(tx, nodeId);
+  await nodeAuth(tx, token, nodeId, bootId);
+  await expireNodeRun(tx, nodeId);
+  const d = await tx.delivery.findUnique({ where: { id }, include: { run: true } });
+  if (!d || d.run.nodeId !== nodeId || d.fence !== fence || (bootId && d.bootId !== bootId))
+    fault('STALE_FENCE', '任务分配不匹配');
+  return d;
+}
+function authorized(d: Delivery & { run: Run }) {
+  if (
+    !ACTIVE_RUNS.includes(d.run.status as (typeof ACTIVE_RUNS)[number]) ||
+    d.leaseExpiresAt.getTime() <= Date.now()
+  )
+    fault('LEASE_EXPIRED', '任务执行权已失效');
+}
+export async function acceptRun(db: PrismaClient, token: string, id: string, body: unknown) {
+  const input = message(body, 'accept');
+  if (input.deliveryId !== id) fault('STALE_FENCE', '分配编号不一致');
+  return db.$transaction(async (tx) => {
+    const d = await bound(tx, token, input.nodeId, id, input.fence, input.bootId);
+    authorized(d);
+    if (!d.acceptedAt) {
+      if (d.ackDeadline.getTime() <= Date.now()) fault('LEASE_EXPIRED', '接收期限已过');
+      await tx.delivery.update({ where: { id }, data: { acceptedAt: new Date() } });
+      if (d.run.status === 'ASSIGNED')
+        await tx.run.update({ where: { id: d.runId }, data: { status: 'RUNNING' } });
+    }
+    return {
+      deliveryId: id,
+      fence: d.fence,
+      leaseExpiresAt: d.leaseExpiresAt.toISOString(),
+      desiredControl: d.run.stopRequested ? 'STOP' : 'CONTINUE',
+    };
+  });
+}
+export async function deliveryConfig(db: PrismaClient, token: string, id: string, body: unknown) {
+  const input = checked<{ nodeId: string; bootId: string; deliveryId: string; fence: number }>(
+    'DeliveryConfigInput',
+    body,
+  );
+  if (input.deliveryId !== id) fault('STALE_FENCE', '分配编号不一致');
+  return db.$transaction(async (tx) => {
+    const d = await bound(tx, token, input.nodeId, id, input.fence, input.bootId);
+    authorized(d);
+    if (!d.acceptedAt || d.run.stopRequested) fault('NODE_NOT_READY', '任务尚未接收或已请求停止');
+    const v = await tx.configVersion.findUniqueOrThrow({ where: { id: d.run.configVersionId! } });
+    const config = v.body as unknown as TestConfiguration;
+    await configSecrets(tx, config);
+    return { deliveryId: id, configHash: v.configHash, config, secretVersions: [] };
+  });
+}
+export async function closeRun(
+  tx: Tx,
+  run: Run,
+  status: 'SUCCEEDED' | 'PARTIAL_FAILED' | 'FAILED' | 'CANCELLED',
+  errorCode?: string,
+) {
+  await tx.run.update({
+    where: { id: run.id },
+    data: { status, finishedAt: new Date(), ...(errorCode ? { errorCode } : {}) },
+  });
+  await tx.nodeSlot.updateMany({
+    where: { nodeId: run.nodeId, runId: run.id },
+    data: { runId: null },
+  });
+}
+export async function stopRun(
+  db: PrismaClient,
+  id: string,
+  reason: unknown,
+  actor: string,
+  requestId: string,
+  key: string,
+) {
+  return idempotent(db, actor, 'POST:/runs/' + id + '/stop', key, reason, async (tx) => {
+    const previous = await tx.run.findUnique({ where: { id } });
+    if (!previous) fault('NOT_FOUND', '批次不存在', 404);
+    await lockNode(tx, previous.nodeId);
+    await expireNodeRun(tx, previous.nodeId);
+    const run = await tx.run.findUniqueOrThrow({ where: { id } });
+    if (run.status === 'QUEUED') await closeRun(tx, run, 'CANCELLED');
+    else if (!RUN_END.includes(run.status))
+      await tx.run.update({
+        where: { id },
+        data: { status: 'STOP_REQUESTED', stopRequested: true },
+      });
+    await tx.auditEvent.create({
+      data: { adminId: actor, action: 'RUN_STOP_REQUESTED', requestId },
+    });
+    return {
+      operationId: id,
+      resourceId: id,
+      status:
+        run.status === 'QUEUED'
+          ? 'CANCELLED'
+          : RUN_END.includes(run.status)
+            ? run.status
+            : 'STOP_REQUESTED',
+    };
+  });
+}
+type Event = Extract<AgentMessage, { kind: 'events' }>['events'][number];
+async function applyEvent(tx: Tx, runId: string, event: Event) {
+  const run = await tx.run.findUniqueOrThrow({ where: { id: runId } });
+  const p = event.payload as Record<string, unknown>;
+  if (event.type === 'RUN_STARTED') {
+    if (event.sequence !== 1 || p.configHash !== run.configHash || p.releaseId !== run.releaseId)
+      fault('EVENT_CONFLICT', '开始事件不匹配');
+    return;
+  }
+  if (event.type === 'TARGETS_DISCOVERED') {
+    if (run.discovered) fault('EVENT_CONFLICT', '目标发现不可重复');
+    const targets = p.targets as {
+      taskId: string;
+      targetKey: string;
+      label: string;
+      sourceUrl: string;
+    }[];
+    const config = await tx.configVersion.findUniqueOrThrow({
+      where: { id: run.configVersionId! },
+    });
+    const max = (config.body as unknown as TestConfiguration).download.maxTargets;
+    const start = await tx.task.count({ where: { runId } });
+    if (
+      (p.startIndex ?? 0) !== start ||
+      start + targets.length > max ||
+      new Set(targets.map((t) => t.taskId)).size !== targets.length ||
+      new Set(targets.map((t) => t.targetKey)).size !== targets.length
+    )
+      fault('EVENT_CONFLICT', '目标数量或编号冲突');
+    for (const [offset, t] of targets.entries()) {
+      const url = new URL(t.sourceUrl);
+      if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password)
+        fault('EVENT_CONFLICT', '目标地址无效');
+      await tx.task.create({
+        data: {
+          id: t.taskId,
+          runId,
+          targetKey: t.targetKey,
+          label: t.label,
+          sourceUrl: t.sourceUrl,
+          position: start + offset,
+        },
+      });
+    }
+    const complete = p.complete !== false;
+    await tx.run.update({
+      where: { id: runId },
+      data: {
+        discovered: complete,
+        ...(complete && !targets.length && !start ? { errorCode: 'NO_TARGETS' } : {}),
+      },
+    });
+    return;
+  }
+  if (event.type === 'TASK_STAGE' || event.type === 'TASK_FINISHED') {
+    const task = await tx.task.findUnique({ where: { id: event.taskId } });
+    if (!run.discovered || !task || task.runId !== runId)
+      fault('EVENT_CONFLICT', '目标不属于本批次或发现尚未完成');
+    if (event.type === 'TASK_STAGE') {
+      const stage = String(p.stage);
+      if (
+        !(['QUEUED', 'DOWNLOADING'].includes(task.status) && stage === 'DOWNLOADING') &&
+        !(task.status === 'DOWNLOADING' && stage === 'DOWNLOADED')
+      )
+        fault('EVENT_CONFLICT', '下载阶段不能倒退');
+      if (stage === 'DOWNLOADED' && schemaIssues('ApkMetadata', p.apk).length)
+        fault('EVENT_CONFLICT', '缺少 APK 校验元数据');
+      await tx.task.update({
+        where: { id: task.id },
+        data: {
+          status: stage,
+          ...(stage === 'DOWNLOADED'
+            ? { apk: p.apk as Prisma.InputJsonValue, cacheHit: p.cacheHit === true }
+            : {}),
+        },
+      });
+      return;
+    }
+    if (['SUCCEEDED', 'FAILED', 'SKIPPED', 'CANCELLED'].includes(task.status))
+      fault('EVENT_CONFLICT', '目标已结束');
+    const status = String(p.status);
+    if (
+      status === 'SUCCEEDED' &&
+      (task.status !== 'DOWNLOADED' || !task.apk || p.proof !== 'FILE_VALIDATION')
+    )
+      fault('EVENT_CONFLICT', '下载成功必须有文件校验证据');
+    if (p.proof === 'APP_UI' || status === 'UNKNOWN')
+      fault('FEATURE_UNAVAILABLE', 'P2 不接受注册结果', 422);
+    await tx.task.update({
+      where: { id: task.id },
+      data: {
+        status,
+        proof: String(p.proof),
+        errorCode: typeof p.errorCode === 'string' ? p.errorCode : null,
+      },
+    });
+    return;
+  }
+  if (event.type === 'STOP_ACK') {
+    if (p.cleanupComplete !== true) {
+      await reviewRun(tx, run, 'CLEANUP_INCOMPLETE');
+      return;
+    }
+    if (!run.stopRequested) fault('EVENT_CONFLICT', '尚未请求停止');
+    await tx.task.updateMany({
+      where: { runId, status: { notIn: ['SUCCEEDED', 'FAILED', 'SKIPPED', 'CANCELLED'] } },
+      data: { status: 'CANCELLED' },
+    });
+    await closeRun(tx, run, 'CANCELLED');
+    return;
+  }
+  if (event.type === 'RUN_FINISHED') {
+    if (run.stopRequested) fault('EVENT_CONFLICT', '停止必须通过清理回执确认');
+    const tasks = await tx.task.findMany({ where: { runId } });
+    if (tasks.some((t) => !['SUCCEEDED', 'FAILED', 'SKIPPED', 'CANCELLED'].includes(t.status)))
+      fault('EVENT_CONFLICT', '目标尚未全部结束');
+    const count = tasks.filter((t) => t.status === 'SUCCEEDED').length;
+    const status =
+      !run.discovered || !tasks.length
+        ? 'FAILED'
+        : count === tasks.length
+          ? 'SUCCEEDED'
+          : count
+            ? 'PARTIAL_FAILED'
+            : 'FAILED';
+    if (p.status !== status) fault('EVENT_CONFLICT', '批次汇总不一致');
+    await closeRun(
+      tx,
+      run,
+      status,
+      typeof p.errorCode === 'string'
+        ? p.errorCode
+        : (run.errorCode ?? (tasks.length ? undefined : 'NO_TARGETS')),
+    );
+    return;
+  }
+  fault('FEATURE_UNAVAILABLE', 'P2 不接受此事件', 422);
+}
+export async function runEvents(db: PrismaClient, token: string, body: unknown) {
+  const input = message(body, 'events');
+  return db.$transaction(
+    async (tx) => {
+      const d = await bound(tx, token, input.nodeId, input.deliveryId, input.fence);
+      const late = RUN_END.includes(d.run.status) || d.leaseExpiresAt.getTime() <= Date.now();
+      if (!late && !d.acceptedAt) fault('NODE_NOT_READY', '尚未确认接收');
+      for (const event of input.events) {
+        if (event.runId !== d.runId) fault('EVENT_CONFLICT', '事件批次不匹配');
+        if (
+          ![
+            'RUN_STARTED',
+            'TARGETS_DISCOVERED',
+            'TASK_STAGE',
+            'TASK_FINISHED',
+            'RUN_FINISHED',
+            'STOP_ACK',
+          ].includes(event.type)
+        )
+          fault('FEATURE_UNAVAILABLE', 'P2 不接受此事件', 422);
+        const hash = digest(canonical(event));
+        const existing = await tx.runEvent.findFirst({
+          where: { OR: [{ id: event.eventId }, { deliveryId: d.id, sequence: event.sequence }] },
+        });
+        if (existing) {
+          if (
+            existing.id !== event.eventId ||
+            existing.deliveryId !== d.id ||
+            existing.contentHash !== hash
+          )
+            fault('EVENT_CONFLICT', '相同事件内容冲突');
+          continue;
+        }
+        await tx.runEvent.create({
+          data: {
+            id: event.eventId,
+            deliveryId: d.id,
+            sequence: event.sequence,
+            contentHash: hash,
+            body: event as unknown as Prisma.InputJsonValue,
+            recordedForReview: late,
+          },
+        });
+      }
+      let applied = d.appliedThroughSequence;
+      if (!late) {
+        while (true) {
+          const next = await tx.runEvent.findUnique({
+            where: { deliveryId_sequence: { deliveryId: d.id, sequence: applied + 1 } },
+          });
+          if (!next || next.recordedForReview) break;
+          const current = await tx.run.findUniqueOrThrow({ where: { id: d.runId } });
+          if (RUN_END.includes(current.status)) break;
+          await applyEvent(tx, d.runId, next.body as unknown as Event);
+          applied++;
+        }
+        await tx.delivery.update({
+          where: { id: d.id },
+          data: { appliedThroughSequence: applied },
+        });
+      }
+      return {
+        ackedEventIds: input.events.map((e) => e.eventId),
+        appliedThroughSequence: applied,
+        recordedForReview: late,
+      };
+    },
+    { timeout: 15000 },
+  );
+}
+export async function reconcileAgent(db: PrismaClient, token: string, body: unknown) {
+  const input = checked<AgentReconcileInput>('AgentReconcileInput', body);
+  return db.$transaction(async (tx) => {
+    await lockNode(tx, input.nodeId);
+    await nodeAuth(tx, token, input.nodeId);
+    const slot = await tx.nodeSlot.findUnique({ where: { nodeId: input.nodeId } });
+    if (slot?.runId) {
+      const run = await tx.run.findUniqueOrThrow({
+        where: { id: slot.runId },
+        include: { delivery: true },
+      });
+      if (run.status !== 'QUEUED' && !RUN_END.includes(run.status))
+        await reviewRun(tx, run, 'AGENT_RESTARTED');
+      if (run.status !== 'QUEUED') {
+        const local = run.delivery
+          ? input.deliveries.find(
+              (d) => d.deliveryId === run.delivery!.id && d.fence === run.delivery!.fence,
+            )
+          : null;
+        const clean =
+          input.cleanupComplete && (local?.cleanupComplete ?? input.deliveries.length === 0);
+        await tx.run.update({
+          where: { id: run.id },
+          data: {
+            cleanupConfirmedAt: clean ? new Date() : null,
+            cleanupBootId: clean ? input.bootId : null,
+          },
+        });
+      }
+    }
+    await tx.agentCredential.update({
+      where: { nodeId: input.nodeId },
+      data: { bootId: input.bootId },
+    });
+    return { reconciled: true, mayClaim: !slot?.runId && !slot?.quarantined };
+  });
+}
+export async function reconcileRun(
+  db: PrismaClient,
+  id: string,
+  body: unknown,
+  actor: string,
+  requestId: string,
+  key: string,
+) {
+  return idempotent(db, actor, 'POST:/runs/' + id + '/reconciliations', key, body, async (tx) => {
+    const run = await tx.run.findUnique({ where: { id } });
+    if (!run) fault('NOT_FOUND', '批次不存在', 404);
+    const node = await lockNode(tx, run.nodeId);
+    const auth = await tx.agentCredential.findUnique({ where: { nodeId: node.id } });
+    const slot = await tx.nodeSlot.findUnique({ where: { nodeId: node.id } });
+    if (
+      run.status !== 'NEEDS_REVIEW' ||
+      !run.cleanupConfirmedAt ||
+      run.cleanupBootId !== auth?.bootId ||
+      !node.lastSeenAt ||
+      node.lastSeenAt <= run.cleanupConfirmedAt ||
+      node.lastSeenAt.getTime() < Date.now() - 45000 ||
+      node.currentDeliveryId ||
+      slot?.runId !== run.id ||
+      slot.operationId
+    )
+      fault('NODE_QUARANTINED', '需要节点重启核验、清理确认和新的空闲心跳');
+    await tx.run.update({
+      where: { id },
+      data: {
+        reviewResolvedAt: new Date(),
+        reconciliationReason: (body as { reason: string }).reason,
+        reconciledBy: actor,
+      },
+    });
+    await tx.nodeSlot.update({
+      where: { nodeId: node.id },
+      data: { runId: null, quarantined: false },
+    });
+    await tx.auditEvent.create({ data: { adminId: actor, action: 'RUN_RECONCILED', requestId } });
+    return { id, reconciled: true };
+  });
+}

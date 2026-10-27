@@ -137,13 +137,21 @@ export async function publishAgent() {
   for (const [entry, out] of [
     ['entry', 'agent'],
     ['boot-entry', 'boot-check'],
+    ['egress-entry', 'egress'],
   ])
     await build({
       entryPoints: [join(root, 'apps/agent/src', entry + '.ts')],
       bundle: true,
+      alias: {
+        '@apk/automation': join(root, 'packages/automation/src/index.ts'),
+        '@apk/contracts': join(root, 'packages/contracts/src/index.ts'),
+      },
       platform: 'node',
       format: 'esm',
       target: 'node24',
+      banner: {
+        js: "import { createRequire as __apkCreateRequire } from 'node:module'; const require = __apkCreateRequire(import.meta.url);",
+      },
       outfile: join(dir, out + '.js'),
     });
   const releaseDir = resolve(process.env.RELEASE_DIR ?? 'data/releases');
@@ -152,6 +160,7 @@ export async function publishAgent() {
   await create({ gzip: true, portable: true, cwd: dir, file: staged }, [
     'agent.js',
     'boot-check.js',
+    'egress.js',
     'npm/package.json',
     'npm/package-lock.json',
   ]);
@@ -162,8 +171,9 @@ export async function publishAgent() {
   const body = {
     id: randomUUID(),
     gitCommit,
-    agentVersion: '0.2.0',
+    agentVersion: '0.3.0',
     protocolVersion: '1.0',
+    features: ['DOWNLOAD_V1'],
     artifactName,
     sha256,
     playbookSha256: await playbookDigest(join(root, 'deploy/ansible')),

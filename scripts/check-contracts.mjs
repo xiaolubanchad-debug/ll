@@ -292,6 +292,77 @@ test('P1 heartbeat health shape matches shared report', () =>
     read('contracts/p1.schema.json').$defs.HealthReport,
   ));
 
+const p2 = read('contracts/fixtures/p2.valid.json');
+for (const [name, value] of Object.entries(p2))
+  test('P2 valid ' + name, () => assert.deepEqual(schemaIssues(name, value), []));
+for (const [label, type, mutate] of [
+  [
+    'unknown run field',
+    'RunInput',
+    (v) => {
+      v.command = 'shell';
+    },
+  ],
+  [
+    'missing fixed config',
+    'RunInput',
+    (v) => {
+      delete v.configVersionId;
+    },
+  ],
+  [
+    'invalid fence',
+    'DeliveryConfigInput',
+    (v) => {
+      v.fence = 0;
+    },
+  ],
+  [
+    'unexpected plaintext secret',
+    'DeliveryConfigInput',
+    (v) => {
+      v.password = 'fixture';
+    },
+  ],
+  [
+    'APK package format',
+    'ApkMetadata',
+    (v) => {
+      v.packageName = '../apk';
+    },
+  ],
+  [
+    'APK size bounded',
+    'ApkMetadata',
+    (v) => {
+      v.size = 536870913;
+    },
+  ],
+  [
+    'node reconcile cannot skip cleanup field',
+    'AgentReconcileInput',
+    (v) => {
+      delete v.cleanupComplete;
+    },
+  ],
+])
+  test('P2 ' + label, () => {
+    const value = structuredClone(p2[type]);
+    mutate(value);
+    assert.ok(schemaIssues(type, value).length);
+  });
+configReject('host egress bypass not a configuration field', (v) => {
+  v.source.allowPrivateNetwork = true;
+});
+configReject('APK size cannot be unbounded', (v) => {
+  v.download.maxApkBytes = 2 ** 40;
+});
+test('P2 inline APK metadata matches shared contract', () =>
+  assert.deepEqual(
+    read('contracts/agent.schema.json').$defs.taskStage.properties.apk,
+    read('contracts/p2.schema.json').$defs.ApkMetadata,
+  ));
+
 function markdownFiles(dir) {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     if (['.git', '.venv', '.venv-deploy', '.tmp', 'node_modules', 'archive'].includes(entry.name))

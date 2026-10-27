@@ -64,6 +64,7 @@ export async function verifyRelease(body: unknown) {
       'npm/package-lock.json',
     ]);
     const seen = new Set<string>();
+    if (manifest.features?.includes('DOWNLOAD_V1')) expected.add('egress.js');
     let invalid = false;
     const lockChunks: Buffer[] = [];
     await listArchive({

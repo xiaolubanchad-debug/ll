@@ -24,6 +24,7 @@ export class RequestError extends Error {
 let csrfToken = '';
 export function useSession(session: SessionView | null) {
   csrfToken = session?.csrfToken ?? '';
+  if (!session) pendingMutations.clear();
 }
 export async function api<T>(
   path: string,
@@ -54,4 +55,20 @@ export async function api<T>(
     throw new RequestError(response.status, error?.error?.message ?? '请求失败，请稍后重试');
   }
   return data as T;
+}
+const pendingMutations = new Map<string, string>();
+export async function mutation<T = unknown>(
+  path: string,
+  body: unknown,
+  headers: Record<string, string> = {},
+) {
+  const intent = JSON.stringify([path, body, headers]);
+  let key = pendingMutations.get(intent);
+  if (!key) {
+    key = crypto.randomUUID();
+    pendingMutations.set(intent, key);
+  }
+  const result = await api<T>(path, 'POST', body, { ...headers, 'Idempotency-Key': key });
+  pendingMutations.delete(intent);
+  return result;
 }

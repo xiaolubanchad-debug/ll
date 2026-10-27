@@ -1,0 +1,32 @@
+{
+  "ConfigInput": { "name": "Example download configuration" },
+  "RunInput": {
+    "nodeId": "11111111-1111-4111-8111-111111111111",
+    "configVersionId": "22222222-2222-4222-8222-222222222222",
+    "releaseId": "33333333-3333-4333-8333-333333333333"
+  },
+  "RunReconcileInput": { "reason": "Fixture only: dedicated browser cleanup checked" },
+  "AgentReconcileInput": {
+    "protocolVersion": "1.0",
+    "nodeId": "11111111-1111-4111-8111-111111111111",
+    "bootId": "44444444-4444-4444-8444-444444444444",
+    "deliveries": [],
+    "cleanupComplete": true
+  },
+  "DeliveryConfigInput": {
+    "protocolVersion": "1.0",
+    "nodeId": "11111111-1111-4111-8111-111111111111",
+    "bootId": "44444444-4444-4444-8444-444444444444",
+    "deliveryId": "55555555-5555-4555-8555-555555555555",
+    "fence": 1
+  },
+  "ApkMetadata": {
+    "packageName": "com.example.fixture",
+    "versionName": "1.0",
+    "versionCode": 1,
+    "abis": ["x86_64"],
+    "size": 1024,
+    "apkSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "cacheDay": "2026-10-27"
+  }
+}

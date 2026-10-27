@@ -16,3 +16,5 @@ npm run check:contracts
 跨字段检查位于 packages/contracts，前端和 API 共用。auth.schema.json、p1.schema.json 定义管理端输入；p0.http.json 与 p1.http.json 列出已实现路由，生成类型、静态校验器和 OpenAPI 后由 CI 检查漂移。p1.valid.json 使用虚构凭据，覆盖服务器、秘密类型、主机指纹、SDK 许可和健康报告正反例。P1 已实现 SSH 检查、部署租约、Agent 注册及心跳；安装验证边界见 [P1 说明](../docs/P1_SETUP.md)。执行任务租约和 APK 注册留待 P2/P3。
 
 Schema 能验证字段格式，不能证明主机可访问、XPath 可命中、定位器正确、设备标识变化、IP 固定或注册成功。网络和业务验证必须由执行层另行完成。
+
+P2 增量定义在 p2.schema.json 和 p2.http.json，正例为 fixtures/p2.valid.json。节点消息新增可选下载协议、分块目标发现、APK 元数据及失败码，旧消息正例继续通过。下载参数新增有界 maxApkBytes。执行协议仍为 1.0，只有声明 DOWNLOAD_V1 的签名发布及匹配心跳可接任务。生成 TypeScript 用数组表达数量可变的集合，数量上下限继续由共享运行时校验器执行。

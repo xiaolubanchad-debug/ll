@@ -17,6 +17,7 @@ export type {
   ReleaseInput,
 } from './generated/types.js';
 export type { NodeView } from './generated/types.js';
+export type {ConfigInput,RunInput,RunReconcileInput,AgentReconcileInput,DeliveryConfigInput,ApkMetadata} from './generated/types.js';
 export interface Issue {
   path: string;
   message: string;

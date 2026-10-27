@@ -71,6 +71,8 @@ model Node {
   health                  Json?
   agentVersion            String?          @db.VarChar(32)
   agentReleaseId          String?          @db.Uuid
+  downloadProtocol        String?          @db.VarChar(16)
+  currentDeliveryId       String?          @db.Uuid
   slot                    NodeSlot?
   operations              Deployment[]
   enrollments             Enrollment[]
@@ -102,6 +104,7 @@ model NodeSlot {
   nodeId      String  @id @db.Uuid
   node        Node    @relation(fields: [nodeId], references: [id], onDelete: Restrict)
   operationId String? @unique @db.Uuid
+  runId       String? @unique @db.Uuid
   quarantined Boolean @default(false)
   fence       Int     @default(0)
 }
@@ -177,13 +180,97 @@ model IdempotencyRecord {
 }
 
 model Run {
-  id        String    @id @default(uuid()) @db.Uuid
-  nodeId    String    @db.Uuid
-  node      Node      @relation(fields: [nodeId], references: [id], onDelete: Restrict)
-  status    RunStatus @default(QUEUED)
-  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+  id                   String         @id @default(uuid()) @db.Uuid
+  nodeId               String         @db.Uuid
+  node                 Node           @relation(fields: [nodeId], references: [id], onDelete: Restrict)
+  status               RunStatus      @default(QUEUED)
+  createdAt            DateTime       @default(now()) @db.Timestamptz(3)
+  configVersionId      String?        @db.Uuid
+  configVersion        ConfigVersion? @relation(fields: [configVersionId], references: [id], onDelete: Restrict)
+  configHash           String?        @db.Char(64)
+  releaseId            String?        @db.Uuid
+  createdBy            String?        @db.Uuid
+  supersedesRunId      String?        @db.Uuid
+  stopRequested        Boolean        @default(false)
+  finishedAt           DateTime?      @db.Timestamptz(3)
+  errorCode            String?        @db.VarChar(100)
+  cleanupConfirmedAt   DateTime?      @db.Timestamptz(3)
+  cleanupBootId        String?        @db.Uuid
+  reviewResolvedAt     DateTime?      @db.Timestamptz(3)
+  reconciliationReason String?        @db.VarChar(300)
+  reconciledBy         String?        @db.Uuid
+  discovered           Boolean        @default(false)
+  tasks                Task[]
+  delivery             Delivery?
 
   @@index([createdAt, id])
+}
+
+model Configuration {
+  id        String          @id @default(uuid()) @db.Uuid
+  name      String          @db.VarChar(100)
+  version   Int             @default(1)
+  createdAt DateTime        @default(now()) @db.Timestamptz(3)
+  versions  ConfigVersion[]
+}
+
+model ConfigVersion {
+  id         String        @id @default(uuid()) @db.Uuid
+  configId   String        @db.Uuid
+  config     Configuration @relation(fields: [configId], references: [id], onDelete: Restrict)
+  version    Int
+  body       Json
+  configHash String        @db.Char(64)
+  createdAt  DateTime      @default(now()) @db.Timestamptz(3)
+  createdBy  String        @db.Uuid
+  runs       Run[]
+
+  @@unique([configId, version])
+}
+
+model Delivery {
+  id                     String     @id @default(uuid()) @db.Uuid
+  runId                  String     @unique @db.Uuid
+  run                    Run        @relation(fields: [runId], references: [id], onDelete: Restrict)
+  bootId                 String     @db.Uuid
+  fence                  Int
+  issuedAt               DateTime   @default(now()) @db.Timestamptz(3)
+  ackDeadline            DateTime   @db.Timestamptz(3)
+  leaseExpiresAt         DateTime   @db.Timestamptz(3)
+  acceptedAt             DateTime?  @db.Timestamptz(3)
+  appliedThroughSequence Int        @default(0)
+  events                 RunEvent[]
+}
+
+model Task {
+  id        String  @id @db.Uuid
+  runId     String  @db.Uuid
+  run       Run     @relation(fields: [runId], references: [id], onDelete: Restrict)
+  targetKey String  @db.Char(64)
+  label     String  @db.VarChar(200)
+  sourceUrl String  @db.VarChar(4096)
+  position  Int
+  status    String  @default("QUEUED") @db.VarChar(32)
+  apk       Json?
+  cacheHit  Boolean @default(false)
+  proof     String  @default("NONE") @db.VarChar(32)
+  errorCode String? @db.VarChar(100)
+
+  @@unique([runId, targetKey])
+  @@unique([runId, position])
+}
+
+model RunEvent {
+  id                String   @id @db.Uuid
+  deliveryId        String   @db.Uuid
+  delivery          Delivery @relation(fields: [deliveryId], references: [id], onDelete: Restrict)
+  sequence          Int
+  contentHash       String   @db.Char(64)
+  body              Json
+  recordedForReview Boolean  @default(false)
+  createdAt         DateTime @default(now()) @db.Timestamptz(3)
+
+  @@unique([deliveryId, sequence])
 }
 
 enum RunStatus {

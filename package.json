@@ -14,8 +14,8 @@
   "scripts": {
     "generate:contracts": "node scripts/generate-contracts.mjs",
     "check:contracts": "node scripts/generate-contracts.mjs --check && npm run build -w @apk/contracts && node scripts/check-contracts.mjs",
-    "build": "npm run build -w @apk/contracts && npm run build -w @apk/platform && npm run build -w @apk/control-api && npm run build -w @apk/deploy-worker && npm run build -w @apk/agent && npm run build -w @apk/web",
-    "typecheck": "npm run build -w @apk/contracts && npm run build -w @apk/platform && npm run typecheck --workspaces --if-present",
+    "build": "npm run build -w @apk/contracts && npm run build -w @apk/platform && npm run build -w @apk/control-api && npm run build -w @apk/deploy-worker && npm run build -w @apk/automation && npm run build -w @apk/agent && npm run build -w @apk/web",
+    "typecheck": "npm run build -w @apk/contracts && npm run build -w @apk/platform && npm run build -w @apk/automation && npm run typecheck --workspaces --if-present",
     "lint": "eslint apps packages scripts tests --max-warnings=0",
     "test": "npm run build && node scripts/test-p0.mjs",
     "dev": "node --env-file=.env scripts/dev.mjs",

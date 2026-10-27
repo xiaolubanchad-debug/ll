@@ -11,10 +11,15 @@ export async function lockNode(tx: Prisma.TransactionClient, id: string) {
 }
 export async function idle(tx: Prisma.TransactionClient, nodeId: string, allowQuarantine = false) {
   const slot = await tx.nodeSlot.findUnique({ where: { nodeId } });
+  if (slot?.quarantined && !allowQuarantine)
+    fault('NODE_QUARANTINED', '服务器状态需核验后才能继续');
   if (
     !slot ||
     slot.operationId ||
-    (await tx.run.count({ where: { nodeId, status: { in: [...BUSY_RUNS] } } }))
+    slot.runId ||
+    (await tx.run.count({
+      where: { nodeId, status: { in: [...BUSY_RUNS] }, reviewResolvedAt: null },
+    }))
   )
     fault('NODE_BUSY', '服务器正在执行其他操作');
   if (slot.quarantined && !allowQuarantine) fault('NODE_QUARANTINED', '服务器状态需核验后才能继续');
@@ -46,7 +51,12 @@ export async function nodeView(db: PrismaClient, id: string) {
     deploymentStatus: node.deploymentStatus,
     connection:
       node.lastSeenAt && node.lastSeenAt.getTime() > Date.now() - 45000 ? 'ONLINE' : 'OFFLINE',
-    occupancy: node.slot?.quarantined ? 'QUARANTINED' : node.slot?.operationId ? 'BUSY' : 'IDLE',
+    occupancy: node.slot?.quarantined
+      ? 'QUARANTINED'
+      : node.slot?.operationId || node.slot?.runId
+        ? 'BUSY'
+        : 'IDLE',
+    downloadProtocol: node.downloadProtocol,
     lastSeenAt: node.lastSeenAt,
     agentVersion: node.agentVersion,
     agentReleaseId: node.agentReleaseId,
@@ -109,6 +119,8 @@ export async function updateNode(
                 deploymentStatus: 'NOT_INSTALLED',
                 agentVersion: null,
                 agentReleaseId: null,
+                downloadProtocol: null,
+                currentDeliveryId: null,
               }
             : {}),
         },

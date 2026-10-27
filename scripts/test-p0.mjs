@@ -161,6 +161,7 @@ try {
   console.log('Real PostgreSQL version:', version[0].server_version);
   await run(['--test', '--test-concurrency=1', 'tests/api.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/p1.test.mjs'], env);
+  await run(['--test', '--test-concurrency=1', 'tests/p2.test.mjs'], env);
   const { initializeAdmin } = await import('../apps/control-api/dist/admin.js');
   const { passwordHash } = await import('../apps/control-api/dist/auth.js');
   const admin = await db.admin.findFirst();
@@ -188,7 +189,7 @@ try {
   );
   await waitFor(env.APP_ORIGIN, ui);
   await run(['--test', 'tests/web.test.mjs'], { ...env, P0_SCREENSHOT_DIR: dir });
-  console.log('P0/P1 integration and browser tests passed (remote installer simulated).');
+  console.log('P0/P1/P2 integration and browser tests passed (EC2 installer simulated; P2 download uses real Chromium).');
 } catch (error) {
   console.error(error instanceof Error ? error.message : 'P0 tests failed');
   process.exitCode = 1;

@@ -16,7 +16,10 @@ const manifest = await json('contracts/p0.http.json');
 const p1 = await json('contracts/p1.schema.json');
 const p1Http = await json('contracts/p1.http.json');
 manifest.routes.push(...p1Http.routes);
-manifest.version = p1Http.version;
+const p2 = await json('contracts/p2.schema.json'),
+  p2Http = await json('contracts/p2.http.json');
+manifest.routes.push(...p2Http.routes);
+manifest.version = p2Http.version;
 const schemas = {
   TestConfiguration: config,
   AgentMessage: agent,
@@ -24,6 +27,9 @@ const schemas = {
   PasswordChangeInput: { ...auth.$defs.passwordChange, $id: auth.$id + '/passwordChange' },
   ...Object.fromEntries(
     Object.entries(p1.$defs).map(([name, value]) => [name, { ...value, $id: p1.$id + '/' + name }]),
+  ),
+  ...Object.fromEntries(
+    Object.entries(p2.$defs).map(([name, value]) => [name, { ...value, $id: p2.$id + '/' + name }]),
   ),
 };
 const ajv = new Ajv({
@@ -72,6 +78,7 @@ const types = (
       compile({ ...structuralShape(schema), title: name }, name, {
         bannerComment: '',
         declareExternallyReferenced: true,
+        ignoreMinAndMaxItems: true,
         style: { singleQuote: true },
       }),
     ),
@@ -144,6 +151,7 @@ const responseTypes = (
       .map(([name, schema]) =>
         compile({ ...schema, title: name }, name, {
           bannerComment: '',
+          ignoreMinAndMaxItems: true,
           style: { singleQuote: true },
         }),
       ),
@@ -153,7 +161,11 @@ const paths = {};
 for (const route of manifest.routes) {
   const operation = {
     operationId: route.operationId,
-    'x-phase': p1Http.routes.some((r) => r.operationId === route.operationId) ? 'P1' : 'P0',
+    'x-phase': p2Http.routes.some((r) => r.operationId === route.operationId)
+      ? 'P2'
+      : p1Http.routes.some((r) => r.operationId === route.operationId)
+        ? 'P1'
+        : 'P0',
     security: route.node
       ? [{ NodeBearer: [] }]
       : route.public || route.internal
@@ -201,10 +213,10 @@ for (const route of manifest.routes) {
     ];
   if (route.internal) operation['x-network-scope'] = 'loopback';
   operation.parameters ??= [];
-  if (route.path.includes('{id}'))
+  for (const name of [...route.path.matchAll(/\{([A-Za-z]+)\}/g)].map((m) => m[1]))
     operation.parameters.push({
       in: 'path',
-      name: 'id',
+      name,
       required: true,
       schema: { type: 'string', format: 'uuid' },
     });
@@ -226,7 +238,7 @@ for (const route of manifest.routes) {
 }
 const openapi = {
   openapi: '3.1.0',
-  info: { title: 'APK 部署中台 P0 API', version: manifest.version },
+  info: { title: 'APK 部署中台 API', version: manifest.version },
   paths,
   components: {
     securitySchemes: {
@@ -266,5 +278,5 @@ else
   console.log(
     process.argv.includes('--check')
       ? 'Generated contracts match source.'
-      : 'Generated types, validators and P0 OpenAPI.',
+      : 'Generated types, validators and OpenAPI.',
   );

@@ -5,6 +5,8 @@ import example from '../../../contracts/fixtures/config.valid.json';
 import { api, RequestError, useSession } from './api';
 import type { SessionView, Row, Page } from './api';
 import ServerManager from './ServerManager.vue';
+import ConfigManager from './ConfigManager.vue';
+import RunManager from './RunManager.vue';
 
 type Section = 'overview' | 'nodes' | 'runs' | 'config' | 'security';
 const session = ref<SessionView | null>(null),
@@ -29,6 +31,7 @@ const validationOk = ref(false);
 const sample = structuredClone(example);
 sample.source.url = '';
 sample.execution.mode = 'DOWNLOAD_ONLY';
+Reflect.deleteProperty(sample.execution, 'proxySecretVersionId');
 sample.registrationFlows = [];
 const draftText = ref(JSON.stringify(sample, null, 2));
 const labels: Record<Section, string> = {
@@ -181,7 +184,7 @@ async function validate() {
   try {
     await api('/configs/validate', 'POST', value);
     validationOk.value = true;
-    validationResult.value = '前端与服务端校验通过。当前仅校验草稿，尚未保存或下发。';
+    validationResult.value = '前端与服务端校验通过。可保存为新版本后建立下载任务。';
   } catch (e) {
     validationResult.value = message(e);
   } finally {
@@ -296,7 +299,7 @@ onMounted(async () => {
       </nav>
       <div class="sidebar-bottom">
         <span class="status-dot"></span> 工程基础已就绪
-        <p>P1 · 服务器与部署管理</p>
+        <p>P2 · 配置与下载任务</p>
       </div>
     </aside>
     <div class="main-area">
@@ -316,14 +319,14 @@ onMounted(async () => {
             <p class="muted">
               {{
                 section === 'overview'
-                  ? '管理基础已建立，后续从这里接入服务器与测试流程。'
+                  ? '管理执行服务器、固定配置版本和下载任务。'
                   : section === 'config'
                     ? '使用统一规则检查测试配置，避免无效内容进入执行节点。'
                     : '所有记录来自当前中台数据库。'
               }}
             </p>
           </div>
-          <span class="phase-tag">P1 部署管理</span>
+          <span class="phase-tag">P2 下载管理</span>
         </div>
         <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon />
         <el-alert v-if="notice" :title="notice" type="success" :closable="false" show-icon />
@@ -347,8 +350,7 @@ onMounted(async () => {
               <span class="phase-tag">服务器接入</span>
               <h2>连接你的第一台执行服务器</h2>
               <p>
-                添加 SSH 连接信息，核验主机身份后检查环境并部署固定版本。APK
-                下载与注册将在后续阶段接入。
+                添加 SSH 连接信息，部署支持下载的固定版本，再选择配置版本开始下载任务。安装注册将在 P3 接入。
               </p>
             </div>
             <el-button @click="section = 'nodes'">管理服务器 →</el-button>
@@ -369,15 +371,7 @@ onMounted(async () => {
           </section>
         </template>
         <ServerManager v-else-if="section === 'nodes'" @changed="refresh" />
-        <section v-else-if="section === 'runs'" class="surface">
-          <h2>测试任务列表</h2>
-          <p class="muted">任务创建和执行将在后续阶段开放。</p>
-          <el-table :data="runs" empty-text="暂无测试任务"
-            ><el-table-column prop="id" label="任务编号" /><el-table-column
-              prop="status"
-              label="状态"
-          /></el-table>
-        </section>
+        <RunManager v-else-if="section === 'runs'" />
         <section v-else-if="section === 'config'" class="surface config-form">
           <h2>测试配置草稿</h2>
           <p class="muted">仅执行格式校验，不访问网站、不下载或注册。</p>
@@ -410,6 +404,15 @@ onMounted(async () => {
           >
             {{ validationResult }}
           </p>
+          <ConfigManager
+            :draft-text="draftText"
+            @load="
+              (value) => {
+                draftText = value;
+                syncFormFromJson();
+              }
+            "
+          />
         </section>
         <template v-else-if="section === 'security'">
           <section class="surface security-form">

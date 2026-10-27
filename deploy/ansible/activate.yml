@@ -4,6 +4,19 @@
   gather_facts: false
   become: true
   tasks:
+    - name: Create durable execution state separate from enrollment identity
+      ansible.builtin.file:
+        path: /var/lib/apk-platform/execution
+        state: directory
+        owner: apk-runner
+        mode: '0700'
+    - name: Install root-owned egress policy for dedicated execution account
+      ansible.builtin.copy:
+        dest: /var/lib/apk-platform/egress-policy.json
+        content: "{{ {'apiUrl': agent_config.apiUrl} | to_json }}"
+        owner: root
+        group: root
+        mode: '0600'
     - name: Create traversable protected identities parent
       ansible.builtin.file:
         path: /var/lib/apk-platform/identities

@@ -2,6 +2,8 @@ import { readFile, mkdir, writeFile, rename, chmod } from 'node:fs/promises';
 import { randomBytes, randomUUID, createCipheriv, createDecipheriv } from 'node:crypto';
 import { join, resolve } from 'node:path';
 import { collectHealth } from './health.js';
+import { TaskEngine } from './tasks.js';
+import type { DownloadOptions } from '@apk/automation';
 interface Config {
   nodeId: string;
   releaseId: string;
@@ -10,6 +12,7 @@ interface Config {
   sdkRoot: string;
   toolsRoot: string;
   bootstrapToken?: string;
+  dataRoot?: string;
 }
 export interface Identity {
   credential?: string;
@@ -68,6 +71,7 @@ export async function callHub(apiUrl: string, path: string, token: string, body:
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
     body: JSON.stringify(body),
   });
+  if (response.status === 204) return {};
   if (!response.ok)
     throw Error(
       response.status === 401 || response.status === 410
@@ -75,7 +79,7 @@ export async function callHub(apiUrl: string, path: string, token: string, body:
         : 'HUB_REQUEST_FAILED',
     );
   const text = await response.text();
-  if (text.length > 65536) throw Error('HUB_RESPONSE_INVALID');
+  if (text.length > 1048576) throw Error('HUB_RESPONSE_INVALID');
   return JSON.parse(text) as Record<string, unknown>;
 }
 export async function startAgent(
@@ -83,6 +87,7 @@ export async function startAgent(
   dir: string,
   signal: AbortSignal,
   health = collectHealth,
+  downloadOptions: DownloadOptions = {},
 ) {
   const identity = await loadIdentity(dir);
   const bootId = randomUUID();
@@ -105,56 +110,80 @@ export async function startAgent(
   let report = await health(config.sdkRoot, config.toolsRoot, config.releaseId),
     checkedAt = Date.now(),
     refreshing = false;
-  while (!signal.aborted) {
-    if (Date.now() - checkedAt > 60000 && !refreshing) {
-      refreshing = true;
-      void health(config.sdkRoot, config.toolsRoot, config.releaseId)
-        .then(
-          (value) => {
-            report = value;
-            checkedAt = Date.now();
-          },
-          () => {
-            report = { ...report, android: false, errors: ['ANDROID_NOT_READY'] };
-            checkedAt = Date.now();
-          },
+  const engine =
+    config.agentVersion === '0.3.0'
+      ? await TaskEngine.open(
+          config.dataRoot ?? '/var/lib/apk-platform/execution',
+          config.nodeId,
+          bootId,
+          config.toolsRoot,
+          (path, body) => callHub(config.apiUrl, path, identity.credential!, body),
+          downloadOptions,
         )
-        .finally(() => {
-          refreshing = false;
-        });
-    }
-    try {
-      await callHub(config.apiUrl, 'heartbeats', identity.credential, {
-        kind: 'heartbeat',
-        protocolVersion: '1.0',
-        nodeId: config.nodeId,
-        releaseId: config.releaseId,
-        agentVersion: config.agentVersion,
-        bootId,
-        sentAt: new Date().toISOString(),
-        capabilities: {
-          download: report.download,
-          android: report.android,
-          kvm: report.kvm,
-          freeDiskBytes: report.freeDiskBytes,
-        },
-        currentDelivery: null,
-        report,
-      });
-    } catch (error) {
-      if (error instanceof Error && error.message === 'IDENTITY_REJECTED') throw error;
-      console.error('Agent 心跳暂未确认，将重试');
-    }
-    await new Promise<void>((resolve) => {
-      const timer = setTimeout(done, 15000);
-      function done() {
-        clearTimeout(timer);
-        signal.removeEventListener('abort', done);
-        resolve();
+      : null;
+  const watch = engine
+    ? setInterval(() => {
+        void engine.tick().catch(() => {});
+      }, 1000)
+    : null;
+  try {
+    while (!signal.aborted) {
+      if (Date.now() - checkedAt > 60000 && !refreshing) {
+        refreshing = true;
+        void health(config.sdkRoot, config.toolsRoot, config.releaseId)
+          .then(
+            (value) => {
+              report = value;
+              checkedAt = Date.now();
+            },
+            () => {
+              report = { ...report, android: false, errors: ['ANDROID_NOT_READY'] };
+              checkedAt = Date.now();
+            },
+          )
+          .finally(() => {
+            refreshing = false;
+          });
       }
-      signal.addEventListener('abort', done, { once: true });
-      if (signal.aborted) done();
-    });
+      try {
+        const sentDelivery = engine?.heartbeat() ?? null;
+        const response = await callHub(config.apiUrl, 'heartbeats', identity.credential, {
+          kind: 'heartbeat',
+          protocolVersion: '1.0',
+          nodeId: config.nodeId,
+          releaseId: config.releaseId,
+          agentVersion: config.agentVersion,
+          bootId,
+          sentAt: new Date().toISOString(),
+          capabilities: {
+            download: report.download,
+            android: report.android,
+            kvm: report.kvm,
+            freeDiskBytes: report.freeDiskBytes,
+            ...(engine ? { downloadProtocol: '1.0' } : {}),
+          },
+          currentDelivery: sentDelivery,
+          report,
+        });
+        engine?.observe(response, sentDelivery?.deliveryId ?? null);
+      } catch (error) {
+        if (error instanceof Error && error.message === 'IDENTITY_REJECTED') throw error;
+        console.error('Agent 心跳暂未确认，将重试');
+      }
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(done, engine ? 5000 : 15000);
+        function done() {
+          clearTimeout(timer);
+          signal.removeEventListener('abort', done);
+          resolve();
+        }
+        signal.addEventListener('abort', done, { once: true });
+        if (signal.aborted) done();
+      });
+    }
+  } finally {
+    if (watch) clearInterval(watch);
+    await engine?.close();
   }
 }
 async function main() {

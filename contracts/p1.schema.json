@@ -360,6 +360,14 @@
               "pattern": "^[a-f0-9]{64}$"
             }
           }
+        },
+        "features": {
+          "type": "array",
+          "maxItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "const": "DOWNLOAD_V1"
+          }
         }
       }
     },
@@ -532,6 +540,10 @@
         },
         "createdAt": {
           "type": "string"
+        },
+        "downloadProtocol": {
+          "type": ["string", "null"],
+          "enum": ["1.0", null]
         }
       }
     }

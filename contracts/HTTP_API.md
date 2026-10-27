@@ -1,8 +1,8 @@
 # HTTP 接口契约
 
-版本 1.1.0，前缀 /api/v1。已实现路由由 p0.http.json 和 p1.http.json 合并生成 openapi.json，CI 比较 Controller、清单和 OpenAPI。下表保留后续阶段设计，以两份机器清单判定实现范围。
+版本 1.2.0，前缀 /api/v1。已实现路由由 p0.http.json、p1.http.json 和 p2.http.json 合并生成 openapi.json，CI 比较 Controller、清单和 OpenAPI。下表保留后续阶段设计，以机器清单判定实现范围。
 
-P0 提供登录、只读基础、配置校验与健康检查。P1 增加服务器、秘密版本、发布、部署操作、Agent 注册及心跳；部署列表支持 nodeId/status 筛选。P1 输入和节点视图定义于 p1.schema.json，细节见 [P1 契约](../docs/P1_CONTRACT.md)。配置保存、任务执行及其节点接口仍待 P2/P3。
+P0 提供登录和校验基础，P1 提供服务器及部署，P2 提供配置版本、下载批次、领取、配置下发、事件和重启核验，见 [P2 契约](../docs/P2_CONTRACT.md)。配置与批次的创建、保存、停止和人工核验都要求幂等键，保存版本另需 If-Match。P2 下载模式不下发代理口令；实际安装注册尚待 P3。列表查询以各机器清单及 Controller 为准，执行事件使用分页轮询，SSE 尚未实现。
 
 ## 通用规则
 
@@ -75,7 +75,7 @@ NodeConnection 凭据上传上限 64 KiB；普通配置正文上限 256 KiB；�
 | POST /agent/heartbeats             | kind=heartbeat，可选 report，P1 currentDelivery 必须为 null | serverTime、desiredControl、heartbeatIntervalSeconds；执行租约随 P2 扩展 |
 | POST /agent/claims                 | kind=claim                                                  | 204 无任务；否则 Delivery，不分配其他节点任务                            |
 | POST /agent/deliveries/{id}/accept | kind=accept                                                 | 接收确认、有效租约；持久化后才能调用                                     |
-| GET /agent/deliveries/{id}/config  | 当前 fence                                                  | 固定配置与本任务 secrets；只有有效租约且未吊销身份可取                   |
+| POST /agent/deliveries/{id}/config  | 当前 fence                                                  | 固定配置与本任务 secrets；只有有效租约且未吊销身份可取                   |
 | POST /agent/events                 | kind=events                                                 | ackedEventIds、appliedThroughSequence、recordedForReview；持久化后响应   |
 | PUT /agent/tasks/{taskId}/account  | kind=account                                                | 按 accountRef 幂等保存生成账户，重复内容不同则冲突；写入后不回显密码     |
 | POST /agent/artifacts              | multipart 文件、deliveryId、fence、taskId、kind、sha256     | artifactId，类型及归属校验，不接收任意文件路径                           |

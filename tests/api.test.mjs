@@ -16,6 +16,7 @@ import {
 } from '../apps/control-api/dist/p1-controllers.js';
 import { settings } from '../apps/control-api/dist/settings.js';
 import { configurationIssues } from '@apk/contracts';
+import { P2Controller, P2AgentController } from '../apps/control-api/dist/p2-controllers.js';
 
 const db = new PrismaClient();
 const origin = process.env.APP_ORIGIN;
@@ -319,6 +320,7 @@ test('P0 real PostgreSQL acceptance', async (t) => {
     await t.test('route implementation, manifest and generated OpenAPI agree', async () => {
       const manifest = JSON.parse(fs.readFileSync('contracts/p0.http.json', 'utf8'));
       manifest.routes.push(...JSON.parse(fs.readFileSync('contracts/p1.http.json', 'utf8')).routes);
+      manifest.routes.push(...JSON.parse(fs.readFileSync('contracts/p2.http.json', 'utf8')).routes);
       const actual = [];
       for (const C of [
         AuthController,
@@ -326,6 +328,8 @@ test('P0 real PostgreSQL acceptance', async (t) => {
         NodesController,
         DeploymentController,
         AgentController,
+        P2Controller,
+        P2AgentController,
       ])
         for (const key of Object.getOwnPropertyNames(C.prototype)) {
           const handler = C.prototype[key];

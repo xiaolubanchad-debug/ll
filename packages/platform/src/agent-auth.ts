@@ -5,6 +5,7 @@ import { randomBytes } from 'node:crypto';
 import { derivedToken, digest } from './security.js';
 import { fault } from './errors.js';
 import { lockNode } from './nodes.js';
+import { expireNodeRun, reviewRun, ACTIVE_RUNS } from './runs.js';
 export async function issueEnrollment(
   db: PrismaClient,
   deploymentId: string,
@@ -123,7 +124,6 @@ export async function agentHeartbeat(db: PrismaClient, token: string, body: unkn
   if (agentIssues(body).length || (body as { kind?: unknown })?.kind !== 'heartbeat')
     fault('VALIDATION_FAILED', '心跳消息无效', 422);
   const input = body as Extract<AgentMessage, { kind: 'heartbeat' }>;
-  if (input.currentDelivery !== null) fault('NODE_NOT_READY', 'P1 不接受执行任务心跳');
   return db.$transaction(async (tx) => {
     await lockNode(tx, input.nodeId);
     const auth = await tx.agentCredential.findUnique({ where: { nodeId: input.nodeId } });
@@ -134,13 +134,34 @@ export async function agentHeartbeat(db: PrismaClient, token: string, body: unkn
     const manifest = release?.manifest as { agentVersion?: string } | null;
     if (input.agentVersion !== manifest?.agentVersion)
       fault('NODE_NOT_READY', '节点程序版本不匹配');
-    const active = await tx.run.count({
-      where: {
-        nodeId: input.nodeId,
-        status: { in: ['RUNNING', 'ASSIGNED', 'STOP_REQUESTED', 'NEEDS_REVIEW'] },
-      },
-    });
-    if (active) fault('AGENT_RECONCILE_REQUIRED', '节点需先核验旧任务');
+    await expireNodeRun(tx, input.nodeId);
+    const slot = await tx.nodeSlot.findUnique({ where: { nodeId: input.nodeId } });
+    const active = slot?.runId
+      ? await tx.run.findUnique({ where: { id: slot.runId }, include: { delivery: true } })
+      : null;
+    let desiredControl = 'CONTINUE',
+      leaseExpiresAt: string | undefined,
+      reconcileRequired = false;
+    if (active?.delivery && ACTIVE_RUNS.includes(active.status as (typeof ACTIVE_RUNS)[number])) {
+      const d = active.delivery,
+        c = input.currentDelivery;
+      if (auth.bootId !== input.bootId) {
+        await reviewRun(tx, active, 'AGENT_RESTARTED');
+        reconcileRequired = true;
+        desiredControl = 'STOP';
+      } else if (!c || c.deliveryId !== d.id || c.runId !== active.id || c.fence !== d.fence) {
+        desiredControl = 'STOP';
+        reconcileRequired = true;
+      } else {
+        const lease = new Date(Date.now() + 120000);
+        await tx.delivery.update({ where: { id: d.id }, data: { leaseExpiresAt: lease } });
+        leaseExpiresAt = lease.toISOString();
+        desiredControl = active.stopRequested ? 'STOP' : 'CONTINUE';
+      }
+    } else if (input.currentDelivery || active?.status === 'NEEDS_REVIEW') {
+      desiredControl = 'STOP';
+      reconcileRequired = active?.status === 'NEEDS_REVIEW';
+    }
     if (auth.bootId !== input.bootId)
       await tx.agentCredential.update({
         where: { nodeId: input.nodeId },
@@ -153,6 +174,8 @@ export async function agentHeartbeat(db: PrismaClient, token: string, body: unkn
         lastSeenAt: new Date(),
         agentVersion: input.agentVersion,
         agentReleaseId: input.releaseId,
+        currentDeliveryId: input.currentDelivery?.deliveryId ?? null,
+        downloadProtocol: input.capabilities.downloadProtocol ?? null,
         health: (report ?? {
           ...input.capabilities,
           android: false,
@@ -162,7 +185,9 @@ export async function agentHeartbeat(db: PrismaClient, token: string, body: unkn
     });
     return {
       serverTime: new Date().toISOString(),
-      desiredControl: 'CONTINUE',
+      desiredControl,
+      ...(leaseExpiresAt ? { leaseExpiresAt } : {}),
+      reconcileRequired,
       heartbeatIntervalSeconds: 15,
     };
   });

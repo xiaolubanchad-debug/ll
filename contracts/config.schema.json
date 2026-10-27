@@ -6,111 +6,335 @@
   "additionalProperties": false,
   "required": ["schemaVersion", "name", "source", "download", "execution", "registrationFlows"],
   "properties": {
-    "schemaVersion": {"const": "1.0"},
-    "name": {"type": "string", "minLength": 1, "maxLength": 100},
+    "schemaVersion": {
+      "const": "1.0"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
     "source": {
-      "type": "object", "additionalProperties": false,
+      "type": "object",
+      "additionalProperties": false,
       "required": ["url", "xpath", "browserUserAgent"],
       "properties": {
-        "url": {"type": "string", "format": "uri", "pattern": "^https?://", "maxLength": 4096},
-        "xpath": {"type": "string", "minLength": 1, "maxLength": 12000},
-        "browserUserAgent": {"type": "string", "maxLength": 1024}
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https?://",
+          "maxLength": 4096
+        },
+        "xpath": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 12000
+        },
+        "browserUserAgent": {
+          "type": "string",
+          "maxLength": 1024
+        }
       }
     },
     "download": {
-      "type": "object", "additionalProperties": false,
-      "required": ["cacheTimezone", "maxTargets", "maxLandingClicks", "timeoutMs", "retries", "landingRules"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cacheTimezone",
+        "maxTargets",
+        "maxLandingClicks",
+        "timeoutMs",
+        "retries",
+        "landingRules"
+      ],
       "properties": {
-        "cacheTimezone": {"const": "Asia/Shanghai"},
-        "maxTargets": {"type": "integer", "minimum": 1, "maximum": 1000},
-        "maxLandingClicks": {"type": "integer", "minimum": 1, "maximum": 5},
-        "timeoutMs": {"type": "integer", "minimum": 10000, "maximum": 600000},
-        "retries": {"type": "integer", "minimum": 0, "maximum": 2},
+        "cacheTimezone": {
+          "const": "Asia/Shanghai"
+        },
+        "maxTargets": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "maxLandingClicks": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "timeoutMs": {
+          "type": "integer",
+          "minimum": 10000,
+          "maximum": 600000
+        },
+        "retries": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2
+        },
         "landingRules": {
-          "type": "array", "minItems": 1, "maxItems": 50,
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 50,
           "items": {
-            "type": "object", "additionalProperties": false,
+            "type": "object",
+            "additionalProperties": false,
             "required": ["host", "by", "selector"],
             "properties": {
-              "host": {"type": "string", "minLength": 1, "maxLength": 253, "pattern": "^(\\*|[a-zA-Z0-9.-]+)$"},
-              "by": {"enum": ["css", "xpath"]},
-              "selector": {"type": "string", "minLength": 1, "maxLength": 4096}
+              "host": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 253,
+                "pattern": "^(\\*|[a-zA-Z0-9.-]+)$"
+              },
+              "by": {
+                "enum": ["css", "xpath"]
+              },
+              "selector": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096
+              }
             }
           }
+        },
+        "maxApkBytes": {
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 536870912,
+          "default": 268435456
         }
       }
     },
     "execution": {
-      "type": "object", "additionalProperties": false,
+      "type": "object",
+      "additionalProperties": false,
       "required": ["mode", "deviceProfiles"],
       "properties": {
-        "mode": {"enum": ["DOWNLOAD_ONLY", "FULL"]},
-        "proxySecretVersionId": {"type": "string", "format": "uuid"},
-        "deviceProfiles": {"type": "array", "minItems": 1, "maxItems": 10, "items": {"$ref": "#/$defs/deviceProfile"}}
+        "mode": {
+          "enum": ["DOWNLOAD_ONLY", "FULL"]
+        },
+        "proxySecretVersionId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "deviceProfiles": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10,
+          "items": {
+            "$ref": "#/$defs/deviceProfile"
+          }
+        }
       },
-      "allOf": [{
-        "if": {"properties": {"mode": {"const": "FULL"}}, "required": ["mode"]},
-        "then": {"required": ["proxySecretVersionId"]}
-      }]
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "FULL"
+              }
+            },
+            "required": ["mode"]
+          },
+          "then": {
+            "required": ["proxySecretVersionId"]
+          }
+        }
+      ]
     },
-    "registrationFlows": {"type": "array", "maxItems": 100, "items": {"$ref": "#/$defs/flow"}}
+    "registrationFlows": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "$ref": "#/$defs/flow"
+      }
+    }
   },
   "$defs": {
     "deviceProfile": {
-      "type": "object", "additionalProperties": false,
+      "type": "object",
+      "additionalProperties": false,
       "required": ["id", "name", "avdDevice", "systemImage", "locale"],
       "properties": {
-        "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"},
-        "name": {"type": "string", "minLength": 1, "maxLength": 100},
-        "avdDevice": {"type": "string", "pattern": "^[a-zA-Z0-9_-]+$", "maxLength": 100},
-        "systemImage": {"type": "string", "pattern": "^system-images;android-[0-9]+;[a-zA-Z0-9_-]+;x86_64$"},
-        "locale": {"type": "string", "pattern": "^[a-z]{2}-[A-Z]{2}$"}
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "avdDevice": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]+$",
+          "maxLength": 100
+        },
+        "systemImage": {
+          "type": "string",
+          "pattern": "^system-images;android-[0-9]+;[a-zA-Z0-9_-]+;x86_64$"
+        },
+        "locale": {
+          "type": "string",
+          "pattern": "^[a-z]{2}-[A-Z]{2}$"
+        }
       }
     },
     "locator": {
-      "type": "object", "additionalProperties": false,
+      "type": "object",
+      "additionalProperties": false,
       "required": ["by", "value"],
       "properties": {
-        "by": {"enum": ["id", "accessibilityId", "xpath", "androidUiAutomator"]},
-        "value": {"type": "string", "minLength": 1, "maxLength": 4096}
+        "by": {
+          "enum": ["id", "accessibilityId", "xpath", "androidUiAutomator"]
+        },
+        "value": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        }
       }
     },
     "step": {
-      "type": "object", "additionalProperties": false,
+      "type": "object",
+      "additionalProperties": false,
       "required": ["action", "timeoutMs", "optional"],
       "properties": {
-        "action": {"enum": ["click", "input", "wait", "back", "submit"]},
-        "locator": {"$ref": "#/$defs/locator"},
-        "text": {"enum": ["{username}", "{password}"]},
-        "timeoutMs": {"type": "integer", "minimum": 1000, "maximum": 120000},
-        "optional": {"type": "boolean"}
+        "action": {
+          "enum": ["click", "input", "wait", "back", "submit"]
+        },
+        "locator": {
+          "$ref": "#/$defs/locator"
+        },
+        "text": {
+          "enum": ["{username}", "{password}"]
+        },
+        "timeoutMs": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 120000
+        },
+        "optional": {
+          "type": "boolean"
+        }
       },
       "allOf": [
-        {"if": {"properties": {"action": {"enum": ["click", "input", "wait", "submit"]}}, "required": ["action"]}, "then": {"required": ["locator"]}},
-        {"if": {"properties": {"action": {"const": "input"}}, "required": ["action"]}, "then": {"required": ["text"]}, "else": {"not": {"required": ["text"]}}},
-        {"if": {"properties": {"action": {"const": "submit"}}, "required": ["action"]}, "then": {"properties": {"optional": {"const": false}}}},
-        {"if": {"properties": {"action": {"const": "back"}}, "required": ["action"]}, "then": {"not": {"required": ["locator"]}}}
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "enum": ["click", "input", "wait", "submit"]
+              }
+            },
+            "required": ["action"]
+          },
+          "then": {
+            "required": ["locator"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "input"
+              }
+            },
+            "required": ["action"]
+          },
+          "then": {
+            "required": ["text"]
+          },
+          "else": {
+            "not": {
+              "required": ["text"]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "submit"
+              }
+            },
+            "required": ["action"]
+          },
+          "then": {
+            "properties": {
+              "optional": {
+                "const": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "back"
+              }
+            },
+            "required": ["action"]
+          },
+          "then": {
+            "not": {
+              "required": ["locator"]
+            }
+          }
+        }
       ]
     },
     "flow": {
-      "type": "object", "additionalProperties": false,
+      "type": "object",
+      "additionalProperties": false,
       "required": ["packageName", "activity", "enabled", "steps", "success"],
       "properties": {
-        "packageName": {"type": "string", "pattern": "^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)+$", "maxLength": 256},
-        "activity": {"type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[a-zA-Z0-9_.$]+$"},
-        "enabled": {"type": "boolean"},
+        "packageName": {
+          "type": "string",
+          "pattern": "^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)+$",
+          "maxLength": 256
+        },
+        "activity": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[a-zA-Z0-9_.$]+$"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
         "steps": {
-          "type": "array", "minItems": 1, "maxItems": 60,
-          "items": {"$ref": "#/$defs/step"},
-          "contains": {"type": "object", "properties": {"action": {"const": "submit"}}, "required": ["action"]},
-          "minContains": 1, "maxContains": 1
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 60,
+          "items": {
+            "$ref": "#/$defs/step"
+          },
+          "contains": {
+            "type": "object",
+            "properties": {
+              "action": {
+                "const": "submit"
+              }
+            },
+            "required": ["action"]
+          },
+          "minContains": 1,
+          "maxContains": 1
         },
         "success": {
-          "type": "object", "additionalProperties": false,
+          "type": "object",
+          "additionalProperties": false,
           "required": ["locator", "timeoutMs"],
           "properties": {
-            "locator": {"$ref": "#/$defs/locator"},
-            "timeoutMs": {"type": "integer", "minimum": 1000, "maximum": 60000}
+            "locator": {
+              "$ref": "#/$defs/locator"
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "minimum": 1000,
+              "maximum": 60000
+            }
           }
         }
       }
