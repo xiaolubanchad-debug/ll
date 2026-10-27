@@ -1,0 +1,52 @@
+[
+  {
+    "kind": "enroll", "protocolVersion": "1.0",
+    "nodeId": "22222222-2222-4222-8222-222222222222", "bootId": "88888888-8888-4888-8888-888888888888",
+    "agentVersion": "0.1.0", "releaseId": "66666666-6666-4666-8666-666666666666"
+  },
+  {
+    "kind": "heartbeat", "protocolVersion": "1.0",
+    "nodeId": "22222222-2222-4222-8222-222222222222", "bootId": "88888888-8888-4888-8888-888888888888",
+    "agentVersion": "0.1.0", "releaseId": "66666666-6666-4666-8666-666666666666", "sentAt": "2026-10-27T09:00:00Z",
+    "capabilities": {"download": true, "android": true, "kvm": true, "freeDiskBytes": 100000000000},
+    "currentDelivery": null
+  },
+  {
+    "kind": "claim", "protocolVersion": "1.0",
+    "nodeId": "22222222-2222-4222-8222-222222222222", "bootId": "88888888-8888-4888-8888-888888888888"
+  },
+  {
+    "kind": "delivery", "protocolVersion": "1.0", "nodeId": "22222222-2222-4222-8222-222222222222",
+    "deliveryId": "44444444-4444-4444-8444-444444444444", "runId": "33333333-3333-4333-8333-333333333333",
+    "fence": 1, "configVersionId": "55555555-5555-4555-8555-555555555555",
+    "configHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "releaseId": "66666666-6666-4666-8666-666666666666",
+    "issuedAt": "2026-10-27T09:00:00Z", "ackDeadline": "2026-10-27T09:00:30Z", "leaseExpiresAt": "2026-10-27T09:02:00Z"
+  },
+  {
+    "kind": "accept", "protocolVersion": "1.0", "nodeId": "22222222-2222-4222-8222-222222222222",
+    "bootId": "88888888-8888-4888-8888-888888888888", "deliveryId": "44444444-4444-4444-8444-444444444444", "fence": 1
+  },
+  {
+    "kind": "account", "protocolVersion": "1.0", "nodeId": "22222222-2222-4222-8222-222222222222",
+    "deliveryId": "44444444-4444-4444-8444-444444444444", "fence": 1,
+    "taskId": "77777777-7777-4777-8777-777777777777", "accountRef": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    "username": "sampleuser", "password": "Example123"
+  },
+  {
+    "kind": "events", "protocolVersion": "1.0", "nodeId": "22222222-2222-4222-8222-222222222222",
+    "deliveryId": "44444444-4444-4444-8444-444444444444", "fence": 1,
+    "events": [
+      {
+        "eventId": "99999999-9999-4999-8999-999999999999", "runId": "33333333-3333-4333-8333-333333333333",
+        "sequence": 1, "occurredAt": "2026-10-27T09:00:31Z", "type": "RUN_STARTED",
+        "payload": {"configHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "releaseId": "66666666-6666-4666-8666-666666666666"}
+      },
+      {
+        "eventId": "99999999-9999-4999-8999-999999999998", "runId": "33333333-3333-4333-8333-333333333333",
+        "taskId": "77777777-7777-4777-8777-777777777777", "sequence": 2, "occurredAt": "2026-10-27T09:01:00Z",
+        "type": "TASK_FINISHED", "payload": {"status": "SKIPPED", "proof": "NONE", "artifactIds": [], "errorCode": "FLOW_NOT_CONFIGURED"}
+      }
+    ]
+  }
+]

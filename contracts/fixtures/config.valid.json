@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "1.0",
+  "name": "示例 APK 注册测试",
+  "source": {
+    "url": "https://downloads.example.test/",
+    "xpath": "//div[@aria-label='1 / 5' or @aria-label='2 / 5']//a[(@class='jgg-item') and (@pid='2692' or @pid='2693' or @pid='2695' or @pid='2696' or @pid='2697' or @pid='2698')]",
+    "browserUserAgent": ""
+  },
+  "download": {
+    "cacheTimezone": "Asia/Shanghai",
+    "maxTargets": 100,
+    "maxLandingClicks": 3,
+    "timeoutMs": 90000,
+    "retries": 2,
+    "landingRules": [{"host": "*", "by": "css", "selector": "a[href*='.apk'], a:has-text('下载'), button:has-text('下载')"}]
+  },
+  "execution": {
+    "mode": "FULL",
+    "proxySecretVersionId": "11111111-1111-4111-8111-111111111111",
+    "deviceProfiles": [{
+      "id": "pixel6-api35",
+      "name": "Pixel 6 Android 15 测试配置",
+      "avdDevice": "pixel_6",
+      "systemImage": "system-images;android-35;google_apis;x86_64",
+      "locale": "en-US"
+    }]
+  },
+  "registrationFlows": [{
+    "packageName": "com.example.testapp",
+    "activity": ".MainActivity",
+    "enabled": false,
+    "steps": [
+      {"action": "click", "locator": {"by": "id", "value": "com.example.testapp:id/open_register"}, "timeoutMs": 20000, "optional": false},
+      {"action": "input", "locator": {"by": "id", "value": "com.example.testapp:id/username"}, "text": "{username}", "timeoutMs": 20000, "optional": false},
+      {"action": "input", "locator": {"by": "id", "value": "com.example.testapp:id/password"}, "text": "{password}", "timeoutMs": 20000, "optional": false},
+      {"action": "submit", "locator": {"by": "id", "value": "com.example.testapp:id/submit"}, "timeoutMs": 20000, "optional": false}
+    ],
+    "success": {"locator": {"by": "id", "value": "com.example.testapp:id/account_home"}, "timeoutMs": 60000}
+  }]
+}
