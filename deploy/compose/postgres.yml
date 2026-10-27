@@ -1,0 +1,18 @@
+services:
+  postgres:
+    image: postgres:17.6-bookworm
+    environment:
+      POSTGRES_USER: apk
+      POSTGRES_DB: apk
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run npm run setup:env first}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U apk -d apk"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+volumes:
+  postgres-data:

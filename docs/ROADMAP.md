@@ -4,9 +4,11 @@
 
 ## 当前记录
 
-已完成：Node.js 与 TypeScript 架构、开发契约、接口清单、配置及节点协议 Schema、虚构正反例和契约检查入口的编写。2026 年 10 月 27 日执行 npm run check:contracts，39 项检查通过，包括 Schema 编译、正反例和文档相对链接；这不是 SSH 部署或 APK 业务验收。
+已完成 P0：npm 工作区、TypeScript strict、Vue 管理页面、NestJS API、Prisma 迁移、管理员 CLI 初始化、Argon2id 密码摘要、数据库会话与限流、CSRF、改密及审计、共享类型与静态校验器、生成 OpenAPI 及 CI 漂移检查。
 
-尚未完成：Node.js 业务工作区、中台页面及 API、真实 SSH 部署、Agent、网页下载、安卓注册。没有真实 APK，注册和设备标识的端到端验收仍依赖后续样本。项目不启动真实注册来验证文档。
+2026 年 10 月 27 日本地验收通过：lint、typecheck、check:contracts、build 和 npm test。39 项契约检查、12 项真实 PostgreSQL/API 验收场景及一条 Chromium 完整页面流程通过。PostgreSQL 17.6 在独立随机 Schema 中验证首次与重复迁移；浏览器覆盖登录、刷新、配置校验、改密、退出和移动端布局。运行依赖 npm audit --omit=dev --audit-level=high 通过。
+
+尚未完成：真实 SSH 部署、Agent、网页下载、安卓注册。没有真实 APK，注册和设备标识的端到端验收仍依赖后续样本。本地验收不等于云端部署；GitHub CI 结果以相应提交的运行记录为准。
 
 ## P0 工程基础
 

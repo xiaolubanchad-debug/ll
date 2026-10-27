@@ -2,8 +2,48 @@
   "name": "apk-deployment-platform",
   "version": "0.1.0",
   "private": true,
-  "description": "Contract baseline for the APK deployment control plane and agents",
-  "engines": {"node": ">=24 <25"},
-  "scripts": {"check:contracts": "node scripts/check-contracts.mjs"},
-  "devDependencies": {"ajv": "8.17.1", "ajv-formats": "3.0.1"}
+  "description": "APK deployment control plane",
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "generate:contracts": "node scripts/generate-contracts.mjs",
+    "check:contracts": "node scripts/generate-contracts.mjs --check && npm run build -w @apk/contracts && node scripts/check-contracts.mjs",
+    "build": "npm run build -w @apk/contracts && npm run build -w @apk/control-api && npm run build -w @apk/web",
+    "typecheck": "npm run build -w @apk/contracts && npm run typecheck --workspaces --if-present",
+    "lint": "eslint apps packages scripts tests --max-warnings=0",
+    "test": "npm run build && node scripts/test-p0.mjs",
+    "dev": "node --env-file=.env scripts/dev.mjs",
+    "setup:env": "node scripts/setup-env.mjs",
+    "db:generate": "prisma generate --schema apps/control-api/prisma/schema.prisma",
+    "db:migrate": "prisma migrate deploy --schema apps/control-api/prisma/schema.prisma",
+    "admin:init": "node --env-file=.env apps/control-api/dist/admin-cli.js"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@playwright/test": "1.56.1",
+    "@types/cookie-parser": "1.4.10",
+    "@types/express": "5.0.5",
+    "@types/node": "24.10.1",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
+    "embedded-postgres": "17.6.0-beta.15",
+    "esbuild": "0.25.12",
+    "eslint": "10.13.0",
+    "eslint-plugin-vue": "10.12.0",
+    "json-schema-to-typescript": "15.0.4",
+    "prettier": "3.6.2",
+    "prisma": "6.19.3",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.72.1"
+  },
+  "overrides": {
+    "multer": "2.5.0",
+    "deepmerge-ts": "8.0.0"
+  }
 }

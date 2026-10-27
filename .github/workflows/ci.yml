@@ -1,0 +1,34 @@
+name: P0 checks
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17.6-bookworm
+        env:
+          POSTGRES_USER: p0test
+          POSTGRES_PASSWORD: p0_ci_ephemeral_only
+          POSTGRES_DB: apk_test_p0
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U p0test -d apk_test_p0"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgresql://p0test:p0_ci_ephemeral_only@127.0.0.1:5432/apk_test_p0
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run db:generate
+      - run: npm run check:contracts
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm audit --omit=dev --audit-level=high
+      - run: npx playwright install --with-deps chromium --only-shell
+      - run: npm test

@@ -1,0 +1,81 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Admin {
+  id                String    @id @default(uuid()) @db.Uuid
+  singleton         Int       @unique @default(1)
+  username          String    @unique @db.VarChar(64)
+  passwordHash      String    @db.VarChar(512)
+  credentialVersion Int       @default(1)
+  createdAt         DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime  @updatedAt @db.Timestamptz(3)
+  sessions          Session[]
+  auditEvents       AuditEvent[]
+}
+
+model Session {
+  id                String    @id @default(uuid()) @db.Uuid
+  adminId           String    @db.Uuid
+  admin             Admin     @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  tokenHash         String    @unique @db.Char(64)
+  credentialVersion Int
+  createdAt         DateTime  @default(now()) @db.Timestamptz(3)
+  expiresAt         DateTime  @db.Timestamptz(3)
+  revokedAt         DateTime? @db.Timestamptz(3)
+
+  @@index([adminId, revokedAt])
+  @@index([expiresAt])
+}
+
+model AuditEvent {
+  id        String   @id @default(uuid()) @db.Uuid
+  adminId   String?  @db.Uuid
+  admin     Admin?   @relation(fields: [adminId], references: [id], onDelete: SetNull)
+  action    String   @db.VarChar(64)
+  requestId String   @db.VarChar(64)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([createdAt, id])
+}
+
+model LoginBucket {
+  key         String   @id @db.Char(64)
+  windowStart DateTime @db.Timestamptz(3)
+  attempts    Int
+}
+
+model Node {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @db.VarChar(100)
+  host      String   @db.VarChar(253)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  runs      Run[]
+}
+
+model Run {
+  id        String   @id @default(uuid()) @db.Uuid
+  nodeId    String   @db.Uuid
+  node      Node     @relation(fields: [nodeId], references: [id], onDelete: Restrict)
+  status    RunStatus @default(QUEUED)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([createdAt, id])
+}
+
+enum RunStatus {
+  QUEUED
+  ASSIGNED
+  RUNNING
+  STOP_REQUESTED
+  SUCCEEDED
+  PARTIAL_FAILED
+  FAILED
+  CANCELLED
+  NEEDS_REVIEW
+}

@@ -13,6 +13,6 @@ npm run check:contracts
 
 检查覆盖 JSON Schema 编译、正例通过、非法代理引用、明文秘密混入、重复提交、可选提交、任意代码字段、节点协议版本及事件类型等反例，也检查文档相对链接。
 
-脚本中的跨字段检查是契约阶段的可执行说明。P0 必须迁移到 packages/contracts 的公共运行时校验器并保留这些用例，不能在 Agent 和 API 各写不同版本。当前没有实现 SSH、数据库锁、远端权限或注册逻辑，相关场景按 ROADMAP.md 验收。
+跨字段检查已迁移到 packages/contracts 的公共运行时校验器，前端和 API 共用，原正反例继续执行。auth.schema.json 与 p0.http.json 新增 P0 登录输入及已实现路由契约；生成类型、静态校验器和 OpenAPI 后由 CI 检查漂移。当前没有实现 SSH 部署、节点租约或 APK 注册逻辑，相关场景按 ROADMAP.md 验收。
 
 Schema 能验证字段格式，不能证明主机可访问、XPath 可命中、定位器正确、设备标识变化、IP 固定或注册成功。网络和业务验证必须由执行层另行完成。

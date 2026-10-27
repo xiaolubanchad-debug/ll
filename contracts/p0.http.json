@@ -1,0 +1,16 @@
+{
+  "version": "1.0.1",
+  "routes": [
+    {"method": "post", "path": "/auth/login", "operationId": "login", "public": true, "request": "LoginInput", "response": "SessionView", "status": 200},
+    {"method": "get", "path": "/auth/me", "operationId": "me", "response": "SessionView", "status": 200},
+    {"method": "post", "path": "/auth/logout", "operationId": "logout", "status": 204},
+    {"method": "put", "path": "/auth/password", "operationId": "changePassword", "request": "PasswordChangeInput", "response": "SessionView", "status": 200},
+    {"method": "get", "path": "/nodes", "operationId": "nodes", "response": "NodeList", "status": 200},
+    {"method": "get", "path": "/runs", "operationId": "runs", "response": "RunList", "status": 200},
+    {"method": "get", "path": "/audit-events", "operationId": "audit", "response": "AuditList", "status": 200},
+    {"method": "post", "path": "/configs/validate", "operationId": "validateConfig", "request": "TestConfiguration", "response": "ValidationResult", "status": 200},
+    {"method": "get", "path": "/openapi.json", "operationId": "openapi", "status": 200},
+    {"method": "get", "path": "/health/live", "operationId": "live", "public": true, "status": 200},
+    {"method": "get", "path": "/health/ready", "operationId": "ready", "internal": true, "status": 200}
+  ]
+}

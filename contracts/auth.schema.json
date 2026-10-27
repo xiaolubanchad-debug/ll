@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.apk-platform.example/v1/auth.schema.json",
+  "$defs": {
+    "login": {
+      "type": "object", "additionalProperties": false, "required": ["username", "password"],
+      "properties": {
+        "username": {"type": "string", "pattern": "^[a-zA-Z0-9_.-]{3,64}$"},
+        "password": {"type": "string", "minLength": 1, "maxLength": 128}
+      }
+    },
+    "passwordChange": {
+      "type": "object", "additionalProperties": false, "required": ["currentPassword", "newPassword"],
+      "properties": {
+        "currentPassword": {"type": "string", "minLength": 1, "maxLength": 128},
+        "newPassword": {"type": "string", "minLength": 12, "maxLength": 128}
+      }
+    }
+  }
+}

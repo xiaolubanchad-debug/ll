@@ -114,7 +114,7 @@ docs/                    方案、契约、决策和验收
 tests/                   跨进程和端到端验收
 ```
 
-这是目标目录，当前只建立文档和契约。早期 Python 草稿作为历史内容保留，不创建新的 Python 业务实现。
+apps/web、apps/control-api、packages/contracts 和测试基础已在 P0 建立，deploy/compose 当前仅提供开发数据库。其余目录及执行能力随后续阶段实现。早期 Python 草稿作为历史内容保留，不创建新的 Python 业务实现。
 
 ## 参考依据
 

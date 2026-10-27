@@ -1,0 +1,23 @@
+{
+  "name": "@apk/control-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@apk/contracts": "0.1.0",
+    "@nestjs/common": "11.2.8",
+    "@nestjs/core": "11.2.8",
+    "@nestjs/platform-express": "11.2.8",
+    "@prisma/client": "6.19.3",
+    "@node-rs/argon2": "2.2.2",
+    "reflect-metadata": "0.2.2",
+    "rxjs": "7.8.2",
+    "cookie-parser": "1.4.7",
+    "helmet": "8.1.0",
+    "express": "5.2.1"
+  }
+}

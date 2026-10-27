@@ -6,7 +6,7 @@
 
 ## 当前状态
 
-2026 年 10 月 27 日已建立方案和开发契约基线 v1.0.0。当前仓库是设计与契约阶段，尚无可运行的 Node.js 中台、部署器或 Agent，未进行真实 EC2 部署和 APK 注册测试。
+已建立方案和开发契约基线，并实现 P0：Node.js 工作区、Vue 管理页面、NestJS API、PostgreSQL 迁移、管理员初始化及登录安全、配置草稿校验。部署器、Agent 和 APK 流程尚未实现。
 
 原 Python 单机方案被本方案替代。早期本地草稿不作为实现依据，也不纳入发布。
 
@@ -22,17 +22,22 @@
 | [部署与凭据规则](docs/DEPLOYMENT_AND_SECURITY.md) | SSH、密钥、发布、网络和运维规则 |
 | [开发阶段和验收](docs/ROADMAP.md) | 实施顺序、验收场景和交付证据 |
 | [架构决策](docs/DECISIONS.md) | 已确定选择及其变更条件 |
+| [P0 启动与验证](docs/P0_SETUP.md) | 本地启动、管理员初始化、测试和边界 |
 | [契约样例](contracts/README.md) | 正反例与检查方式 |
 
 ## 开发规则
 
 开发前阅读 [AGENTS.md](AGENTS.md) 和开发契约。跨模块行为先更新契约，再修改实现；不以界面完成度代替端到端验收。
 
-Node.js 24 LTS 为开发基线，依赖安装使用 npm 和受版本控制的 package-lock.json。此阶段的根 package.json 只用于契约检查；后续建立工作区时保留检查命令。
+Node.js 24 LTS 为开发基线，依赖安装使用 npm 和受版本控制的 package-lock.json。首次启动步骤见 [P0 启动与验证](docs/P0_SETUP.md)。
 
 ```sh
 npm ci
+npm run db:generate
+npm run lint
+npm run typecheck
 npm run check:contracts
+npm run build
 ```
 
 代码仓库：[xiaolubanchad-debug/ll](https://github.com/xiaolubanchad-debug/ll)。仓库中只能提交代码、文档和虚构样例，禁止提交 SSH 私钥、代理口令、实际账户、APK 和执行日志。

@@ -1,0 +1,2010 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "APK 部署中台 P0 API",
+    "version": "1.0.1"
+  },
+  "paths": {
+    "/api/v1/auth/login": {
+      "post": {
+        "operationId": "login",
+        "x-phase": "P0",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionView"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "统一错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "operationId": "me",
+        "x-phase": "P0",
+        "security": [
+          {
+            "AdminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionView"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "统一错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "operationId": "logout",
+        "x-phase": "P0",
+        "security": [
+          {
+            "AdminSession": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "成功"
+          },
+          "default": {
+            "description": "统一错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/password": {
+      "put": {
+        "operationId": "changePassword",
+        "x-phase": "P0",
+        "security": [
+          {
+            "AdminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionView"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "统一错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordChangeInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/nodes": {
+      "get": {
+        "operationId": "nodes",
+        "x-phase": "P0",
+        "security": [
+          {
+            "AdminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodeList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "统一错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/runs": {
+      "get": {
+        "operationId": "runs",
+        "x-phase": "P0",
+        "security": [
+          {
+            "AdminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "统一错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/audit-events": {
+      "get": {
+        "operationId": "audit",
+        "x-phase": "P0",
+        "security": [
+          {
+            "AdminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditList"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "统一错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/configs/validate": {
+      "post": {
+        "operationId": "validateConfig",
+        "x-phase": "P0",
+        "security": [
+          {
+            "AdminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "统一错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestConfiguration"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/openapi.json": {
+      "get": {
+        "operationId": "openapi",
+        "x-phase": "P0",
+        "security": [
+          {
+            "AdminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "default": {
+            "description": "统一错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/health/live": {
+      "get": {
+        "operationId": "live",
+        "x-phase": "P0",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "default": {
+            "description": "统一错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/health/ready": {
+      "get": {
+        "operationId": "ready",
+        "x-phase": "P0",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "default": {
+            "description": "统一错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "x-network-scope": "loopback"
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "AdminSession": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "apk_session"
+      }
+    },
+    "schemas": {
+      "TestConfiguration": {
+        "title": "APK test configuration version 1.0",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schemaVersion",
+          "name",
+          "source",
+          "download",
+          "execution",
+          "registrationFlows"
+        ],
+        "properties": {
+          "schemaVersion": {
+            "const": "1.0"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "source": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "url",
+              "xpath",
+              "browserUserAgent"
+            ],
+            "properties": {
+              "url": {
+                "type": "string",
+                "format": "uri",
+                "pattern": "^https?://",
+                "maxLength": 4096
+              },
+              "xpath": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 12000
+              },
+              "browserUserAgent": {
+                "type": "string",
+                "maxLength": 1024
+              }
+            }
+          },
+          "download": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "cacheTimezone",
+              "maxTargets",
+              "maxLandingClicks",
+              "timeoutMs",
+              "retries",
+              "landingRules"
+            ],
+            "properties": {
+              "cacheTimezone": {
+                "const": "Asia/Shanghai"
+              },
+              "maxTargets": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1000
+              },
+              "maxLandingClicks": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 5
+              },
+              "timeoutMs": {
+                "type": "integer",
+                "minimum": 10000,
+                "maximum": 600000
+              },
+              "retries": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2
+              },
+              "landingRules": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 50,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "host",
+                    "by",
+                    "selector"
+                  ],
+                  "properties": {
+                    "host": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 253,
+                      "pattern": "^(\\*|[a-zA-Z0-9.-]+)$"
+                    },
+                    "by": {
+                      "enum": [
+                        "css",
+                        "xpath"
+                      ]
+                    },
+                    "selector": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 4096
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "execution": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "mode",
+              "deviceProfiles"
+            ],
+            "properties": {
+              "mode": {
+                "enum": [
+                  "DOWNLOAD_ONLY",
+                  "FULL"
+                ]
+              },
+              "proxySecretVersionId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "deviceProfiles": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 10,
+                "items": {
+                  "$ref": "#/components/schemas/TestConfiguration/$defs/deviceProfile"
+                }
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "mode": {
+                      "const": "FULL"
+                    }
+                  },
+                  "required": [
+                    "mode"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "proxySecretVersionId"
+                  ]
+                }
+              }
+            ]
+          },
+          "registrationFlows": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/TestConfiguration/$defs/flow"
+            }
+          }
+        },
+        "$defs": {
+          "deviceProfile": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "name",
+              "avdDevice",
+              "systemImage",
+              "locale"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "avdDevice": {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9_-]+$",
+                "maxLength": 100
+              },
+              "systemImage": {
+                "type": "string",
+                "pattern": "^system-images;android-[0-9]+;[a-zA-Z0-9_-]+;x86_64$"
+              },
+              "locale": {
+                "type": "string",
+                "pattern": "^[a-z]{2}-[A-Z]{2}$"
+              }
+            }
+          },
+          "locator": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "by",
+              "value"
+            ],
+            "properties": {
+              "by": {
+                "enum": [
+                  "id",
+                  "accessibilityId",
+                  "xpath",
+                  "androidUiAutomator"
+                ]
+              },
+              "value": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096
+              }
+            }
+          },
+          "step": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "action",
+              "timeoutMs",
+              "optional"
+            ],
+            "properties": {
+              "action": {
+                "enum": [
+                  "click",
+                  "input",
+                  "wait",
+                  "back",
+                  "submit"
+                ]
+              },
+              "locator": {
+                "$ref": "#/components/schemas/TestConfiguration/$defs/locator"
+              },
+              "text": {
+                "enum": [
+                  "{username}",
+                  "{password}"
+                ]
+              },
+              "timeoutMs": {
+                "type": "integer",
+                "minimum": 1000,
+                "maximum": 120000
+              },
+              "optional": {
+                "type": "boolean"
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "action": {
+                      "enum": [
+                        "click",
+                        "input",
+                        "wait",
+                        "submit"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "action"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "locator"
+                  ]
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "action": {
+                      "const": "input"
+                    }
+                  },
+                  "required": [
+                    "action"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "text"
+                  ]
+                },
+                "else": {
+                  "not": {
+                    "required": [
+                      "text"
+                    ]
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "action": {
+                      "const": "submit"
+                    }
+                  },
+                  "required": [
+                    "action"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "optional": {
+                      "const": false
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "action": {
+                      "const": "back"
+                    }
+                  },
+                  "required": [
+                    "action"
+                  ]
+                },
+                "then": {
+                  "not": {
+                    "required": [
+                      "locator"
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          "flow": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "packageName",
+              "activity",
+              "enabled",
+              "steps",
+              "success"
+            ],
+            "properties": {
+              "packageName": {
+                "type": "string",
+                "pattern": "^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)+$",
+                "maxLength": 256
+              },
+              "activity": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256,
+                "pattern": "^[a-zA-Z0-9_.$]+$"
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "steps": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 60,
+                "items": {
+                  "$ref": "#/components/schemas/TestConfiguration/$defs/step"
+                },
+                "contains": {
+                  "type": "object",
+                  "properties": {
+                    "action": {
+                      "const": "submit"
+                    }
+                  },
+                  "required": [
+                    "action"
+                  ]
+                },
+                "minContains": 1,
+                "maxContains": 1
+              },
+              "success": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "locator",
+                  "timeoutMs"
+                ],
+                "properties": {
+                  "locator": {
+                    "$ref": "#/components/schemas/TestConfiguration/$defs/locator"
+                  },
+                  "timeoutMs": {
+                    "type": "integer",
+                    "minimum": 1000,
+                    "maximum": 60000
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "AgentMessage": {
+        "title": "APK node protocol 1.0 messages",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/AgentMessage/$defs/enroll"
+          },
+          {
+            "$ref": "#/components/schemas/AgentMessage/$defs/heartbeat"
+          },
+          {
+            "$ref": "#/components/schemas/AgentMessage/$defs/claim"
+          },
+          {
+            "$ref": "#/components/schemas/AgentMessage/$defs/delivery"
+          },
+          {
+            "$ref": "#/components/schemas/AgentMessage/$defs/accept"
+          },
+          {
+            "$ref": "#/components/schemas/AgentMessage/$defs/events"
+          },
+          {
+            "$ref": "#/components/schemas/AgentMessage/$defs/account"
+          }
+        ],
+        "$defs": {
+          "uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "time": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "string",
+            "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+          },
+          "hash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "enroll": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "protocolVersion",
+              "nodeId",
+              "bootId",
+              "agentVersion",
+              "releaseId"
+            ],
+            "properties": {
+              "kind": {
+                "const": "enroll"
+              },
+              "protocolVersion": {
+                "const": "1.0"
+              },
+              "nodeId": {
+                "$ref": "#/components/schemas/AgentMessage/$defs/uuid"
+              },
+              "bootId": {
+                "$ref": "#/components/schemas/AgentMessage/$defs/uuid"
+              },
+              "agentVersion": {
+                "$ref": "#/components/schemas/AgentMessage/$defs/version"
+              },
+              "releaseId": {
+                "$ref": "#/components/schemas/AgentMessage/$defs/uuid"
+              }
+            }
+          },
+          "currentDelivery": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "deliveryId",
+              "runId",
+              "fence"
+            ],
+            "properties": {
+              "deliveryId": {
+                "$ref": "#/components/schemas/AgentMessage/$defs/uuid"
+              },
+              "runId": {
+                "$ref": "#/components/schemas/AgentMessage/$defs/uuid"
+              },
+              "fence": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          },
+          "heartbeat": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "protocolVersion",
+              "nodeId",
+              "bootId",
+              "agentVersion",
+              "releaseId",
+              "sentAt",
+              "capabilities",
+              "currentDelivery"
+            ],
+            "properties": {
+              "kind": {
+                "const": "heartbeat"
+              },
+              "protocolVersion": {
+                "const": "1.0"
+              },
+              "nodeId": {
+                "$ref": "#/components/schemas/AgentMessage/$defs/uuid"
+              },
+              "bootId": {
+                "$ref": "#/components/schemas/AgentMessage/$defs/uuid"
+              },
+              "agentVersion": {
+                "$ref": "#/components/schemas/AgentMessage/$defs/version"
+              },
+              "releaseId": {
+                "$ref": "#/components/schemas/AgentMessage/$defs/uuid"
+              },
+              "sentAt": {
+                "$ref": "#/components/schemas/AgentMessage/$defs/time"
+              },
+              "capabilities": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "download",
+                  "android",
+                  "kvm",
+                  "freeDiskBytes"
+                ],
+                "properties": {
+                  "download": {
+                    "type": "boolean"
+                  },
+                  "android": {
+                    "type": "boolean"
+                  },
+                  "kvm": {
+                    "type": "boolean"
+                  },
+                  "freeDiskBytes": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              },
+              "currentDelivery": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/AgentMessage/$defs/currentDelivery"
+                  }
+                ]
+              }
+            }
+          },
+          "claim": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "protocolVersion",
+              "nodeId",
+              "bootId"
+            ],
+            "properties": {
+              "kind": {
+                "const": "claim"
+              },
+              "protocolVersion": {
+                "const": "1.0"
+              },
+              "nodeId": {
+                "$ref": "#/components/schemas/AgentMessage/$defs/uuid"
+              },
+              "bootId": {
+                "$ref": "#/components/schemas/AgentMessage/$defs/uuid"
+              }
+            }
+          },
+          "delivery": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "protocolVersion",
+              "nodeId",
+              "deliveryId",
+              "runId",
+              "fence",
+              "configVersionId",
+              "configHash",
+              "releaseId",
+              "issuedAt",
+              "ackDeadline",
+              "leaseExpiresAt"
+            ],
+            "properties": {
+              "kind": {
+                "const": "delivery"
+              },
+              "protocolVersion": {
+                "const": "1.0"
+              },
+              "nodeId": {
+                "$ref": "#/components/schemas/AgentMessage/$defs/uuid"
+              },
+              "deliveryId": {
+                "$ref": "#/components/schemas/AgentMessage/$defs/uuid"
+              },
+              "runId": {
+                "$ref": "#/components/schemas/AgentMessage/$defs/uuid"
+              },
+              "fence": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "configVersionId": {
+                "$ref": "#/components/schemas/AgentMessage/$defs/uuid"
+              },
+              "configHash": {
+                "$ref": "#/components/schemas/AgentMessage/$defs/hash"
+              },
+              "releaseId": {
+                "$ref": "#/components/schemas/AgentMessage/$defs/uuid"
+              },
+              "issuedAt": {
+                "$ref": "#/components/schemas/AgentMessage/$defs/time"
+              },
+              "ackDeadline": {
+                "$ref": "#/components/schemas/AgentMessage/$defs/time"
+              },
+              "leaseExpiresAt": {
+                "$ref": "#/components/schemas/AgentMessage/$defs/time"
+              }
+            }
+          },
+          "accept": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "protocolVersion",
+              "nodeId",
+              "bootId",
+              "deliveryId",
+              "fence"
+            ],
+            "properties": {
+              "kind": {
+                "const": "accept"
+              },
+              "protocolVersion": {
+                "const": "1.0"
+              },
+              "nodeId": {
+                "$ref": "#/components/schemas/AgentMessage/$defs/uuid"
+              },
+              "bootId": {
+                "$ref": "#/components/schemas/AgentMessage/$defs/uuid"
+              },
+              "deliveryId": {
+                "$ref": "#/components/schemas/AgentMessage/$defs/uuid"
+              },
+              "fence": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          },
+          "events": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "protocolVersion",
+              "nodeId",
+              "deliveryId",
+              "fence",
+              "events"
+            ],
+            "properties": {
+              "kind": {
+                "const": "events"
+              },
+              "protocolVersion": {
+                "const": "1.0"
+              },
+              "nodeId": {
+                "$ref": "#/components/schemas/AgentMessage/$defs/uuid"
+              },
+              "deliveryId": {
+                "$ref": "#/components/schemas/AgentMessage/$defs/uuid"
+              },
+              "fence": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "events": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 100,
+                "items": {
+                  "$ref": "#/components/schemas/AgentMessage/$defs/event"
+                }
+              }
+            }
+          },
+          "account": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "protocolVersion",
+              "nodeId",
+              "deliveryId",
+              "fence",
+              "taskId",
+              "accountRef",
+              "username",
+              "password"
+            ],
+            "properties": {
+              "kind": {
+                "const": "account"
+              },
+              "protocolVersion": {
+                "const": "1.0"
+              },
+              "nodeId": {
+                "$ref": "#/components/schemas/AgentMessage/$defs/uuid"
+              },
+              "deliveryId": {
+                "$ref": "#/components/schemas/AgentMessage/$defs/uuid"
+              },
+              "fence": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "taskId": {
+                "$ref": "#/components/schemas/AgentMessage/$defs/uuid"
+              },
+              "accountRef": {
+                "$ref": "#/components/schemas/AgentMessage/$defs/uuid"
+              },
+              "username": {
+                "type": "string",
+                "pattern": "^[a-zA-Z]{6,10}$"
+              },
+              "password": {
+                "type": "string",
+                "minLength": 8,
+                "maxLength": 12,
+                "pattern": "^(?=.*[a-zA-Z])(?=.*[0-9])[a-zA-Z0-9]+$"
+              }
+            }
+          },
+          "event": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "eventId",
+              "runId",
+              "sequence",
+              "occurredAt",
+              "type",
+              "payload"
+            ],
+            "properties": {
+              "eventId": {
+                "$ref": "#/components/schemas/AgentMessage/$defs/uuid"
+              },
+              "runId": {
+                "$ref": "#/components/schemas/AgentMessage/$defs/uuid"
+              },
+              "taskId": {
+                "$ref": "#/components/schemas/AgentMessage/$defs/uuid"
+              },
+              "sequence": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "occurredAt": {
+                "$ref": "#/components/schemas/AgentMessage/$defs/time"
+              },
+              "type": {
+                "enum": [
+                  "RUN_STARTED",
+                  "TARGETS_DISCOVERED",
+                  "TASK_STAGE",
+                  "SUBMISSION_INTENT",
+                  "TASK_FINISHED",
+                  "RUN_FINISHED",
+                  "STOP_ACK",
+                  "LOG"
+                ]
+              },
+              "payload": {
+                "type": "object"
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "type": {
+                      "const": "RUN_STARTED"
+                    }
+                  },
+                  "required": [
+                    "type"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "payload": {
+                      "$ref": "#/components/schemas/AgentMessage/$defs/runStarted"
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "type": {
+                      "const": "TARGETS_DISCOVERED"
+                    }
+                  },
+                  "required": [
+                    "type"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "payload": {
+                      "$ref": "#/components/schemas/AgentMessage/$defs/targets"
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "type": {
+                      "const": "TASK_STAGE"
+                    }
+                  },
+                  "required": [
+                    "type"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "taskId"
+                  ],
+                  "properties": {
+                    "payload": {
+                      "$ref": "#/components/schemas/AgentMessage/$defs/taskStage"
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "type": {
+                      "const": "SUBMISSION_INTENT"
+                    }
+                  },
+                  "required": [
+                    "type"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "taskId"
+                  ],
+                  "properties": {
+                    "payload": {
+                      "$ref": "#/components/schemas/AgentMessage/$defs/submission"
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "type": {
+                      "const": "TASK_FINISHED"
+                    }
+                  },
+                  "required": [
+                    "type"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "taskId"
+                  ],
+                  "properties": {
+                    "payload": {
+                      "$ref": "#/components/schemas/AgentMessage/$defs/taskFinished"
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "type": {
+                      "const": "RUN_FINISHED"
+                    }
+                  },
+                  "required": [
+                    "type"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "payload": {
+                      "$ref": "#/components/schemas/AgentMessage/$defs/runFinished"
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "type": {
+                      "const": "STOP_ACK"
+                    }
+                  },
+                  "required": [
+                    "type"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "payload": {
+                      "$ref": "#/components/schemas/AgentMessage/$defs/stopAck"
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "type": {
+                      "const": "LOG"
+                    }
+                  },
+                  "required": [
+                    "type"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "payload": {
+                      "$ref": "#/components/schemas/AgentMessage/$defs/log"
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "runStarted": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "configHash",
+              "releaseId"
+            ],
+            "properties": {
+              "configHash": {
+                "$ref": "#/components/schemas/AgentMessage/$defs/hash"
+              },
+              "releaseId": {
+                "$ref": "#/components/schemas/AgentMessage/$defs/uuid"
+              }
+            }
+          },
+          "targets": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "targets"
+            ],
+            "properties": {
+              "targets": {
+                "type": "array",
+                "maxItems": 1000,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "taskId",
+                    "targetKey",
+                    "label",
+                    "sourceUrl"
+                  ],
+                  "properties": {
+                    "taskId": {
+                      "$ref": "#/components/schemas/AgentMessage/$defs/uuid"
+                    },
+                    "targetKey": {
+                      "$ref": "#/components/schemas/AgentMessage/$defs/hash"
+                    },
+                    "label": {
+                      "type": "string",
+                      "maxLength": 200
+                    },
+                    "sourceUrl": {
+                      "type": "string",
+                      "format": "uri",
+                      "pattern": "^https?://",
+                      "maxLength": 4096
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "taskStage": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "stage"
+            ],
+            "properties": {
+              "stage": {
+                "enum": [
+                  "QUEUED",
+                  "DOWNLOADING",
+                  "DOWNLOADED",
+                  "PREPARING",
+                  "INSTALLING",
+                  "LAUNCHING",
+                  "REGISTERING",
+                  "VERIFYING"
+                ]
+              },
+              "cacheHit": {
+                "type": "boolean"
+              },
+              "packageName": {
+                "type": "string",
+                "maxLength": 256
+              },
+              "apkSha256": {
+                "$ref": "#/components/schemas/AgentMessage/$defs/hash"
+              },
+              "deviceProfileId": {
+                "type": "string",
+                "maxLength": 64
+              }
+            }
+          },
+          "submission": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "submissionId",
+              "accountRef"
+            ],
+            "properties": {
+              "submissionId": {
+                "$ref": "#/components/schemas/AgentMessage/$defs/uuid"
+              },
+              "accountRef": {
+                "$ref": "#/components/schemas/AgentMessage/$defs/uuid"
+              }
+            }
+          },
+          "taskFinished": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "status",
+              "proof",
+              "artifactIds"
+            ],
+            "properties": {
+              "status": {
+                "enum": [
+                  "SUCCEEDED",
+                  "FAILED",
+                  "SKIPPED",
+                  "CANCELLED",
+                  "UNKNOWN"
+                ]
+              },
+              "proof": {
+                "enum": [
+                  "APP_UI",
+                  "FILE_VALIDATION",
+                  "NONE"
+                ]
+              },
+              "artifactIds": {
+                "type": "array",
+                "maxItems": 100,
+                "uniqueItems": true,
+                "items": {
+                  "$ref": "#/components/schemas/AgentMessage/$defs/uuid"
+                }
+              },
+              "accountRef": {
+                "$ref": "#/components/schemas/AgentMessage/$defs/uuid"
+              },
+              "errorCode": {
+                "type": "string",
+                "pattern": "^[A-Z_]+$",
+                "maxLength": 100
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "status": {
+                      "const": "SUCCEEDED"
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "proof": {
+                      "enum": [
+                        "APP_UI",
+                        "FILE_VALIDATION"
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "proof": {
+                      "const": "APP_UI"
+                    }
+                  },
+                  "required": [
+                    "proof"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "accountRef"
+                  ],
+                  "properties": {
+                    "artifactIds": {
+                      "type": "array",
+                      "minItems": 1
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "runFinished": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "status"
+            ],
+            "properties": {
+              "status": {
+                "enum": [
+                  "SUCCEEDED",
+                  "PARTIAL_FAILED",
+                  "FAILED",
+                  "CANCELLED",
+                  "NEEDS_REVIEW"
+                ]
+              }
+            }
+          },
+          "stopAck": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "cleanupComplete"
+            ],
+            "properties": {
+              "cleanupComplete": {
+                "type": "boolean"
+              }
+            }
+          },
+          "log": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "level",
+              "message"
+            ],
+            "properties": {
+              "level": {
+                "enum": [
+                  "INFO",
+                  "WARN",
+                  "ERROR"
+                ]
+              },
+              "message": {
+                "type": "string",
+                "maxLength": 4000
+              }
+            }
+          }
+        }
+      },
+      "LoginInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "username",
+          "password"
+        ],
+        "properties": {
+          "username": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_.-]{3,64}$"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
+      },
+      "PasswordChangeInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "currentPassword",
+          "newPassword"
+        ],
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "newPassword": {
+            "type": "string",
+            "minLength": 12,
+            "maxLength": 128
+          }
+        }
+      },
+      "SessionView": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "admin": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "username": {
+                "type": "string"
+              },
+              "role": {
+                "const": "SUPER_ADMIN"
+              }
+            },
+            "required": [
+              "id",
+              "username",
+              "role"
+            ]
+          },
+          "csrfToken": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "admin",
+          "csrfToken"
+        ]
+      },
+      "ValidationResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "valid": {
+            "const": true
+          }
+        },
+        "required": [
+          "valid"
+        ]
+      },
+      "NodeList": {
+        "type": "object",
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "host": {
+                  "type": "string"
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "host",
+                "createdAt"
+              ]
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "RunList": {
+        "type": "object",
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "nodeId": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "id",
+                "nodeId",
+                "status",
+                "createdAt"
+              ]
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "AuditList": {
+        "type": "object",
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "action": {
+                  "type": "string"
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "id",
+                "action",
+                "createdAt"
+              ]
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "ApiError": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "requestId": {
+                "type": "string"
+              },
+              "details": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "message"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "code",
+              "message",
+              "requestId",
+              "details"
+            ]
+          }
+        },
+        "required": [
+          "error"
+        ]
+      }
+    }
+  }
+}

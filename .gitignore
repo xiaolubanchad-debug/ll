@@ -4,6 +4,7 @@ __pycache__/
 .pytest_cache/
 *.pyc
 .env
+.env.*
 data/
 *.apk
 *.apks
@@ -18,3 +19,7 @@ coverage/
 *.db
 *.log
 archive/
+test-results/
+playwright-report/
+*.tsbuildinfo
+!.env.example

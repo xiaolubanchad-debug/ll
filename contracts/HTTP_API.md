@@ -1,6 +1,8 @@
 # HTTP 接口契约
 
-版本 1.0.0，前缀 /api/v1。此文件定义待实现接口，当前没有运行中的服务。控制端 REST 路由在 P0 生成 OpenAPI，并与本文逐项核对。
+版本 1.0.1，前缀 /api/v1。P0 已实现的路由列在 p0.http.json 并生成 openapi.json，其余路由仍是后续阶段设计。CI 比较已实现 Controller、P0 清单和 OpenAPI，防止把设计接口误报为已完成。
+
+P0 范围为 auth 四个接口、nodes/runs/audit-events 的只读分页、configs/validate、openapi.json 和健康检查。列表当前只支持 cursor 和 limit；后续的 nodeId/status 筛选随对应阶段实现。P0 不保存配置版本，也不提供节点写入、部署或实际任务执行。
 
 ## 通用规则
 
@@ -37,6 +39,7 @@ POST 创建批次、部署、配置版本、停止和核验必须带 Idempotency
 | POST /deployments/{id}/stop | reason | 202 或终态原结果，取消请求不等于已回滚 |
 | GET /deployments/{id}/events | afterSequence,limit | 可补读事件列表 |
 | GET /configs | cursor,limit | 配置摘要及最新版本号 |
+| POST /configs/validate | 符合 config.schema.json 的草稿 | P0 已实现，只校验无持久化，返回 {valid:true}，要求会话和 CSRF |
 | POST /configs | name | 配置容器，尚不可执行 |
 | POST /configs/{id}/versions | 符合 config.schema.json 的正文 | 不可变版本、configVersionId、configHash |
 | GET /configs/{id}/versions/{versionId} | 无 | 非敏感完整配置，不解密代理口令 |
@@ -56,6 +59,9 @@ POST 创建批次、部署、配置版本、停止和核验必须带 Idempotency
 | GET /audit-events | cursor,limit | 管理操作审计 |
 | GET /health/live | 无，公开 | 进程存活，不返回内部地址或配置 |
 | GET /health/ready | 无，内部 | 数据库和关键依赖就绪，供部署系统使用 |
+| GET /openapi.json | 管理员会话 | P0 已实现路由的生成文档 |
+
+登录及 me 返回 SessionView，包括 admin 摘要和 csrfToken。改密成功也返回 SessionView，并轮换当前 Cookie、撤销旧会话。密码修改和配置校验请求使用 JSON，Header 包含精确 Origin 与 X-CSRF-Token。会话最长 12 小时，非滑动续期。P0 管理员密码为 12–128 个字符，不采用 APK 测试账户的 8–12 位规则。
 
 NodeConnection 凭据上传上限 64 KiB；普通配置正文上限 256 KiB；单张截图上限 10 MiB；单份日志上限 20 MiB。注册流程不得包含实际账户密码，只能引用生成变量。所有嵌套未知字段默认拒绝。
 
