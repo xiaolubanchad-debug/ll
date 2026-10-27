@@ -79,8 +79,9 @@ npm run check:contracts
 npm audit --omit=dev --audit-level=high
 npm test
 ansible-playbook -i 'target,' --syntax-check deploy/ansible/install.yml deploy/ansible/activate.yml
+node scripts/check-ansible.mjs .venv-deploy/bin/ansible-playbook
 ```
 
-验收包含 P0 回归、首次及重复迁移、真实 SSH 密码与私钥认证、无凭据指纹探测、固定脚本执行、故障错误码、加密凭据及不回显、发布校验、幂等与双 Worker 竞争、注册响应丢失重试、身份吊销、过期隔离和核验、受限 PostgreSQL 角色，以及服务器页面新增/停止/归档操作。CI 在 Linux 检查 Playbook 语法。
+验收包含 P0 回归、首次及重复迁移、真实 SSH 密码与私钥认证、无凭据指纹探测、固定脚本执行、故障错误码、加密凭据及不回显、发布校验、幂等与双 Worker 竞争、注册响应丢失重试、身份吊销、过期隔离和核验、受限 PostgreSQL 角色，以及服务器页面新增/停止/归档操作。CI 在 Linux 检查 Playbook 语法，并用真实 Ansible 本地连接验证含模板符号的凭据保持原文。
 
 测试安装器明确使用替身，不下载或启动真实 Android、不登录 EC2、不安装实际 APK。真实 EC2 的首次安装、升级、网络断开及安卓启动，仍需在提供测试实例后单独验收。P1 Agent 只注册和心跳，不领取或执行 APK 测试任务。

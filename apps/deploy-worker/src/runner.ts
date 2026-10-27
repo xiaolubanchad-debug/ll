@@ -19,6 +19,24 @@ export interface Runner {
   activate(context: InstallContext, bootstrapToken: string, signal: AbortSignal): Promise<void>;
 }
 const root = fileURLToPath(new URL('../../../', import.meta.url));
+export function renderInventory(target: Record<string, string | number | boolean>) {
+  return (
+    'all:\n  hosts:\n    target:\n' +
+    Object.entries(target)
+      .map(([key, value]) => {
+        if (!/^[a-z][a-z0-9_]*$/.test(key)) throw new Error('INVENTORY_KEY_INVALID');
+        return (
+          '      ' +
+          key +
+          ': ' +
+          (typeof value === 'string' ? '!unsafe ' : '') +
+          JSON.stringify(value)
+        );
+      })
+      .join('\n') +
+    '\n'
+  );
+}
 export class AnsibleRunner implements Runner {
   constructor(
     private readonly playbooks = join(root, 'deploy/ansible'),
@@ -53,7 +71,7 @@ export class AnsibleRunner implements Runner {
         `[${context.node.host}]:${context.node.port} ${context.node.hostKey}\n${context.node.host} ${context.node.hostKey}\n`,
         { mode: 0o600 },
       );
-      const target: Record<string, unknown> = {
+      const target: Record<string, string | number | boolean> = {
         ansible_host: context.node.host,
         ansible_port: context.node.port,
         ansible_user: context.node.username,
@@ -70,13 +88,11 @@ export class AnsibleRunner implements Runner {
             JSON.stringify({ 'Enter passphrase for .*:': context.ssh.passphrase }),
             { mode: 0o600 },
           );
-      } else target.ansible_password = context.ssh.password;
+      } else if (context.ssh.password) target.ansible_password = context.ssh.password;
       if (context.sudoPassword) target.ansible_become_password = context.sudoPassword;
-      await writeFile(
-        join(dir, 'inventory', 'hosts.json'),
-        JSON.stringify({ all: { hosts: { target } } }),
-        { mode: 0o600 },
-      );
+      await writeFile(join(dir, 'inventory', 'hosts.yml'), renderInventory(target), {
+        mode: 0o600,
+      });
       const toolchainHash = (await import('@apk/platform')).digest(
         (await import('@apk/platform')).canonical(context.manifest.toolchain),
       );
@@ -115,6 +131,7 @@ export class AnsibleRunner implements Runner {
             ANSIBLE_HOST_KEY_CHECKING: 'True',
             ANSIBLE_RETRY_FILES_ENABLED: 'False',
             ANSIBLE_NOCOLOR: '1',
+            ANSIBLE_SSH_PASSWORD_MECHANISM: 'sshpass',
           },
         });
         let resolved = false;

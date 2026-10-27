@@ -24,7 +24,7 @@ const pair = generateKeyPairSync('rsa', {
   publicKeyEncoding: { type: 'spki', format: 'pem' },
 });
 const parsedKey = utils.parseKey(pair.privateKey);
-const password = 'ssh-test-' + randomBytes(10).toString('hex');
+const password = 'ssh-test-' + randomBytes(10).toString('hex') + '{{ 2 + 2 }}';
 const machine = { kvm: true, disk: 50 * 1024 ** 3, sudo: true, marker: false };
 const sockets = new Set();
 let authAttempts = 0,
