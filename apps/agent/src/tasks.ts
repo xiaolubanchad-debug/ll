@@ -361,6 +361,11 @@ export class TaskEngine {
                   policy: this.options.policy,
                   proxyCheckUrl: this.options.proxyCheckUrl,
                   androidFactory: this.options.androidFactory,
+                  learning: {
+                    load: async (key) => this.store.loadRegistrationTemplate(key),
+                    save: async (key, value) => this.store.saveRegistrationTemplate(key, value),
+                    drop: async (key) => this.store.dropRegistrationTemplate(key),
+                  },
                   beforeAction,
                   resources: async (record) => {
                     this.store.android(d.deliveryId, record);

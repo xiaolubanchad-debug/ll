@@ -1,4 +1,4 @@
-import type { ApkMetadata, TestConfiguration } from '@apk/contracts';
+import type { ApkMetadata, TestConfiguration, RegistrationRecognition } from '@apk/contracts';
 import { registrationFlowFor } from '@apk/contracts';
 import { startAndroid } from './android.js';
 import type { AndroidOptions } from './android.js';
@@ -7,12 +7,21 @@ import { redactScreenshot } from './screenshot.js';
 import type { Target, AutomationEvent } from './download.js';
 import { RegistrationError } from './registration-types.js';
 import type { Account, AndroidSession, Rect, TaskCompletion } from './registration-types.js';
+import { canonical, sha } from './common.js';
+import { discoverRegistration } from './registration-discovery.js';
+import type { RegistrationDiscovery, RegistrationLearning } from './registration-discovery.js';
+import {
+  readRegistrationPage,
+  registrationOutcome,
+  registrationBindingsValid,
+} from './registration-ui.js';
 
 export interface RegistrationHooks extends AndroidOptions {
   account(taskId: string): Promise<Account>;
   intent(taskId: string, accountRef: string, signal: AbortSignal): Promise<void>;
   evidence(taskId: string, bytes: Buffer, signal: AbortSignal): Promise<string>;
   androidFactory?: typeof startAndroid;
+  learning?: RegistrationLearning;
 }
 export type RegistrationCompletion = TaskCompletion & { cleanupComplete: boolean };
 export async function registerApk(
@@ -26,7 +35,8 @@ export async function registerApk(
   hooks: RegistrationHooks,
 ): Promise<RegistrationCompletion> {
   const template = registrationFlowFor(config, apk.packageName, target.entryId);
-  if (!template)
+  const automatic = !template && config.execution.autoRegistration?.enabled === true;
+  if (!template && !automatic)
     return {
       status: 'SKIPPED',
       proof: 'NONE',
@@ -34,7 +44,18 @@ export async function registerApk(
       errorCode: 'FLOW_NOT_CONFIGURED',
       cleanupComplete: true,
     };
-  const flow = structuredClone(template);
+  const flow: TestConfiguration['registrationFlows'][number] = template
+    ? structuredClone(template)
+    : {
+        packageName: apk.packageName,
+        activity: '@launcher',
+        enabled: true,
+        steps: [],
+        success: {
+          locator: { by: 'xpath', value: '//*[@text="注册成功"]' },
+          timeoutMs: config.execution.autoRegistration!.successTimeoutMs,
+        },
+      };
   flow.packageName = apk.packageName;
   for (const locator of [
     ...flow.steps.map((s) => s.locator),
@@ -52,6 +73,12 @@ export async function registerApk(
     artifactIds: [],
     errorCode: 'ANDROID_FAILED',
   };
+  let recognition: RegistrationRecognition | undefined;
+  let discovery: RegistrationDiscovery | undefined,
+    learningKey = '',
+    beforeSubmit = '',
+    discovering = false;
+  const inputs: Rect[] = [];
   const stage = async (name: string, extra: Record<string, unknown> = {}) =>
     emit({ type: 'TASK_STAGE', taskId: target.taskId, payload: { stage: name, ...extra } });
   const action = () => {
@@ -85,9 +112,64 @@ export async function registerApk(
     await stage('LAUNCHING');
     await session.launch(flow.packageName, flow.activity);
     action();
-    await stage('REGISTERING');
+    if (automatic) {
+      recognition = {
+        source: 'CONTROLS',
+        navigationSteps: 0,
+        cache: 'MISS',
+        learned: false,
+        needsAdaptation: false,
+      };
+      await stage('DISCOVERING');
+      discovering = true;
+      learningKey = sha(
+        canonical([
+          'AUTO_V1',
+          config.source.url,
+          config.source.xpath,
+          target.entryId ?? apk.packageName,
+          profile,
+          config.execution.autoRegistration,
+        ]),
+      );
+      discovery = await discoverRegistration(
+        session,
+        apk.packageName,
+        config.execution.autoRegistration!,
+        learningKey,
+        signal,
+        action,
+        recognition!,
+        hooks.learning,
+      );
+      discovering = false;
+      const form = discovery.form;
+      const input = (locator: typeof form.username, text: '{username}' | '{password}') => ({
+        action: 'input' as const,
+        locator,
+        text,
+        timeoutMs: 10000,
+        optional: false,
+      });
+      flow.steps = [
+        ...(form.agreement
+          ? [
+              {
+                action: 'click' as const,
+                locator: form.agreement,
+                timeoutMs: 10000,
+                optional: false,
+              },
+            ]
+          : []),
+        input(form.username, '{username}'),
+        input(form.password, '{password}'),
+        ...(form.confirm ? [input(form.confirm, '{password}')] : []),
+        { action: 'submit', locator: form.submit, timeoutMs: 10000, optional: false },
+      ];
+    }
+    await stage('REGISTERING', recognition ? { recognition: structuredClone(recognition) } : {});
     account = await hooks.account(target.taskId);
-    const inputs: Rect[] = [];
     for (const [position, step] of flow.steps.entries()) {
       if (submitted) break; // Verification below is read-only, including when stop has been requested.
       action();
@@ -97,6 +179,18 @@ export async function registerApk(
       }
       let id: string;
       try {
+        if (automatic && step.action === 'submit') {
+          await session.hideKeyboard?.();
+          action();
+          beforeSubmit = await session.source(signal);
+          if (
+            !registrationBindingsValid(
+              readRegistrationPage(beforeSubmit, apk.packageName),
+              discovery!.form,
+            )
+          )
+            throw new RegistrationError('AUTO_FORM_CHANGED');
+        }
         id = await session.find(step.locator!, step.timeoutMs, signal);
       } catch (error) {
         if (
@@ -141,6 +235,21 @@ export async function registerApk(
         let outcome: 'SUCCEEDED' | 'FAILED' | undefined;
         while (Date.now() < deadline) {
           const remaining = () => Math.max(1, deadline - Date.now());
+          if (automatic) {
+            try {
+              outcome = registrationOutcome(
+                await session.source(verificationSignal),
+                apk.packageName,
+                account,
+                beforeSubmit,
+              );
+            } catch {
+              /* A read failure does not justify another submission. */
+            }
+            if (outcome) break;
+            await new Promise((r) => setTimeout(r, Math.min(200, remaining())));
+            continue;
+          }
           const success = await session
             .find(flow.success.locator, Math.min(500, remaining()), verificationSignal)
             .then(
@@ -174,6 +283,11 @@ export async function registerApk(
             screenshot = await session.screenshot(verificationSignal);
           if (tree !== (await session.source(verificationSignal)))
             throw new RegistrationError('EVIDENCE_UNSAFE');
+          if (
+            automatic &&
+            registrationOutcome(tree, apk.packageName, account, beforeSubmit) !== outcome
+          )
+            throw new RegistrationError('EVIDENCE_UNSAFE');
           const bytes = redactScreenshot(screenshot, tree, account, inputs);
           if (Date.now() >= deadline) throw new RegistrationError('REGISTRATION_UNKNOWN');
           const artifactId = await hooks.evidence(target.taskId, bytes, verificationSignal);
@@ -197,7 +311,9 @@ export async function registerApk(
         errorCode: 'REGISTRATION_UNKNOWN',
       };
     else {
-      const code = error instanceof RegistrationError ? error.code : 'ANDROID_FAILED';
+      let code = error instanceof RegistrationError ? error.code : 'ANDROID_FAILED';
+      if (automatic && (code === 'FLOW_STEP_FAILED' || (discovering && code === 'APPIUM_FAILED')))
+        code = discovering ? 'AUTO_PAGE_UNREADABLE' : 'AUTO_FORM_CHANGED';
       if (code === 'CLEANUP_INCOMPLETE') clean = false;
       result = {
         status: signal.aborted ? 'CANCELLED' : 'FAILED',
@@ -205,9 +321,44 @@ export async function registerApk(
         artifactIds: [],
         errorCode: code,
       };
+      if (recognition && !signal.aborted && code.startsWith('AUTO_')) {
+        recognition.needsAdaptation = true;
+        try {
+          action();
+          const proofSignal = AbortSignal.timeout(5000),
+            tree = await session!.source(proofSignal),
+            shot = await session!.screenshot(proofSignal);
+          if (tree !== (await session!.source(proofSignal)))
+            throw new RegistrationError('EVIDENCE_UNSAFE');
+          const fields = readRegistrationPage(tree, apk.packageName)
+            .controls.filter((e) => e.editable)
+            .map((e) => e.rect);
+          const bytes = redactScreenshot(
+            shot,
+            tree,
+            account ?? {
+              accountRef: '',
+              username: '__NO_GENERATED_ACCOUNT__',
+              password: '__NO_GENERATED_PASSWORD__',
+            },
+            [...inputs, ...fields],
+          );
+          result.artifactIds.push(await hooks.evidence(target.taskId, bytes, proofSignal));
+        } catch {
+          /* Unsafe or unavailable diagnostic screenshots are withheld. */
+        }
+      }
     }
   } finally {
     if (session) clean = await session.close().catch(() => false);
   }
-  return { ...result, cleanupComplete: clean };
+  if (result.status === 'SUCCEEDED' && clean && discovery && hooks.learning) {
+    try {
+      await hooks.learning.save(learningKey, discovery.template);
+      recognition!.learned = true;
+    } catch {
+      /* A cache write cannot change an already proved registration outcome. */
+    }
+  }
+  return { ...result, ...(recognition ? { recognition } : {}), cleanupComplete: clean };
 }

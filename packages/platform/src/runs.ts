@@ -6,7 +6,7 @@ import type {
   AgentReconcileInput,
   TestConfiguration,
 } from '@apk/contracts';
-import { agentIssues, schemaIssues } from '@apk/contracts';
+import { agentIssues, schemaIssues, registrationFlowFor } from '@apk/contracts';
 import { checked, readSecret } from './secrets.js';
 import { digest, canonical } from './security.js';
 import { lockNode, idle } from './nodes.js';
@@ -134,9 +134,14 @@ export async function createRun(
           (r) => r.mode !== undefined || r.autoWaitMs !== undefined,
         )) &&
       (!manifest?.features?.includes('DAILY_V1') ||
-        !['0.5.0', '0.5.1'].includes(node.agentVersion ?? ''))
+        !['0.5.0', '0.5.1', '0.6.0'].includes(node.agentVersion ?? ''))
     )
       fault('NODE_UPGRADE_REQUIRED', '请部署支持每日下载与循环注册的 Agent');
+    if (
+      configuration.execution.autoRegistration !== undefined &&
+      (!manifest?.features?.includes('AUTO_REGISTRATION_V1') || node.agentVersion !== '0.6.0')
+    )
+      fault('NODE_UPGRADE_REQUIRED', '自动识别注册入口需要 Agent 0.6.0');
     const plan = await prepareDailyPlan(tx, input, config, now);
     if (input.purpose === 'PROXY_CHECK')
       await readSecret(tx, input.proxySecretVersionId!, ['HTTP_PROXY']);
@@ -493,6 +498,34 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
     const task = await tx.task.findUnique({ where: { id: event.taskId } });
     if (!run.discovered || !task || task.runId !== runId)
       fault('EVENT_CONFLICT', '目标不属于本批次或发现尚未完成');
+    const automatic =
+      full &&
+      config.execution.autoRegistration?.enabled === true &&
+      !registrationFlowFor(
+        config,
+        (task.apk as { packageName?: string } | null)?.packageName ?? '',
+        task.entryId ?? undefined,
+      );
+    if (p.recognition) {
+      const summary = p.recognition as {
+        learned: boolean;
+        source: string;
+        cache: string;
+        templateHash?: string;
+        needsAdaptation: boolean;
+      };
+      if (
+        !automatic ||
+        (event.type === 'TASK_STAGE' &&
+          (p.stage !== 'REGISTERING' || summary.learned || summary.needsAdaptation)) ||
+        (summary.learned && (p.status !== 'SUCCEEDED' || !summary.templateHash)) ||
+        (summary.source === 'LEARNED') !== (summary.cache === 'HIT') ||
+        (summary.cache === 'HIT' && !summary.templateHash) ||
+        (summary.needsAdaptation &&
+          (p.status !== 'FAILED' || !String(p.errorCode).startsWith('AUTO_')))
+      )
+        fault('EVENT_CONFLICT', '自动识别摘要与任务不一致');
+    }
     if (event.type === 'TASK_STAGE') {
       const stage = String(p.stage);
       if (run.purpose === 'REGISTER' && stage === 'DOWNLOADING') {
@@ -520,6 +553,7 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
         'PREPARING',
         'INSTALLING',
         'LAUNCHING',
+        ...(automatic ? ['DISCOVERING'] : []),
         'REGISTERING',
         'VERIFYING',
       ];
@@ -563,6 +597,7 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
             ? { apk: p.apk as Prisma.InputJsonValue, cacheHit: p.cacheHit === true }
             : {}),
           ...(p.observation ? { observation: p.observation as Prisma.InputJsonValue } : {}),
+          ...(p.recognition ? { recognition: p.recognition as Prisma.InputJsonValue } : {}),
         },
       });
       return;
@@ -633,6 +668,7 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
         proof: String(p.proof),
         errorCode: typeof p.errorCode === 'string' ? p.errorCode : null,
         ...(typeof p.accountRef === 'string' ? { accountRef: p.accountRef } : {}),
+        ...(p.recognition ? { recognition: p.recognition as Prisma.InputJsonValue } : {}),
       },
     });
     if (run.purpose === 'REGISTER' && status === 'SUCCEEDED')
@@ -711,10 +747,24 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
         tasks.some(
           (t) => t.attemptStarted && !t.submissionId && t.errorCode === 'FLOW_STEP_FAILED',
         );
+      const adaptation =
+        p.errorCode === 'AUTO_ADAPTATION_REQUIRED' &&
+        tasks.some(
+          (t) =>
+            t.attemptStarted &&
+            !t.submissionId &&
+            t.errorCode?.startsWith('AUTO_') &&
+            (t.recognition as { needsAdaptation?: boolean } | null)?.needsAdaptation === true,
+        );
       if (
         !run.discovered ||
         active.length ||
-        (!reached && !empty && !missing && !changed && run.attemptsStarted < run.attemptLimit)
+        (!reached &&
+          !empty &&
+          !missing &&
+          !changed &&
+          !adaptation &&
+          run.attemptsStarted < run.attemptLimit)
       )
         fault('EVENT_CONFLICT', '注册循环尚未达到终止条件');
       const expected = reached ? 'SUCCEEDED' : run.successes ? 'PARTIAL_FAILED' : 'FAILED';
@@ -722,11 +772,13 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
         ? undefined
         : empty
           ? 'NO_ADAPTED_APKS'
-          : changed
-            ? 'FLOW_LAYOUT_CHANGED'
-            : missing
-              ? 'CACHE_MISSING'
-              : 'ATTEMPT_LIMIT';
+          : adaptation
+            ? 'AUTO_ADAPTATION_REQUIRED'
+            : changed
+              ? 'FLOW_LAYOUT_CHANGED'
+              : missing
+                ? 'CACHE_MISSING'
+                : 'ATTEMPT_LIMIT';
       if (p.status !== expected || p.errorCode !== code)
         fault('EVENT_CONFLICT', '配额结果或原因不一致');
       await tx.task.updateMany({

@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.apk-platform.example/v1/v16.schema.json",
+  "$defs": {
+    "AutoRegistration": {
+      "type": "object", "additionalProperties": false,
+      "required": ["enabled", "screenshotFallback", "maxNavigationSteps", "timeoutMs", "successTimeoutMs"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "screenshotFallback": {"type": "boolean"},
+        "maxNavigationSteps": {"type": "integer", "minimum": 1, "maximum": 12},
+        "timeoutMs": {"type": "integer", "minimum": 15000, "maximum": 90000},
+        "successTimeoutMs": {"type": "integer", "minimum": 1000, "maximum": 60000}
+      }
+    },
+    "RegistrationRecognition": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source", "navigationSteps", "cache", "learned", "needsAdaptation"],
+      "properties": {
+        "source": {"enum": ["CONTROLS", "OCR", "LEARNED"]},
+        "navigationSteps": {"type": "integer", "minimum": 0, "maximum": 12},
+        "cache": {"enum": ["MISS", "HIT", "INVALIDATED"]},
+        "learned": {"type": "boolean"},
+        "needsAdaptation": {"type": "boolean"},
+        "templateHash": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+      }
+    },
+    "LearnedRegistrationTemplate": {
+      "type": "object", "additionalProperties": false,
+      "required": ["version", "navigation", "formHash", "templateHash"],
+      "properties": {
+        "version": {"const": "1.0"},
+        "navigation": {
+          "type": "array", "maxItems": 12,
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["screenHash", "role", "candidateHash"],
+            "properties": {
+              "screenHash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+              "candidateHash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+              "role": {"enum": ["REGISTER", "ACCOUNT", "LOGIN", "CONSENT"]}
+            }
+          }
+        },
+        "formHash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "templateHash": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+      }
+    }
+  }
+}

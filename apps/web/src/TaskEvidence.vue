@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { ref, onUnmounted } from 'vue';
 import { api, mutation } from './api';
+import type { RegistrationRecognition } from '@apk/contracts';
 const props = defineProps<{
   task: {
     id: string;
     status: string;
+    recognition?: RegistrationRecognition;
     observation?: {
       model: string;
       locale: string;
@@ -82,6 +84,27 @@ onUnmounted(() => {
   <section class="surface">
     <h3>注册证据</h3>
     <p class="fingerprint">{{ task.id }}</p>
+    <template v-if="task.recognition">
+      <p>
+        注册路径：{{
+          { CONTROLS: '页面控件识别', OCR: '本地图片入口识别', LEARNED: '复用已验证路径' }[
+            task.recognition.source
+          ]
+        }}
+        · 已导航 {{ task.recognition.navigationSteps }} 步
+      </p>
+      <p>
+        路径缓存：{{
+          { MISS: '首次识别', HIT: '已核对复用', INVALIDATED: '旧路径变化，重新识别' }[
+            task.recognition.cache
+          ]
+        }}
+        · {{ task.recognition.learned ? '已保存成功路径' : '未保存新的成功路径' }}
+      </p>
+      <p v-if="task.recognition.needsAdaptation">
+        当前页面需要适配，可查看下方脱敏截图；剩余未执行次数未计入尝试。
+      </p>
+    </template>
     <el-alert v-if="error" :title="error" type="error" :closable="false" />
     <template v-if="task.observation"
       ><p>模拟器实际型号：{{ task.observation.model }} · 语言：{{ task.observation.locale }}</p>

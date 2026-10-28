@@ -7,6 +7,7 @@ import { randomUUID, createHash } from 'node:crypto';
 import { AppiumClient } from './webdriver.js';
 import { startProxyBridge, proxyObservation } from './proxy.js';
 import { NetworkPolicy } from './network.js';
+import { recognizeRegistrationScreenshot } from './ocr.js';
 import { removeOwned } from './cache.js';
 import type {
   Profile,
@@ -451,8 +452,11 @@ export async function startAndroid(
       },
       find: (l, t, s) => rpc.find(l, t, s),
       click: (id, t) => rpc.click(id, t),
+      tap: (x, y, t) => rpc.tap(x, y, t),
+      ocr: (bytes, s) => recognizeRegistrationScreenshot(bytes, options.toolsRoot, workspace, s),
       submit: (id, t) => rpc.submit(id, t),
       input: (id, value) => rpc.input(id, value),
+      hideKeyboard: () => rpc.hideKeyboard(),
       back: () => rpc.back(),
       rect: (id) => rpc.rect(id),
       screenshot: (s) => rpc.screenshot(s),

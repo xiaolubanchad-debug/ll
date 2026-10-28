@@ -28,6 +28,10 @@ const v15 = await json('contracts/v15.schema.json'),
   v15Http = await json('contracts/v15.http.json');
 manifest.routes.push(...v15Http.routes);
 manifest.version = v15Http.version;
+const v16 = await json('contracts/v16.schema.json'),
+  v16Http = await json('contracts/v16.http.json');
+manifest.routes.push(...v16Http.routes);
+manifest.version = v16Http.version;
 const schemas = {
   TestConfiguration: config,
   AgentMessage: agent,
@@ -46,6 +50,12 @@ const schemas = {
     Object.entries(v15.$defs).map(([name, value]) => [
       name,
       { ...value, $id: v15.$id + '/' + name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    Object.entries(v16.$defs).map(([name, value]) => [
+      name,
+      { ...value, $id: v16.$id + '/' + name },
     ]),
   ),
 };

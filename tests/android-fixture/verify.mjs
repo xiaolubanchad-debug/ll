@@ -1,18 +1,24 @@
 import assert from 'node:assert/strict';
 import { createServer, request } from 'node:http';
 import { connect } from 'node:net';
-import { readFile, writeFile, mkdir, readdir } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, readdir, access } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { randomUUID, randomBytes, createHash } from 'node:crypto';
 import { URLSearchParams } from 'node:url';
-import { registerApk, inspectApk, NetworkPolicy, cacheDay } from '@apk/automation';
+import { registerApk, inspectApk, NetworkPolicy, cacheDay, startAndroid } from '@apk/automation';
 import { openAgentStore } from '../../apps/agent/src/store.js';
 process.umask(0o077);
 const root = resolve(process.argv[2]),
   config = JSON.parse(await readFile('/var/lib/apk-platform/agent-config.json', 'utf8'));
-assert.ok(root.startsWith('/var/lib/apk-platform/p3-verification-'));
+const automatic = process.argv[3] === '--auto';
+assert.match(
+  root,
+  automatic
+    ? /^\/var\/lib\/apk-platform\/v16-verification-[a-f0-9-]{36}$/
+    : /^\/var\/lib\/apk-platform\/p3-verification-/,
+);
 await mkdir(root, { recursive: true, mode: 0o700 });
-const store = await openAgentStore(join(root, 'journal'));
+let store = await openAgentStore(join(root, 'journal'));
 let mode = 'SUCCESS',
   currentAccount,
   currentCase,
@@ -23,6 +29,11 @@ const reports = [],
 const abort = new AbortController();
 process.on('SIGTERM', () => abort.abort());
 process.on('SIGINT', () => abort.abort());
+const stopTimer = setInterval(() => {
+  void access(join(root, 'stop-requested'))
+    .then(() => abort.abort())
+    .catch(() => {});
+}, 500);
 let passed = false;
 const sha = (b) => createHash('sha256').update(b).digest('hex');
 const track = (server) =>
@@ -144,15 +155,27 @@ const policy = new NetworkPolicy(
 );
 const outcomes = [];
 try {
-  for (const [variant, behavior, expected] of [
-    ['alpha', 'SUCCESS', 'SUCCEEDED'],
-    ['beta', 'SUCCESS', 'SUCCEEDED'],
-    ['alpha', 'REJECT', 'FAILED'],
-    ['alpha', 'TIMEOUT', 'UNKNOWN'],
-    ['alpha', 'CHANGED', 'FAILED'],
-  ]) {
+  const cases = automatic
+    ? [
+        ['gamma', 'SUCCESS', 'SUCCEEDED'],
+        ['gamma', 'SUCCESS', 'SUCCEEDED'],
+        ['delta', 'SUCCESS', 'SUCCEEDED'],
+        ['gamma', 'TIMEOUT', 'UNKNOWN'],
+      ]
+    : [
+        ['alpha', 'SUCCESS', 'SUCCEEDED'],
+        ['beta', 'SUCCESS', 'SUCCEEDED'],
+        ['alpha', 'REJECT', 'FAILED'],
+        ['alpha', 'TIMEOUT', 'UNKNOWN'],
+        ['alpha', 'CHANGED', 'FAILED'],
+      ];
+  for (const [caseIndex, [variant, behavior, expected]] of cases.entries()) {
     if (abort.signal.aborted) throw Error('OWNED_VERIFICATION_STOPPED');
-    currentCase = variant + '-' + behavior;
+    if (automatic && caseIndex === 1) {
+      store.close();
+      store = await openAgentStore(join(root, 'journal'));
+    }
+    currentCase = variant + '-' + behavior + (automatic ? '-' + caseIndex : '');
     mode = behavior;
     const before = requests,
       taskId = randomUUID(),
@@ -216,10 +239,20 @@ try {
         },
       ],
     };
+    if (automatic) {
+      testConfig.execution.autoRegistration = {
+        enabled: true,
+        screenshotFallback: true,
+        maxNavigationSteps: 8,
+        timeoutMs: 90000,
+        successTimeoutMs: behavior === 'TIMEOUT' ? 3000 : 15000,
+      };
+      testConfig.registrationFlows = [];
+    }
     console.log(JSON.stringify({ case: currentCase, stage: 'STARTING' }));
     const result = await registerApk(
       testConfig,
-      { taskId },
+      { taskId, ...(automatic ? { entryId: variant } : {}) },
       metadata,
       file,
       0,
@@ -235,7 +268,42 @@ try {
         proxy: credential,
         policy,
         proxyCheckUrl: 'http://203.0.113.10:18080/ip',
-        beforeAction: () => {},
+        beforeAction: () => {
+          if (abort.signal.aborted) throw Error('OWNED_VERIFICATION_STOPPED');
+        },
+        ...(automatic
+          ? {
+              learning: {
+                load: async (key) => store.loadRegistrationTemplate(key),
+                save: async (key, value) => store.saveRegistrationTemplate(key, value),
+                drop: async (key) => store.dropRegistrationTemplate(key),
+              },
+              androidFactory: async (...args) => {
+                const session = await startAndroid(...args);
+                let inputStarted = false;
+                return {
+                  ...session,
+                  source: async (signal) => {
+                    const text = await session.source(signal);
+                    if (!inputStarted)
+                      await writeFile(join(root, 'last-before-input.xml'), text, { mode: 0o600 });
+                    return text;
+                  },
+                  input: async (...values) => {
+                    inputStarted = true;
+                    return session.input(...values);
+                  },
+                  ocr: async (bytes, signal) => {
+                    const lines = await session.ocr(bytes, signal);
+                    await writeFile(join(root, 'owned-ocr-lines.json'), JSON.stringify(lines), {
+                      mode: 0o600,
+                    });
+                    return lines;
+                  },
+                };
+              },
+            }
+          : {}),
         resources: async (record) => {
           store.android(d.deliveryId, record);
           if (record) resources.push({ ...record });
@@ -267,6 +335,12 @@ try {
     console.log(JSON.stringify(resultRecord));
     assert.equal(result.cleanupComplete, true);
     assert.equal(result.status, expected);
+    if (automatic) {
+      assert.ok(result.recognition);
+      assert.equal(result.recognition.learned, expected === 'SUCCEEDED');
+      if (caseIndex === 1) assert.equal(result.recognition.cache, 'HIT');
+      if (variant === 'delta') assert.equal(result.recognition.source, 'OCR');
+    }
     assert.equal(requests - before, behavior === 'CHANGED' ? 0 : 1);
     if (expected === 'SUCCEEDED') assert.equal(result.proof, 'APP_UI');
     if (behavior === 'REJECT') assert.equal(result.errorCode, 'REGISTRATION_REJECTED');
@@ -289,6 +363,7 @@ try {
     }),
   );
 } finally {
+  clearInterval(stopTimer);
   await writeFile(
     join(root, 'verification.json'),
     JSON.stringify(

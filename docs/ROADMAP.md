@@ -18,6 +18,8 @@ P3 自有 APK 验收覆盖两个成功流程、明确拒绝、提交超时 UNKNO
 
 ## P0 工程基础
 
+1.6 的自动入口识别、本地 OCR、表单判定与成功路径复用遵循 [1.6 契约](V16_CONTRACT.md)。验收覆盖控件导航、图片触控、模板跨包名与重启、未知结果不学习，以及真实 PostgreSQL/SQLite/Chromium 和自有安卓 APK；生产发布及真实产品结果分别记录，见 [操作说明](V16_SETUP.md)。
+
 交付 npm 工作区、TypeScript strict、NestJS 与 Vue 骨架、PostgreSQL/Prisma 迁移、配置环境样例、管理员初始化与会话、统一错误响应、Schema 生成类型和 OpenAPI。根 npm 命令统一为 lint、typecheck、test、check:contracts、build。
 
 验收：空数据库一条迁移命令建立结构；无默认密码；未登录不能读服务器或任务；前后端均能拒绝非法配置；Schema 与接口差异检查在 CI 运行。开发用例不需要 EC2 或实际凭据。

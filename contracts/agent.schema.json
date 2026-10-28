@@ -783,7 +783,8 @@
             "INSTALLING",
             "LAUNCHING",
             "REGISTERING",
-            "VERIFYING"
+            "VERIFYING",
+            "DISCOVERING"
           ]
         },
         "cacheHit": {
@@ -858,6 +859,48 @@
         },
         "observation": {
           "$ref": "#/$defs/deviceObservation"
+        },
+        "recognition": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "source",
+            "navigationSteps",
+            "cache",
+            "learned",
+            "needsAdaptation"
+          ],
+          "properties": {
+            "source": {
+              "enum": [
+                "CONTROLS",
+                "OCR",
+                "LEARNED"
+              ]
+            },
+            "navigationSteps": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 12
+            },
+            "cache": {
+              "enum": [
+                "MISS",
+                "HIT",
+                "INVALIDATED"
+              ]
+            },
+            "learned": {
+              "type": "boolean"
+            },
+            "needsAdaptation": {
+              "type": "boolean"
+            },
+            "templateHash": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
         }
       }
     },
@@ -917,6 +960,48 @@
           "type": "string",
           "pattern": "^[A-Z_]+$",
           "maxLength": 100
+        },
+        "recognition": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "source",
+            "navigationSteps",
+            "cache",
+            "learned",
+            "needsAdaptation"
+          ],
+          "properties": {
+            "source": {
+              "enum": [
+                "CONTROLS",
+                "OCR",
+                "LEARNED"
+              ]
+            },
+            "navigationSteps": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 12
+            },
+            "cache": {
+              "enum": [
+                "MISS",
+                "HIT",
+                "INVALIDATED"
+              ]
+            },
+            "learned": {
+              "type": "boolean"
+            },
+            "needsAdaptation": {
+              "type": "boolean"
+            },
+            "templateHash": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
         }
       },
       "allOf": [
@@ -1000,7 +1085,8 @@
             "CACHE_MISSING",
             "NO_ADAPTED_APKS",
             "PROXY_CHECK_FAILED",
-            "FLOW_LAYOUT_CHANGED"
+            "FLOW_LAYOUT_CHANGED",
+            "AUTO_ADAPTATION_REQUIRED"
           ]
         }
       }

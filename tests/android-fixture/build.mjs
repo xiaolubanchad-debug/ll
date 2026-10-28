@@ -90,7 +90,7 @@ try {
 }
 // The signing password is ephemeral; the whole test directory is recreated for a new build.
 const built = [];
-for (const variant of ['alpha', 'beta']) {
+for (const variant of ['alpha', 'beta', 'gamma', 'delta']) {
   const pkg = 'com.example.p3' + variant,
     work = join(out, variant);
   await mkdir(join(work, 'res/values'), { recursive: true });
@@ -109,6 +109,11 @@ for (const variant of ['alpha', 'beta']) {
         'account_home',
         'rejected',
         'pending',
+        'my',
+        'login',
+        'login_submit',
+        'login_username',
+        'login_password',
       ]
         .map((id) => '<item type="id" name="' + id + '"/>')
         .join('') +
@@ -126,7 +131,9 @@ for (const variant of ['alpha', 'beta']) {
     join(work, 'MainActivity.java'),
     (await readFile(join(source, 'MainActivity.java'), 'utf8'))
       .replace('FIXTURE_PACKAGE', pkg)
-      .replaceAll('FIXTURE_BETA', variant === 'beta' ? 'true' : 'false'),
+      .replaceAll('FIXTURE_BETA', variant === 'beta' ? 'true' : 'false')
+      .replaceAll('FIXTURE_GAMMA', variant === 'gamma' ? 'true' : 'false')
+      .replaceAll('FIXTURE_DELTA', variant === 'delta' ? 'true' : 'false'),
   );
   run(
     join(tools, 'aapt2'),

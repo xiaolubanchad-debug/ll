@@ -142,6 +142,19 @@ test('browser login, config checks, refresh, password change and logout', async 
     assert.equal(entryFlow.packageName, '*');
     assert.equal(entryFlow.activity, '@launcher');
     assert.ok(entryDraft.registrationFlows.some((f) => f.packageName === 'com.example.signup'));
+    await page.getByText('自动识别注册入口', { exact: true }).click();
+    await page.getByLabel('开启自动寻找注册入口', { exact: true }).check();
+    await page.getByLabel('最多寻找步数（1–12）', { exact: true }).fill('13');
+    await page.getByRole('button', { name: '将自动识别设置应用到草稿', exact: true }).click();
+    await expect(page.getByText('请核对识别步数、时间及当前配置', { exact: true })).toBeVisible();
+    await page.getByLabel('最多寻找步数（1–12）', { exact: true }).fill('8');
+    await page.getByRole('button', { name: '将自动识别设置应用到草稿', exact: true }).click();
+    const automaticDraft = JSON.parse(
+      await page.getByLabel('完整配置 JSON', { exact: true }).inputValue(),
+    );
+    assert.equal(automaticDraft.execution.autoRegistration.enabled, true);
+    assert.equal(automaticDraft.execution.autoRegistration.screenshotFallback, true);
+    assert.equal(automaticDraft.registrationFlows.length, entryDraft.registrationFlows.length);
     assert.ok(
       !(await page.evaluate(() =>
         JSON.stringify({ ...window.localStorage, ...window.sessionStorage }).includes(

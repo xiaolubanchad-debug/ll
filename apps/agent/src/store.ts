@@ -9,8 +9,8 @@ import {
   createDecipheriv,
   createHash,
 } from 'node:crypto';
-import type { AgentMessage } from '@apk/contracts';
-import { RegistrationError } from '@apk/automation';
+import type { AgentMessage, LearnedRegistrationTemplate } from '@apk/contracts';
+import { RegistrationError, validLearnedTemplate } from '@apk/automation';
 import type { Account, AndroidRecord } from '@apk/automation';
 import { pinyinUsername } from './accounts.js';
 export type Delivery = Extract<AgentMessage, { kind: 'delivery' }>;
@@ -52,6 +52,60 @@ export class AgentStore {
     this.db.exec(
       'CREATE UNIQUE INDEX IF NOT EXISTS accounts_username_hash ON accounts(username_hash)',
     );
+    this.db.exec(
+      'CREATE TABLE IF NOT EXISTS registration_templates (key TEXT PRIMARY KEY,sealed BLOB NOT NULL,used_at INTEGER NOT NULL)',
+    );
+  }
+  loadRegistrationTemplate(key: string): LearnedRegistrationTemplate | undefined {
+    if (!/^[a-f0-9]{64}$/.test(key)) throw Error('TEMPLATE_KEY_INVALID');
+    const row = this.db.prepare('SELECT sealed FROM registration_templates WHERE key=?').get(key);
+    if (!row) return undefined;
+    try {
+      const bytes = Buffer.from(row.sealed as Uint8Array),
+        decipher = createDecipheriv('aes-256-gcm', this.key, bytes.subarray(0, 12));
+      decipher.setAAD(Buffer.from('template:' + key));
+      decipher.setAuthTag(bytes.subarray(12, 28));
+      const template = JSON.parse(
+        Buffer.concat([decipher.update(bytes.subarray(28)), decipher.final()]).toString(),
+      );
+      if (!validLearnedTemplate(template)) throw Error();
+      this.db
+        .prepare('UPDATE registration_templates SET used_at=? WHERE key=?')
+        .run(Date.now(), key);
+      return template;
+    } catch {
+      this.dropRegistrationTemplate(key);
+      return undefined;
+    }
+  }
+  dropRegistrationTemplate(key: string) {
+    this.db.prepare('DELETE FROM registration_templates WHERE key=?').run(key);
+  }
+  saveRegistrationTemplate(key: string, template: LearnedRegistrationTemplate) {
+    if (!/^[a-f0-9]{64}$/.test(key) || !validLearnedTemplate(template))
+      throw Error('TEMPLATE_INVALID');
+    const iv = randomBytes(12),
+      cipher = createCipheriv('aes-256-gcm', this.key, iv);
+    cipher.setAAD(Buffer.from('template:' + key));
+    const bytes = Buffer.concat([cipher.update(JSON.stringify(template)), cipher.final()]),
+      sealed = Buffer.concat([iv, cipher.getAuthTag(), bytes]);
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      this.db
+        .prepare(
+          'INSERT INTO registration_templates(key,sealed,used_at) VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET sealed=excluded.sealed,used_at=excluded.used_at',
+        )
+        .run(key, sealed, Date.now());
+      this.db
+        .prepare(
+          'DELETE FROM registration_templates WHERE key IN (SELECT key FROM registration_templates ORDER BY used_at DESC,key LIMIT -1 OFFSET 2000)',
+        )
+        .run();
+      this.db.exec('COMMIT');
+    } catch (error) {
+      this.db.exec('ROLLBACK');
+      throw error;
+    }
   }
   deliveries(): LocalDelivery[] {
     return this.db

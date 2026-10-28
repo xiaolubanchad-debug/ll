@@ -1,4 +1,4 @@
-import type { TestConfiguration } from '@apk/contracts';
+import type { TestConfiguration, RegistrationRecognition } from '@apk/contracts';
 export type Locator = TestConfiguration['registrationFlows'][number]['success']['locator'];
 export type Profile = TestConfiguration['execution']['deviceProfiles'][number];
 export interface Account {
@@ -11,6 +11,11 @@ export interface Rect {
   y: number;
   width: number;
   height: number;
+}
+export interface OcrLine {
+  text: string;
+  confidence: number;
+  rect: Rect;
 }
 export interface DeviceObservation {
   profileId: string;
@@ -41,6 +46,7 @@ export interface TaskCompletion {
   artifactIds: string[];
   accountRef?: string;
   errorCode?: string;
+  recognition?: RegistrationRecognition;
 }
 export interface AndroidSession {
   observation: DeviceObservation;
@@ -49,8 +55,11 @@ export interface AndroidSession {
   launch(packageName: string, activity: string): Promise<void>;
   find(locator: Locator, timeout: number, signal?: AbortSignal): Promise<string>;
   click(id: string, timeout?: number): Promise<void>;
+  tap?(x: number, y: number, timeout?: number): Promise<void>;
+  ocr?(bytes: Buffer, signal: AbortSignal): Promise<OcrLine[]>;
   submit(id: string, timeout: number): Promise<void>;
   input(id: string, value: string): Promise<void>;
+  hideKeyboard?(): Promise<void>;
   back(): Promise<void>;
   rect(id: string): Promise<Rect>;
   screenshot(signal?: AbortSignal): Promise<Buffer>;

@@ -167,6 +167,7 @@ try {
   await run(['--test', '--test-concurrency=1', 'tests/v15-download.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/v15-entry.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/proxy-probe.test.mjs'], env);
+  await run(['--test', '--test-concurrency=1', 'tests/registration-discovery.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/p3.test.mjs'], env);
   const { initializeAdmin } = await import('../apps/control-api/dist/admin.js');
   const { passwordHash } = await import('../apps/control-api/dist/auth.js');

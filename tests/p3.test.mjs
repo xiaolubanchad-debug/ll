@@ -209,7 +209,7 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
         value = { sessionId: id, capabilities: {} };
       } else if (req.url.endsWith('/elements')) {
         let visible = true;
-        const key = b.value;
+        const key = mode.startsWith('auto-') ? b.value.split(':id/').at(-1) : b.value;
         if (key === 'success')
           visible = !!s?.submitted && ['success', 'lost-success', 'cleanup'].includes(mode);
         if (key === 'rejected') visible = !!s?.submitted && mode === 'reject';
@@ -220,12 +220,13 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
         }
         if (
           key === 'password' &&
-          body.registrationFlows[0].steps.some((x) => x.locator?.value === 'next')
+          body.registrationFlows[0]?.steps.some((x) => x.locator?.value === 'next')
         )
           visible = s.next;
         value = visible ? [{ 'element-6066-11e4-a52e-4f735466cecf': key }] : [];
       } else if (req.url.endsWith('/click')) {
         const id = parts[4];
+        if (mode.startsWith('auto-') && id === 'open-register') s.autoForm = true;
         if (id === 'next') s.next = true;
         if (id === 'submit') {
           submitted++;
@@ -240,8 +241,29 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
         s[parts[4]] = b.text;
       } else if (req.url.endsWith('/rect')) value = { x: 10, y: 10, width: 20, height: 10 };
       else if (req.url.endsWith('/screenshot')) value = white.toString('base64');
-      else if (req.url.endsWith('/source'))
-        value = '<hierarchy><node text="' + s.username + '" bounds="[50,50][90,70]" /></hierarchy>';
+      else if (req.url.endsWith('/appium/device/is_keyboard_shown')) value = false;
+      else if (req.url.endsWith('/source')) {
+        if (mode.startsWith('auto-')) {
+          const pkg = s.packageName ?? 'com.example.p2';
+          const control = (id, text, kind, y, password = false) =>
+            `<node package="${pkg}" class="android.widget.${kind}" resource-id="${pkg}:id/${id}" text="${text}" enabled="true" clickable="${kind === 'Button'}" password="${password}" bounds="[10,${y}][110,${y + 15}]"/>`;
+          const content = s.submitted
+            ? control('result', 'Registration successful', 'TextView', 10)
+            : s.autoForm || mode === 'auto-unsupported'
+              ? control(
+                  mode === 'auto-unsupported' ? 'phone' : 'username',
+                  mode === 'auto-unsupported' ? 'Phone number' : s.username || 'Username',
+                  'EditText',
+                  20,
+                ) +
+                control('password', s.password || 'Password', 'EditText', 40, true) +
+                control('submit', 'Register', 'Button', 60)
+              : control('open-register', 'Register', 'Button', 10);
+          value = `<hierarchy><node package="${pkg}" class="android.widget.FrameLayout" text="" clickable="false" bounds="[0,0][120,120]">${content}</node></hierarchy>`;
+        } else
+          value =
+            '<hierarchy><node text="' + s.username + '" bounds="[50,50][90,70]" /></hierarchy>';
+      }
       res.setHeader('content-type', 'application/json');
       res.end(JSON.stringify({ value }));
     });
@@ -265,13 +287,15 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
       install: async () => {
         installed++;
       },
-      launch: async () => {
+      launch: async (pkg) => {
         launched++;
+        sessions.get(c.session).packageName = pkg;
       },
       find: (...a) => c.find(...a),
       click: (...a) => c.click(...a),
       submit: (...a) => c.submit(...a),
       input: (...a) => c.input(...a),
+      hideKeyboard: () => c.hideKeyboard(),
       back: () => c.back(),
       rect: (id) => c.rect(id),
       screenshot: () => c.screenshot(),
@@ -371,7 +395,7 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
       {
         nodeId: node.id,
         releaseId: release.id,
-        agentVersion: '0.5.1',
+        agentVersion: '0.6.0',
         apiUrl: base,
         sdkRoot: '/fixture',
         toolsRoot: resolve('.'),
@@ -475,8 +499,8 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
         artifactName: 'agent-' + randomBytes(32).toString('hex') + '.tgz',
         sha256: randomBytes(32).toString('hex'),
         manifest: {
-          agentVersion: '0.5.1',
-          features: ['DOWNLOAD_V1', 'REGISTRATION_V1', 'DAILY_V1'],
+          agentVersion: '0.6.0',
+          features: ['DOWNLOAD_V1', 'REGISTRATION_V1', 'DAILY_V1', 'AUTO_REGISTRATION_V1'],
           toolchain: { systemImage: body.execution.deviceProfiles[0].systemImage },
         },
       },
@@ -487,7 +511,7 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
         host: 'p3.example.test',
         deploymentStatus: 'INSTALLED',
         agentReleaseId: release.id,
-        agentVersion: '0.5.1',
+        agentVersion: '0.6.0',
         downloadProtocol: '1.0',
         health: report,
         lastSeenAt: new Date(),
@@ -763,6 +787,99 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
           successTarget: 3,
           attemptLimit: 5,
         };
+        await t.test(
+          '1.6 automatic flows include unadapted assets, persist receipts and learn across Agent restart',
+          async () => {
+            const stored = await db.configVersion.findUniqueOrThrow({ where: { id: version.id } }),
+              automatic = structuredClone(stored.body);
+            automatic.registrationFlows = [];
+            automatic.execution.autoRegistration = {
+              enabled: true,
+              screenshotFallback: false,
+              maxNavigationSteps: 8,
+              timeoutMs: 15000,
+              successTimeoutMs: 1500,
+            };
+            const container = (await req('/configs/' + version.configId)).data;
+            const saved = await req(
+              '/configs/' + version.configId + '/versions',
+              'POST',
+              automatic,
+              { ...idem(), 'If-Match': String(container.version) },
+            );
+            assert.equal(saved.status, 201);
+            const input = {
+              purpose: 'REGISTER',
+              configVersionId: saved.data.id,
+              sourceDownloadId: downloaded.id,
+              successTarget: 3,
+              attemptLimit: 3,
+            };
+            const manifest = structuredClone(release.manifest);
+            await db.release.update({
+              where: { id: release.id },
+              data: {
+                manifest: { ...manifest, features: ['DOWNLOAD_V1', 'REGISTRATION_V1', 'DAILY_V1'] },
+              },
+            });
+            try {
+              const old = await req(
+                '/runs',
+                'POST',
+                { nodeId: node.id, releaseId: release.id, ...input },
+                idem(),
+              );
+              assert.equal(old.status, 409);
+              assert.equal(old.data.error.code, 'NODE_UPGRADE_REQUIRED');
+            } finally {
+              await db.release.update({ where: { id: release.id }, data: { manifest } });
+            }
+            mode = 'auto-success';
+            const before = submitted;
+            const first = await purpose(input);
+            assert.equal(first.status, 'SUCCEEDED', JSON.stringify(first));
+            assert.equal(first.executionPlan.assets.length, 3);
+            assert.equal(first.successes, 3);
+            assert.equal(submitted - before, 3);
+            const firstTasks = await db.task.findMany({ where: { runId: first.id } });
+            assert.ok(
+              firstTasks.every(
+                (task) => task.recognition.learned && task.recognition.source === 'CONTROLS',
+              ),
+            );
+            const stages = await db.runEvent.findMany({ where: { delivery: { runId: first.id } } });
+            assert.ok(stages.some((e) => e.body.payload.stage === 'DISCOVERING'));
+            abort.abort();
+            await agentRun;
+            await start();
+            const second = await purpose(input);
+            assert.equal(second.status, 'SUCCEEDED', JSON.stringify(second));
+            const tasks = await db.task.findMany({ where: { runId: second.id } });
+            assert.ok(
+              tasks.every(
+                (task) => task.recognition.cache === 'HIT' && task.recognition.source === 'LEARNED',
+              ),
+            );
+            assert.equal(activeSessions, 0);
+            mode = 'auto-unsupported';
+            const rejected = await purpose({ ...input, successTarget: 2, attemptLimit: 5 });
+            assert.equal(rejected.status, 'FAILED');
+            assert.equal(rejected.errorCode, 'AUTO_ADAPTATION_REQUIRED');
+            assert.equal(rejected.attemptsStarted, 1);
+            assert.equal(
+              await db.task.count({
+                where: { runId: rejected.id, attemptStarted: false, status: 'SKIPPED' },
+              }),
+              4,
+            );
+            const badTask = await db.task.findFirstOrThrow({
+              where: { runId: rejected.id, attemptStarted: true },
+            });
+            assert.equal(badTask.recognition.needsAdaptation, true);
+            assert.equal(badTask.submissionId, null);
+            mode = 'success';
+          },
+        );
         await t.test(
           'all APKs share target; each attempt has a closed previous session; unused slots do not count',
           async () => {

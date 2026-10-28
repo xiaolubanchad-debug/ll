@@ -3,6 +3,7 @@ import { ref, onMounted, onUnmounted } from 'vue';
 import { configurationIssues, schemaIssues } from '@apk/contracts';
 import { api, mutation } from './api';
 import RegistrationFlowEditor from './RegistrationFlowEditor.vue';
+import AutomaticRegistrationEditor from './AutomaticRegistrationEditor.vue';
 const props = defineProps<{ draftText: string }>();
 const emit = defineEmits<{ load: [value: string] }>();
 interface Config {
@@ -200,6 +201,7 @@ onUnmounted(() => {
       </p>
     </details>
     <RegistrationFlowEditor :draft-text="draftText" @load="(value) => emit('load', value)" />
+    <AutomaticRegistrationEditor :draft-text="draftText" @load="(value) => emit('load', value)" />
     <label for="config-name">配置名称</label
     ><el-input id="config-name" v-model="name" maxlength="100" />
     <div class="form-actions">

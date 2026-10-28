@@ -11,9 +11,12 @@
   },
   "dependencies": {
     "@apk/contracts": "0.1.0",
+    "@tesseract.js-data/chi_sim": "1.0.0",
+    "@tesseract.js-data/eng": "1.0.0",
     "fast-xml-parser": "5.11.2",
     "ipaddr.js": "2.5.0",
     "pngjs": "7.0.0",
+    "tesseract.js": "7.0.0",
     "yauzl": "3.4.0"
   },
   "devDependencies": {

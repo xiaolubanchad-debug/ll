@@ -124,8 +124,37 @@ export class AppiumClient {
   async submit(id: string, timeout: number) {
     await this.command('POST', this.path('/element/' + id + '/click'), {}, timeout, null);
   }
+  async tap(x: number, y: number, timeout = 10000) {
+    if (![x, y].every((v) => Number.isInteger(v) && v >= 0 && v <= 16384))
+      throw new RegistrationError('AUTO_PAGE_INVALID');
+    await this.command(
+      'POST',
+      this.path('/actions'),
+      {
+        actions: [
+          {
+            type: 'pointer',
+            id: 'registration-touch',
+            parameters: { pointerType: 'touch' },
+            actions: [
+              { type: 'pointerMove', duration: 0, x, y, origin: 'viewport' },
+              { type: 'pointerDown', button: 0 },
+              { type: 'pause', duration: 60 },
+              { type: 'pointerUp', button: 0 },
+            ],
+          },
+        ],
+      },
+      timeout,
+    );
+  }
   async input(id: string, value: string) {
     await this.command('POST', this.path('/element/' + id + '/value'), { text: value });
+  }
+  async hideKeyboard() {
+    const shown = await this.command('GET', this.path('/appium/device/is_keyboard_shown'));
+    if (shown === true) await this.command('POST', this.path('/appium/device/hide_keyboard'), {});
+    else if (shown !== false) throw new RegistrationError('AUTO_PAGE_UNREADABLE');
   }
   async back() {
     await this.command('POST', this.path('/back'), {});

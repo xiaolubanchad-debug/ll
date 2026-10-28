@@ -273,6 +273,7 @@ model Task {
   proof          String         @default("NONE") @db.VarChar(32)
   errorCode      String?        @db.VarChar(100)
   observation    Json?
+  recognition    Json?
   accountRef     String?        @db.Uuid
   submissionId   String?        @unique @db.Uuid
   submittedAt    DateTime?      @db.Timestamptz(3)

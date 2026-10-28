@@ -69,6 +69,7 @@ export async function runCachedRegistrations(
     cleanupIncomplete = false,
     missing = false;
   let layoutChanged = false;
+  let needsAdaptation = false;
   try {
     for (const [index, target] of targets.entries()) {
       beforeAction();
@@ -113,11 +114,13 @@ export async function runCachedRegistrations(
       }
       const { cleanupComplete, ...payload } = completion;
       layoutChanged = completion.errorCode === 'FLOW_STEP_FAILED';
+      needsAdaptation = completion.recognition?.needsAdaptation === true;
       await emit({ type: 'TASK_FINISHED', taskId: target.taskId, payload });
       if (completion.status === 'SUCCEEDED') successes++;
       cleanupIncomplete = !cleanupComplete;
       review = cleanupIncomplete || completion.status === 'UNKNOWN';
-      if (review || missing || layoutChanged || successes >= plan.successTarget) break;
+      if (review || missing || layoutChanged || needsAdaptation || successes >= plan.successTarget)
+        break;
     }
   } finally {
     cache.releasePins();
@@ -129,13 +132,15 @@ export async function runCachedRegistrations(
       : 'REGISTRATION_UNKNOWN'
     : !targets.length
       ? 'NO_ADAPTED_APKS'
-      : layoutChanged
-        ? 'FLOW_LAYOUT_CHANGED'
-        : missing
-          ? 'CACHE_MISSING'
-          : successes < plan.successTarget
-            ? 'ATTEMPT_LIMIT'
-            : undefined;
+      : needsAdaptation
+        ? 'AUTO_ADAPTATION_REQUIRED'
+        : layoutChanged
+          ? 'FLOW_LAYOUT_CHANGED'
+          : missing
+            ? 'CACHE_MISSING'
+            : successes < plan.successTarget
+              ? 'ATTEMPT_LIMIT'
+              : undefined;
   await emit({
     type: 'RUN_FINISHED',
     payload: {

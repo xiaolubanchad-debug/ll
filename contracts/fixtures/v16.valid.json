@@ -1,0 +1,29 @@
+{
+  "AutoRegistration": {
+    "enabled": true,
+    "screenshotFallback": true,
+    "maxNavigationSteps": 8,
+    "timeoutMs": 60000,
+    "successTimeoutMs": 60000
+  },
+  "RegistrationRecognition": {
+    "source": "CONTROLS",
+    "navigationSteps": 2,
+    "cache": "MISS",
+    "learned": false,
+    "needsAdaptation": false,
+    "templateHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "LearnedRegistrationTemplate": {
+    "version": "1.0",
+    "navigation": [
+      {
+        "screenHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "candidateHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "role": "REGISTER"
+      }
+    ],
+    "formHash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "templateHash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+  }
+}

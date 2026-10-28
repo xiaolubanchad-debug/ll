@@ -34,6 +34,13 @@ export interface TestConfiguration {
      * @maxItems 10
      */
     deviceProfiles: DeviceProfile[];
+    autoRegistration?: {
+      enabled: boolean;
+      screenshotFallback: boolean;
+      maxNavigationSteps: number;
+      timeoutMs: number;
+      successTimeoutMs: number;
+    };
   };
   /**
    * @maxItems 100
@@ -299,9 +306,9 @@ export interface ReleaseInput {
     npmLockSha256: string;
   };
   /**
-   * @maxItems 3
+   * @maxItems 4
    */
-  features?: ('DOWNLOAD_V1' | 'REGISTRATION_V1' | 'DAILY_V1')[];
+  features?: ('DOWNLOAD_V1' | 'REGISTRATION_V1' | 'DAILY_V1' | 'AUTO_REGISTRATION_V1')[];
 }
 
 export interface HealthReport {
@@ -503,6 +510,37 @@ export interface DailyExecutionPlan {
     };
     entryId?: string;
   }[];
+}
+
+export interface AutoRegistration {
+  enabled: boolean;
+  screenshotFallback: boolean;
+  maxNavigationSteps: number;
+  timeoutMs: number;
+  successTimeoutMs: number;
+}
+
+export interface RegistrationRecognition {
+  source: 'CONTROLS' | 'OCR' | 'LEARNED';
+  navigationSteps: number;
+  cache: 'MISS' | 'HIT' | 'INVALIDATED';
+  learned: boolean;
+  needsAdaptation: boolean;
+  templateHash?: string;
+}
+
+export interface LearnedRegistrationTemplate {
+  version: '1.0';
+  /**
+   * @maxItems 12
+   */
+  navigation: {
+    screenHash: string;
+    candidateHash: string;
+    role: 'REGISTER' | 'ACCOUNT' | 'LOGIN' | 'CONSENT';
+  }[];
+  formHash: string;
+  templateHash: string;
 }
 
 export interface SessionView {

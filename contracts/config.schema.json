@@ -160,6 +160,40 @@
           "items": {
             "$ref": "#/$defs/deviceProfile"
           }
+        },
+        "autoRegistration": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled",
+            "screenshotFallback",
+            "maxNavigationSteps",
+            "timeoutMs",
+            "successTimeoutMs"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "screenshotFallback": {
+              "type": "boolean"
+            },
+            "maxNavigationSteps": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 12
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "minimum": 15000,
+              "maximum": 90000
+            },
+            "successTimeoutMs": {
+              "type": "integer",
+              "minimum": 1000,
+              "maximum": 60000
+            }
+          }
         }
       },
       "allOf": [

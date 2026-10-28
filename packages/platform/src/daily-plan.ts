@@ -1,6 +1,6 @@
 import type { Prisma, ConfigVersion } from '@prisma/client';
 import type { DailyExecutionPlan, RunInput, TestConfiguration } from '@apk/contracts';
-import { schemaIssues, registrationFlowFor } from '@apk/contracts';
+import { schemaIssues, registrationAvailable } from '@apk/contracts';
 import { digest, canonical } from './security.js';
 import { fault } from './errors.js';
 
@@ -83,7 +83,7 @@ export async function prepareDailyPlan(
       const apk = task.apk as unknown as DailyExecutionPlan['assets'][number]['apk'];
       if (apk.cacheDay !== plan.cacheDay)
         fault('DOWNLOAD_SOURCE_INVALID', '文件日期与当天批次不一致', 422);
-      if (!registrationFlowFor(config, apk.packageName, task.entryId ?? undefined)) continue;
+      if (!registrationAvailable(config, apk.packageName, task.entryId ?? undefined)) continue;
       plan.assets.push({
         targetKey: task.targetKey,
         label: task.label,

@@ -22,6 +22,76 @@ const config = read('contracts/fixtures/config.valid.json');
 const messages = read('contracts/fixtures/agent.valid.json');
 let passed = 0;
 const v15Examples = read('contracts/fixtures/v15.valid.json');
+const v16Examples = read('contracts/fixtures/v16.valid.json');
+for (const [name, value] of Object.entries(v16Examples))
+  test('1.6 valid ' + name, () => assert.deepEqual(schemaIssues(name, value), []));
+test('1.6 embedded recognition settings match the versioned schema', () =>
+  assert.deepEqual(
+    read('contracts/config.schema.json').properties.execution.properties.autoRegistration,
+    read('contracts/v16.schema.json').$defs.AutoRegistration,
+  ));
+test('1.6 excessive navigation is rejected', () =>
+  assert.ok(
+    schemaIssues('AutoRegistration', { ...v16Examples.AutoRegistration, maxNavigationSteps: 13 })
+      .length,
+  ));
+test('1.6 unbounded discovery time is rejected', () =>
+  assert.ok(
+    schemaIssues('AutoRegistration', { ...v16Examples.AutoRegistration, timeoutMs: 90001 }).length,
+  ));
+test('1.6 arbitrary visual service endpoint is rejected', () =>
+  assert.ok(
+    schemaIssues('AutoRegistration', {
+      ...v16Examples.AutoRegistration,
+      url: 'https://untrusted.example.test',
+    }).length,
+  ));
+test('1.6 account text cannot enter recognition metadata', () =>
+  assert.ok(
+    schemaIssues('RegistrationRecognition', {
+      ...v16Examples.RegistrationRecognition,
+      username: 'real-account',
+    }).length,
+  ));
+test('1.6 learned recipes cannot contain execution commands', () =>
+  assert.ok(
+    schemaIssues('LearnedRegistrationTemplate', {
+      ...v16Examples.LearnedRegistrationTemplate,
+      navigation: [{ ...v16Examples.LearnedRegistrationTemplate.navigation[0], role: 'EXEC' }],
+    }).length,
+  ));
+test('1.6 automatic recognition requires full mode', () => {
+  const c = structuredClone(config);
+  c.execution.mode = 'DOWNLOAD_ONLY';
+  delete c.execution.proxySecretVersionId;
+  c.execution.autoRegistration = structuredClone(v16Examples.AutoRegistration);
+  assert.ok(configurationIssues(c).length);
+});
+test('1.6 automatic recognition does not require a manual flow', () => {
+  const c = structuredClone(config);
+  c.execution.autoRegistration = structuredClone(v16Examples.AutoRegistration);
+  c.registrationFlows = [];
+  assert.deepEqual(configurationIssues(c), []);
+});
+test('1.6 capability allows four declared features', () => {
+  const check = ajv.compile(
+    read('contracts/p1.schema.json').$defs.ReleaseInput.properties.features,
+  );
+  assert.ok(check(['DOWNLOAD_V1', 'REGISTRATION_V1', 'DAILY_V1', 'AUTO_REGISTRATION_V1']));
+  assert.equal(check(['DOWNLOAD_V1', 'ARBITRARY_CODE']), false);
+});
+test('1.6 adaptation stop is an allowed terminal event', () => {
+  const input = structuredClone(messages.find((m) => m.kind === 'events'));
+  input.events = [
+    {
+      ...input.events[0],
+      type: 'RUN_FINISHED',
+      payload: { status: 'FAILED', errorCode: 'AUTO_ADAPTATION_REQUIRED' },
+    },
+  ];
+  delete input.events[0].taskId;
+  assert.deepEqual(agentIssues(input), []);
+});
 for (const [name, value] of Object.entries(v15Examples)) {
   test('1.5 valid ' + name, () => assert.deepEqual(schemaIssues(name, value), []));
 }

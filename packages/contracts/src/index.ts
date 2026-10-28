@@ -7,6 +7,11 @@ import type {
 } from './generated/types.js';
 export type { ArtifactInput, AccountViewInput, TaskReconcileInput } from './generated/types.js';
 export type { ScheduleInput, DailyExecutionPlan, ProxyObservation } from './generated/types.js';
+export type {
+  AutoRegistration,
+  RegistrationRecognition,
+  LearnedRegistrationTemplate,
+} from './generated/types.js';
 export type { TestConfiguration, AgentMessage, LoginInput, PasswordChangeInput };
 export type { SessionView, NodeList, RunList, AuditList } from './generated/types.js';
 export type {
@@ -60,6 +65,8 @@ export function configurationIssues(value: unknown): Issue[] {
   const issues = schemaIssues('TestConfiguration', value);
   if (issues.length) return issues;
   const config = value as TestConfiguration;
+  if (config.execution.autoRegistration?.enabled && config.execution.mode !== 'FULL')
+    issues.push({ path: '/execution/autoRegistration', message: '自动识别注册需要完整模式和代理' });
   let url: URL;
   try {
     url = new URL(config.source.url);
@@ -112,6 +119,16 @@ export function registrationFlowFor(
         f.entryId === entryId &&
         (f.packageName === '*' || f.packageName === packageName),
     ) ?? matches.find((f) => !f.entryId && f.packageName === packageName)
+  );
+}
+export function registrationAvailable(
+  config: TestConfiguration,
+  packageName: string,
+  entryId?: string,
+) {
+  return (
+    !!registrationFlowFor(config, packageName, entryId) ||
+    config.execution.autoRegistration?.enabled === true
   );
 }
 export function agentIssues(value: unknown): Issue[] {

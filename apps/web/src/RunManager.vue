@@ -4,7 +4,7 @@ import TaskEvidence from './TaskEvidence.vue';
 import DailySchedulePanel from './DailySchedulePanel.vue';
 import { purposeLabels, reasonLabels } from './result-labels';
 import { api, mutation } from './api';
-import type { NodeView } from '@apk/contracts';
+import type { NodeView, RegistrationRecognition } from '@apk/contracts';
 const nodes = ref<NodeView[]>([]),
   configs = ref<{ id: string; name: string }[]>([]),
   versions = ref<{ id: string; version: number }[]>([]),
@@ -84,6 +84,7 @@ const selected = ref<Run | null>(null),
       status: string;
       cacheHit: boolean;
       errorCode: string | null;
+      recognition?: RegistrationRecognition;
       apk: { packageName: string; apkSha256: string; cacheDay: string } | null;
       observation?: {
         model: string;
@@ -115,6 +116,7 @@ const status: Record<string, string> = {
   PREPARING: '准备模拟器',
   INSTALLING: '正在安装',
   LAUNCHING: '正在启动',
+  DISCOVERING: '寻找注册入口',
   REGISTERING: '填写注册流程',
   VERIFYING: '核验提交结果',
   UNKNOWN: '注册结果未知',

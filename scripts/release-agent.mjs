@@ -69,6 +69,9 @@ export async function publishAgent() {
     playwright: '1.64.1',
     appium: '3.9.0',
     'appium-uiautomator2-driver': '8.7.2',
+    'tesseract.js': '7.0.0',
+    '@tesseract.js-data/eng': '1.0.0',
+    '@tesseract.js-data/chi_sim': '1.0.0',
   };
   await writeFile(
     join(npmDir, 'package.json'),
@@ -138,9 +141,14 @@ export async function publishAgent() {
     ['entry', 'agent'],
     ['boot-entry', 'boot-check'],
     ['egress-entry', 'egress'],
+    ['ocr-entry', 'ocr-worker'],
   ])
     await build({
-      entryPoints: [join(root, 'apps/agent/src', entry + '.ts')],
+      entryPoints: [
+        entry === 'ocr-entry'
+          ? join(root, 'packages/automation/src/ocr-worker.ts')
+          : join(root, 'apps/agent/src', entry + '.ts'),
+      ],
       bundle: true,
       alias: {
         '@apk/automation': join(root, 'packages/automation/src/index.ts'),
@@ -161,6 +169,7 @@ export async function publishAgent() {
     'agent.js',
     'boot-check.js',
     'egress.js',
+    'ocr-worker.js',
     'npm/package.json',
     'npm/package-lock.json',
   ]);
@@ -171,9 +180,9 @@ export async function publishAgent() {
   const body = {
     id: randomUUID(),
     gitCommit,
-    agentVersion: '0.5.1',
+    agentVersion: '0.6.0',
     protocolVersion: '1.0',
-    features: ['DOWNLOAD_V1', 'REGISTRATION_V1', 'DAILY_V1'],
+    features: ['DOWNLOAD_V1', 'REGISTRATION_V1', 'DAILY_V1', 'AUTO_REGISTRATION_V1'],
     artifactName,
     sha256,
     playbookSha256: await playbookDigest(join(root, 'deploy/ansible')),
