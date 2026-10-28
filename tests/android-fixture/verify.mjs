@@ -5,7 +5,14 @@ import { readFile, writeFile, mkdir, readdir, access } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { randomUUID, randomBytes, createHash } from 'node:crypto';
 import { URLSearchParams } from 'node:url';
-import { registerApk, inspectApk, NetworkPolicy, cacheDay, startAndroid } from '@apk/automation';
+import {
+  registerApk,
+  inspectApk,
+  NetworkPolicy,
+  cacheDay,
+  startAndroid,
+  readRegistrationPage,
+} from '@apk/automation';
 import { openAgentStore } from '../../apps/agent/src/store.js';
 process.umask(0o077);
 const root = resolve(process.argv[2]),
@@ -245,7 +252,7 @@ try {
         screenshotFallback: true,
         maxNavigationSteps: 8,
         timeoutMs: 90000,
-        successTimeoutMs: behavior === 'TIMEOUT' ? 3000 : 15000,
+        successTimeoutMs: behavior === 'TIMEOUT' ? 3000 : 60000,
       };
       testConfig.registrationFlows = [];
     }
@@ -292,6 +299,62 @@ try {
                   input: async (...values) => {
                     inputStarted = true;
                     return session.input(...values);
+                  },
+                  submit: async (...values) => {
+                    const started = Date.now();
+                    try {
+                      await session.submit(...values);
+                      console.log(
+                        JSON.stringify({
+                          case: currentCase,
+                          submitTransport: 'ACK',
+                          elapsedMs: Date.now() - started,
+                        }),
+                      );
+                    } catch (error) {
+                      console.log(
+                        JSON.stringify({
+                          case: currentCase,
+                          submitTransport: 'UNKNOWN',
+                          elapsedMs: Date.now() - started,
+                          code:
+                            error instanceof Error && 'code' in error ? error.code : 'UNAVAILABLE',
+                        }),
+                      );
+                      throw error;
+                    }
+                  },
+                  close: async () => {
+                    try {
+                      const page = readRegistrationPage(
+                        await session.source(AbortSignal.timeout(5000)),
+                        pkg,
+                      );
+                      console.log(
+                        JSON.stringify({
+                          case: currentCase,
+                          finalUi: {
+                            fields: page.controls
+                              .filter((e) => e.editable)
+                              .map((e) => ({
+                                filled: !!e.text && e.text !== e.hint,
+                                password: e.password,
+                              })),
+                            submitEnabled: page.controls.find((e) =>
+                              e.resourceId.endsWith(':id/submit'),
+                            )?.enabled,
+                            result: page.controls.some((e) => e.text === 'Registration successful')
+                              ? 'SUCCESS'
+                              : page.controls.some((e) => e.text === 'Pending result')
+                                ? 'PENDING'
+                                : 'OTHER',
+                          },
+                        }),
+                      );
+                    } catch {
+                      console.log(JSON.stringify({ case: currentCase, finalUi: 'UNAVAILABLE' }));
+                    }
+                    return session.close();
                   },
                   ocr: async (bytes, signal) => {
                     const lines = await session.ocr(bytes, signal);

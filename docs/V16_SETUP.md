@@ -19,3 +19,11 @@ Agent 0.6.0，契约 1.6.0。规则见 [自动识别契约](V16_CONTRACT.md)。�
 验证分别覆盖：契约及正反例；页面识别、真实中英文 OCR、受控 Appium 边界、真实 PostgreSQL/SQLite/Chromium；EC2 上的自有 Android 测试包；实际产品 APP。源码、构建脚本及虚构页面可入 Git，APK、真实账户、模型副本、截图、凭据及生产日志不可入 Git。实际执行的范围以对应提交的验证记录为准。
 
 实现依据：[Tesseract.js 本地部署](https://github.com/naptha/tesseract.js/blob/master/docs/local-installation.md)、[Appium 固定键盘命令](https://appium.io/docs/en/latest/reference/api/appium/)。
+
+## 本次验收记录（2026-10-28）
+
+本地通过 116 项契约检查、lint、typecheck、build 及 83 项测试；1 项 Linux 专用检查在 Windows 跳过，Ubuntu 24.04/26.04 的独立 CI 检查通过。启动布局变化的正反例已加入回归：界面稳定后重新识别，持续变化时不输入或提交。
+
+Ubuntu 26.04 / KVM EC2 上实际运行四项自有 APK 用例：三层原生入口注册、重启 SQLite 后路径命中、Canvas 图片入口经本地 OCR 触控后注册、提交超时保留 UNKNOWN。前三项均有 APP_UI 成功证明；四项均只收到一次注册请求，模拟器与任务目录均已确认清理。成功用例采用 60 秒核验时限。测试使用自有代理及受控服务，不代表住宅代理已承载实际产品注册，也不代表任意新 APP 均能识别。
+
+实际产品 APP 的自动识别注册尚未验收；升级不自动开启配置或计划。原始证据及测试账户仅保存在受保护的运维目录。

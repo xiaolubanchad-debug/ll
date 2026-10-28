@@ -87,6 +87,13 @@ export async function discoverRegistration(
       check();
       const page = readRegistrationPage(source, pkg);
       if (page.foreign) throw new RegistrationError('AUTO_FOREIGN_SCREEN');
+      await pause();
+      const settledSource = await session.source(bounded);
+      check();
+      if (readRegistrationPage(settledSource, pkg).hash !== page.hash) {
+        source = settledSource;
+        continue;
+      }
       let candidates = registrationEntries(page, pkg),
         picture: Buffer | undefined;
       const consent = candidates.filter((c) => c.role === 'CONSENT');
@@ -159,27 +166,31 @@ export async function discoverRegistration(
       const candidate: EntryCandidate = candidates[0],
         step = { screenHash: page.hash, role: candidate.role, candidateHash: candidate.hash };
       const mark = sha(canonical(step));
+      check();
+      const currentSource = await session.source(bounded);
+      if (readRegistrationPage(currentSource, pkg).hash !== page.hash) {
+        source = currentSource;
+        continue;
+      }
       if (visited.has(mark)) throw new RegistrationError('AUTO_NAVIGATION_LOOP');
-      visited.add(mark);
       if (cached && canonical(cached.navigation[navigation.length]) !== canonical(step)) {
         cached = undefined;
         recognition.cache = 'INVALIDATED';
         await learning?.drop(key);
       }
-      check();
-      if (readRegistrationPage(await session.source(bounded), pkg).hash !== page.hash)
-        throw new RegistrationError('AUTO_SCREEN_CHANGED');
       if (candidate.locator) {
         const id = await session.find(candidate.locator, remain(2000), bounded);
         check();
         await session.click(id, remain(5000));
       } else {
+        if (!picture) throw new RegistrationError('AUTO_SCREEN_CHANGED');
         if (
-          !picture ||
           regionHash(await session.screenshot(bounded), candidate.rect) !==
-            regionHash(picture, candidate.rect)
-        )
-          throw new RegistrationError('AUTO_SCREEN_CHANGED');
+          regionHash(picture, candidate.rect)
+        ) {
+          source = await session.source(bounded);
+          continue;
+        }
         check();
         await session.tap!(
           Math.round(candidate.rect.x + candidate.rect.width / 2),
@@ -187,6 +198,7 @@ export async function discoverRegistration(
           remain(5000),
         );
       }
+      visited.add(mark);
       navigation.push(step);
       recognition.navigationSteps = navigation.length;
       const waitUntil = Date.now() + remain(8000);
@@ -201,7 +213,7 @@ export async function discoverRegistration(
         throw new RegistrationError('AUTO_NAVIGATION_STALLED');
       source = next;
     }
-    throw new RegistrationError('AUTO_NAVIGATION_LIMIT');
+    throw new RegistrationError('AUTO_SCREEN_CHANGED');
   } catch (error) {
     if (signal.aborted) throw new RegistrationError('CANCELLED');
     if (bounded.aborted || Date.now() >= deadline)

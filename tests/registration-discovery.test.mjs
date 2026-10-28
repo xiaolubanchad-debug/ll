@@ -101,6 +101,7 @@ function pageXml(pkg, state, values = {}, variant = {}) {
 }
 function sessionFixture(pkg, variant = {}) {
   let state = variant.consent ? 'CONSENT' : variant.nested ? 'HOME' : 'ENTRY';
+  let sourceReads = 0;
   const values = {},
     trace = [];
   const session = {
@@ -125,7 +126,13 @@ function sessionFixture(pkg, variant = {}) {
       assert.equal(activity, '@launcher');
       trace.push('launch');
     },
-    source: async () => pageXml(pkg, state, values, variant),
+    source: async () => {
+      const xml = pageXml(pkg, state, values, variant);
+      sourceReads++;
+      return variant.unstable || (variant.startingAnimation && sourceReads <= 3)
+        ? xml.replace('text=""', `text="Owned animation ${sourceReads}"`)
+        : xml;
+    },
     screenshot: async () => variant.picture ?? white,
     find: async (locator) => {
       const current = readRegistrationPage(pageXml(pkg, state, values, variant), pkg),
@@ -396,6 +403,21 @@ test('untrusted UI and tampered learned recipes cannot become commands or succes
     ),
     undefined,
   );
+});
+
+test('startup layout changes are reread before actions and unending changes cannot submit', async (t) => {
+  const h = await harness(t);
+  const stable = await h.run('com.example.animation', { nested: true, startingAnimation: true });
+  assert.equal(stable.result.status, 'SUCCEEDED');
+  assert.equal(stable.intents, 1);
+  assert.equal(stable.result.recognition.navigationSteps, 3);
+  const unstable = await h.run('com.example.unstable', { unstable: true });
+  assert.equal(unstable.result.status, 'FAILED');
+  assert.equal(unstable.result.errorCode, 'AUTO_SCREEN_CHANGED');
+  assert.equal(unstable.result.recognition.needsAdaptation, true);
+  assert.equal(unstable.accounts, 0);
+  assert.equal(unstable.intents, 0);
+  assert.ok(!unstable.trace.some((entry) => entry.startsWith('click:')));
 });
 
 test('a discovery deadline is reported as adaptation timeout without generating an account', async (t) => {
