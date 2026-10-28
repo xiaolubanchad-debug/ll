@@ -1,0 +1,16 @@
+.git
+node_modules
+**/node_modules
+**/dist
+.tmp
+.venv*
+.env*
+!.env.example
+data
+archive
+test-results
+playwright-report
+*.apk
+*.key
+*.pem
+*.log

@@ -29,6 +29,8 @@
 | [P2 增量契约](docs/P2_CONTRACT.md)                | 领取、租约、事件、每日缓存和网络约束         |
 | [契约样例](contracts/README.md)                   | 正反例与检查方式                             |
 
+执行节点兼容 Ubuntu 24.04 / 26.04 LTS x86_64，使用新的 Agent 0.3.1 签名发布；验证范围及旧版本升级见 [兼容契约](docs/UBUNTU_COMPATIBILITY.md)。
+
 ## 开发规则
 
 开发前阅读 [AGENTS.md](AGENTS.md) 和开发契约。跨模块行为先更新契约，再修改实现；不以界面完成度代替端到端验收。

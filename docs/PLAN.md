@@ -1,6 +1,6 @@
 # APK 测试部署中台实施方案
 
-版本：1.2.0。生效日期：2026 年 10 月 27 日。实现语言基线：Node.js + TypeScript。P0/P1/P2 代码已实现；配置及下载见 [P2 部署与验证](P2_SETUP.md) 和 [P2 契约](P2_CONTRACT.md)。安装注册尚待 P3，真实 EC2 环境仍需独立验收。
+版本：1.3.0。生效日期：2026 年 10 月 28 日。实现语言基线：Node.js + TypeScript。P0/P1/P2 代码已实现；配置及下载见 [P2 部署与验证](P2_SETUP.md) 和 [P2 契约](P2_CONTRACT.md)。安装注册尚待 P3，真实 EC2 环境仍需独立验收。
 
 中台统一管理服务器、部署、测试配置和结果。执行节点运行浏览器和安卓环境。管理员不需要逐台登录 EC2 修改业务配置。
 
@@ -32,7 +32,7 @@ flowchart LR
 
 中台先部署在 Hostinger KVM 8 或普通 Ubuntu 服务器。它不运行安卓模拟器，不要求嵌套虚拟化。PostgreSQL、中台 API、部署 Worker、Nginx 使用 Docker Compose，数据目录持久化。宿主机不挂载 Docker socket 给业务容器。
 
-EC2 采用 Ubuntu 24.04 x86_64，在部署时实际验证 /dev/kvm 访问和模拟器加速能力。仅型号名称不能证明环境可用。Agent、浏览器、Android SDK 和 Appium 先直接安装在宿主机，通过 systemd 管理，不在第一版嵌套 Docker 运行安卓。
+EC2 接受 Ubuntu 24.04 / 26.04 LTS x86_64，平台规则见 [兼容契约](UBUNTU_COMPATIBILITY.md)，在部署时实际验证 /dev/kvm 访问和模拟器加速能力。仅型号名称不能证明环境可用。Agent、浏览器、Android SDK 和 Appium 先直接安装在宿主机，通过 systemd 管理，不在第一版嵌套 Docker 运行安卓。
 
 ## 技术选择
 

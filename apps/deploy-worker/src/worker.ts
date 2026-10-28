@@ -18,6 +18,7 @@ import {
   SAFE_CODES,
 } from '@apk/platform';
 import type { HealthReport } from '@apk/platform';
+import { executionOSSupported } from '@apk/contracts';
 import type { Runner, InstallContext } from './runner.js';
 const scriptPath = fileURLToPath(
   new URL('../../../deploy/ansible/files/inspect.sh', import.meta.url),
@@ -58,7 +59,8 @@ export function parseInspection(text: string): HealthReport & { ownerNodeId?: st
   if (!Number.isSafeInteger(r.memoryKiB) || !Number.isSafeInteger(r.freeDiskBytes))
     throw new PlatformError(409, 'SSH_UNREACHABLE', '远程检查数值无效');
   if (values.NODE_ID && /^[a-f0-9-]{36}$/i.test(values.NODE_ID)) r.ownerNodeId = values.NODE_ID;
-  if (r.ubuntu !== 'ubuntu:24.04') r.errors.push('UNSUPPORTED_OS');
+  const os = /^([^:]+):([^:]+)$/.exec(r.ubuntu);
+  if (!os || !executionOSSupported(os[1], os[2])) r.errors.push('UNSUPPORTED_OS');
   if (r.arch !== 'x86_64') r.errors.push('UNSUPPORTED_ARCH');
   if (r.freeDiskBytes < 20 * 1024 ** 3) r.errors.push('DISK_LOW');
   if (!r.kvm) r.errors.push('NO_KVM');

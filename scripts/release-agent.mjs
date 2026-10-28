@@ -66,7 +66,7 @@ export async function publishAgent() {
   const npmDir = join(dir, 'npm');
   await mkdir(npmDir);
   const dependencies = {
-    playwright: '1.56.1',
+    playwright: '1.64.1',
     appium: '3.9.0',
     'appium-uiautomator2-driver': '8.7.2',
   };
@@ -171,7 +171,7 @@ export async function publishAgent() {
   const body = {
     id: randomUUID(),
     gitCommit,
-    agentVersion: '0.3.0',
+    agentVersion: '0.3.1',
     protocolVersion: '1.0',
     features: ['DOWNLOAD_V1'],
     artifactName,

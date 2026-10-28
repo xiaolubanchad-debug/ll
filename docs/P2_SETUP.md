@@ -8,7 +8,7 @@
 2. 从干净的已提交源码执行 `npm run release:agent`，在中台登记新的签名清单。此发布声明 DOWNLOAD_V1，包含 Agent 0.3.0 和专用出口规则安装器；旧 P1 发布仍可登记，但不能领取下载任务。
 3. 选择空闲的 EC2 执行节点部署新版本。身份目录仍按部署隔离，任务及缓存固定保存在 `/var/lib/apk-platform/execution`，升级不清空。Node.js 24 是必需条件，SQLite 使用其内置模块。
 
-生产安装仍沿用 P1 的 Ubuntu/KVM 和固定 Android 工具链前置检查；本阶段没有另建不带 Android 的部署变体。旧 Agent 继续心跳，但页面提示需升级，服务端也会拒绝向其创建 P2 批次。
+新兼容发布使用 Agent 0.3.1 / Playwright 1.64.1，接受 Ubuntu 24.04 和 26.04 x86_64，见 [兼容契约](UBUNTU_COMPATIBILITY.md)。生产安装仍沿用 P1 的 Ubuntu/KVM 和固定 Android 工具链前置检查；本阶段没有另建不带 Android 的部署变体。旧 Agent 继续心跳，但页面提示需升级，服务端也会拒绝向其创建 P2 批次。
 
 ## 配置和开始
 

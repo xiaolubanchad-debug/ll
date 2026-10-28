@@ -293,6 +293,13 @@ test('P1 heartbeat health shape matches shared report', () =>
   ));
 
 const p2 = read('contracts/fixtures/p2.valid.json');
+for (const { distribution, version, errors } of read('contracts/fixtures/execution-platforms.json'))
+  test(`Execution OS ${distribution}:${version}`, () => {
+    assert.equal(
+      schemaIssues('ExecutionOS', { distribution, version }).length === 0,
+      !errors.includes('UNSUPPORTED_OS'),
+    );
+  });
 for (const [name, value] of Object.entries(p2))
   test('P2 valid ' + name, () => assert.deepEqual(schemaIssues(name, value), []));
 for (const [label, type, mutate] of [

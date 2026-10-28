@@ -1,3 +1,3 @@
 import type { ValidateFunction } from 'ajv';
-declare const validators: Record<"TestConfiguration" | "AgentMessage" | "LoginInput" | "PasswordChangeInput" | "NodeInput" | "SecretInput" | "HostKeyInput" | "DeploymentInput" | "ReasonInput" | "ReconcileInput" | "ReleaseInput" | "HealthReport" | "NodeView" | "ConfigInput" | "RunInput" | "RunReconcileInput" | "AgentReconcileInput" | "DeliveryConfigInput" | "ApkMetadata", ValidateFunction>;
+declare const validators: Record<"TestConfiguration" | "AgentMessage" | "LoginInput" | "PasswordChangeInput" | "NodeInput" | "SecretInput" | "HostKeyInput" | "DeploymentInput" | "ReasonInput" | "ReconcileInput" | "ReleaseInput" | "HealthReport" | "NodeView" | "ExecutionOS" | "ConfigInput" | "RunInput" | "RunReconcileInput" | "AgentReconcileInput" | "DeliveryConfigInput" | "ApkMetadata", ValidateFunction>;
 export default validators;

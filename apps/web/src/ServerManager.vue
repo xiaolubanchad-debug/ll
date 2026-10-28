@@ -61,7 +61,7 @@ const codes: Record<string, string> = {
   NO_KVM: '未检测到 KVM 设备',
   DISK_LOW: '磁盘剩余空间不足',
   SUDO_REQUIRED: 'sudo 权限或密码不可用',
-  UNSUPPORTED_OS: '需要 Ubuntu 24.04',
+  UNSUPPORTED_OS: '支持 Ubuntu 24.04 / 26.04 LTS',
   UNSUPPORTED_ARCH: '需要 x86_64',
   SSH_AUTH_FAILED: 'SSH 认证或连接失败',
   HOST_KEY_MISMATCH: '主机指纹不一致',
@@ -470,8 +470,11 @@ onUnmounted(() => {
         </div>
         <div class="deploy-panel">
           <h3>部署固定版本</h3>
-          <label for="release-id">发布版本</label
-          ><select id="release-id" v-model="releaseId">
+          <label for="release-id">发布版本</label>
+          <p class="muted">
+            执行节点支持 Ubuntu 24.04 / 26.04 LTS x86_64；26.04 请使用 Agent 0.3.1 的新签名发布。
+          </p>
+          <select id="release-id" v-model="releaseId">
             <option value="">请选择已登记的版本</option>
             <option v-for="r in releases" :key="r.id" :value="r.id">
               {{ r.manifest.agentVersion }} · {{ r.manifest.gitCommit.slice(0, 8) }} ·

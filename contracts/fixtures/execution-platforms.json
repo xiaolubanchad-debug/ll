@@ -1,0 +1,14 @@
+[
+  { "distribution": "ubuntu", "version": "24.04", "arch": "x86_64", "errors": [] },
+  { "distribution": "ubuntu", "version": "26.04", "arch": "x86_64", "errors": [] },
+  {
+    "distribution": "ubuntu",
+    "version": "26.04",
+    "arch": "aarch64",
+    "errors": ["UNSUPPORTED_ARCH"]
+  },
+  { "distribution": "ubuntu", "version": "22.04", "arch": "x86_64", "errors": ["UNSUPPORTED_OS"] },
+  { "distribution": "ubuntu", "version": "26.10", "arch": "x86_64", "errors": ["UNSUPPORTED_OS"] },
+  { "distribution": "debian", "version": "13", "arch": "x86_64", "errors": ["UNSUPPORTED_OS"] },
+  { "distribution": "ubuntu", "version": "26.04.1", "arch": "x86_64", "errors": ["UNSUPPORTED_OS"] }
+]

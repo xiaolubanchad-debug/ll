@@ -3,6 +3,16 @@ on: [push, pull_request]
 permissions:
   contents: read
 jobs:
+  ubuntu-download:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        ubuntu: ['24.04', '26.04']
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - run: docker build --build-arg UBUNTU_IMAGE=ubuntu:${{ matrix.ubuntu }} -f tests/ubuntu/Dockerfile -t apk-ubuntu-test:${{ matrix.ubuntu }} .
+      - run: docker run --rm --cap-drop ALL --security-opt no-new-privileges:true apk-ubuntu-test:${{ matrix.ubuntu }}
   verify:
     runs-on: ubuntu-latest
     services:
@@ -33,6 +43,7 @@ jobs:
       - run: python3 -m venv .venv-deploy && .venv-deploy/bin/pip install -r deploy/requirements.txt
       - run: .venv-deploy/bin/ansible-playbook -i 'target,' --syntax-check deploy/ansible/install.yml deploy/ansible/activate.yml
       - run: npm run build -w @apk/deploy-worker && node scripts/check-ansible.mjs .venv-deploy/bin/ansible-playbook
+      - run: node scripts/check-platforms.mjs .venv-deploy/bin/ansible-playbook
       - run: npx playwright install --with-deps chromium --only-shell
       - run: npm test
       - run: sudo apt-get update && sudo apt-get install -y nftables

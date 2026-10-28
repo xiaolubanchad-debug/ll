@@ -17,10 +17,20 @@ export type {
   ReleaseInput,
 } from './generated/types.js';
 export type { NodeView } from './generated/types.js';
-export type {ConfigInput,RunInput,RunReconcileInput,AgentReconcileInput,DeliveryConfigInput,ApkMetadata} from './generated/types.js';
+export type {
+  ConfigInput,
+  RunInput,
+  RunReconcileInput,
+  AgentReconcileInput,
+  DeliveryConfigInput,
+  ApkMetadata,
+} from './generated/types.js';
 export interface Issue {
   path: string;
   message: string;
+}
+export function executionOSSupported(distribution: string, version: string): boolean {
+  return schemaIssues('ExecutionOS', { distribution, version }).length === 0;
 }
 export function schemaIssues(name: keyof typeof validators, value: unknown): Issue[] {
   const validate = validators[name];

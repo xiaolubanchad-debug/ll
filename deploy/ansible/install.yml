@@ -11,13 +11,9 @@
     tools_root: '{{ tool_root }}/tools'
     release_root: '/opt/apk-platform/releases/{{ release_id }}'
   tasks:
-    - name: Verify Ubuntu platform
-      ansible.builtin.assert:
-        that:
-          - ansible_facts.distribution == 'Ubuntu'
-          - ansible_facts.distribution_version == '24.04'
-          - ansible_facts.architecture == 'x86_64'
-        fail_msg: UNSUPPORTED_OS
+    - name: Verify supported execution platform
+      ansible.builtin.import_tasks: tasks/platform-check.yml
+      tags: [platform_check]
     - name: Check KVM device
       ansible.builtin.stat:
         path: /dev/kvm
@@ -49,6 +45,7 @@
         state: stopped
       when: "'apk-agent.service' in ansible_facts.services"
     - name: Install system prerequisites
+      tags: [system_prerequisites]
       ansible.builtin.apt:
         update_cache: true
         cache_valid_time: 3600

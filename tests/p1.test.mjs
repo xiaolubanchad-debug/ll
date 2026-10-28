@@ -25,7 +25,13 @@ const pair = generateKeyPairSync('rsa', {
 });
 const parsedKey = utils.parseKey(pair.privateKey);
 const password = 'ssh-test-' + randomBytes(10).toString('hex') + '{{ 2 + 2 }}';
-const machine = { kvm: true, disk: 50 * 1024 ** 3, sudo: true, marker: false };
+const machine = {
+  ubuntu: 'ubuntu:24.04',
+  kvm: true,
+  disk: 50 * 1024 ** 3,
+  sudo: true,
+  marker: false,
+};
 const sockets = new Set();
 let authAttempts = 0,
   publicAuth = 0;
@@ -62,7 +68,7 @@ const ssh = new Server({ hostKeys: [pair.privateKey] }, (client) => {
           assert.ok(input.includes('KVM'));
           assert.ok(!input.includes(password));
           stream.write(
-            `UBUNTU=ubuntu:24.04\nARCH=x86_64\nMEMORY=32768000\nDISK=${machine.disk}\nKVM=${machine.kvm ? 1 : 0}\nSUDO=${machine.sudo ? 1 : 0}\nMARKER=${machine.marker ? 1 : 0}\n`,
+            `UBUNTU=${machine.ubuntu}\nARCH=x86_64\nMEMORY=32768000\nDISK=${machine.disk}\nKVM=${machine.kvm ? 1 : 0}\nSUDO=${machine.sudo ? 1 : 0}\nMARKER=${machine.marker ? 1 : 0}\n`,
           );
           stream.exit(0);
           stream.end();
@@ -377,6 +383,34 @@ test('P1 acceptance: real SSH transport and database; simulated remote OS and in
         machine.disk = 50 * 1024 ** 3;
       },
     );
+    await t.test(
+      'SSH platform checks accept both LTS releases and preserve prerequisite failures',
+      async () => {
+        const worker = new Worker(db, runner);
+        try {
+          for (const ubuntu of ['ubuntu:24.04', 'ubuntu:26.04']) {
+            machine.ubuntu = ubuntu;
+            const id = await job('checks');
+            await worker.once();
+            const result = await jobResult(id);
+            assert.equal(result.status, 'SUCCEEDED');
+            assert.equal(result.result.ubuntu, ubuntu);
+          }
+          machine.kvm = false;
+          let id = await job('checks');
+          await worker.once();
+          assert.equal((await jobResult(id)).errorCode, 'NO_KVM');
+          machine.kvm = true;
+          machine.ubuntu = 'ubuntu:26.10';
+          id = await job('checks');
+          await worker.once();
+          assert.equal((await jobResult(id)).errorCode, 'UNSUPPORTED_OS');
+        } finally {
+          machine.ubuntu = 'ubuntu:24.04';
+          machine.kvm = true;
+        }
+      },
+    );
     await t.test('release registry verifies signature, artifact, lock and path', async () => {
       manifest = await makeRelease();
       assert.equal(
@@ -391,6 +425,38 @@ test('P1 acceptance: real SSH transport and database; simulated remote OS and in
       );
       assert.equal((await request('/releases', 'POST', manifest)).status, 201);
       assert.equal((await request('/releases', 'POST', manifest)).status, 409);
+    });
+    await t.test('invalid OS and missing KVM never invoke the installer', async () => {
+      const before = installCount;
+      const worker = new Worker(db, runner);
+      try {
+        for (const [ubuntu, kvm, code] of [
+          ['ubuntu:26.10', true, 'UNSUPPORTED_OS'],
+          ['ubuntu:26.04', false, 'NO_KVM'],
+        ]) {
+          machine.ubuntu = ubuntu;
+          machine.kvm = kvm;
+          const created = await request(
+            '/deployments',
+            'POST',
+            { nodeId: node.id, releaseId: manifest.id, licenseAccepted: true },
+            idem(),
+          );
+          assert.equal(created.status, 202);
+          await worker.once();
+          const result = await jobResult(created.data.operationId);
+          assert.equal(result.status, 'FAILED');
+          assert.equal(result.errorCode, code);
+          assert.equal(installCount, before);
+          assert.equal(
+            (await db.nodeSlot.findUnique({ where: { nodeId: node.id } })).quarantined,
+            false,
+          );
+        }
+      } finally {
+        machine.ubuntu = 'ubuntu:24.04';
+        machine.kvm = true;
+      }
     });
     await t.test(
       'deployment is idempotent and exclusive; Agent registers and heartbeats after simulated install',

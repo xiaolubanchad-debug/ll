@@ -178,7 +178,9 @@ export class AnsibleRunner implements Runner {
             ) as { event?: string; event_data?: { res?: { msg?: string } } };
             const msg = event.event_data?.res?.msg;
             if (event.event === 'runner_on_failed' && typeof msg === 'string') {
-              if (msg.includes('NO_KVM')) failure = 'NO_KVM';
+              if (msg.includes('UNSUPPORTED_OS')) failure = 'UNSUPPORTED_OS';
+              else if (msg.includes('UNSUPPORTED_ARCH')) failure = 'UNSUPPORTED_ARCH';
+              else if (msg.includes('NO_KVM')) failure = 'NO_KVM';
               else if (msg.includes('ANDROID_NOT_READY')) failure = 'ANDROID_NOT_READY';
               else if (msg.toLowerCase().includes('sudo')) failure = 'SUDO_REQUIRED';
             }

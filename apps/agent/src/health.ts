@@ -3,6 +3,7 @@ import { constants } from 'node:fs';
 import { arch, totalmem } from 'node:os';
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
+import { executionOSSupported } from '@apk/contracts';
 export interface AgentHealth {
   ubuntu: string;
   arch: string;
@@ -104,7 +105,7 @@ export async function collectHealth(
   const errors: string[] = [];
   if (!kvm) errors.push('NO_KVM');
   if (freeDiskBytes < 20 * 1024 ** 3) errors.push('DISK_LOW');
-  if (id !== 'ubuntu' || version !== '24.04') errors.push('UNSUPPORTED_OS');
+  if (!executionOSSupported(id, version)) errors.push('UNSUPPORTED_OS');
   if (arch() !== 'x64') errors.push('UNSUPPORTED_ARCH');
   if (!android) errors.push('ANDROID_NOT_READY');
   return {

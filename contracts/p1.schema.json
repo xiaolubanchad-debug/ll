@@ -546,6 +546,25 @@
           "enum": ["1.0", null]
         }
       }
+    },
+    "ExecutionOS": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "distribution",
+        "version"
+      ],
+      "properties": {
+        "distribution": {
+          "const": "ubuntu"
+        },
+        "version": {
+          "enum": [
+            "24.04",
+            "26.04"
+          ]
+        }
+      }
     }
   }
 }

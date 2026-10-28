@@ -6,7 +6,7 @@
 
 先按 [P0 启动说明](P0_SETUP.md) 安装依赖、迁移数据库、建立管理员并启动管理页面。已有 P0 数据库直接运行 `npm run db:migrate`，新增迁移保留原账户及会话，并为原有节点补建占用槽。先备份数据库和密钥。
 
-真实部署 Worker 运行在 Ubuntu 24.04 x86_64，与 API 使用同一代码提交、同一受保护发布目录和主密钥。Windows 可开发及运行本地测试，不能运行生产安装器。Worker 本身不需要 KVM；目标 EC2 必须有可供 apk-runner 使用的 `/dev/kvm`、至少 20 GiB 剩余空间及 sudo 权限。
+真实部署 Worker 运行在 Ubuntu 24.04 x86_64，与 API 使用同一代码提交、同一受保护发布目录和主密钥。Windows 可开发及运行本地测试，不能运行生产安装器。Worker 本身不需要 KVM；目标 EC2 接受 Ubuntu 24.04 / 26.04 LTS x86_64，详见 [兼容契约](UBUNTU_COMPATIBILITY.md)。目标必须有可供 apk-runner 使用的 `/dev/kvm`、至少 20 GiB 剩余空间及 sudo 权限。
 
 在 Linux 中台安装 Python 3.12、venv、OpenSSH 客户端和 sshpass，然后安装固定 Ansible 依赖：
 
@@ -46,7 +46,7 @@ npm run release:agent
 
 命令读取官方 Node/Android 元数据，固定各档案 URL、revision 和校验值，生成冻结 npm lock、打包 Agent 与空模拟器启动检查器，以 Ed25519 签名。输出在忽略 Git 的 `data/releases` 中。首次需要网络访问 npm、nodejs.org 和 dl.google.com；Google 元数据暂不可用时命令失败，不退回未经校验的地址。
 
-发布固定 Node 24.18.0、Playwright 1.56.1、Appium 3.9.0、UiAutomator2 driver 8.7.2、Android API 35/google_apis/x86_64，Android 档案版本以本次签名清单为准。后续部署不重新解析 latest。Agent 构件和 npm lock 使用 SHA256；部分 Google 元数据仅提供 SHA1，按其官方值校验并在签名清单中固定。
+发布固定 Node 24.18.0、Playwright 1.64.1（新发布；旧 P1 清单保持 1.56.1）、Appium 3.9.0、UiAutomator2 driver 8.7.2、Android API 35/google_apis/x86_64，Android 档案版本以本次签名清单为准。后续部署不重新解析 latest。Agent 构件和 npm lock 使用 SHA256；部分 Google 元数据仅提供 SHA1，按其官方值校验并在签名清单中固定。
 
 在服务器页面展开“登记签名发布版本”，粘贴输出的 manifest JSON。API 校验签名、本地构件摘要、归档文件白名单及 npm lock 摘要后登记。发布包必须已放在 API 和 Worker 共用的 RELEASE_DIR，页面不能上传任意脚本或远程下载地址。Playbook 内容变化后必须生成新发布，旧清单不能用于新脚本。
 

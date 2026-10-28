@@ -1,6 +1,6 @@
 # 开发契约
 
-版本 1.2.0，日期 2026 年 10 月 27 日。MUST 表示发布必须满足，SHOULD 表示偏离时必须记录原因，MAY 表示可选。P0/P1 实现范围见对应启动文档；P2 行为由 [P2_CONTRACT.md](P2_CONTRACT.md) 细化，验证边界见 [P2_SETUP.md](P2_SETUP.md)。P3/P4 的契约不表示已完成能力。
+版本 1.3.0，日期 2026 年 10 月 28 日。MUST 表示发布必须满足，SHOULD 表示偏离时必须记录原因，MAY 表示可选。P0/P1 实现范围见对应启动文档；P2 行为由 [P2_CONTRACT.md](P2_CONTRACT.md) 细化，验证边界见 [P2_SETUP.md](P2_SETUP.md)。P3/P4 的契约不表示已完成能力。
 
 ## 契约权威与变更
 
@@ -9,6 +9,8 @@
 contracts/ 下的 JSON Schema 是线上数据结构校验来源，HTTP_API.md 定义路由和行为。从这些结构及 p0.http.json、p1.http.json 生成共享 TypeScript 类型、静态校验器与 OpenAPI，并纳入漂移检查。类型生成对 if/then/else 只表达结构，跨字段约束由公共运行时校验器负责，不能仅依赖 TypeScript 编译来验证外部请求。
 
 接口前缀为 /api/v1，节点协议 protocolVersion 为 1.0，配置 schemaVersion 为 1.0。新增可选字段必须保留默认行为；改变必填项、字段类型、状态含义、重试或提交规则属于破坏性变更，必须升级契约版本并提供迁移及兼容测试。不兼容节点拒绝接收任务，界面显示需升级。
+
+Ubuntu 24.04 与 26.04 的执行节点检查及固定浏览器版本遵循 [平台兼容契约 1.3.0](UBUNTU_COMPATIBILITY.md)；平台接受不代替 KVM 和实际安卓启动证明。
 
 ## 模块与进程边界
 

@@ -350,6 +350,11 @@ export interface NodeView {
   downloadProtocol?: '1.0' | null;
 }
 
+export interface ExecutionOS {
+  distribution: 'ubuntu';
+  version: '24.04' | '26.04';
+}
+
 export interface ConfigInput {
   name: string;
 }
