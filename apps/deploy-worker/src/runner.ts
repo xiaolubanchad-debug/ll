@@ -5,7 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { join, resolve, sep } from 'node:path';
 import type { Node } from '@prisma/client';
 import type { ReleaseInput } from '@apk/contracts';
-import { PlatformError, artifactPath, playbookDigest } from '@apk/platform';
+import { PlatformError, artifactPath, playbookDigest, hostKeyLine } from '@apk/platform';
+import ssh2 from 'ssh2';
 export interface InstallContext {
   node: Node;
   manifest: ReleaseInput;
@@ -76,18 +77,27 @@ export class AnsibleRunner implements Runner {
         ansible_port: context.node.port,
         ansible_user: context.node.username,
         ansible_connection: 'ssh',
+        ansible_ssh_args: '-C -o ControlMaster=no -o ControlPersist=no -o ControlPath=none',
         ansible_python_interpreter: '/usr/bin/python3',
         ansible_become: true,
         ansible_ssh_common_args: `-o StrictHostKeyChecking=yes -o UserKnownHostsFile=${known} -o IdentitiesOnly=yes -o ConnectTimeout=10`,
       };
       if (context.ssh.privateKey) {
+        const key = ssh2.utils.parseKey(context.ssh.privateKey, context.ssh.passphrase);
+        if (key instanceof Error || Array.isArray(key) || !key.isPrivateKey())
+          throw new PlatformError(422, 'SSH_KEY_INVALID', '私钥或口令无效');
+        // Runner consumes its ssh_key input after ssh-add. Keep a separate identity
+        // until OpenSSH finishes so IdentitiesOnly selects this job's key, including
+        // encrypted PEM keys whose public part cannot be read without a passphrase.
+        const identity = join(dir, 'identity_key');
+        await writeFile(identity, context.ssh.privateKey, { mode: 0o600 });
+        await writeFile(identity + '.pub', hostKeyLine(key.getPublicSSH()) + '\n', { mode: 0o600 });
+        target.ansible_ssh_private_key_file = identity;
         await writeFile(join(dir, 'env', 'ssh_key'), context.ssh.privateKey, { mode: 0o600 });
         if (context.ssh.passphrase)
-          await writeFile(
-            join(dir, 'env', 'passwords'),
-            JSON.stringify({ 'Enter passphrase for .*:': context.ssh.passphrase }),
-            { mode: 0o600 },
-          );
+          await writeFile(join(dir, 'identity_passphrase'), context.ssh.passphrase, {
+            mode: 0o600,
+          });
       } else if (context.ssh.password) target.ansible_password = context.ssh.password;
       if (context.sudoPassword) target.ansible_become_password = context.sudoPassword;
       await writeFile(join(dir, 'inventory', 'hosts.yml'), renderInventory(target), {
@@ -132,6 +142,14 @@ export class AnsibleRunner implements Runner {
             ANSIBLE_RETRY_FILES_ENABLED: 'False',
             ANSIBLE_NOCOLOR: '1',
             ANSIBLE_SSH_PASSWORD_MECHANISM: 'sshpass',
+            ...(context.ssh.passphrase
+              ? {
+                  SSH_ASKPASS: join(root, 'scripts/ssh-askpass.mjs'),
+                  SSH_ASKPASS_REQUIRE: 'force',
+                  DISPLAY: 'apk-platform:0',
+                  APK_SSH_PASSPHRASE_FILE: join(dir, 'identity_passphrase'),
+                }
+              : {}),
           },
         });
         let resolved = false;
@@ -177,7 +195,18 @@ export class AnsibleRunner implements Runner {
               await readFile(join(events, artifact, 'job_events', file), 'utf8'),
             ) as { event?: string; event_data?: { res?: { msg?: string } } };
             const msg = event.event_data?.res?.msg;
-            if (event.event === 'runner_on_failed' && typeof msg === 'string') {
+            if (event.event === 'runner_on_unreachable') {
+              failure =
+                typeof msg === 'string' &&
+                /host key verification failed|remote host identification has changed/i.test(msg)
+                  ? 'HOST_KEY_MISMATCH'
+                  : typeof msg === 'string' &&
+                      /permission denied|authentication failed|no supported authentication/i.test(
+                        msg,
+                      )
+                    ? 'SSH_AUTH_FAILED'
+                    : 'SSH_UNREACHABLE';
+            } else if (event.event === 'runner_on_failed' && typeof msg === 'string') {
               if (msg.includes('UNSUPPORTED_OS')) failure = 'UNSUPPORTED_OS';
               else if (msg.includes('UNSUPPORTED_ARCH')) failure = 'UNSUPPORTED_ARCH';
               else if (msg.includes('NO_KVM')) failure = 'NO_KVM';

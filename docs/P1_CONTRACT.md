@@ -12,6 +12,8 @@ PROBE、CHECK、DEPLOY 共用部署作业表和节点槽。创建作业在事务
 
 SSH 使用固定检查脚本和严格主机公钥验证。Ansible Runner 使用结构化 inventory、独立 0700 工作目录、0600 密钥及密码文件；参数和事件中不含口令。日志只发布固定步骤名、状态和错误码，不直接转发远端输出。生产 Worker 只执行仓库内固定 Playbook，测试替身仅通过依赖注入提供。
 
+私钥选择与 Runner 清理顺序遵循 [SSH 身份修复契约 1.3.1](SSH_RUNNER_FIX.md)；保留 IdentitiesOnly 与主机指纹检查，显式指定本次身份文件，并正确归类 OpenSSH 认证失败。
+
 Inventory 中的字符串使用 Ansible 的 !unsafe 标记，确保特殊符号和模板片段作为原文传递；SSH 密码机制固定使用 sshpass。Linux CI 通过真实 Ansible 本地连接检查 SSH 与 sudo 密码的原文保持。
 
 发布由本地命令打包 Agent 并签名，包含源提交、Agent SHA256、Playbook 摘要、协议版本和固定工具档案。管理员登记时验证签名和本地构件，不接受任意下载地址。依赖档案限定官方 Node 与 Android 主机、固定 URL 和校验值。Google 档案可使用其官方元数据中的 SHA1；Node 与 Agent 使用 SHA256。主版本、档案 revision 和 URL 固定到发布，不在部署时重新解析 latest。

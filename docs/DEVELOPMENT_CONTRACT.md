@@ -1,6 +1,6 @@
 # 开发契约
 
-版本 1.3.0，日期 2026 年 10 月 28 日。MUST 表示发布必须满足，SHOULD 表示偏离时必须记录原因，MAY 表示可选。P0/P1 实现范围见对应启动文档；P2 行为由 [P2_CONTRACT.md](P2_CONTRACT.md) 细化，验证边界见 [P2_SETUP.md](P2_SETUP.md)。P3/P4 的契约不表示已完成能力。
+版本 1.3.1，日期 2026 年 10 月 28 日。MUST 表示发布必须满足，SHOULD 表示偏离时必须记录原因，MAY 表示可选。P0/P1 实现范围见对应启动文档；P2 行为由 [P2_CONTRACT.md](P2_CONTRACT.md) 细化，验证边界见 [P2_SETUP.md](P2_SETUP.md)。P3/P4 的契约不表示已完成能力。
 
 ## 契约权威与变更
 

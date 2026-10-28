@@ -44,6 +44,8 @@ jobs:
       - run: .venv-deploy/bin/ansible-playbook -i 'target,' --syntax-check deploy/ansible/install.yml deploy/ansible/activate.yml
       - run: npm run build -w @apk/deploy-worker && node scripts/check-ansible.mjs .venv-deploy/bin/ansible-playbook
       - run: node scripts/check-platforms.mjs .venv-deploy/bin/ansible-playbook
+      - run: sudo apt-get update && sudo apt-get install -y openssh-server
+      - run: sudo --preserve-env=PATH node scripts/check-runner.mjs "$PWD/.venv-deploy/bin/ansible-runner"
       - run: npx playwright install --with-deps chromium --only-shell
       - run: npm test
       - run: sudo apt-get update && sudo apt-get install -y nftables

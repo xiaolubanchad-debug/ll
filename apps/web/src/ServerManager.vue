@@ -64,6 +64,7 @@ const codes: Record<string, string> = {
   UNSUPPORTED_OS: '支持 Ubuntu 24.04 / 26.04 LTS',
   UNSUPPORTED_ARCH: '需要 x86_64',
   SSH_AUTH_FAILED: 'SSH 认证或连接失败',
+  SSH_UNREACHABLE: '无法连接 SSH 服务',
   HOST_KEY_MISMATCH: '主机指纹不一致',
   ANDROID_NOT_READY: '安卓环境尚未就绪',
   AGENT_TIMEOUT: '未确认 Agent 就绪',

@@ -1,6 +1,6 @@
 # HTTP 接口契约
 
-版本 1.3.0，前缀 /api/v1。已实现路由由 p0.http.json、p1.http.json 和 p2.http.json 合并生成 openapi.json，CI 比较 Controller、清单和 OpenAPI。下表保留后续阶段设计，以机器清单判定实现范围。
+版本 1.3.1，前缀 /api/v1。已实现路由由 p0.http.json、p1.http.json 和 p2.http.json 合并生成 openapi.json，CI 比较 Controller、清单和 OpenAPI。下表保留后续阶段设计，以机器清单判定实现范围。
 
 P0 提供登录和校验基础，P1 提供服务器及部署，P2 提供配置版本、下载批次、领取、配置下发、事件和重启核验，见 [P2 契约](../docs/P2_CONTRACT.md)。配置与批次的创建、保存、停止和人工核验都要求幂等键，保存版本另需 If-Match。P2 下载模式不下发代理口令；实际安装注册尚待 P3。列表查询以各机器清单及 Controller 为准，执行事件使用分页轮询，SSE 尚未实现。
 
