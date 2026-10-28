@@ -100,7 +100,7 @@ try {
   await mkdir(releaseDir);
   await mkdir(jobs);
   const book =
-    '- hosts: target\n  gather_facts: false\n  vars:\n    ansible_become: false\n  tasks:\n    - name: Owned SSH fixture connection\n      ansible.builtin.raw: printf APK_RUNNER_TRANSPORT_OK\n      changed_when: false\n';
+    '- hosts: target\n  gather_facts: false\n  vars:\n    ansible_become: false\n  tasks:\n    - name: Signed download capability reaches Playbook\n      ansible.builtin.assert:\n        that: download_enabled == true\n    - name: Owned SSH fixture connection\n      ansible.builtin.raw: printf APK_RUNNER_TRANSPORT_OK\n      changed_when: false\n';
   await writeFile(join(books, 'install.yml'), book);
   await writeFile(join(books, 'activate.yml'), book);
   const bytes = Buffer.from('owned-runner-fixture-not-a-release'),
@@ -121,7 +121,8 @@ try {
     },
     manifest: {
       id: randomUUID(),
-      agentVersion: '0.3.1',
+      agentVersion: '0.3.4',
+      features: ['DOWNLOAD_V1'],
       artifactName,
       sha256: sha,
       playbookSha256: await playbookDigest(books),

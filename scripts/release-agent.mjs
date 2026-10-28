@@ -171,7 +171,7 @@ export async function publishAgent() {
   const body = {
     id: randomUUID(),
     gitCommit,
-    agentVersion: '0.3.3',
+    agentVersion: '0.3.4',
     protocolVersion: '1.0',
     features: ['DOWNLOAD_V1'],
     artifactName,

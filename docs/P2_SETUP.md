@@ -10,7 +10,7 @@
 
 新兼容发布使用 Agent 0.3.1 / Playwright 1.64.1，接受 Ubuntu 24.04 和 26.04 x86_64，见 [兼容契约](UBUNTU_COMPATIBILITY.md)。生产安装仍沿用 P1 的 Ubuntu/KVM 和固定 Android 工具链前置检查；本阶段没有另建不带 Android 的部署变体。旧 Agent 继续心跳，但页面提示需升级，服务端也会拒绝向其创建 P2 批次。
 
-当前安装选择 Agent 0.3.3 新签名发布，包含普通账户驱动注册权限和 SDK 布局修复；下载协议保持兼容，见 [驱动安装契约](APPIUM_INSTALL_FIX.md) 和 [SDK 安装契约](ANDROID_SDK_LAYOUT.md)。
+当前安装选择 Agent 0.3.4 新签名发布，包含普通账户驱动注册权限和 SDK 布局修复；下载协议保持兼容，见 [驱动安装契约](APPIUM_INSTALL_FIX.md) 和 [SDK 安装契约](ANDROID_SDK_LAYOUT.md)。
 
 ## 配置和开始
 

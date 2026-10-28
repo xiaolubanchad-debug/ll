@@ -473,7 +473,7 @@ onUnmounted(() => {
           <h3>部署固定版本</h3>
           <label for="release-id">发布版本</label>
           <p class="muted">
-            执行节点支持 Ubuntu 24.04 / 26.04 LTS x86_64；安装请使用 Agent 0.3.3 的新签名发布。
+            执行节点支持 Ubuntu 24.04 / 26.04 LTS x86_64；安装请使用 Agent 0.3.4 的新签名发布。
           </p>
           <select id="release-id" v-model="releaseId">
             <option value="">请选择已登记的版本</option>

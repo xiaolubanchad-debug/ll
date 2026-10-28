@@ -29,7 +29,7 @@
 | [P2 增量契约](docs/P2_CONTRACT.md)                | 领取、租约、事件、每日缓存和网络约束         |
 | [契约样例](contracts/README.md)                   | 正反例与检查方式                             |
 
-执行节点兼容 Ubuntu 24.04 / 26.04 LTS x86_64，安装使用 Agent 0.3.3 签名发布；版本沿革见 [兼容契约](docs/UBUNTU_COMPATIBILITY.md)，安装修复见 [驱动权限契约](docs/APPIUM_INSTALL_FIX.md) 和 [SDK 布局契约](docs/ANDROID_SDK_LAYOUT.md)。
+执行节点兼容 Ubuntu 24.04 / 26.04 LTS x86_64，安装使用 Agent 0.3.4 签名发布；版本沿革见 [兼容契约](docs/UBUNTU_COMPATIBILITY.md)，安装修复见 [驱动权限契约](docs/APPIUM_INSTALL_FIX.md) 和 [SDK 布局契约](docs/ANDROID_SDK_LAYOUT.md)。
 
 ## 开发规则
 

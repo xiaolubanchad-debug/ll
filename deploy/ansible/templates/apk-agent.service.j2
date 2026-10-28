@@ -16,7 +16,7 @@ Environment=JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
 Environment=APPIUM_HOME={{ agent_config.toolsRoot }}/appium-home
 Environment=PLAYWRIGHT_BROWSERS_PATH={{ agent_config.toolsRoot }}/browsers
 ExecStart=/opt/apk-platform/runtime/node/bin/node /opt/apk-platform/current/agent.js
-{% if agent_config.agentVersion in ['0.3.0', '0.3.1'] %}
+{% if download_enabled | mandatory %}
 ExecStartPre=+/opt/apk-platform/runtime/node/bin/node /opt/apk-platform/current/egress.js
 {% endif %}
 Restart=on-failure
