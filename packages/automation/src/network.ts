@@ -80,6 +80,7 @@ export async function startEgress(policy: NetworkPolicy, maxBytes: number, timeo
         },
       );
       upstream.on('socket', (s) => {
+        if (sockets.has(s)) return;
         sockets.add(s);
         s.once('close', () => sockets.delete(s));
       });

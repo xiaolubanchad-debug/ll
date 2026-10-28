@@ -373,6 +373,10 @@ onMounted(async () => {
         <section v-else-if="section === 'config'" class="surface config-form">
           <h2>测试配置草稿</h2>
           <p class="muted">仅执行格式校验，不访问网站、不下载或注册。</p>
+          <p class="muted">
+            Agent 0.4.1 使用手机竖屏和触屏访问网站、打开落地页及下载。browserUserAgent 留空使用默认
+            Android 手机浏览器；此配置不改变 APK 内的请求 UA。
+          </p>
           <label for="source-url">网站 URL</label
           ><el-input
             id="source-url"

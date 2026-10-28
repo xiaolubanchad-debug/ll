@@ -154,7 +154,7 @@ async function capture(
     beforeAction();
     const element = await locate(source, config, target);
     await element
-      .click({ timeout: Math.min(config.download.timeoutMs, 10000), noWaitAfter: true })
+      .tap({ timeout: Math.min(config.download.timeoutMs, 10000), noWaitAfter: true })
       .catch(() => {});
     await pause(150, signal);
     while (!result && Date.now() < end) {
@@ -199,7 +199,7 @@ async function capture(
             clicks.set(page, count + 1);
             landingClicks++;
             beforeAction();
-            await candidate.click({ timeout: 2000, noWaitAfter: true }).catch(() => {});
+            await candidate.tap({ timeout: 2000, noWaitAfter: true }).catch(() => {});
             clicked = true;
             await pause(150, signal);
             break;
@@ -272,13 +272,11 @@ export async function runDownload(
     beforeAction();
     await policy.endpoint(config.source.url);
     beforeAction();
-    const chromium =
-      options.chromium ??
-      (
-        (await import(
-          pathToFileURL(join(resolve(toolsRoot), 'node_modules/playwright/index.mjs')).href
-        )) as { chromium: BrowserType }
-      ).chromium;
+    const runtime = (await import(
+      pathToFileURL(join(resolve(toolsRoot), 'node_modules/playwright/index.mjs')).href
+    )) as Pick<typeof import('playwright'), 'chromium' | 'devices'>;
+    const chromium = options.chromium ?? runtime.chromium;
+    const mobile = runtime.devices['Pixel 7']!;
     // Playwright requires its explicit persistent-context API for a supplied profile.
     // Each batch uses this fresh private directory; no shared browser profile is opened.
     beforeAction();
@@ -288,7 +286,12 @@ export async function runDownload(
       proxy: { server: egress.url, bypass: '<-loopback>' },
       acceptDownloads: true,
       serviceWorkers: 'block',
-      ...(config.source.browserUserAgent ? { userAgent: config.source.browserUserAgent } : {}),
+      viewport: mobile.viewport,
+      screen: { width: 412, height: 915 },
+      deviceScaleFactor: mobile.deviceScaleFactor,
+      isMobile: true,
+      hasTouch: true,
+      userAgent: config.source.browserUserAgent || mobile.userAgent,
       args: [
         '--disable-quic',
         '--force-webrtc-ip-handling-policy=disable_non_proxied_udp',

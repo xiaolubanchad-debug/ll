@@ -29,9 +29,11 @@
 | [P2 增量契约](docs/P2_CONTRACT.md)                | 领取、租约、事件、每日缓存和网络约束         |
 | [P3 安装注册](docs/P3_SETUP.md)                   | 代理、注册流程、结果证据与验证边界           |
 | [P3 增量契约](docs/P3_CONTRACT.md)                | 唯一提交、未知结果、账户与截图保护           |
+| [手机屏幕契约](docs/MOBILE_SCREEN_CONTRACT.md)   | 网页与落地页使用手机布局、竖屏和触屏操作     |
+| [下一版下载与注册需求](docs/DAILY_DOWNLOAD_AND_REGISTRATION_REQUIREMENTS.md) | 每日 00:05、三种下载路径、成功目标与尝试上限，尚未实现 |
 | [契约样例](contracts/README.md)                   | 正反例与检查方式                             |
 
-执行节点兼容 Ubuntu 24.04 / 26.04 LTS x86_64。完整安装注册使用 Agent 0.4.0 签名发布，0.3.x 继续支持下载模式；版本沿革见 [兼容契约](docs/UBUNTU_COMPATIBILITY.md)，安装修复见 [驱动权限契约](docs/APPIUM_INSTALL_FIX.md) 和 [SDK 布局契约](docs/ANDROID_SDK_LAYOUT.md)。
+执行节点兼容 Ubuntu 24.04 / 26.04 LTS x86_64。Agent 0.4.1 在完整安装注册基础上，将网页、落地页及下载统一为手机竖屏和触屏模式；旧版本必须升级签名发布后才能使用这项默认行为。0.3.x 继续支持旧下载模式；版本沿革见 [兼容契约](docs/UBUNTU_COMPATIBILITY.md)，安装修复见 [驱动权限契约](docs/APPIUM_INSTALL_FIX.md) 和 [SDK 布局契约](docs/ANDROID_SDK_LAYOUT.md)。
 
 ## 开发规则
 

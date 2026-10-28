@@ -163,6 +163,7 @@ try {
   await run(['--test', '--test-concurrency=1', 'tests/api.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/p1.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/p2.test.mjs'], env);
+  await run(['--test', '--test-concurrency=1', 'tests/mobile-download.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/p3.test.mjs'], env);
   const { initializeAdmin } = await import('../apps/control-api/dist/admin.js');
   const { passwordHash } = await import('../apps/control-api/dist/auth.js');

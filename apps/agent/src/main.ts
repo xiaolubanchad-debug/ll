@@ -118,7 +118,8 @@ export async function startAgent(
   let report = await health(config.sdkRoot, config.toolsRoot, config.releaseId),
     checkedAt = Date.now(),
     refreshing = false;
-  const engine = ['0.3.0', '0.3.1', '0.3.2', '0.3.3', '0.3.4', '0.4.0'].includes(
+  const registration = ['0.4.0', '0.4.1'].includes(config.agentVersion);
+  const engine = ['0.3.0', '0.3.1', '0.3.2', '0.3.3', '0.3.4', '0.4.0', '0.4.1'].includes(
     config.agentVersion,
   )
     ? await TaskEngine.open(
@@ -129,7 +130,7 @@ export async function startAgent(
         (path, body, signal) => callHub(config.apiUrl, path, identity.credential!, body, signal),
         {
           ...downloadOptions,
-          ...(config.agentVersion === '0.4.0' ? { sdkRoot: config.sdkRoot } : {}),
+          ...(registration ? { sdkRoot: config.sdkRoot } : {}),
         },
       )
     : null;
@@ -173,7 +174,7 @@ export async function startAgent(
             kvm: report.kvm,
             freeDiskBytes: report.freeDiskBytes,
             ...(engine ? { downloadProtocol: '1.0' } : {}),
-            ...(engine && config.agentVersion === '0.4.0' ? { registrationProtocol: '1.0' } : {}),
+            ...(engine && registration ? { registrationProtocol: '1.0' } : {}),
           },
           currentDelivery: sentDelivery,
           report,

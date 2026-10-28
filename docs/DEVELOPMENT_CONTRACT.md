@@ -1,10 +1,12 @@
 # 开发契约
 
-版本 1.4.0，日期 2026 年 10 月 28 日。MUST 表示发布必须满足，SHOULD 表示偏离时必须记录原因，MAY 表示可选。P2 行为由 [P2_CONTRACT.md](P2_CONTRACT.md) 细化；P3 以 [P3_CONTRACT.md](P3_CONTRACT.md) 为增量权威，分别记录自动化测试、真实 Android 与产品注册验证。P4 的契约不表示已完成能力。
+版本 1.4.1，日期 2026 年 10 月 28 日。MUST 表示发布必须满足，SHOULD 表示偏离时必须记录原因，MAY 表示可选。P2 行为由 [P2_CONTRACT.md](P2_CONTRACT.md) 细化；P3 以 [P3_CONTRACT.md](P3_CONTRACT.md) 为增量权威，分别记录自动化测试、真实 Android 与产品注册验证。网页手机屏幕和触控遵循 [移动端屏幕契约 1.4.1](MOBILE_SCREEN_CONTRACT.md)。P4 的契约不表示已完成能力。
 
 ## 契约权威与变更
 
 优先级为用户最新明确要求、带版本的本契约与接口契约、JSON Schema、实施方案、实现代码。发现相互冲突必须在同一变更中修正，不允许通过实现悄悄改变接口含义。
+
+下一版已确认的每日 00:05 下载、三种下载路径、旧包清理、全 APK 成功目标 N 与尝试上限 M，记录于 [需求增量 1.5.0](DAILY_DOWNLOAD_AND_REGISTRATION_REQUIREMENTS.md)。该文件明确尚未实现的范围；实施时须先细化调度、配额、缓存引用和模拟信息验证契约，再同步 Schema 与运行时校验，不得将当前单批次协议直接解释为已有定时及配额能力。
 
 contracts/ 下的 JSON Schema 是线上数据结构校验来源，HTTP_API.md 定义路由和行为。从这些结构及 p0.http.json、p1.http.json 生成共享 TypeScript 类型、静态校验器与 OpenAPI，并纳入漂移检查。类型生成对 if/then/else 只表达结构，跨字段约束由公共运行时校验器负责，不能仅依赖 TypeScript 编译来验证外部请求。
 
