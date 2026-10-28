@@ -192,7 +192,7 @@ export class DeploymentController {
       await this.db.secretVersion.findMany({
         ...args,
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-        select: { id: true, type: true, createdAt: true, revokedAt: true },
+        select: { id: true, type: true, name: true, createdAt: true, revokedAt: true },
       }),
       limit,
     );

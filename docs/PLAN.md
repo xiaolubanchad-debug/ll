@@ -1,6 +1,8 @@
 # APK 测试部署中台实施方案
 
-版本：1.6.0。生效日期：2026 年 10 月 28 日。实现语言基线：Node.js + TypeScript。P0/P1/P2 已验收。P3 实现和验收遵循 [安卓注册契约](P3_CONTRACT.md)，网页手机屏幕见 [1.4.1 增量](MOBILE_SCREEN_CONTRACT.md)，发布、EC2 自有测试 APK 与真实产品注册分别记录验证范围。
+1.7 中台结果、中文日志、数据库汇总、历史回填与页面操作遵循 [1.7 契约](V17_CONTRACT.md)，操作见 [使用说明](V17_SETUP.md)。兼容 Agent 0.6.0，不改变注册提交及未知结果规则。
+
+版本：1.7.0。生效日期：2026 年 10 月 29 日。实现语言基线：Node.js + TypeScript。P0/P1/P2 已验收。P3 实现和验收遵循 [安卓注册契约](P3_CONTRACT.md)，网页手机屏幕见 [1.4.1 增量](MOBILE_SCREEN_CONTRACT.md)，发布、EC2 自有测试 APK 与真实产品注册分别记录验证范围。
 
 中台统一管理服务器、部署、测试配置和结果。执行节点运行浏览器和安卓环境。管理员不需要逐台登录 EC2 修改业务配置。
 
@@ -50,7 +52,7 @@ EC2 接受 Ubuntu 24.04 / 26.04 LTS x86_64，平台规则见 [兼容契约](UBUN
 | 浏览器         | Playwright、Chromium                                              | 定位图标、处理跳转和下载，不走业务代理               |
 | Android        | Emulator、ADB、Appium 3、UiAutomator2、固定 WebDriver HTTP 适配器 | 独立数据环境、安装启动及控件操作；不自动重发变更命令 |
 | APK 分析       | Node ZIP、二进制 AndroidManifest 解析器                           | 校验结构、CRC、包名、版本和 ABI，不靠文件名判断      |
-| 日志与页面事件 | 结构化 JSON、HTTPS、SSE                                           | 先写数据库，再推送，断线可补读                       |
+| 日志与页面事件 | 结构化 JSON、HTTPS、增量分页轮询                                           | 先写数据库，再推送，断线可补读                       |
 | 节点记录       | SQLite                                                            | 保存执行状态、提交记录和待上传队列                   |
 | 部署与反向代理 | Docker Compose、Nginx、systemd                                    | 中台容器化，安卓节点使用宿主机服务                   |
 

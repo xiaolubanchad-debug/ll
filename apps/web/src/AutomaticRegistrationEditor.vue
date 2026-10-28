@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import { configurationIssues } from '@apk/contracts';
 import type { TestConfiguration } from '@apk/contracts';
 const props = defineProps<{ draftText: string }>(),
@@ -11,9 +11,11 @@ const enabled = ref(false),
   verifySeconds = ref(60),
   error = ref(''),
   notice = ref('');
-function read() {
-  error.value = '';
-  notice.value = '';
+function read(clear = true) {
+  if (clear) {
+    error.value = '';
+    notice.value = '';
+  }
   try {
     const body = JSON.parse(props.draftText) as TestConfiguration,
       settings = body.execution.autoRegistration;
@@ -26,6 +28,17 @@ function read() {
     error.value = '当前配置 JSON 格式无效';
   }
 }
+watch(
+  () => {
+    try {
+      return JSON.stringify(JSON.parse(props.draftText).execution?.autoRegistration ?? null);
+    } catch {
+      return 'INVALID';
+    }
+  },
+  () => read(false),
+  { immediate: true },
+);
 function apply() {
   error.value = '';
   notice.value = '';
@@ -56,13 +69,7 @@ function apply() {
 }
 </script>
 <template>
-  <details
-    @toggle="
-      (event) => {
-        if ((event.target as HTMLDetailsElement).open) read();
-      }
-    "
-  >
+  <details>
     <summary>自动识别注册入口</summary>
     <p class="muted">
       适用于不同 APP 的注册入口。已启用的手工流程优先；其他 APP 自动寻找入口和用户名、密码表单。需

@@ -6,6 +6,7 @@ const props = defineProps<{
   task: {
     id: string;
     status: string;
+    accountAvailable?: boolean;
     recognition?: RegistrationRecognition;
     observation?: {
       model: string;
@@ -133,7 +134,10 @@ onUnmounted(() => {
     </div>
     <label for="account-reason">查看测试账户的原因</label
     ><el-input id="account-reason" v-model="reason" maxlength="300" />
-    <el-button :disabled="busy || !reason.trim()" @click="view">审计后查看账户</el-button>
+    <el-button :disabled="busy || !reason.trim() || task.accountAvailable === false" @click="view"
+      >审计后查看账户</el-button
+    >
+    <p v-if="task.accountAvailable === false" class="muted">此轮尚无已保存账户。</p>
     <div v-if="account">
       <p>用户名：{{ account.username }}</p>
       <p>密码：{{ account.password }}</p>

@@ -1,0 +1,7 @@
+{
+  "ResultsQuery":{"from":"2026-10-29","to":"2026-10-29","category":"UNKNOWN","review":"OPEN","limit":"100"},
+  "OverviewQuery":{"day":"2026-10-29"},
+  "TimelineQuery":{"afterSequence":"100","limit":"100"},
+  "AssetQuery":{"day":"2026-10-29","q":"com.example"},
+  "RunQuery":{"purpose":"REGISTER","status":"NEEDS_REVIEW"}
+}

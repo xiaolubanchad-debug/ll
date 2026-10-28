@@ -1,4 +1,21 @@
 import validators from './generated/validators.js';
+export type {
+  ResultCategory,
+  RegistrationRecordView,
+  RegistrationListView,
+  RegistrationDetailView,
+  OverviewView,
+  RunSummaryView,
+  TimelinePage,
+  AssetListView,
+  ValidationListView,
+  ResultsQuery,
+  OverviewQuery,
+  TimelineQuery,
+  AssetQuery,
+  RunQuery,
+  ConsoleRunListView,
+} from './generated/types.js';
 import type {
   TestConfiguration,
   AgentMessage,

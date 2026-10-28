@@ -8,6 +8,7 @@ const props = defineProps<{
   configVersionId: string;
   releaseId: string;
   nodes: NodeView[];
+  showProxy?: boolean;
 }>();
 interface Schedule {
   id: string;
@@ -137,8 +138,10 @@ onMounted(() => void action(refresh));
       :min="successTarget"
       max="1000"
     />
-    <el-checkbox v-model="autoRegister">下载完成后自动注册（需完整配置及代理）</el-checkbox>
-    <el-checkbox v-model="enabled">开启每日计划</el-checkbox>
+    <label class="inline-check"
+      ><input v-model="autoRegister" type="checkbox" />下载完成后自动注册（需完整配置及代理）</label
+    >
+    <label class="inline-check"><input v-model="enabled" type="checkbox" />开启每日计划</label>
     <div class="form-actions">
       <el-button :disabled="busy || !nodeId || !configVersionId || !releaseId" @click="save"
         >保存每日计划</el-button
@@ -188,7 +191,7 @@ onMounted(() => void action(refresh));
       >
     </el-table>
   </section>
-  <section class="surface config-form">
+  <section v-if="showProxy !== false" class="surface config-form">
     <h2>代理连通检查</h2>
     <p class="muted">
       在选中的 EC2 上测试已保存代理，不安装或打开产品 APP。探测出口仅代表本次检查请求。

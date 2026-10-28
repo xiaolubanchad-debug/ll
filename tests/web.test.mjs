@@ -19,7 +19,9 @@ test('browser login, config checks, refresh, password change and logout', async 
     await page.getByLabel('密码', { exact: true }).fill(process.env.P0_TEST_PASSWORD);
     await page.getByRole('button', { name: '登录中台' }).click();
     await expect(page.getByRole('heading', { name: '工作台', exact: true })).toBeVisible();
-    await expect(page.getByRole('cell', { name: '登录成功', exact: true }).first()).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: '当前执行与待处理', exact: true }),
+    ).toBeVisible();
     await page.screenshot({
       path: path.join(process.env.P0_SCREENSHOT_DIR, 'p0-desktop.png'),
       fullPage: true,
@@ -65,7 +67,8 @@ test('browser login, config checks, refresh, password change and logout', async 
     await page.getByText('归档服务器', { exact: true }).click();
     await page.getByRole('button', { name: '确认归档服务器', exact: true }).click();
     await expect(page.getByText('尚未接入服务器')).toBeVisible();
-    await page.getByRole('button', { name: '配置校验', exact: false }).first().click();
+    await page.getByRole('button', { name: '任务方案', exact: false }).first().click();
+    await expect(page.getByLabel('完整配置 JSON', { exact: true })).not.toBeVisible();
     let validateRequests = 0;
     page.on('request', (r) => {
       if (r.url().includes('/configs/validate')) validateRequests++;
@@ -93,7 +96,7 @@ test('browser login, config checks, refresh, password change and logout', async 
       path: path.join(process.env.P0_SCREENSHOT_DIR, 'p2-configs.png'),
       fullPage: true,
     });
-    await page.getByText('HTTP 代理配置', { exact: true }).click();
+    await page.getByText('快速新增代理（可选）', { exact: true }).click();
     await page.getByLabel('代理地址', { exact: true }).fill('proxy.example.test');
     await page.getByLabel('代理用户名', { exact: true }).fill('FixtureUser');
     await page.getByLabel('代理密码', { exact: true }).fill('FixtureProxyPassword123');
@@ -112,6 +115,13 @@ test('browser login, config checks, refresh, password change and logout', async 
       await page.getByLabel('完整配置 JSON', { exact: true }).inputValue(),
     );
     assert.equal(proxyDraft.execution.mode, 'FULL');
+    await page.getByLabel('自动寻找各 APP 的注册入口', { exact: true }).check();
+    await expect(page.getByLabel('自动寻找各 APP 的注册入口', { exact: true })).toBeChecked();
+    assert.equal(
+      JSON.parse(await page.getByLabel('完整配置 JSON', { exact: true }).inputValue()).execution
+        .autoRegistration.enabled,
+      true,
+    );
     assert.match(proxyDraft.execution.proxySecretVersionId, /^[a-f0-9-]{36}$/);
     assert.ok(!JSON.stringify(proxyDraft).includes('FixtureProxyPassword123'));
     await page.getByText('添加基础注册流程', { exact: true }).click();
@@ -143,7 +153,7 @@ test('browser login, config checks, refresh, password change and logout', async 
     assert.equal(entryFlow.activity, '@launcher');
     assert.ok(entryDraft.registrationFlows.some((f) => f.packageName === 'com.example.signup'));
     await page.getByText('自动识别注册入口', { exact: true }).click();
-    await page.getByLabel('开启自动寻找注册入口', { exact: true }).check();
+    await expect(page.getByLabel('开启自动寻找注册入口', { exact: true })).toBeChecked();
     await page.getByLabel('最多寻找步数（1–12）', { exact: true }).fill('13');
     await page.getByRole('button', { name: '将自动识别设置应用到草稿', exact: true }).click();
     await expect(page.getByText('请核对识别步数、时间及当前配置', { exact: true })).toBeVisible();
@@ -164,7 +174,7 @@ test('browser login, config checks, refresh, password change and logout', async 
     );
     await page.getByRole('button', { name: '保存草稿为新版本', exact: true }).click();
     await expect(page.getByRole('button', { name: '载入版本', exact: true })).toHaveCount(3);
-    await page.getByRole('button', { name: '测试任务', exact: false }).first().click();
+    await page.getByRole('button', { name: '执行任务', exact: false }).first().click();
     await expect(page.getByRole('heading', { name: '开始测试任务', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: '开始下载', exact: true })).toBeDisabled();
     await page.getByLabel('任务配置', { exact: true }).selectOption({ label: '浏览器配置版本' });
@@ -174,15 +184,21 @@ test('browser login, config checks, refresh, password change and logout', async 
         .getByRole('option', { name: '版本 3', exact: true }),
     ).toHaveCount(1);
     await page.getByLabel('固定配置版本', { exact: true }).selectOption({ label: '版本 3' });
+    await page.getByRole('tab', { name: '每日计划', exact: true }).click();
     await expect(
       page.getByRole('heading', { name: '每日下载与注册计划', exact: true }),
     ).toBeVisible();
     await expect(page.getByLabel('每日下载时间（北京时间）', { exact: true })).toHaveValue('00:05');
+    await expect(page.getByLabel('开启每日计划', { exact: true })).not.toBeChecked();
+    await page.getByLabel('开启每日计划', { exact: true }).check();
+    await expect(page.getByLabel('开启每日计划', { exact: true })).toBeChecked();
+    await page.getByLabel('开启每日计划', { exact: true }).uncheck();
+    await page.getByRole('tab', { name: '新建执行', exact: true }).click();
     await page.getByLabel('执行内容', { exact: true }).selectOption('REGISTER');
     await expect(page.getByRole('button', { name: '开始循环注册', exact: true })).toBeDisabled();
     await page.getByLabel('执行内容', { exact: true }).selectOption('LEGACY');
     await expect(page.getByRole('button', { name: '开始安装注册', exact: true })).toBeDisabled();
-    await page.getByRole('button', { name: '账户安全', exact: false }).first().click();
+    await page.getByRole('button', { name: '系统设置', exact: false }).first().click();
     await page.getByLabel('当前密码', { exact: true }).fill(process.env.P0_TEST_PASSWORD);
     await page.getByLabel('新密码', { exact: true }).fill('BrowserChangedPassword123');
     await page.getByLabel('确认新密码', { exact: true }).fill('BrowserChangedPassword123');

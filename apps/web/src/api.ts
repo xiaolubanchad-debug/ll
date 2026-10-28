@@ -37,6 +37,7 @@ export async function api<T>(
     response = await fetch('/api/v1' + path, {
       method,
       credentials: 'same-origin',
+      signal: AbortSignal.timeout(20000),
       headers: {
         ...(method !== 'GET'
           ? { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken }
@@ -46,10 +47,11 @@ export async function api<T>(
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
   } catch {
-    throw new RequestError(0, '无法连接中台，请检查服务是否启动');
+    throw new RequestError(0, '无法连接中台或请求超时，请稍后重试');
   }
   if (response.status === 204) return undefined as T;
   const data: unknown = await response.json().catch(() => null);
+  if (response.ok && data === null) throw new RequestError(503, '中台响应暂时无法解析，请稍后重试');
   if (!response.ok) {
     const error = data as { error?: { message?: string; requestId?: string } } | null;
     throw new RequestError(response.status, error?.error?.message ?? '请求失败，请稍后重试');

@@ -1,4 +1,360 @@
 // Generated. Run npm run generate:contracts.
+export type ResultCategory =
+  | 'SUCCESS'
+  | 'REJECTED'
+  | 'ERROR'
+  | 'ADAPTATION'
+  | 'UNKNOWN'
+  | 'SKIPPED'
+  | 'STOPPED'
+  | 'PENDING';
+
+export interface RunQuery {
+  nodeId?: string;
+  configVersionId?: string;
+  purpose?: 'DOWNLOAD' | 'REGISTER' | 'LEGACY' | 'PROXY_CHECK';
+  status?:
+    | 'QUEUED'
+    | 'ASSIGNED'
+    | 'RUNNING'
+    | 'STOP_REQUESTED'
+    | 'SUCCEEDED'
+    | 'FAILED'
+    | 'PARTIAL_FAILED'
+    | 'CANCELLED'
+    | 'NEEDS_REVIEW';
+  cacheDay?: string;
+  cursor?: string;
+  limit?: string;
+}
+
+export interface ConsoleRunListView {
+  items: {
+    id: string;
+    nodeName: string;
+    configName: string;
+    purpose: string;
+    status: string;
+    createdAt: string;
+    successes: number;
+    successTarget: number;
+    attemptsStarted: number;
+    attemptLimit: number;
+    errorCode: string | null;
+    nodeId: string;
+    configVersionId: string | null;
+    configVersion: number;
+    cacheDay: string | null;
+  }[];
+  nextCursor: string | null;
+}
+
+export interface ResultsQuery {
+  from?: string;
+  to?: string;
+  nodeId?: string;
+  runId?: string;
+  q?: string;
+  category?: 'SUCCESS' | 'REJECTED' | 'ERROR' | 'ADAPTATION' | 'UNKNOWN' | 'SKIPPED' | 'STOPPED' | 'PENDING';
+  review?: 'OPEN' | 'RESOLVED';
+  cursor?: string;
+  limit?: string;
+}
+
+export interface OverviewQuery {
+  day?: string;
+  nodeId?: string;
+}
+
+export interface TimelineQuery {
+  afterSequence?: string;
+  beforeSequence?: string;
+  taskId?: string;
+  limit?: string;
+}
+
+export interface AssetQuery {
+  day?: string;
+  nodeId?: string;
+  q?: string;
+  cursor?: string;
+  limit?: string;
+}
+
+export interface RegistrationRecordView {
+  id: string;
+  runId: string;
+  nodeId: string;
+  nodeName: string;
+  configName: string;
+  configVersion: number;
+  purpose: string;
+  position: number;
+  label: string;
+  entryId: string | null;
+  status: string;
+  category: 'SUCCESS' | 'REJECTED' | 'ERROR' | 'ADAPTATION' | 'UNKNOWN' | 'SKIPPED' | 'STOPPED' | 'PENDING';
+  proof: string;
+  errorCode: string | null;
+  lastStage: string;
+  startedAt: string;
+  finishedAt: string | null;
+  elapsedMs: number | null;
+  apk: {
+    packageName: string;
+    versionName: string | null;
+    versionCode: number | null;
+    /**
+     * @maxItems 20
+     */
+    abis: string[];
+    size: number;
+    apkSha256: string;
+    cacheDay: string;
+  } | null;
+  hasAccount: boolean;
+  reviewOutcome: ('SUCCEEDED' | 'FAILED') | null;
+}
+
+export interface RegistrationListView {
+  items: {
+    id: string;
+    runId: string;
+    nodeId: string;
+    nodeName: string;
+    configName: string;
+    configVersion: number;
+    purpose: string;
+    position: number;
+    label: string;
+    entryId: string | null;
+    status: string;
+    category: 'SUCCESS' | 'REJECTED' | 'ERROR' | 'ADAPTATION' | 'UNKNOWN' | 'SKIPPED' | 'STOPPED' | 'PENDING';
+    proof: string;
+    errorCode: string | null;
+    lastStage: string;
+    startedAt: string;
+    finishedAt: string | null;
+    elapsedMs: number | null;
+    apk: {
+      packageName: string;
+      versionName: string | null;
+      versionCode: number | null;
+      /**
+       * @maxItems 20
+       */
+      abis: string[];
+      size: number;
+      apkSha256: string;
+      cacheDay: string;
+    } | null;
+    hasAccount: boolean;
+    reviewOutcome: ('SUCCEEDED' | 'FAILED') | null;
+  }[];
+  nextCursor: string | null;
+}
+
+export interface RegistrationDetailView {
+  record: {
+    id: string;
+    runId: string;
+    nodeId: string;
+    nodeName: string;
+    configName: string;
+    configVersion: number;
+    purpose: string;
+    position: number;
+    label: string;
+    entryId: string | null;
+    status: string;
+    category: 'SUCCESS' | 'REJECTED' | 'ERROR' | 'ADAPTATION' | 'UNKNOWN' | 'SKIPPED' | 'STOPPED' | 'PENDING';
+    proof: string;
+    errorCode: string | null;
+    lastStage: string;
+    startedAt: string;
+    finishedAt: string | null;
+    elapsedMs: number | null;
+    apk: {
+      packageName: string;
+      versionName: string | null;
+      versionCode: number | null;
+      /**
+       * @maxItems 20
+       */
+      abis: string[];
+      size: number;
+      apkSha256: string;
+      cacheDay: string;
+    } | null;
+    hasAccount: boolean;
+    reviewOutcome: ('SUCCEEDED' | 'FAILED') | null;
+  };
+  observation: {
+    model: string;
+    locale: string;
+    shellAndroidIdHash: string;
+    proxyObservedIp: string;
+    proxyObservedAt: string;
+  } | null;
+  recognition: {
+    source: 'CONTROLS' | 'OCR' | 'LEARNED';
+    navigationSteps: number;
+    cache: 'MISS' | 'HIT' | 'INVALIDATED';
+    learned: boolean;
+    needsAdaptation: boolean;
+    templateHash?: string;
+  } | null;
+  reviews: {
+    outcome: 'SUCCEEDED' | 'FAILED';
+    reason: string;
+    createdAt: string;
+  }[];
+}
+
+export interface OverviewView {
+  day: string;
+  generatedAt: string;
+  servers: {
+    total: number;
+    online: number;
+    busy: number;
+    quarantined: number;
+  };
+  downloads: {
+    validated: number;
+    failed: number;
+  };
+  registrations: {
+    SUCCESS: number;
+    REJECTED: number;
+    ERROR: number;
+    ADAPTATION: number;
+    UNKNOWN: number;
+    SKIPPED: number;
+    STOPPED: number;
+    PENDING: number;
+  };
+  reviewedUnknown: number;
+  activeRuns: {
+    id: string;
+    nodeName: string;
+    configName: string;
+    purpose: string;
+    status: string;
+    createdAt: string;
+    successes: number;
+    successTarget: number;
+    attemptsStarted: number;
+    attemptLimit: number;
+    errorCode: string | null;
+  }[];
+}
+
+export interface RunSummaryView {
+  run: {
+    id: string;
+    nodeName: string;
+    configName: string;
+    purpose: string;
+    status: string;
+    createdAt: string;
+    successes: number;
+    successTarget: number;
+    attemptsStarted: number;
+    attemptLimit: number;
+    errorCode: string | null;
+  };
+  nodeId: string;
+  configVersion: number;
+  releaseId: string | null;
+  finishedAt: string | null;
+  counts: {
+    SUCCESS: number;
+    REJECTED: number;
+    ERROR: number;
+    ADAPTATION: number;
+    UNKNOWN: number;
+    SKIPPED: number;
+    STOPPED: number;
+    PENDING: number;
+  };
+  taskCount: number;
+  cleanup: 'CONFIRMED' | 'PENDING' | 'NEEDS_REVIEW';
+  activeTask: {
+    id: string;
+    position: number;
+    label: string;
+    stage: string;
+    packageName: string | null;
+  } | null;
+}
+
+export interface TimelinePage {
+  items: {
+    id: string;
+    sequence: number;
+    taskId: string | null;
+    occurredAt: string;
+    receivedAt: string;
+    type: string;
+    stage: string | null;
+    title: string;
+    errorCode: string | null;
+    recordedForReview: boolean;
+    applied: boolean;
+  }[];
+  hasEarlier: boolean;
+  hasLater: boolean;
+  firstSequence: number | null;
+  lastSequence: number | null;
+}
+
+export interface AssetListView {
+  items: {
+    id: string;
+    runId: string;
+    nodeId: string;
+    nodeName: string;
+    configName: string;
+    label: string;
+    entryId: string | null;
+    status: string;
+    errorCode: string | null;
+    createdAt: string;
+    apk: {
+      packageName: string;
+      versionName: string | null;
+      versionCode: number | null;
+      /**
+       * @maxItems 20
+       */
+      abis: string[];
+      size: number;
+      apkSha256: string;
+      cacheDay: string;
+    } | null;
+  }[];
+  nextCursor: string | null;
+}
+
+export interface ValidationListView {
+  items: {
+    id: string;
+    nodeName: string;
+    status: string;
+    createdAt: string;
+    passed: boolean;
+    cleanupComplete: boolean;
+    cases: {
+      name: string;
+      status: string;
+      proof: string;
+      requests: number;
+    }[];
+  }[];
+  nextCursor: string | null;
+}
+
 export interface TestConfiguration {
   schemaVersion: '1.0';
   name: string;
@@ -254,6 +610,7 @@ export interface SecretInput {
     port?: number;
     username?: string;
   };
+  name?: string;
 }
 
 export interface HostKeyInput {

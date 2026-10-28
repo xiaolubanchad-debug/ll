@@ -21,6 +21,18 @@ const agentCheck = ajv.compile(read('contracts/agent.schema.json'));
 const config = read('contracts/fixtures/config.valid.json');
 const messages = read('contracts/fixtures/agent.valid.json');
 let passed = 0;
+for (const [name, value] of Object.entries(read('contracts/fixtures/v17.valid.json')))
+  test('1.7 valid ' + name, () => assert.deepEqual(schemaIssues(name, value), []));
+for (const [name, value] of [
+  ['ResultsQuery', { from: '2026-10-29', limit: '101' }],
+  ['ResultsQuery', { category: 'ASSUME_SUCCESS' }],
+  ['ResultsQuery', { username: 'private-account' }],
+  ['ResultsQuery', { q: 'line\nbreak' }],
+  ['TimelineQuery', { afterSequence: '1', beforeSequence: '2' }],
+  ['TimelineQuery', { afterSequence: '-1' }],
+  ['AssetQuery', { url: 'http://untrusted.example' }],
+])
+  test('1.7 rejects ' + JSON.stringify(value), () => assert.ok(schemaIssues(name, value).length));
 const v15Examples = read('contracts/fixtures/v15.valid.json');
 const v16Examples = read('contracts/fixtures/v16.valid.json');
 for (const [name, value] of Object.entries(v16Examples))

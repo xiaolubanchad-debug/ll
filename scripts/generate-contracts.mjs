@@ -32,7 +32,17 @@ const v16 = await json('contracts/v16.schema.json'),
   v16Http = await json('contracts/v16.http.json');
 manifest.routes.push(...v16Http.routes);
 manifest.version = v16Http.version;
+const v17 = await json('contracts/v17.schema.json'),
+  v17Http = await json('contracts/v17.http.json');
+manifest.routes.push(...v17Http.routes);
+manifest.version = v17Http.version;
 const schemas = {
+  ...Object.fromEntries(
+    Object.entries(v17.$defs).map(([name, value]) => [
+      name,
+      { ...value, $id: v17.$id + '/' + name },
+    ]),
+  ),
   TestConfiguration: config,
   AgentMessage: agent,
   LoginInput: { ...auth.$defs.login, $id: auth.$id + '/login' },
@@ -195,15 +205,17 @@ const paths = {};
 for (const route of manifest.routes) {
   const operation = {
     operationId: route.operationId,
-    'x-phase': v15Http.routes.some((r) => r.operationId === route.operationId)
-      ? '1.5'
-      : p3Http.routes.some((r) => r.operationId === route.operationId)
-        ? 'P3'
-        : p2Http.routes.some((r) => r.operationId === route.operationId)
-          ? 'P2'
-          : p1Http.routes.some((r) => r.operationId === route.operationId)
-            ? 'P1'
-            : 'P0',
+    'x-phase': v17Http.routes.some((r) => r.operationId === route.operationId)
+      ? '1.7'
+      : v15Http.routes.some((r) => r.operationId === route.operationId)
+        ? '1.5'
+        : p3Http.routes.some((r) => r.operationId === route.operationId)
+          ? 'P3'
+          : p2Http.routes.some((r) => r.operationId === route.operationId)
+            ? 'P2'
+            : p1Http.routes.some((r) => r.operationId === route.operationId)
+              ? 'P1'
+              : 'P0',
     security: route.node
       ? [{ NodeBearer: [] }]
       : route.public || route.internal
@@ -251,6 +263,17 @@ for (const route of manifest.routes) {
     ];
   if (route.internal) operation['x-network-scope'] = 'loopback';
   operation.parameters ??= [];
+  if (route.query) {
+    const querySchema = schemas[route.query];
+    operation.parameters.push(
+      ...Object.entries(querySchema.properties).map(([name, schema]) => ({
+        in: 'query',
+        name,
+        schema,
+        required: false,
+      })),
+    );
+  }
   for (const name of [...route.path.matchAll(/\{([A-Za-z]+)\}/g)].map((m) => m[1]))
     operation.parameters.push({
       in: 'path',

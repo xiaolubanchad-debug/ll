@@ -29,11 +29,12 @@ export async function createSecret(
       data: {
         id,
         type: input.type,
+        name: input.name ?? null,
         encrypted: encrypted as unknown as Prisma.InputJsonValue,
         keyId: 'local-v1',
         createdBy: adminId,
       },
-      select: { id: true, type: true, createdAt: true, revokedAt: true },
+      select: { id: true, type: true, name: true, createdAt: true, revokedAt: true },
     });
     await tx.auditEvent.create({ data: { adminId, action: 'SECRET_CREATED', requestId } });
     return result;

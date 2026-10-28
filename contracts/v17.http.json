@@ -1,0 +1,66 @@
+{
+  "version": "1.7.0",
+  "routes": [
+    {
+      "method": "get",
+      "path": "/console/overview",
+      "operationId": "consoleOverview",
+      "response": "OverviewView",
+      "status": 200,
+      "query": "OverviewQuery"
+    },
+    {
+      "method": "get",
+      "path": "/console/runs",
+      "operationId": "consoleRuns",
+      "response": "ConsoleRunListView",
+      "status": 200,
+      "query": "RunQuery"
+    },
+    {
+      "method": "get",
+      "path": "/registrations",
+      "operationId": "registrationRecords",
+      "response": "RegistrationListView",
+      "status": 200,
+      "query": "ResultsQuery"
+    },
+    {
+      "method": "get",
+      "path": "/registrations/{id}",
+      "operationId": "registrationRecord",
+      "response": "RegistrationDetailView",
+      "status": 200
+    },
+    {
+      "method": "get",
+      "path": "/runs/{id}/summary",
+      "operationId": "runSummary",
+      "response": "RunSummaryView",
+      "status": 200
+    },
+    {
+      "method": "get",
+      "path": "/runs/{id}/timeline",
+      "operationId": "runTimeline",
+      "response": "TimelinePage",
+      "status": 200,
+      "query": "TimelineQuery"
+    },
+    {
+      "method": "get",
+      "path": "/apk-assets",
+      "operationId": "apkAssets",
+      "response": "AssetListView",
+      "status": 200,
+      "query": "AssetQuery"
+    },
+    {
+      "method": "get",
+      "path": "/console/validations",
+      "operationId": "consoleValidations",
+      "response": "ValidationListView",
+      "status": 200
+    }
+  ]
+}

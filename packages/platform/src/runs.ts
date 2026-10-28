@@ -593,6 +593,11 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
         where: { id: task.id },
         data: {
           status: stage,
+          lastStage: stage,
+          startedAt: task.startedAt ?? new Date(),
+          ...(!task.registrationStartedAt && (run.purpose === 'REGISTER' || stage === 'PREPARING')
+            ? { registrationStartedAt: new Date() }
+            : {}),
           ...(stage === 'DOWNLOADED'
             ? { apk: p.apk as Prisma.InputJsonValue, cacheHit: p.cacheHit === true }
             : {}),
@@ -665,6 +670,10 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
       where: { id: task.id },
       data: {
         status,
+        finishedAt: new Date(),
+        ...(full && !task.registrationStartedAt && status === 'SKIPPED'
+          ? { registrationStartedAt: new Date() }
+          : {}),
         proof: String(p.proof),
         errorCode: typeof p.errorCode === 'string' ? p.errorCode : null,
         ...(typeof p.accountRef === 'string' ? { accountRef: p.accountRef } : {}),

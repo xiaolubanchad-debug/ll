@@ -10,4 +10,5 @@ export * from './ssh.js';
 export * from './releases.js';
 export * from './agent-auth.js';
 export * from './registration.js';
+export * from './console.js';
 export { saveSchedule, tickSchedules } from './schedules.js';

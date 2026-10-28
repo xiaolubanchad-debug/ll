@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted, watch } from 'vue';
 import { configurationIssues, schemaIssues } from '@apk/contracts';
 import { api, mutation } from './api';
 import RegistrationFlowEditor from './RegistrationFlowEditor.vue';
@@ -32,11 +32,39 @@ const proxyHost = ref(''),
   proxyUser = ref(''),
   proxyPassword = ref(''),
   proxyId = ref('');
-const proxies = ref<{ id: string; createdAt: string }[]>([]);
+const automatic = ref(false),
+  proxyApplied = ref(false);
+function toggleAutomatic() {
+  void action(async () => {
+    const value = JSON.parse(props.draftText);
+    if (automatic.value) {
+      if (value.execution.mode !== 'FULL' || !value.execution.proxySecretVersionId)
+        throw Error('请先应用已保存的代理');
+      value.execution.autoRegistration = {
+        enabled: true,
+        screenshotFallback: true,
+        maxNavigationSteps: 8,
+        timeoutMs: 60000,
+        successTimeoutMs: 60000,
+        ...value.execution.autoRegistration,
+      };
+      value.execution.autoRegistration.enabled = true;
+    } else delete value.execution.autoRegistration;
+    emit('load', JSON.stringify(value, null, 2));
+    notice.value = '注册方式已应用到草稿，保存新版本后在下一次执行生效。';
+  });
+}
+const proxies = ref<{ id: string; createdAt: string; name?: string | null }[]>([]);
 async function loadProxies() {
   proxies.value = (
     await api<{
-      items: { id: string; type: string; createdAt: string; revokedAt: string | null }[];
+      items: {
+        id: string;
+        type: string;
+        name?: string | null;
+        createdAt: string;
+        revokedAt: string | null;
+      }[];
     }>('/secrets?limit=100')
   ).items.filter((s) => s.type === 'HTTP_PROXY' && !s.revokedAt);
 }
@@ -64,10 +92,18 @@ async function saveProxy() {
 function applyProxy() {
   void action(async () => {
     const body = JSON.parse(props.draftText);
+    if (!proxyId.value) {
+      body.execution.mode = 'DOWNLOAD_ONLY';
+      delete body.execution.proxySecretVersionId;
+      delete body.execution.autoRegistration;
+      emit('load', JSON.stringify(body, null, 2));
+      notice.value = '已移除代理，草稿切换为仅下载模式。';
+      return;
+    }
     body.execution.mode = 'FULL';
     body.execution.proxySecretVersionId = proxyId.value;
     emit('load', JSON.stringify(body, null, 2));
-    notice.value = '草稿已切换为完整测试，仍需配置每个 APK 的注册流程并保存新版本';
+    notice.value = '已将代理应用到完整注册草稿，请选择自动识别或手工流程，再保存新版本。';
   });
 }
 async function action(work: () => Promise<void>) {
@@ -95,6 +131,12 @@ async function select(c: Config) {
     versions.value = (
       await api<{ items: Version[] }>('/configs/' + c.id + '/versions?limit=100')
     ).items;
+    name.value = c.name;
+    if (versions.value[0]) {
+      const latest = await api<Version>('/configs/' + c.id + '/versions/' + versions.value[0].id);
+      emit('load', JSON.stringify(latest.body, null, 2));
+      notice.value = '已载入最新保存版本，编辑后请另存新版本。';
+    }
   });
 }
 async function create() {
@@ -146,12 +188,27 @@ onUnmounted(() => {
   proxyUser.value = '';
   proxyPassword.value = '';
 });
+watch(
+  () => props.draftText,
+  () => {
+    try {
+      const value = JSON.parse(props.draftText);
+      proxyId.value = value.execution?.proxySecretVersionId ?? '';
+      proxyApplied.value = value.execution?.mode === 'FULL' && !!proxyId.value;
+      automatic.value = value.execution?.autoRegistration?.enabled === true;
+    } catch {
+      /* Keep the current selection while editing JSON. */
+    }
+  },
+  { immediate: true },
+);
 </script>
 <template>
   <div class="version-manager">
-    <h2>配置版本管理</h2>
+    <h2>代理、注册方式与方案版本</h2>
     <p class="muted">
-      保存后版本不可修改。完整测试按包名匹配注册流程；没有启用流程的 APK 会跳过安装注册。
+      保存产生新版本，运行中的任务继续使用原版本。手工流程优先；开启自动识别后，其余 APK
+      自动寻找入口，无法识别时待适配。
     </p>
     <el-alert v-if="error" :title="error" type="error" :closable="false" /><el-alert
       v-if="notice"
@@ -159,8 +216,28 @@ onUnmounted(() => {
       type="success"
       :closable="false"
     />
+    <label for="scheme-proxy">注册所用代理</label
+    ><select id="scheme-proxy" v-model="proxyId" @change="applyProxy">
+      <option value="">请选择已保存代理</option>
+      <option v-for="p in proxies" :key="p.id" :value="p.id">
+        {{ p.name ?? '历史代理 ' + p.id.slice(0, 8) }}
+      </option>
+    </select>
+    <div class="form-actions">
+      <el-button :disabled="busy || !proxyId" @click="applyProxy">应用所选代理到草稿</el-button
+      ><a href="#/proxies">管理和检查代理 →</a>
+    </div>
+    <label class="inline-check"
+      ><input
+        v-model="automatic"
+        type="checkbox"
+        :disabled="!proxyApplied"
+        @change="toggleAutomatic"
+      />自动寻找各 APP 的注册入口</label
+    >
+    <p v-if="!proxyApplied" class="muted">先选择并应用代理，再开启自动注册入口识别。</p>
     <details>
-      <summary>HTTP 代理配置</summary>
+      <summary>快速新增代理（可选）</summary>
       <label for="proxy-host">代理地址</label
       ><el-input id="proxy-host" v-model="proxyHost" placeholder="proxy.example.com" />
       <label for="proxy-port">端口</label

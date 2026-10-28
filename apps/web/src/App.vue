@@ -1,29 +1,38 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { onMounted, ref, computed } from 'vue';
 import { configurationIssues, loginIssues, passwordChangeIssues } from '@apk/contracts';
 import example from '../../../contracts/fixtures/config.valid.json';
 import { api, RequestError, useSession } from './api';
 import type { SessionView, Row, Page } from './api';
 import ServerManager from './ServerManager.vue';
 import ConfigManager from './ConfigManager.vue';
-import RunManager from './RunManager.vue';
+import ExecutionCenter from './ExecutionCenter.vue';
+import RunDetail from './RunDetail.vue';
+import OverviewPanel from './OverviewPanel.vue';
+import RegistrationRecords from './RegistrationRecords.vue';
+import ApkAssets from './ApkAssets.vue';
+import ProxyManager from './ProxyManager.vue';
+import ValidationRecords from './ValidationRecords.vue';
+import { route, navigate } from './navigation';
+import type { Section } from './navigation';
 
-type Section = 'overview' | 'nodes' | 'runs' | 'config' | 'security';
 const session = ref<SessionView | null>(null),
   loading = ref(true),
   busy = ref(false),
   error = ref(''),
   notice = ref('');
-const section = ref<Section>('overview'),
+const section = computed<Section>({
+    get: () => route.value.section,
+    set: (value) => navigate(value),
+  }),
   username = ref(''),
   password = ref('');
-const nodes = ref<Row[]>([]),
-  runs = ref<Row[]>([]),
-  audit = ref<Row[]>([]),
+const audit = ref<Row[]>([]),
   auditCursor = ref<string | null>(null);
 const currentPassword = ref(''),
   newPassword = ref(''),
   confirmation = ref('');
+const executionMode = ref('DOWNLOAD_ONLY');
 const sourceUrl = ref(''),
   xpath = ref(example.source.xpath),
   validationResult = ref('');
@@ -36,10 +45,13 @@ sample.registrationFlows = [];
 const draftText = ref(JSON.stringify(sample, null, 2));
 const labels: Record<Section, string> = {
   overview: '工作台',
+  config: '任务方案',
+  runs: '执行任务',
+  results: '注册记录',
+  assets: 'APK 资源',
+  proxies: '代理管理',
   nodes: '服务器',
-  runs: '测试任务',
-  config: '配置校验',
-  security: '账户安全',
+  security: '系统设置',
 };
 function message(e: unknown) {
   return e instanceof Error ? e.message : '操作失败，请稍后重试';
@@ -50,13 +62,7 @@ function signedIn(value: SessionView | null) {
 }
 async function refresh() {
   try {
-    const [n, r, a] = await Promise.all([
-      api<Page>('/nodes'),
-      api<Page>('/runs'),
-      api<Page>('/audit-events'),
-    ]);
-    nodes.value = n.items;
-    runs.value = r.items;
+    const a = await api<Page>('/audit-events');
     audit.value = a.items;
     auditCursor.value = a.nextCursor;
   } catch (e) {
@@ -92,8 +98,6 @@ async function logout() {
   try {
     await api('/auth/logout', 'POST', {});
     signedIn(null);
-    nodes.value = [];
-    runs.value = [];
     audit.value = [];
     notice.value = '';
   } catch (e) {
@@ -128,6 +132,19 @@ async function changePassword() {
     busy.value = false;
   }
 }
+function syncMode() {
+  try {
+    const value = JSON.parse(draftText.value);
+    value.execution.mode = executionMode.value;
+    if (executionMode.value === 'DOWNLOAD_ONLY') {
+      delete value.execution.proxySecretVersionId;
+      delete value.execution.autoRegistration;
+    }
+    draftText.value = JSON.stringify(value, null, 2);
+  } catch {
+    error.value = '请先修正高级设置中的 JSON 格式';
+  }
+}
 function syncSource() {
   try {
     const value: unknown = JSON.parse(draftText.value);
@@ -156,6 +173,8 @@ function syncFormFromJson() {
       typeof value.source === 'object'
     ) {
       const source = value.source as Record<string, unknown>;
+      executionMode.value =
+        (value as { execution?: { mode?: string } }).execution?.mode ?? 'DOWNLOAD_ONLY';
       if (typeof source.url === 'string') sourceUrl.value = source.url;
       if (typeof source.xpath === 'string') xpath.value = source.xpath;
     }
@@ -298,8 +317,8 @@ onMounted(async () => {
         </button>
       </nav>
       <div class="sidebar-bottom">
-        <span class="status-dot"></span> 工程基础已就绪
-        <p>1.6 · 自动识别注册入口</p>
+        <span class="status-dot"></span> 执行记录统一管理
+        <p>1.7 · 执行结果与日志</p>
       </div>
     </aside>
     <div class="main-area">
@@ -319,64 +338,36 @@ onMounted(async () => {
             <p class="muted">
               {{
                 section === 'overview'
-                  ? '管理执行服务器、固定配置版本和下载任务。'
+                  ? '查看注册结果、下载进度及需要处理的问题。'
                   : section === 'config'
-                    ? '使用统一规则检查测试配置，避免无效内容进入执行节点。'
+                    ? '设置网站、下载规则与注册方式，保存后在新执行中生效。'
                     : '所有记录来自当前中台数据库。'
               }}
             </p>
           </div>
-          <span class="phase-tag">1.6 自动化测试</span>
+          <span class="phase-tag">1.7 管理控制台</span>
         </div>
         <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon />
         <el-alert v-if="notice" :title="notice" type="success" :closable="false" show-icon />
-        <template v-if="section === 'overview'">
-          <div class="stats">
-            <article>
-              <span>服务器</span><strong>{{ nodes.length }}</strong
-              ><small>已接入节点</small>
-            </article>
-            <article>
-              <span>测试任务</span><strong>{{ runs.length }}</strong
-              ><small>最近任务记录</small>
-            </article>
-            <article>
-              <span>管理身份</span><strong class="text-stat">超级管理员</strong
-              ><small>账户与基础权限已启用</small>
-            </article>
-          </div>
-          <section class="surface next-step">
-            <div>
-              <span class="phase-tag">服务器接入</span>
-              <h2>连接你的第一台执行服务器</h2>
-              <p>添加 SSH 连接信息并部署固定版本，再选择配置版本开始下载或安装注册测试。</p>
-            </div>
-            <el-button @click="section = 'nodes'">管理服务器 →</el-button>
-          </section>
-          <section class="surface">
-            <h2>最近操作</h2>
-            <el-table :data="audit.slice(0, 8)" empty-text="暂无操作记录"
-              ><el-table-column label="操作"
-                ><template #default="scope">{{
-                  actionLabels[scope.row.action] ?? scope.row.action
-                }}</template></el-table-column
-              ><el-table-column label="时间（北京时间）"
-                ><template #default="scope">{{
-                  when(scope.row.createdAt)
-                }}</template></el-table-column
-              ></el-table
-            >
-          </section>
-        </template>
+        <OverviewPanel v-if="section === 'overview'" />
+        <RegistrationRecords v-else-if="section === 'results'" />
+        <ApkAssets v-else-if="section === 'assets'" />
+        <ProxyManager v-else-if="section === 'proxies'" />
         <ServerManager v-else-if="section === 'nodes'" @changed="refresh" />
-        <RunManager v-else-if="section === 'runs'" />
+        <RunDetail v-else-if="section === 'runs' && route.id" :key="route.id" :run-id="route.id" />
+        <ExecutionCenter v-else-if="section === 'runs'" />
         <section v-else-if="section === 'config'" class="surface config-form">
-          <h2>测试配置草稿</h2>
+          <h2>任务方案设置</h2>
           <p class="muted">仅执行格式校验，不访问网站、不下载或注册。</p>
           <p class="muted">
             网页与落地页使用手机竖屏和触屏。网页 UA 留空时使用默认 Android 手机浏览器。 Agent 0.6.0
             支持入口自动识别、本地图片入口识别及循环注册；APP 画像和 UA 的采集情况不影响注册验收。
           </p>
+          <label for="scheme-mode">执行模式</label
+          ><select id="scheme-mode" v-model="executionMode" @change="syncMode">
+            <option value="DOWNLOAD_ONLY">只下载 APK</option>
+            <option value="FULL">下载并注册（需要代理）</option>
+          </select>
           <label for="source-url">网站 URL</label
           ><el-input
             id="source-url"
@@ -386,14 +377,20 @@ onMounted(async () => {
           />
           <label for="xpath">图标 XPath</label
           ><el-input id="xpath" v-model="xpath" type="textarea" :rows="3" @input="syncSource" />
-          <label for="config-json">完整配置 JSON</label
-          ><textarea
-            id="config-json"
-            v-model="draftText"
-            class="json-editor"
-            spellcheck="false"
-            @input="syncFormFromJson"
-          />
+          <details class="advanced-settings">
+            <summary>高级设置：完整配置 JSON</summary>
+            <p class="muted">
+              复杂落地页规则和设备配置在此编辑。修改后需保存新版本，运行中的任务保持原配置。
+            </p>
+            <label for="config-json">完整配置 JSON</label
+            ><textarea
+              id="config-json"
+              v-model="draftText"
+              class="json-editor"
+              spellcheck="false"
+              @input="syncFormFromJson"
+            />
+          </details>
           <div class="form-actions">
             <el-button type="primary" :loading="busy" @click="validate">校验配置</el-button
             ><span class="muted">草稿仅在当前页面内存中保留</span>
@@ -416,7 +413,8 @@ onMounted(async () => {
             "
           />
         </section>
-        <template v-else-if="section === 'security'">
+        <template v-else-if="section === 'security'"
+          ><ValidationRecords />
           <section class="surface security-form">
             <h2>修改管理员密码</h2>
             <p class="muted">新密码至少12位。修改后将撤销其他登录会话。</p>

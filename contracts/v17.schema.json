@@ -1,0 +1,1735 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.apk-platform.example/v1/v17.schema.json",
+  "$defs": {
+    "ResultCategory": {
+      "enum": [
+        "SUCCESS",
+        "REJECTED",
+        "ERROR",
+        "ADAPTATION",
+        "UNKNOWN",
+        "SKIPPED",
+        "STOPPED",
+        "PENDING"
+      ]
+    },
+    "RunQuery": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "nodeId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "configVersionId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "purpose": {
+          "enum": ["DOWNLOAD", "REGISTER", "LEGACY", "PROXY_CHECK"]
+        },
+        "status": {
+          "enum": [
+            "QUEUED",
+            "ASSIGNED",
+            "RUNNING",
+            "STOP_REQUESTED",
+            "SUCCEEDED",
+            "FAILED",
+            "PARTIAL_FAILED",
+            "CANCELLED",
+            "NEEDS_REVIEW"
+          ]
+        },
+        "cacheDay": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "cursor": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,400}$"
+        },
+        "limit": {
+          "type": "string",
+          "pattern": "^(?:[1-9]|[1-9][0-9]|100)$"
+        }
+      },
+      "required": []
+    },
+    "ConsoleRunListView": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "nodeName": {
+                "type": "string"
+              },
+              "configName": {
+                "type": "string"
+              },
+              "purpose": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "successes": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "successTarget": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "attemptsStarted": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "attemptLimit": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "errorCode": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "nodeId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "configVersionId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "configVersion": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "cacheDay": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "nodeName",
+              "configName",
+              "purpose",
+              "status",
+              "createdAt",
+              "successes",
+              "successTarget",
+              "attemptsStarted",
+              "attemptLimit",
+              "errorCode",
+              "nodeId",
+              "configVersionId",
+              "configVersion",
+              "cacheDay"
+            ]
+          }
+        },
+        "nextCursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": ["items", "nextCursor"]
+    },
+    "ResultsQuery": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "to": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "nodeId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "runId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "q": {
+          "type": "string",
+          "maxLength": 100,
+          "pattern": "^[^\\u0000-\\u001f\\u007f]*$"
+        },
+        "category": {
+          "enum": [
+            "SUCCESS",
+            "REJECTED",
+            "ERROR",
+            "ADAPTATION",
+            "UNKNOWN",
+            "SKIPPED",
+            "STOPPED",
+            "PENDING"
+          ]
+        },
+        "review": {
+          "enum": ["OPEN", "RESOLVED"]
+        },
+        "cursor": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,400}$"
+        },
+        "limit": {
+          "type": "string",
+          "pattern": "^(?:[1-9]|[1-9][0-9]|100)$"
+        }
+      },
+      "required": []
+    },
+    "OverviewQuery": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "day": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "nodeId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": []
+    },
+    "TimelineQuery": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "afterSequence": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,9})$"
+        },
+        "beforeSequence": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,9}$"
+        },
+        "taskId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "limit": {
+          "type": "string",
+          "pattern": "^(?:[1-9]|[1-9][0-9]|100)$"
+        }
+      },
+      "required": [],
+      "not": {
+        "required": ["afterSequence", "beforeSequence"]
+      }
+    },
+    "AssetQuery": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "day": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "nodeId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "q": {
+          "type": "string",
+          "maxLength": 100,
+          "pattern": "^[^\\u0000-\\u001f\\u007f]*$"
+        },
+        "cursor": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,400}$"
+        },
+        "limit": {
+          "type": "string",
+          "pattern": "^(?:[1-9]|[1-9][0-9]|100)$"
+        }
+      },
+      "required": []
+    },
+    "RegistrationRecordView": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "runId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "nodeId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "nodeName": {
+          "type": "string"
+        },
+        "configName": {
+          "type": "string"
+        },
+        "configVersion": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "purpose": {
+          "type": "string"
+        },
+        "position": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "label": {
+          "type": "string"
+        },
+        "entryId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "type": "string"
+        },
+        "category": {
+          "enum": [
+            "SUCCESS",
+            "REJECTED",
+            "ERROR",
+            "ADAPTATION",
+            "UNKNOWN",
+            "SKIPPED",
+            "STOPPED",
+            "PENDING"
+          ]
+        },
+        "proof": {
+          "type": "string"
+        },
+        "errorCode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lastStage": {
+          "type": "string"
+        },
+        "startedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "finishedAt": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "elapsedMs": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "apk": {
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "packageName",
+                "versionName",
+                "versionCode",
+                "abis",
+                "size",
+                "apkSha256",
+                "cacheDay"
+              ],
+              "properties": {
+                "packageName": {
+                  "type": "string",
+                  "pattern": "^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)+$",
+                  "maxLength": 256
+                },
+                "versionName": {
+                  "type": ["string", "null"],
+                  "maxLength": 256
+                },
+                "versionCode": {
+                  "type": ["integer", "null"],
+                  "minimum": 0
+                },
+                "abis": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "maxItems": 20,
+                  "items": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_-]{1,40}$"
+                  }
+                },
+                "size": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 536870912
+                },
+                "apkSha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "cacheDay": {
+                  "type": "string",
+                  "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "hasAccount": {
+          "type": "boolean"
+        },
+        "reviewOutcome": {
+          "anyOf": [
+            {
+              "enum": ["SUCCEEDED", "FAILED"]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "runId",
+        "nodeId",
+        "nodeName",
+        "configName",
+        "configVersion",
+        "purpose",
+        "position",
+        "label",
+        "entryId",
+        "status",
+        "category",
+        "proof",
+        "errorCode",
+        "lastStage",
+        "startedAt",
+        "finishedAt",
+        "elapsedMs",
+        "apk",
+        "hasAccount",
+        "reviewOutcome"
+      ]
+    },
+    "RegistrationListView": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "runId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "nodeId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "nodeName": {
+                "type": "string"
+              },
+              "configName": {
+                "type": "string"
+              },
+              "configVersion": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "purpose": {
+                "type": "string"
+              },
+              "position": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "label": {
+                "type": "string"
+              },
+              "entryId": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "status": {
+                "type": "string"
+              },
+              "category": {
+                "enum": [
+                  "SUCCESS",
+                  "REJECTED",
+                  "ERROR",
+                  "ADAPTATION",
+                  "UNKNOWN",
+                  "SKIPPED",
+                  "STOPPED",
+                  "PENDING"
+                ]
+              },
+              "proof": {
+                "type": "string"
+              },
+              "errorCode": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "lastStage": {
+                "type": "string"
+              },
+              "startedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "finishedAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "elapsedMs": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "apk": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "packageName",
+                      "versionName",
+                      "versionCode",
+                      "abis",
+                      "size",
+                      "apkSha256",
+                      "cacheDay"
+                    ],
+                    "properties": {
+                      "packageName": {
+                        "type": "string",
+                        "pattern": "^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)+$",
+                        "maxLength": 256
+                      },
+                      "versionName": {
+                        "type": ["string", "null"],
+                        "maxLength": 256
+                      },
+                      "versionCode": {
+                        "type": ["integer", "null"],
+                        "minimum": 0
+                      },
+                      "abis": {
+                        "type": "array",
+                        "uniqueItems": true,
+                        "maxItems": 20,
+                        "items": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z0-9_-]{1,40}$"
+                        }
+                      },
+                      "size": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 536870912
+                      },
+                      "apkSha256": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      },
+                      "cacheDay": {
+                        "type": "string",
+                        "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+                      }
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "hasAccount": {
+                "type": "boolean"
+              },
+              "reviewOutcome": {
+                "anyOf": [
+                  {
+                    "enum": ["SUCCEEDED", "FAILED"]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "runId",
+              "nodeId",
+              "nodeName",
+              "configName",
+              "configVersion",
+              "purpose",
+              "position",
+              "label",
+              "entryId",
+              "status",
+              "category",
+              "proof",
+              "errorCode",
+              "lastStage",
+              "startedAt",
+              "finishedAt",
+              "elapsedMs",
+              "apk",
+              "hasAccount",
+              "reviewOutcome"
+            ]
+          }
+        },
+        "nextCursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": ["items", "nextCursor"]
+    },
+    "RegistrationDetailView": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "record": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "runId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "nodeId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "nodeName": {
+              "type": "string"
+            },
+            "configName": {
+              "type": "string"
+            },
+            "configVersion": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "purpose": {
+              "type": "string"
+            },
+            "position": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "label": {
+              "type": "string"
+            },
+            "entryId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "status": {
+              "type": "string"
+            },
+            "category": {
+              "enum": [
+                "SUCCESS",
+                "REJECTED",
+                "ERROR",
+                "ADAPTATION",
+                "UNKNOWN",
+                "SKIPPED",
+                "STOPPED",
+                "PENDING"
+              ]
+            },
+            "proof": {
+              "type": "string"
+            },
+            "errorCode": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "lastStage": {
+              "type": "string"
+            },
+            "startedAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "finishedAt": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "elapsedMs": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "apk": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "packageName",
+                    "versionName",
+                    "versionCode",
+                    "abis",
+                    "size",
+                    "apkSha256",
+                    "cacheDay"
+                  ],
+                  "properties": {
+                    "packageName": {
+                      "type": "string",
+                      "pattern": "^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)+$",
+                      "maxLength": 256
+                    },
+                    "versionName": {
+                      "type": ["string", "null"],
+                      "maxLength": 256
+                    },
+                    "versionCode": {
+                      "type": ["integer", "null"],
+                      "minimum": 0
+                    },
+                    "abis": {
+                      "type": "array",
+                      "uniqueItems": true,
+                      "maxItems": 20,
+                      "items": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9_-]{1,40}$"
+                      }
+                    },
+                    "size": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 536870912
+                    },
+                    "apkSha256": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    },
+                    "cacheDay": {
+                      "type": "string",
+                      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+                    }
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "hasAccount": {
+              "type": "boolean"
+            },
+            "reviewOutcome": {
+              "anyOf": [
+                {
+                  "enum": ["SUCCEEDED", "FAILED"]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "runId",
+            "nodeId",
+            "nodeName",
+            "configName",
+            "configVersion",
+            "purpose",
+            "position",
+            "label",
+            "entryId",
+            "status",
+            "category",
+            "proof",
+            "errorCode",
+            "lastStage",
+            "startedAt",
+            "finishedAt",
+            "elapsedMs",
+            "apk",
+            "hasAccount",
+            "reviewOutcome"
+          ]
+        },
+        "observation": {
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "model": {
+                  "type": "string"
+                },
+                "locale": {
+                  "type": "string"
+                },
+                "shellAndroidIdHash": {
+                  "type": "string"
+                },
+                "proxyObservedIp": {
+                  "type": "string"
+                },
+                "proxyObservedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "model",
+                "locale",
+                "shellAndroidIdHash",
+                "proxyObservedIp",
+                "proxyObservedAt"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "recognition": {
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["source", "navigationSteps", "cache", "learned", "needsAdaptation"],
+              "properties": {
+                "source": {
+                  "enum": ["CONTROLS", "OCR", "LEARNED"]
+                },
+                "navigationSteps": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 12
+                },
+                "cache": {
+                  "enum": ["MISS", "HIT", "INVALIDATED"]
+                },
+                "learned": {
+                  "type": "boolean"
+                },
+                "needsAdaptation": {
+                  "type": "boolean"
+                },
+                "templateHash": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reviews": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "outcome": {
+                "enum": ["SUCCEEDED", "FAILED"]
+              },
+              "reason": {
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": ["outcome", "reason", "createdAt"]
+          }
+        }
+      },
+      "required": ["record", "observation", "recognition", "reviews"]
+    },
+    "OverviewView": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "day": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "generatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "servers": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "total": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "online": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "busy": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "quarantined": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": ["total", "online", "busy", "quarantined"]
+        },
+        "downloads": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "validated": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "failed": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": ["validated", "failed"]
+        },
+        "registrations": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "SUCCESS": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "REJECTED": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "ERROR": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "ADAPTATION": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "UNKNOWN": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "SKIPPED": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "STOPPED": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "PENDING": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "SUCCESS",
+            "REJECTED",
+            "ERROR",
+            "ADAPTATION",
+            "UNKNOWN",
+            "SKIPPED",
+            "STOPPED",
+            "PENDING"
+          ]
+        },
+        "reviewedUnknown": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "activeRuns": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "nodeName": {
+                "type": "string"
+              },
+              "configName": {
+                "type": "string"
+              },
+              "purpose": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "successes": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "successTarget": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "attemptsStarted": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "attemptLimit": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "errorCode": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "nodeName",
+              "configName",
+              "purpose",
+              "status",
+              "createdAt",
+              "successes",
+              "successTarget",
+              "attemptsStarted",
+              "attemptLimit",
+              "errorCode"
+            ]
+          }
+        }
+      },
+      "required": [
+        "day",
+        "generatedAt",
+        "servers",
+        "downloads",
+        "registrations",
+        "reviewedUnknown",
+        "activeRuns"
+      ]
+    },
+    "RunSummaryView": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "run": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "nodeName": {
+              "type": "string"
+            },
+            "configName": {
+              "type": "string"
+            },
+            "purpose": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "createdAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "successes": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "successTarget": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "attemptsStarted": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "attemptLimit": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "errorCode": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "nodeName",
+            "configName",
+            "purpose",
+            "status",
+            "createdAt",
+            "successes",
+            "successTarget",
+            "attemptsStarted",
+            "attemptLimit",
+            "errorCode"
+          ]
+        },
+        "nodeId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "configVersion": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "releaseId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "finishedAt": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "counts": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "SUCCESS": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "REJECTED": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "ERROR": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "ADAPTATION": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "UNKNOWN": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "SKIPPED": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "STOPPED": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "PENDING": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "SUCCESS",
+            "REJECTED",
+            "ERROR",
+            "ADAPTATION",
+            "UNKNOWN",
+            "SKIPPED",
+            "STOPPED",
+            "PENDING"
+          ]
+        },
+        "taskCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cleanup": {
+          "enum": ["CONFIRMED", "PENDING", "NEEDS_REVIEW"]
+        },
+        "activeTask": {
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "position": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "label": {
+                  "type": "string"
+                },
+                "stage": {
+                  "type": "string"
+                },
+                "packageName": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": ["id", "position", "label", "stage", "packageName"]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "run",
+        "nodeId",
+        "configVersion",
+        "releaseId",
+        "finishedAt",
+        "counts",
+        "taskCount",
+        "cleanup",
+        "activeTask"
+      ]
+    },
+    "TimelinePage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "sequence": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "taskId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "occurredAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "receivedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "type": {
+                "type": "string"
+              },
+              "stage": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "title": {
+                "type": "string"
+              },
+              "errorCode": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "recordedForReview": {
+                "type": "boolean"
+              },
+              "applied": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "id",
+              "sequence",
+              "taskId",
+              "occurredAt",
+              "receivedAt",
+              "type",
+              "stage",
+              "title",
+              "errorCode",
+              "recordedForReview",
+              "applied"
+            ]
+          }
+        },
+        "hasEarlier": {
+          "type": "boolean"
+        },
+        "hasLater": {
+          "type": "boolean"
+        },
+        "firstSequence": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lastSequence": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": ["items", "hasEarlier", "hasLater", "firstSequence", "lastSequence"]
+    },
+    "AssetListView": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "runId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "nodeId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "nodeName": {
+                "type": "string"
+              },
+              "configName": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "entryId": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "status": {
+                "type": "string"
+              },
+              "errorCode": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "apk": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "packageName",
+                      "versionName",
+                      "versionCode",
+                      "abis",
+                      "size",
+                      "apkSha256",
+                      "cacheDay"
+                    ],
+                    "properties": {
+                      "packageName": {
+                        "type": "string",
+                        "pattern": "^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)+$",
+                        "maxLength": 256
+                      },
+                      "versionName": {
+                        "type": ["string", "null"],
+                        "maxLength": 256
+                      },
+                      "versionCode": {
+                        "type": ["integer", "null"],
+                        "minimum": 0
+                      },
+                      "abis": {
+                        "type": "array",
+                        "uniqueItems": true,
+                        "maxItems": 20,
+                        "items": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z0-9_-]{1,40}$"
+                        }
+                      },
+                      "size": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 536870912
+                      },
+                      "apkSha256": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      },
+                      "cacheDay": {
+                        "type": "string",
+                        "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+                      }
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "runId",
+              "nodeId",
+              "nodeName",
+              "configName",
+              "label",
+              "entryId",
+              "status",
+              "errorCode",
+              "createdAt",
+              "apk"
+            ]
+          }
+        },
+        "nextCursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": ["items", "nextCursor"]
+    },
+    "ValidationListView": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "nodeName": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "passed": {
+                "type": "boolean"
+              },
+              "cleanupComplete": {
+                "type": "boolean"
+              },
+              "cases": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "proof": {
+                      "type": "string"
+                    },
+                    "requests": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": ["name", "status", "proof", "requests"]
+                }
+              }
+            },
+            "required": [
+              "id",
+              "nodeName",
+              "status",
+              "createdAt",
+              "passed",
+              "cleanupComplete",
+              "cases"
+            ]
+          }
+        },
+        "nextCursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": ["items", "nextCursor"]
+    }
+  }
+}

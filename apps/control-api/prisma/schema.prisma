@@ -84,6 +84,7 @@ model Node {
 
 model SecretVersion {
   id        String    @id @default(uuid()) @db.Uuid
+  name      String?   @db.VarChar(100)
   type      String    @db.VarChar(32)
   keyId     String    @db.VarChar(64)
   encrypted Json
@@ -260,6 +261,10 @@ model Delivery {
 
 model Task {
   id             String         @id @db.Uuid
+  startedAt      DateTime?       @db.Timestamptz(3)
+  registrationStartedAt DateTime? @db.Timestamptz(3)
+  finishedAt     DateTime?       @db.Timestamptz(3)
+  lastStage      String         @default("QUEUED") @db.VarChar(32)
   runId          String         @db.Uuid
   run            Run            @relation(fields: [runId], references: [id], onDelete: Restrict)
   targetKey      String         @db.Char(64)
@@ -284,6 +289,7 @@ model Task {
 
   @@unique([runId, targetKey])
   @@unique([runId, position])
+  @@index([registrationStartedAt, id])
 }
 
 model AccountResult {
