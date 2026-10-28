@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.apk-platform.example/v1/p3.schema.json",
+  "$defs": {
+    "ArtifactInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocolVersion",
+        "nodeId",
+        "bootId",
+        "deliveryId",
+        "fence",
+        "taskId",
+        "artifactId",
+        "kind",
+        "sha256",
+        "dataBase64",
+        "redaction"
+      ],
+      "properties": {
+        "protocolVersion": {
+          "const": "1.0"
+        },
+        "nodeId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "bootId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "deliveryId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "fence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "taskId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "artifactId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "kind": {
+          "const": "screenshot"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "dataBase64": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 13981016,
+          "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+        },
+        "redaction": {
+          "const": "CREDENTIAL_MASKED"
+        }
+      }
+    },
+    "AccountViewInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reason"],
+      "properties": {
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        }
+      }
+    },
+    "TaskReconcileInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["outcome", "reason", "evidenceIds"],
+      "properties": {
+        "outcome": {
+          "enum": ["SUCCEEDED", "FAILED"]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 1000
+        },
+        "evidenceIds": {
+          "type": "array",
+          "maxItems": 100,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      }
+    }
+  }
+}

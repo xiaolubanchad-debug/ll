@@ -1,6 +1,6 @@
 # APK 测试部署中台实施方案
 
-版本：1.3.4。生效日期：2026 年 10 月 28 日。实现语言基线：Node.js + TypeScript。P0/P1/P2 代码已实现；配置及下载见 [P2 部署与验证](P2_SETUP.md) 和 [P2 契约](P2_CONTRACT.md)。Ubuntu 26.04 / KVM EC2 的安装、空 Android 启动、Agent 注册心跳及 0.3.3 到 0.3.4 升级已独立验收；真实 APK 安装注册尚待 P3。
+版本：1.4.0。生效日期：2026 年 10 月 28 日。实现语言基线：Node.js + TypeScript。P0/P1/P2 已验收。P3 实现和验收遵循 [安卓注册契约](P3_CONTRACT.md)，发布、EC2 自有测试 APK 与真实产品注册分别记录验证范围。
 
 中台统一管理服务器、部署、测试配置和结果。执行节点运行浏览器和安卓环境。管理员不需要逐台登录 EC2 修改业务配置。
 
@@ -36,19 +36,19 @@ EC2 接受 Ubuntu 24.04 / 26.04 LTS x86_64，平台规则见 [兼容契约](UBUN
 
 ## 技术选择
 
-| 模块 | 选择 | 边界 |
-| --- | --- | --- |
-| 管理页面 | Vue 3、TypeScript、Element Plus、Vite | 仅调用中台，不能直接 SSH 或访问 Appium |
-| 中台 API | NestJS、TypeScript | 鉴权、配置版本、任务编排、审计和结果查询 |
-| 数据库 | PostgreSQL 17、Prisma | 中台唯一业务事实来源，事务式分配任务 |
-| 部署 Worker | Node.js 子进程调用 Ansible Runner CLI | 独立进程执行固定 Playbook，不接受任意 Shell |
-| 执行节点 | Node.js 24、TypeScript | 拉取任务、本地持久化、执行和回传 |
-| 浏览器 | Playwright、Chromium | 定位图标、处理跳转和下载，不走业务代理 |
-| Android | Emulator、ADB、Appium 3、UiAutomator2、WebdriverIO | 独立数据环境、安装启动及控件操作 |
-| APK 分析 | apkanalyzer 或 aapt2 | 校验包名、版本和 ABI，不靠文件名判断 |
-| 日志与页面事件 | 结构化 JSON、HTTPS、SSE | 先写数据库，再推送，断线可补读 |
-| 节点记录 | SQLite | 保存执行状态、提交记录和待上传队列 |
-| 部署与反向代理 | Docker Compose、Nginx、systemd | 中台容器化，安卓节点使用宿主机服务 |
+| 模块           | 选择                                                              | 边界                                                 |
+| -------------- | ----------------------------------------------------------------- | ---------------------------------------------------- |
+| 管理页面       | Vue 3、TypeScript、Element Plus、Vite                             | 仅调用中台，不能直接 SSH 或访问 Appium               |
+| 中台 API       | NestJS、TypeScript                                                | 鉴权、配置版本、任务编排、审计和结果查询             |
+| 数据库         | PostgreSQL 17、Prisma                                             | 中台唯一业务事实来源，事务式分配任务                 |
+| 部署 Worker    | Node.js 子进程调用 Ansible Runner CLI                             | 独立进程执行固定 Playbook，不接受任意 Shell          |
+| 执行节点       | Node.js 24、TypeScript                                            | 拉取任务、本地持久化、执行和回传                     |
+| 浏览器         | Playwright、Chromium                                              | 定位图标、处理跳转和下载，不走业务代理               |
+| Android        | Emulator、ADB、Appium 3、UiAutomator2、固定 WebDriver HTTP 适配器 | 独立数据环境、安装启动及控件操作；不自动重发变更命令 |
+| APK 分析       | Node ZIP、二进制 AndroidManifest 解析器                           | 校验结构、CRC、包名、版本和 ABI，不靠文件名判断      |
+| 日志与页面事件 | 结构化 JSON、HTTPS、SSE                                           | 先写数据库，再推送，断线可补读                       |
+| 节点记录       | SQLite                                                            | 保存执行状态、提交记录和待上传队列                   |
+| 部署与反向代理 | Docker Compose、Nginx、systemd                                    | 中台容器化，安卓节点使用宿主机服务                   |
 
 Python 仅作为 Ansible 的运行依赖，不承载自研业务服务。第一版不引入 Redis、Kubernetes、微服务集群、AWS 自动创建实例或自动扩缩容。
 
@@ -56,16 +56,16 @@ Python 仅作为 Ansible 的运行依赖，不承载自研业务服务。第一�
 
 ## 模块职责
 
-| 模块 | 输入 | 输出与责任 |
-| --- | --- | --- |
-| auth | 管理员凭据 | 安全会话、权限和操作审计 |
-| nodes | 地址、SSH 连接及主机指纹 | 节点资产、连接和就绪状态 |
-| deployments | 节点 ID、固定发布 ID | 独立部署任务、步骤日志和部署结果 |
-| configurations | Schema 校验后的配置、凭据引用 | 不可变配置版本及非敏感摘要 |
-| runs | 配置版本、节点、幂等键 | 批次、节点锁、执行状态及停止意图 |
-| evidence | 节点上报 | 截图、日志、结果和加密账户数据 |
-| agent | 固定任务快照、节点凭据 | 单节点串行执行、心跳与结果补传 |
-| automation | 下载目标、设备配置、注册流程 | 各阶段结果，不直接操作中台数据库 |
+| 模块           | 输入                          | 输出与责任                       |
+| -------------- | ----------------------------- | -------------------------------- |
+| auth           | 管理员凭据                    | 安全会话、权限和操作审计         |
+| nodes          | 地址、SSH 连接及主机指纹      | 节点资产、连接和就绪状态         |
+| deployments    | 节点 ID、固定发布 ID          | 独立部署任务、步骤日志和部署结果 |
+| configurations | Schema 校验后的配置、凭据引用 | 不可变配置版本及非敏感摘要       |
+| runs           | 配置版本、节点、幂等键        | 批次、节点锁、执行状态及停止意图 |
+| evidence       | 节点上报                      | 截图、日志、结果和加密账户数据   |
+| agent          | 固定任务快照、节点凭据        | 单节点串行执行、心跳与结果补传   |
+| automation     | 下载目标、设备配置、注册流程  | 各阶段结果，不直接操作中台数据库 |
 
 HTTP 接口、部署 Worker 和 Agent 分别运行。中台进程不等待远程安装结束，也不直接启动本机安卓。节点不能访问中台数据库或其他节点的凭据。
 
@@ -123,6 +123,6 @@ apps/web、apps/control-api、packages/contracts 和测试基础已在 P0 建立
 - [Playwright 多语言说明](https://playwright.dev/docs/languages)：更换业务语言不改变浏览器核心能力。
 - [Ansible Runner CLI](https://docs.ansible.com/projects/runner/en/stable/standalone/)：Node.js 通过子进程使用部署工具。
 - [Appium 3 要求](https://appium.io/docs/en/3.0/guides/migrating-2-to-3/)：Node.js 与 npm 兼容要求。
-- [WebdriverIO](https://webdriver.io/docs/why-webdriverio)：通过 Appium 控制 Android。
+- [Appium CLI](https://appium.io/docs/en/3.7/reference/cli/server/)：通过固定 WebDriver HTTP 适配器控制 Android，变更命令不自动重发。
 
 技术路线是本项目的架构决策，不代表已经完成部署或兼容性测试。

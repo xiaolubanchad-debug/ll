@@ -7,12 +7,13 @@ import type {
   TestConfiguration,
 } from '@apk/contracts';
 import { agentIssues, schemaIssues } from '@apk/contracts';
-import { checked } from './secrets.js';
+import { checked, readSecret } from './secrets.js';
 import { digest, canonical } from './security.js';
 import { lockNode, idle } from './nodes.js';
 import { idempotent } from './jobs.js';
 import { configSecrets } from './configurations.js';
 import { fault } from './errors.js';
+import { isIP } from 'node:net';
 type Tx = P.TransactionClient;
 export const ACTIVE_RUNS = ['ASSIGNED', 'RUNNING', 'STOP_REQUESTED'] as const;
 export const RUN_END = ['SUCCEEDED', 'PARTIAL_FAILED', 'FAILED', 'CANCELLED', 'NEEDS_REVIEW'];
@@ -82,8 +83,10 @@ export async function createRun(
     if (node.agentReleaseId !== input.releaseId || node.deploymentStatus !== 'INSTALLED')
       fault('NODE_NOT_READY', '节点发布版本不匹配');
     const release = await tx.release.findUnique({ where: { id: input.releaseId } });
-    const manifest = release?.manifest as { features?: string[] } | undefined;
-    const health = node.health as { download?: boolean } | null;
+    const manifest = release?.manifest as
+      | { features?: string[]; toolchain?: { systemImage?: string } }
+      | undefined;
+    const health = node.health as { download?: boolean; android?: boolean; kvm?: boolean } | null;
     if (
       !manifest?.features?.includes('DOWNLOAD_V1') ||
       node.downloadProtocol !== '1.0' ||
@@ -94,8 +97,17 @@ export async function createRun(
     if (!config) fault('NOT_FOUND', '配置版本不存在', 404);
     const configuration = config.body as unknown as TestConfiguration;
     await configSecrets(tx, configuration);
-    if (configuration.execution.mode !== 'DOWNLOAD_ONLY')
-      fault('FEATURE_UNAVAILABLE', 'P2 仅支持下载模式，安装注册尚未开放', 422);
+    if (configuration.execution.mode === 'FULL') {
+      if (!manifest.features?.includes('REGISTRATION_V1') || node.registrationProtocol !== '1.0')
+        fault('NODE_UPGRADE_REQUIRED', '完整测试需要支持注册的 Agent 版本');
+      if (!health?.android || !health.kvm) fault('NODE_NOT_READY', '安卓环境尚未就绪');
+      if (
+        configuration.execution.deviceProfiles.some(
+          (p) => p.systemImage !== manifest.toolchain?.systemImage,
+        )
+      )
+        fault('DEVICE_PROFILE_UNSUPPORTED', '设备镜像必须与签名工具链一致', 422);
+    }
     if (input.supersedesRunId) {
       const old = await tx.run.findUnique({ where: { id: input.supersedesRunId } });
       if (!old || !RUN_END.includes(old.status) || old.nodeId !== node.id)
@@ -171,7 +183,7 @@ export async function claimRun(db: PrismaClient, token: string, body: unknown) {
     return deliveryView(run, d);
   });
 }
-async function bound(
+export async function boundDelivery(
   tx: Tx,
   token: string,
   nodeId: string,
@@ -187,6 +199,7 @@ async function bound(
     fault('STALE_FENCE', '任务分配不匹配');
   return d;
 }
+const bound = boundDelivery;
 function authorized(d: Delivery & { run: Run }) {
   if (
     !ACTIVE_RUNS.includes(d.run.status as (typeof ACTIVE_RUNS)[number]) ||
@@ -227,7 +240,18 @@ export async function deliveryConfig(db: PrismaClient, token: string, id: string
     const v = await tx.configVersion.findUniqueOrThrow({ where: { id: d.run.configVersionId! } });
     const config = v.body as unknown as TestConfiguration;
     await configSecrets(tx, config);
-    return { deliveryId: id, configHash: v.configHash, config, secretVersions: [] };
+    const proxyId =
+      config.execution.mode === 'FULL' ? config.execution.proxySecretVersionId : undefined;
+    const secretVersions = proxyId
+      ? [
+          {
+            id: proxyId,
+            type: 'HTTP_PROXY',
+            secretValue: await readSecret(tx, proxyId, ['HTTP_PROXY']),
+          },
+        ]
+      : [];
+    return { deliveryId: id, configHash: v.configHash, config, secretVersions };
   });
 }
 export async function closeRun(
@@ -283,6 +307,11 @@ export async function stopRun(
 type Event = Extract<AgentMessage, { kind: 'events' }>['events'][number];
 async function applyEvent(tx: Tx, runId: string, event: Event) {
   const run = await tx.run.findUniqueOrThrow({ where: { id: runId } });
+  const version = run.configVersionId
+    ? await tx.configVersion.findUnique({ where: { id: run.configVersionId } })
+    : null;
+  const config = version?.body as unknown as TestConfiguration;
+  const full = config?.execution.mode === 'FULL';
   const p = event.payload as Record<string, unknown>;
   if (event.type === 'RUN_STARTED') {
     if (event.sequence !== 1 || p.configHash !== run.configHash || p.releaseId !== run.releaseId)
@@ -334,19 +363,73 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
     });
     return;
   }
+  if (event.type === 'SUBMISSION_INTENT') {
+    const task = await tx.task.findUnique({ where: { id: event.taskId } });
+    const account = await tx.accountResult.findUnique({
+      where: { accountRef: String(p.accountRef) },
+    });
+    if (
+      !full ||
+      !task ||
+      task.runId !== runId ||
+      task.status !== 'REGISTERING' ||
+      task.submissionId ||
+      !account ||
+      account.taskId !== task.id ||
+      !task.observation
+    )
+      fault('EVENT_CONFLICT', '提交意图与账户或阶段不匹配');
+    await tx.task.update({
+      where: { id: task.id },
+      data: {
+        submissionId: String(p.submissionId),
+        accountRef: account.accountRef,
+        submittedAt: new Date(),
+      },
+    });
+    return;
+  }
   if (event.type === 'TASK_STAGE' || event.type === 'TASK_FINISHED') {
     const task = await tx.task.findUnique({ where: { id: event.taskId } });
     if (!run.discovered || !task || task.runId !== runId)
       fault('EVENT_CONFLICT', '目标不属于本批次或发现尚未完成');
     if (event.type === 'TASK_STAGE') {
       const stage = String(p.stage);
+      const androidStages = [
+        'DOWNLOADED',
+        'PREPARING',
+        'INSTALLING',
+        'LAUNCHING',
+        'REGISTERING',
+        'VERIFYING',
+      ];
+      const androidForward =
+        full &&
+        androidStages.indexOf(task.status) >= 0 &&
+        androidStages.indexOf(stage) === androidStages.indexOf(task.status) + 1;
       if (
         !(['QUEUED', 'DOWNLOADING'].includes(task.status) && stage === 'DOWNLOADING') &&
-        !(task.status === 'DOWNLOADING' && stage === 'DOWNLOADED')
+        !(task.status === 'DOWNLOADING' && stage === 'DOWNLOADED') &&
+        !androidForward
       )
-        fault('EVENT_CONFLICT', '下载阶段不能倒退');
+        fault('EVENT_CONFLICT', '任务阶段不能跳过或倒退');
       if (stage === 'DOWNLOADED' && schemaIssues('ApkMetadata', p.apk).length)
         fault('EVENT_CONFLICT', '缺少 APK 校验元数据');
+      if (stage === 'INSTALLING') {
+        const observation = p.observation as
+          | { profileId?: string; proxyObservedIp?: string }
+          | undefined;
+        if (
+          !observation ||
+          !config.execution.deviceProfiles.some((v) => v.id === observation.profileId) ||
+          !isIP(observation.proxyObservedIp ?? '')
+        )
+          fault('EVENT_CONFLICT', '缺少设备与代理探测证据');
+      }
+      if (stage === 'VERIFYING' && !task.submissionId)
+        fault('EVENT_CONFLICT', '核验前必须保存提交意图');
+      if (p.observation && stage !== 'INSTALLING')
+        fault('EVENT_CONFLICT', '设备证据只能在安装前记录');
       await tx.task.update({
         where: { id: task.id },
         data: {
@@ -354,26 +437,77 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
           ...(stage === 'DOWNLOADED'
             ? { apk: p.apk as Prisma.InputJsonValue, cacheHit: p.cacheHit === true }
             : {}),
+          ...(p.observation ? { observation: p.observation as Prisma.InputJsonValue } : {}),
         },
       });
       return;
     }
-    if (['SUCCEEDED', 'FAILED', 'SKIPPED', 'CANCELLED'].includes(task.status))
+    if (['SUCCEEDED', 'FAILED', 'SKIPPED', 'CANCELLED', 'UNKNOWN'].includes(task.status))
       fault('EVENT_CONFLICT', '目标已结束');
     const status = String(p.status);
     if (
+      !full &&
       status === 'SUCCEEDED' &&
       (task.status !== 'DOWNLOADED' || !task.apk || p.proof !== 'FILE_VALIDATION')
     )
       fault('EVENT_CONFLICT', '下载成功必须有文件校验证据');
-    if (p.proof === 'APP_UI' || status === 'UNKNOWN')
+    if (!full && (p.proof === 'APP_UI' || status === 'UNKNOWN'))
       fault('FEATURE_UNAVAILABLE', 'P2 不接受注册结果', 422);
+    if (full) {
+      const account = p.accountRef
+        ? await tx.accountResult.findUnique({ where: { accountRef: String(p.accountRef) } })
+        : null;
+      if (p.accountRef && (!account || account.taskId !== task.id))
+        fault('EVENT_CONFLICT', '账户不属于本任务');
+      if (
+        p.proof === 'APP_UI' &&
+        (!task.submissionId || task.status !== 'VERIFYING' || !task.observation || !account)
+      )
+        fault('EVENT_CONFLICT', '界面结果必须有关联提交和核验阶段');
+      if (
+        task.submissionId &&
+        (p.accountRef !== task.accountRef || !['SUCCEEDED', 'UNKNOWN', 'FAILED'].includes(status))
+      )
+        fault('EVENT_CONFLICT', '提交后不能跳过或取消注册结果');
+      if (status === 'UNKNOWN' && !task.submissionId)
+        fault('EVENT_CONFLICT', '未知注册结果必须关联提交意图');
+      if (
+        task.submissionId &&
+        status === 'FAILED' &&
+        (p.errorCode !== 'REGISTRATION_REJECTED' || p.proof !== 'APP_UI')
+      )
+        fault('EVENT_CONFLICT', '提交后仅明确拒绝可记为失败');
+      if (
+        status === 'SUCCEEDED' &&
+        (!task.apk ||
+          !task.observation ||
+          !task.submissionId ||
+          task.status !== 'VERIFYING' ||
+          !account ||
+          p.proof !== 'APP_UI')
+      )
+        fault('EVENT_CONFLICT', '注册成功缺少提交与界面证据');
+      if (
+        status === 'SKIPPED' &&
+        (task.status !== 'DOWNLOADED' || p.errorCode !== 'FLOW_NOT_CONFIGURED')
+      )
+        fault('EVENT_CONFLICT', '未适配任务才能跳过');
+      const ids = p.artifactIds as string[];
+      if (
+        ids.length &&
+        (await tx.artifact.count({
+          where: { id: { in: ids }, taskId: task.id, recordedForReview: false },
+        })) !== ids.length
+      )
+        fault('EVENT_CONFLICT', '截图不属于本次有效任务');
+    }
     await tx.task.update({
       where: { id: task.id },
       data: {
         status,
         proof: String(p.proof),
         errorCode: typeof p.errorCode === 'string' ? p.errorCode : null,
+        ...(typeof p.accountRef === 'string' ? { accountRef: p.accountRef } : {}),
       },
     });
     return;
@@ -384,16 +518,49 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
       return;
     }
     if (!run.stopRequested) fault('EVENT_CONFLICT', '尚未请求停止');
+    const unresolved = await tx.task.count({
+      where: {
+        runId,
+        OR: [
+          { status: 'UNKNOWN' },
+          { submissionId: { not: null }, status: { notIn: ['SUCCEEDED', 'FAILED'] } },
+        ],
+      },
+    });
+    if (unresolved) {
+      await tx.task.updateMany({
+        where: {
+          runId,
+          submissionId: { not: null },
+          status: { notIn: ['SUCCEEDED', 'FAILED', 'UNKNOWN'] },
+        },
+        data: { status: 'UNKNOWN', errorCode: 'REGISTRATION_UNKNOWN' },
+      });
+      await reviewRun(tx, run, 'REGISTRATION_UNKNOWN');
+      return;
+    }
     await tx.task.updateMany({
-      where: { runId, status: { notIn: ['SUCCEEDED', 'FAILED', 'SKIPPED', 'CANCELLED'] } },
+      where: {
+        runId,
+        status: { notIn: ['SUCCEEDED', 'FAILED', 'SKIPPED', 'CANCELLED', 'UNKNOWN'] },
+      },
       data: { status: 'CANCELLED' },
     });
     await closeRun(tx, run, 'CANCELLED');
     return;
   }
   if (event.type === 'RUN_FINISHED') {
-    if (run.stopRequested) fault('EVENT_CONFLICT', '停止必须通过清理回执确认');
     const tasks = await tx.task.findMany({ where: { runId } });
+    if (tasks.some((t) => t.status === 'UNKNOWN') || p.errorCode === 'CLEANUP_INCOMPLETE') {
+      if (p.status !== 'NEEDS_REVIEW') fault('EVENT_CONFLICT', '未知结果或清理失败必须隔离');
+      await reviewRun(
+        tx,
+        run,
+        p.errorCode === 'CLEANUP_INCOMPLETE' ? 'CLEANUP_INCOMPLETE' : 'REGISTRATION_UNKNOWN',
+      );
+      return;
+    }
+    if (run.stopRequested) return; // Acknowledge the race, but only STOP_ACK can release this slot.
     if (tasks.some((t) => !['SUCCEEDED', 'FAILED', 'SKIPPED', 'CANCELLED'].includes(t.status)))
       fault('EVENT_CONFLICT', '目标尚未全部结束');
     const count = tasks.filter((t) => t.status === 'SUCCEEDED').length;
@@ -432,6 +599,7 @@ export async function runEvents(db: PrismaClient, token: string, body: unknown) 
             'RUN_STARTED',
             'TARGETS_DISCOVERED',
             'TASK_STAGE',
+            'SUBMISSION_INTENT',
             'TASK_FINISHED',
             'RUN_FINISHED',
             'STOP_ACK',
@@ -479,10 +647,14 @@ export async function runEvents(db: PrismaClient, token: string, body: unknown) 
           data: { appliedThroughSequence: applied },
         });
       }
+      const current = await tx.run.findUniqueOrThrow({ where: { id: d.runId } });
       return {
         ackedEventIds: input.events.map((e) => e.eventId),
         appliedThroughSequence: applied,
         recordedForReview: late,
+        desiredControl:
+          current.stopRequested || current.status === 'NEEDS_REVIEW' ? 'STOP' : 'CONTINUE',
+        reconcileRequired: current.status === 'NEEDS_REVIEW',
       };
     },
     { timeout: 15000 },
@@ -509,6 +681,40 @@ export async function reconcileAgent(db: PrismaClient, token: string, body: unkn
           : null;
         const clean =
           input.cleanupComplete && (local?.cleanupComplete ?? input.deliveries.length === 0);
+        for (const submission of local?.submissions ?? []) {
+          const task = await tx.task.findUnique({ where: { id: submission.taskId } });
+          const account = await tx.accountResult.findUnique({
+            where: { accountRef: submission.accountRef },
+          });
+          if (
+            !task ||
+            task.runId !== run.id ||
+            !account ||
+            account.taskId !== task.id ||
+            account.deliveryId !== run.delivery?.id
+          )
+            fault('EVENT_CONFLICT', '恢复提交摘要不匹配');
+          if (task.submissionId && task.submissionId !== submission.submissionId)
+            fault('EVENT_CONFLICT', '提交编号不可替换');
+          if (!['SUCCEEDED', 'FAILED', 'SKIPPED', 'CANCELLED'].includes(task.status))
+            await tx.task.update({
+              where: { id: task.id },
+              data: {
+                submissionId: submission.submissionId,
+                accountRef: account.accountRef,
+                status: 'UNKNOWN',
+                errorCode: 'REGISTRATION_UNKNOWN',
+              },
+            });
+        }
+        await tx.task.updateMany({
+          where: {
+            runId: run.id,
+            submissionId: { not: null },
+            status: { notIn: ['SUCCEEDED', 'FAILED', 'UNKNOWN'] },
+          },
+          data: { status: 'UNKNOWN', errorCode: 'REGISTRATION_UNKNOWN' },
+        });
         await tx.run.update({
           where: { id: run.id },
           data: {
@@ -539,6 +745,16 @@ export async function reconcileRun(
     const node = await lockNode(tx, run.nodeId);
     const auth = await tx.agentCredential.findUnique({ where: { nodeId: node.id } });
     const slot = await tx.nodeSlot.findUnique({ where: { nodeId: node.id } });
+    if (
+      await tx.task.count({
+        where: {
+          runId: id,
+          status: 'UNKNOWN',
+          reviews: { none: { outcome: { in: ['SUCCEEDED', 'FAILED'] } } },
+        },
+      })
+    )
+      fault('NODE_QUARANTINED', '须先记录未知注册任务的人工核验决议');
     if (
       run.status !== 'NEEDS_REVIEW' ||
       !run.cleanupConfirmedAt ||

@@ -83,6 +83,29 @@
               },
               "cleanupComplete": {
                 "type": "boolean"
+              },
+              "submissions": {
+                "type": "array",
+                "maxItems": 1000,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["taskId", "submissionId", "accountRef"],
+                  "properties": {
+                    "taskId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "submissionId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "accountRef": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  }
+                }
               }
             }
           }

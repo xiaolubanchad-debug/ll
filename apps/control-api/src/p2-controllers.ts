@@ -137,6 +137,7 @@ export class P2Controller {
         ...args,
         where: { runId: uuid(id) },
         orderBy: [{ position: 'asc' }, { id: 'asc' }],
+        include: { reviews: { orderBy: { createdAt: 'desc' }, take: 1 } },
       }),
       limit,
     );

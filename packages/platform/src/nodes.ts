@@ -57,6 +57,7 @@ export async function nodeView(db: PrismaClient, id: string) {
         ? 'BUSY'
         : 'IDLE',
     downloadProtocol: node.downloadProtocol,
+    registrationProtocol: node.registrationProtocol,
     lastSeenAt: node.lastSeenAt,
     agentVersion: node.agentVersion,
     agentReleaseId: node.agentReleaseId,
@@ -120,6 +121,7 @@ export async function updateNode(
                 agentVersion: null,
                 agentReleaseId: null,
                 downloadProtocol: null,
+                registrationProtocol: null,
                 currentDeliveryId: null,
               }
             : {}),

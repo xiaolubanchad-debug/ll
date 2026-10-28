@@ -299,7 +299,7 @@ onMounted(async () => {
       </nav>
       <div class="sidebar-bottom">
         <span class="status-dot"></span> 工程基础已就绪
-        <p>P2 · 配置与下载任务</p>
+        <p>P3 · 下载、安装与注册</p>
       </div>
     </aside>
     <div class="main-area">
@@ -326,7 +326,7 @@ onMounted(async () => {
               }}
             </p>
           </div>
-          <span class="phase-tag">P2 下载管理</span>
+          <span class="phase-tag">P3 自动化测试</span>
         </div>
         <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon />
         <el-alert v-if="notice" :title="notice" type="success" :closable="false" show-icon />
@@ -349,9 +349,7 @@ onMounted(async () => {
             <div>
               <span class="phase-tag">服务器接入</span>
               <h2>连接你的第一台执行服务器</h2>
-              <p>
-                添加 SSH 连接信息，部署支持下载的固定版本，再选择配置版本开始下载任务。安装注册将在 P3 接入。
-              </p>
+              <p>添加 SSH 连接信息并部署固定版本，再选择配置版本开始下载或安装注册测试。</p>
             </div>
             <el-button @click="section = 'nodes'">管理服务器 →</el-button>
           </section>

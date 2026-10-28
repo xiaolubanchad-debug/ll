@@ -11,6 +11,7 @@ import { ApkCache, removeOwned } from './cache.js';
 import { inspectApk } from './apk.js';
 import { NetworkPolicy, startEgress } from './network.js';
 import { sha, canonical, normalizeUrl, cacheDay, DownloadError } from './common.js';
+import type { RegistrationCompletion } from './registration.js';
 export interface AutomationEvent {
   type: 'TARGETS_DISCOVERED' | 'TASK_STAGE' | 'TASK_FINISHED' | 'RUN_FINISHED';
   taskId?: string;
@@ -36,6 +37,12 @@ export interface DownloadOptions {
   now?: () => Date;
   onBrowser?: (record: BrowserRecord) => Promise<void>;
   onClosed?: () => Promise<void>;
+  afterDownload?: (
+    target: Target,
+    apk: ApkMetadata,
+    file: string,
+    index: number,
+  ) => Promise<RegistrationCompletion>;
 }
 const pause = (ms: number, signal: AbortSignal) =>
   new Promise<void>((ok, no) => {
@@ -347,8 +354,10 @@ export async function runDownload(
           complete: start + 20 >= targets!.length,
         },
       });
-    let succeeded = 0;
-    for (const target of targets!) {
+    let succeeded = 0,
+      review = false,
+      cleanupIncomplete = false;
+    for (const [index, target] of targets!.entries()) {
       beforeAction();
       const day = cacheDay(now());
       await emit({ type: 'TASK_STAGE', taskId: target.taskId, payload: { stage: 'DOWNLOADING' } });
@@ -421,12 +430,30 @@ export async function runDownload(
             taskId: target.taskId,
             payload: { stage: 'DOWNLOADED', cacheHit: hit, apk },
           });
+          const completion = options.afterDownload
+            ? await options.afterDownload(
+                target,
+                apk,
+                cache.path(cache.key(nodeId, day, target.targetKey)),
+                index,
+              )
+            : {
+                status: 'SUCCEEDED',
+                proof: 'FILE_VALIDATION',
+                artifactIds: [],
+                cleanupComplete: true,
+              };
+          const { cleanupComplete, ...payload } = completion;
           await emit({
             type: 'TASK_FINISHED',
             taskId: target.taskId,
-            payload: { status: 'SUCCEEDED', proof: 'FILE_VALIDATION', artifactIds: [] },
+            payload,
           });
-          succeeded++;
+          if (completion.status === 'SUCCEEDED') succeeded++;
+          cleanupIncomplete = !cleanupComplete;
+          review = cleanupIncomplete || completion.status === 'UNKNOWN';
+          if (review) break;
+          if (signal.aborted) throw new DownloadError('CANCELLED');
         } else
           await emit({
             type: 'TASK_FINISHED',
@@ -445,14 +472,20 @@ export async function runDownload(
     await emit({
       type: 'RUN_FINISHED',
       payload: {
-        status: !targets!.length
-          ? 'FAILED'
-          : succeeded === targets!.length
-            ? 'SUCCEEDED'
-            : succeeded
-              ? 'PARTIAL_FAILED'
-              : 'FAILED',
-        ...(!targets!.length ? { errorCode: 'NO_TARGETS' } : {}),
+        status: review
+          ? 'NEEDS_REVIEW'
+          : !targets!.length
+            ? 'FAILED'
+            : succeeded === targets!.length
+              ? 'SUCCEEDED'
+              : succeeded
+                ? 'PARTIAL_FAILED'
+                : 'FAILED',
+        ...(review
+          ? { errorCode: cleanupIncomplete ? 'CLEANUP_INCOMPLETE' : 'REGISTRATION_UNKNOWN' }
+          : !targets!.length
+            ? { errorCode: 'NO_TARGETS' }
+            : {}),
       },
     });
   } catch (error) {

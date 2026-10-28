@@ -336,6 +336,21 @@
               "maximum": 60000
             }
           }
+        },
+        "failure": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["locator", "timeoutMs"],
+          "properties": {
+            "locator": {
+              "$ref": "#/$defs/locator"
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "minimum": 1000,
+              "maximum": 60000
+            }
+          }
         }
       }
     }

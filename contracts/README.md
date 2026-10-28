@@ -17,4 +17,6 @@ npm run check:contracts
 
 Schema 能验证字段格式，不能证明主机可访问、XPath 可命中、定位器正确、设备标识变化、IP 固定或注册成功。网络和业务验证必须由执行层另行完成。
 
+P3 增量为 p3.schema.json、p3.http.json 和 fixtures/p3.valid.json；执行协议仍为 1.0。增加注册能力门禁、设备观测、PNG 上传、查看账户原因和未知任务决议。Schema 与跨字段检查共同拒绝带副作用的 UiAutomator、提交后返回、明文凭据事件和没有证据的注册成功。状态转换及归属还需数据库事务验证，详见 [P3 契约](../docs/P3_CONTRACT.md)。
+
 P2 增量定义在 p2.schema.json 和 p2.http.json，正例为 fixtures/p2.valid.json。节点消息新增可选下载协议、分块目标发现、APK 元数据及失败码，旧消息正例继续通过。下载参数新增有界 maxApkBytes。执行协议仍为 1.0，只有声明 DOWNLOAD_V1 的签名发布及匹配心跳可接任务。生成 TypeScript 用数组表达数量可变的集合，数量上下限继续由共享运行时校验器执行。

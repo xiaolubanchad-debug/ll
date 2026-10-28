@@ -3,7 +3,7 @@ import { randomBytes, randomUUID, createCipheriv, createDecipheriv } from 'node:
 import { join, resolve } from 'node:path';
 import { collectHealth } from './health.js';
 import { TaskEngine } from './tasks.js';
-import type { DownloadOptions } from '@apk/automation';
+import type { ExecutionOptions } from './tasks.js';
 interface Config {
   nodeId: string;
   releaseId: string;
@@ -53,7 +53,13 @@ export async function saveIdentity(dir: string, value: Identity) {
   await rename(file, join(dir, 'identity.enc'));
   await chmod(join(dir, 'identity.enc'), 0o600);
 }
-export async function callHub(apiUrl: string, path: string, token: string, body: unknown) {
+export async function callHub(
+  apiUrl: string,
+  path: string,
+  token: string,
+  body: unknown,
+  signal?: AbortSignal,
+) {
   const base = new URL(apiUrl);
   if (
     base.username ||
@@ -65,9 +71,11 @@ export async function callHub(apiUrl: string, path: string, token: string, body:
   )
     throw Error('HUB_URL_INVALID');
   const response = await fetch(new URL('/api/v1/agent/' + path, base), {
-    method: 'POST',
+    method: /^tasks\/[a-f0-9-]{36}\/account$/.test(path) ? 'PUT' : 'POST',
     redirect: 'error',
-    signal: AbortSignal.timeout(10000),
+    signal: signal
+      ? AbortSignal.any([signal, AbortSignal.timeout(10000)])
+      : AbortSignal.timeout(10000),
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
     body: JSON.stringify(body),
   });
@@ -87,7 +95,7 @@ export async function startAgent(
   dir: string,
   signal: AbortSignal,
   health = collectHealth,
-  downloadOptions: DownloadOptions = {},
+  downloadOptions: ExecutionOptions = {},
 ) {
   const identity = await loadIdentity(dir);
   const bootId = randomUUID();
@@ -110,17 +118,21 @@ export async function startAgent(
   let report = await health(config.sdkRoot, config.toolsRoot, config.releaseId),
     checkedAt = Date.now(),
     refreshing = false;
-  const engine =
-    ['0.3.0', '0.3.1', '0.3.2', '0.3.3', '0.3.4'].includes(config.agentVersion)
-      ? await TaskEngine.open(
-          config.dataRoot ?? '/var/lib/apk-platform/execution',
-          config.nodeId,
-          bootId,
-          config.toolsRoot,
-          (path, body) => callHub(config.apiUrl, path, identity.credential!, body),
-          downloadOptions,
-        )
-      : null;
+  const engine = ['0.3.0', '0.3.1', '0.3.2', '0.3.3', '0.3.4', '0.4.0'].includes(
+    config.agentVersion,
+  )
+    ? await TaskEngine.open(
+        config.dataRoot ?? '/var/lib/apk-platform/execution',
+        config.nodeId,
+        bootId,
+        config.toolsRoot,
+        (path, body, signal) => callHub(config.apiUrl, path, identity.credential!, body, signal),
+        {
+          ...downloadOptions,
+          ...(config.agentVersion === '0.4.0' ? { sdkRoot: config.sdkRoot } : {}),
+        },
+      )
+    : null;
   const watch = engine
     ? setInterval(() => {
         void engine.tick().catch(() => {});
@@ -161,6 +173,7 @@ export async function startAgent(
             kvm: report.kvm,
             freeDiskBytes: report.freeDiskBytes,
             ...(engine ? { downloadProtocol: '1.0' } : {}),
+            ...(engine && config.agentVersion === '0.4.0' ? { registrationProtocol: '1.0' } : {}),
           },
           currentDelivery: sentDelivery,
           report,

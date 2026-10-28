@@ -1,0 +1,48 @@
+{
+  "version": "1.4.0",
+  "routes": [
+    {
+      "method": "put",
+      "path": "/agent/tasks/{taskId}/account",
+      "operationId": "storeAccount",
+      "request": "AgentMessage",
+      "status": 200,
+      "node": true
+    },
+    {
+      "method": "post",
+      "path": "/agent/artifacts",
+      "operationId": "uploadArtifact",
+      "request": "ArtifactInput",
+      "status": 200,
+      "node": true
+    },
+    {
+      "method": "get",
+      "path": "/tasks/{taskId}/artifacts",
+      "operationId": "taskArtifacts",
+      "status": 200
+    },
+    {
+      "method": "get",
+      "path": "/artifacts/{artifactId}/content",
+      "operationId": "artifactContent",
+      "status": 200
+    },
+    {
+      "method": "post",
+      "path": "/tasks/{taskId}/account-view",
+      "operationId": "viewAccount",
+      "request": "AccountViewInput",
+      "status": 200
+    },
+    {
+      "method": "post",
+      "path": "/tasks/{taskId}/reconciliations",
+      "operationId": "reconcileTask",
+      "request": "TaskReconcileInput",
+      "idempotent": true,
+      "status": 200
+    }
+  ]
+}

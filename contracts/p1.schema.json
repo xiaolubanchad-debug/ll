@@ -363,10 +363,10 @@
         },
         "features": {
           "type": "array",
-          "maxItems": 1,
+          "maxItems": 2,
           "uniqueItems": true,
           "items": {
-            "const": "DOWNLOAD_V1"
+            "enum": ["DOWNLOAD_V1", "REGISTRATION_V1"]
           }
         }
       }
@@ -544,25 +544,22 @@
         "downloadProtocol": {
           "type": ["string", "null"],
           "enum": ["1.0", null]
+        },
+        "registrationProtocol": {
+          "type": ["string", "null"]
         }
       }
     },
     "ExecutionOS": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "distribution",
-        "version"
-      ],
+      "required": ["distribution", "version"],
       "properties": {
         "distribution": {
           "const": "ubuntu"
         },
         "version": {
-          "enum": [
-            "24.04",
-            "26.04"
-          ]
+          "enum": ["24.04", "26.04"]
         }
       }
     }

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
+import TaskEvidence from './TaskEvidence.vue';
 import { api, mutation } from './api';
 import type { NodeView } from '@apk/contracts';
 const nodes = ref<NodeView[]>([]),
@@ -13,6 +14,20 @@ const nodeId = ref(''),
   error = ref(''),
   notice = ref(''),
   cursor = ref<string | null>(null);
+const mode = ref('DOWNLOAD_ONLY'),
+  evidenceId = ref('');
+const evidenceTask = computed(() => tasks.value.find((t) => t.id === evidenceId.value));
+async function loadMode() {
+  await action(async () => {
+    mode.value = versionId.value
+      ? (
+          await api<{ body: { execution: { mode: string } } }>(
+            '/configs/' + configId.value + '/versions/' + versionId.value,
+          )
+        ).body.execution.mode
+      : 'DOWNLOAD_ONLY';
+  });
+}
 interface Run {
   id: string;
   status: string;
@@ -30,6 +45,14 @@ const selected = ref<Run | null>(null),
       cacheHit: boolean;
       errorCode: string | null;
       apk: { packageName: string; apkSha256: string; cacheDay: string } | null;
+      observation?: {
+        model: string;
+        locale: string;
+        shellAndroidIdHash: string;
+        proxyObservedIp: string;
+        proxyObservedAt: string;
+      };
+      reviews?: { outcome: string; reason: string }[];
     }[]
   >([]),
   taskCursor = ref<string | null>(null),
@@ -39,7 +62,7 @@ const selected = ref<Run | null>(null),
 const status: Record<string, string> = {
   QUEUED: '等待领取',
   ASSIGNED: '等待接收确认',
-  RUNNING: '下载中',
+  RUNNING: '执行中',
   STOP_REQUESTED: '停止待确认',
   SUCCEEDED: '已完成',
   PARTIAL_FAILED: '部分失败',
@@ -49,6 +72,12 @@ const status: Record<string, string> = {
   DOWNLOADING: '正在下载',
   DOWNLOADED: '文件已校验',
   SKIPPED: '已跳过',
+  PREPARING: '准备模拟器',
+  INSTALLING: '正在安装',
+  LAUNCHING: '正在启动',
+  REGISTERING: '填写注册流程',
+  VERIFYING: '核验提交结果',
+  UNKNOWN: '注册结果未知',
 };
 async function action(work: () => Promise<void>) {
   busy.value = true;
@@ -112,7 +141,10 @@ async function start() {
     });
     selected.value = await api<Run>('/runs/' + created.resourceId);
     await refresh();
-    notice.value = '下载任务已建立，将使用固定配置版本';
+    notice.value =
+      mode.value === 'FULL'
+        ? '完整测试已建立，将创建测试账户并保留执行证据'
+        : '下载任务已建立，将使用固定配置版本';
   });
 }
 async function stop() {
@@ -160,8 +192,10 @@ onUnmounted(() => clearInterval(timer));
       :closable="false"
     />
     <section class="surface config-form">
-      <h2>开始下载任务</h2>
-      <p class="muted">仅下载与文件校验。每个服务器串行执行，同日缓存命中仍会复核文件。</p>
+      <h2>开始测试任务</h2>
+      <p class="muted">
+        根据固定配置版本执行下载或完整安装注册。每个服务器串行执行，同日缓存命中仍会复核文件。
+      </p>
       <label for="run-node">执行服务器</label
       ><select id="run-node" v-model="nodeId">
         <option value="">请选择在线且空闲的服务器</option>
@@ -183,14 +217,17 @@ onUnmounted(() => clearInterval(timer));
         <option value="">请选择已保存的配置</option>
         <option v-for="c in configs" :key="c.id" :value="c.id">{{ c.name }}</option></select
       ><label for="run-version">固定配置版本</label
-      ><select id="run-version" v-model="versionId">
+      ><select id="run-version" v-model="versionId" @change="loadMode">
         <option value="">请选择版本</option>
         <option v-for="v in versions" :key="v.id" :value="v.id">版本 {{ v.version }}</option>
       </select>
+      <p v-if="mode === 'FULL'" class="muted">
+        完整测试会实际安装 APK 并创建账户，提交结果未知时暂停本批次并等待人工核验。
+      </p>
       <div class="form-actions">
-        <el-button type="primary" :disabled="busy || !nodeId || !versionId" @click="start"
-          >开始下载</el-button
-        >
+        <el-button type="primary" :disabled="busy || !nodeId || !versionId" @click="start">{{
+          mode === 'FULL' ? '开始安装注册' : '开始下载'
+        }}</el-button>
       </div>
     </section>
     <section class="surface">
@@ -232,7 +269,7 @@ onUnmounted(() => clearInterval(timer));
         >
       </div>
       <p v-if="selected.status === 'NEEDS_REVIEW'" class="muted">
-        先重启节点服务，确认旧浏览器已清理并收到新的空闲心跳，再进行人工核验。系统不会自动重跑。
+        确认节点已清理并收到新的空闲心跳；存在未知注册任务时，须先逐项记录人工核验决议。系统不会自动重跑。
       </p>
       <el-table :data="tasks" empty-text="尚未发现目标"
         ><el-table-column prop="label" label="入口" /><el-table-column label="结果"
@@ -251,6 +288,10 @@ onUnmounted(() => clearInterval(timer));
           ><template #default="s">{{
             s.row.apk?.apkSha256.slice(0, 16) ?? '—'
           }}</template></el-table-column
+        ><el-table-column label="证据与账户"
+          ><template #default="s"
+            ><el-button text @click="evidenceId = s.row.id">查看注册证据</el-button></template
+          ></el-table-column
         ></el-table
       ><el-button v-if="taskCursor" text @click="action(() => details(true))"
         >加载更多目标</el-button
@@ -265,5 +306,11 @@ onUnmounted(() => clearInterval(timer));
         </ol>
       </details>
     </section>
+    <TaskEvidence
+      v-if="evidenceTask"
+      :key="evidenceTask.id"
+      :task="evidenceTask"
+      @updated="action(() => details())"
+    />
   </div>
 </template>

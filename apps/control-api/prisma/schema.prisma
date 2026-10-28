@@ -39,6 +39,7 @@ model AuditEvent {
   admin     Admin?   @relation(fields: [adminId], references: [id], onDelete: SetNull)
   action    String   @db.VarChar(64)
   requestId String   @db.VarChar(64)
+  details   Json?
   createdAt DateTime @default(now()) @db.Timestamptz(3)
 
   @@index([createdAt, id])
@@ -72,6 +73,7 @@ model Node {
   agentVersion            String?          @db.VarChar(32)
   agentReleaseId          String?          @db.Uuid
   downloadProtocol        String?          @db.VarChar(16)
+  registrationProtocol    String?          @db.VarChar(16)
   currentDeliveryId       String?          @db.Uuid
   slot                    NodeSlot?
   operations              Deployment[]
@@ -240,6 +242,8 @@ model Delivery {
   acceptedAt             DateTime?  @db.Timestamptz(3)
   appliedThroughSequence Int        @default(0)
   events                 RunEvent[]
+  accounts               AccountResult[]
+  artifacts              Artifact[]
 }
 
 model Task {
@@ -255,9 +259,56 @@ model Task {
   cacheHit  Boolean @default(false)
   proof     String  @default("NONE") @db.VarChar(32)
   errorCode String? @db.VarChar(100)
+  observation Json?
+  accountRef String? @db.Uuid
+  submissionId String? @unique @db.Uuid
+  submittedAt DateTime? @db.Timestamptz(3)
+  account AccountResult?
+  artifacts Artifact[]
+  reviews TaskReview[]
 
   @@unique([runId, targetKey])
   @@unique([runId, position])
+}
+
+model AccountResult {
+  accountRef String @id @db.Uuid
+  taskId String @unique @db.Uuid
+  task Task @relation(fields: [taskId], references: [id], onDelete: Restrict)
+  deliveryId String @db.Uuid
+  delivery Delivery @relation(fields: [deliveryId], references: [id], onDelete: Restrict)
+  fence Int
+  encrypted Json
+  contentHash String @db.Char(64)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+}
+
+model Artifact {
+  id String @id @db.Uuid
+  taskId String @db.Uuid
+  task Task @relation(fields: [taskId], references: [id], onDelete: Restrict)
+  deliveryId String @db.Uuid
+  delivery Delivery @relation(fields: [deliveryId], references: [id], onDelete: Restrict)
+  fence Int
+  kind String @db.VarChar(32)
+  sha256 String @db.Char(64)
+  bytes Int
+  storageKey String @unique @db.VarChar(100)
+  recordedForReview Boolean @default(false)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([taskId, createdAt])
+}
+
+model TaskReview {
+  id String @id @default(uuid()) @db.Uuid
+  taskId String @db.Uuid
+  task Task @relation(fields: [taskId], references: [id], onDelete: Restrict)
+  outcome String @db.VarChar(32)
+  reason String @db.VarChar(1000)
+  evidenceIds String[] @db.Uuid
+  createdBy String @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([taskId, createdAt])
 }
 
 model RunEvent {

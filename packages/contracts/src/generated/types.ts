@@ -58,6 +58,10 @@ export interface Flow {
     locator: Locator;
     timeoutMs: number;
   };
+  failure?: {
+    locator: Locator;
+    timeoutMs: number;
+  };
 }
 export interface Step {
   action: 'click' | 'input' | 'wait' | 'back' | 'submit';
@@ -99,6 +103,7 @@ export interface Heartbeat {
     kvm: boolean;
     freeDiskBytes: number;
     downloadProtocol?: '1.0';
+    registrationProtocol?: '1.0';
   };
   currentDelivery: null | CurrentDelivery;
   report?: {
@@ -290,9 +295,9 @@ export interface ReleaseInput {
     npmLockSha256: string;
   };
   /**
-   * @maxItems 1
+   * @maxItems 2
    */
-  features?: 'DOWNLOAD_V1'[];
+  features?: ('DOWNLOAD_V1' | 'REGISTRATION_V1')[];
 }
 
 export interface HealthReport {
@@ -348,6 +353,7 @@ export interface NodeView {
   } | null;
   createdAt: string;
   downloadProtocol?: '1.0' | null;
+  registrationProtocol?: string | null;
 }
 
 export interface ExecutionOS {
@@ -381,6 +387,14 @@ export interface AgentReconcileInput {
     deliveryId: string;
     fence: number;
     cleanupComplete: boolean;
+    /**
+     * @maxItems 1000
+     */
+    submissions?: {
+      taskId: string;
+      submissionId: string;
+      accountRef: string;
+    }[];
   }[];
   cleanupComplete: boolean;
 }
@@ -404,6 +418,33 @@ export interface ApkMetadata {
   size: number;
   apkSha256: string;
   cacheDay: string;
+}
+
+export interface ArtifactInput {
+  protocolVersion: '1.0';
+  nodeId: string;
+  bootId: string;
+  deliveryId: string;
+  fence: number;
+  taskId: string;
+  artifactId: string;
+  kind: 'screenshot';
+  sha256: string;
+  dataBase64: string;
+  redaction: 'CREDENTIAL_MASKED';
+}
+
+export interface AccountViewInput {
+  reason: string;
+}
+
+export interface TaskReconcileInput {
+  outcome: 'SUCCEEDED' | 'FAILED';
+  reason: string;
+  /**
+   * @maxItems 100
+   */
+  evidenceIds: string[];
 }
 
 export interface SessionView {
@@ -441,6 +482,7 @@ export interface NodeList {
     } | null;
     createdAt: string;
     downloadProtocol?: '1.0' | null;
+    registrationProtocol?: string | null;
   }[];
   nextCursor: string | null;
 }

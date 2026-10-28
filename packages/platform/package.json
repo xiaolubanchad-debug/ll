@@ -12,6 +12,7 @@
   "dependencies": {
     "@apk/contracts": "0.1.0",
     "@prisma/client": "6.19.3",
+    "pngjs": "7.0.0",
     "ssh2": "1.17.0",
     "tar": "7.5.22"
   }

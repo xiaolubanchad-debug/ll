@@ -176,6 +176,7 @@ export async function agentHeartbeat(db: PrismaClient, token: string, body: unkn
         agentReleaseId: input.releaseId,
         currentDeliveryId: input.currentDelivery?.deliveryId ?? null,
         downloadProtocol: input.capabilities.downloadProtocol ?? null,
+        registrationProtocol: input.capabilities.registrationProtocol ?? null,
         health: (report ?? {
           ...input.capabilities,
           android: false,

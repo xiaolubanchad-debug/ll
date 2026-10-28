@@ -368,7 +368,7 @@ test('P2 acceptance with real PostgreSQL, SQLite, Chromium and owned fixture sit
               idem(),
             )
           ).data.error.code,
-          'FEATURE_UNAVAILABLE',
+          'NODE_UPGRADE_REQUIRED',
         );
         assert.ok(
           !JSON.stringify(

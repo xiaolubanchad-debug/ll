@@ -15,6 +15,9 @@ import { ErrorFilter } from './errors.js';
 import { settings } from './settings.js';
 import { NodesController, DeploymentController, AgentController } from './p1-controllers.js';
 import { P2Controller, P2AgentController } from './p2-controllers.js';
+import { P3Controller, P3AgentController } from './p3-controllers.js';
+import { digest } from '@apk/platform';
+import { ApiError } from './errors.js';
 
 @Module({
   controllers: [
@@ -25,6 +28,8 @@ import { P2Controller, P2AgentController } from './p2-controllers.js';
     AgentController,
     P2Controller,
     P2AgentController,
+    P3Controller,
+    P3AgentController,
   ],
   providers: [Database, AuthService, { provide: APP_GUARD, useClass: SessionGuard }],
 })
@@ -43,6 +48,23 @@ export async function createApp() {
     next();
   });
   app.use(helmet());
+  app.use(
+    '/api/v1/agent/artifacts',
+    async (req: AuthedRequest, _res: Response, next: NextFunction) => {
+      try {
+        const token = req.get('authorization')?.match(/^Bearer ([-_A-Za-z0-9]{43})$/)?.[1];
+        if (!token) throw new ApiError(401, 'UNAUTHENTICATED', '需要节点身份');
+        const auth = await app
+          .get(Database)
+          .agentCredential.findUnique({ where: { tokenHash: digest(token) } });
+        if (!auth || auth.revokedAt) throw new ApiError(401, 'UNAUTHENTICATED', '节点身份无效');
+        next();
+      } catch (error) {
+        next(error);
+      }
+    },
+    json({ limit: '14mb' }),
+  );
   app.use(json({ limit: '256kb' }));
   app.use(cookieParser());
   app.setGlobalPrefix('api/v1');

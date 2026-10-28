@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "APK 部署中台 API",
-    "version": "1.3.4"
+    "version": "1.4.0"
   },
   "paths": {
     "/api/v1/auth/login": {
@@ -2318,6 +2318,300 @@
         },
         "parameters": []
       }
+    },
+    "/api/v1/agent/tasks/{taskId}/account": {
+      "put": {
+        "operationId": "storeAccount",
+        "x-phase": "P3",
+        "security": [
+          {
+            "NodeBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "default": {
+            "description": "统一错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentMessage"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "taskId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/agent/artifacts": {
+      "post": {
+        "operationId": "uploadArtifact",
+        "x-phase": "P3",
+        "security": [
+          {
+            "NodeBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "default": {
+            "description": "统一错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ArtifactInput"
+              }
+            }
+          }
+        },
+        "parameters": []
+      }
+    },
+    "/api/v1/tasks/{taskId}/artifacts": {
+      "get": {
+        "operationId": "taskArtifacts",
+        "x-phase": "P3",
+        "security": [
+          {
+            "AdminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "default": {
+            "description": "统一错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "taskId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/artifacts/{artifactId}/content": {
+      "get": {
+        "operationId": "artifactContent",
+        "x-phase": "P3",
+        "security": [
+          {
+            "AdminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "default": {
+            "description": "统一错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "artifactId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/tasks/{taskId}/account-view": {
+      "post": {
+        "operationId": "viewAccount",
+        "x-phase": "P3",
+        "security": [
+          {
+            "AdminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "default": {
+            "description": "统一错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountViewInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "taskId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/tasks/{taskId}/reconciliations": {
+      "post": {
+        "operationId": "reconcileTask",
+        "x-phase": "P3",
+        "security": [
+          {
+            "AdminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "default": {
+            "description": "统一错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskReconcileInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "taskId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -2756,6 +3050,24 @@
                     "maximum": 60000
                   }
                 }
+              },
+              "failure": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "locator",
+                  "timeoutMs"
+                ],
+                "properties": {
+                  "locator": {
+                    "$ref": "#/components/schemas/TestConfiguration/$defs/locator"
+                  },
+                  "timeoutMs": {
+                    "type": "integer",
+                    "minimum": 1000,
+                    "maximum": 60000
+                  }
+                }
               }
             }
           }
@@ -2916,6 +3228,9 @@
                     "minimum": 0
                   },
                   "downloadProtocol": {
+                    "const": "1.0"
+                  },
+                  "registrationProtocol": {
                     "const": "1.0"
                   }
                 }
@@ -3589,6 +3904,9 @@
                     "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
                   }
                 }
+              },
+              "observation": {
+                "$ref": "#/components/schemas/AgentMessage/$defs/deviceObservation"
               }
             }
           },
@@ -3723,7 +4041,10 @@
                   "DOWNLOAD_FAILED",
                   "APK_INVALID",
                   "APK_TOO_LARGE",
-                  "CLEANUP_INCOMPLETE"
+                  "CLEANUP_INCOMPLETE",
+                  "REGISTRATION_UNKNOWN",
+                  "ANDROID_FAILED",
+                  "ACCOUNT_SYNC_FAILED"
                 ]
               }
             }
@@ -3758,6 +4079,69 @@
               "message": {
                 "type": "string",
                 "maxLength": 4000
+              }
+            }
+          },
+          "deviceObservation": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "profileId",
+              "avdName",
+              "apiLevel",
+              "model",
+              "locale",
+              "shellAndroidIdHash",
+              "androidIdScope",
+              "proxyObservedIp",
+              "proxyObservedAt",
+              "proxyIpScope",
+              "appUserAgent",
+              "identitySource"
+            ],
+            "properties": {
+              "profileId": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+              },
+              "avdName": {
+                "type": "string",
+                "pattern": "^p3_[a-f0-9]{32}$"
+              },
+              "apiLevel": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100
+              },
+              "model": {
+                "type": "string",
+                "maxLength": 200
+              },
+              "locale": {
+                "type": "string",
+                "maxLength": 100
+              },
+              "shellAndroidIdHash": {
+                "$ref": "#/components/schemas/AgentMessage/$defs/hash"
+              },
+              "androidIdScope": {
+                "const": "SHELL_NOT_APP"
+              },
+              "proxyObservedIp": {
+                "type": "string",
+                "maxLength": 64
+              },
+              "proxyObservedAt": {
+                "$ref": "#/components/schemas/AgentMessage/$defs/time"
+              },
+              "proxyIpScope": {
+                "const": "PROBE_ONLY"
+              },
+              "appUserAgent": {
+                "const": "UNVERIFIED"
+              },
+              "identitySource": {
+                "const": "EMULATOR_NOT_REAL_DEVICE"
               }
             }
           }
@@ -4236,10 +4620,13 @@
           },
           "features": {
             "type": "array",
-            "maxItems": 1,
+            "maxItems": 2,
             "uniqueItems": true,
             "items": {
-              "const": "DOWNLOAD_V1"
+              "enum": [
+                "DOWNLOAD_V1",
+                "REGISTRATION_V1"
+              ]
             }
           }
         }
@@ -4451,6 +4838,12 @@
               "1.0",
               null
             ]
+          },
+          "registrationProtocol": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
@@ -4572,6 +4965,33 @@
                 },
                 "cleanupComplete": {
                   "type": "boolean"
+                },
+                "submissions": {
+                  "type": "array",
+                  "maxItems": 1000,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "taskId",
+                      "submissionId",
+                      "accountRef"
+                    ],
+                    "properties": {
+                      "taskId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "submissionId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "accountRef": {
+                        "type": "string",
+                        "format": "uuid"
+                      }
+                    }
+                  }
                 }
               }
             }
@@ -4666,6 +5086,113 @@
           "cacheDay": {
             "type": "string",
             "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+          }
+        }
+      },
+      "ArtifactInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "protocolVersion",
+          "nodeId",
+          "bootId",
+          "deliveryId",
+          "fence",
+          "taskId",
+          "artifactId",
+          "kind",
+          "sha256",
+          "dataBase64",
+          "redaction"
+        ],
+        "properties": {
+          "protocolVersion": {
+            "const": "1.0"
+          },
+          "nodeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "bootId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "deliveryId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fence": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "taskId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "artifactId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "const": "screenshot"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "dataBase64": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 13981016,
+            "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+          },
+          "redaction": {
+            "const": "CREDENTIAL_MASKED"
+          }
+        }
+      },
+      "AccountViewInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "reason"
+        ],
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          }
+        }
+      },
+      "TaskReconcileInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "outcome",
+          "reason",
+          "evidenceIds"
+        ],
+        "properties": {
+          "outcome": {
+            "enum": [
+              "SUCCEEDED",
+              "FAILED"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 1000
+          },
+          "evidenceIds": {
+            "type": "array",
+            "maxItems": 100,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         }
       },
@@ -4836,6 +5363,12 @@
                   "enum": [
                     "1.0",
                     null
+                  ]
+                },
+                "registrationProtocol": {
+                  "type": [
+                    "string",
+                    "null"
                   ]
                 }
               }

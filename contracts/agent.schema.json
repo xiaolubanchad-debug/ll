@@ -140,6 +140,9 @@
             },
             "downloadProtocol": {
               "const": "1.0"
+            },
+            "registrationProtocol": {
+              "const": "1.0"
             }
           }
         },
@@ -746,6 +749,9 @@
               "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
             }
           }
+        },
+        "observation": {
+          "$ref": "#/$defs/deviceObservation"
         }
       }
     },
@@ -846,7 +852,10 @@
             "DOWNLOAD_FAILED",
             "APK_INVALID",
             "APK_TOO_LARGE",
-            "CLEANUP_INCOMPLETE"
+            "CLEANUP_INCOMPLETE",
+            "REGISTRATION_UNKNOWN",
+            "ANDROID_FAILED",
+            "ACCOUNT_SYNC_FAILED"
           ]
         }
       }
@@ -872,6 +881,69 @@
         "message": {
           "type": "string",
           "maxLength": 4000
+        }
+      }
+    },
+    "deviceObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profileId",
+        "avdName",
+        "apiLevel",
+        "model",
+        "locale",
+        "shellAndroidIdHash",
+        "androidIdScope",
+        "proxyObservedIp",
+        "proxyObservedAt",
+        "proxyIpScope",
+        "appUserAgent",
+        "identitySource"
+      ],
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+        },
+        "avdName": {
+          "type": "string",
+          "pattern": "^p3_[a-f0-9]{32}$"
+        },
+        "apiLevel": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "model": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "locale": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "shellAndroidIdHash": {
+          "$ref": "#/$defs/hash"
+        },
+        "androidIdScope": {
+          "const": "SHELL_NOT_APP"
+        },
+        "proxyObservedIp": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "proxyObservedAt": {
+          "$ref": "#/$defs/time"
+        },
+        "proxyIpScope": {
+          "const": "PROBE_ONLY"
+        },
+        "appUserAgent": {
+          "const": "UNVERIFIED"
+        },
+        "identitySource": {
+          "const": "EMULATOR_NOT_REAL_DEVICE"
         }
       }
     }

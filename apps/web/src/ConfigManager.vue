@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
-import { configurationIssues } from '@apk/contracts';
+import { ref, onMounted, onUnmounted } from 'vue';
+import { configurationIssues, schemaIssues } from '@apk/contracts';
 import { api, mutation } from './api';
 const props = defineProps<{ draftText: string }>();
 const emit = defineEmits<{ load: [value: string] }>();
@@ -25,6 +25,49 @@ const configs = ref<Config[]>([]),
   error = ref(''),
   notice = ref(''),
   cursor = ref<string | null>(null);
+const proxyHost = ref(''),
+  proxyPort = ref(8080),
+  proxyUser = ref(''),
+  proxyPassword = ref(''),
+  proxyId = ref('');
+const proxies = ref<{ id: string; createdAt: string }[]>([]);
+async function loadProxies() {
+  proxies.value = (
+    await api<{
+      items: { id: string; type: string; createdAt: string; revokedAt: string | null }[];
+    }>('/secrets?limit=100')
+  ).items.filter((s) => s.type === 'HTTP_PROXY' && !s.revokedAt);
+}
+async function saveProxy() {
+  await action(async () => {
+    const body = {
+      type: 'HTTP_PROXY',
+      secretValue: {
+        host: proxyHost.value,
+        port: proxyPort.value,
+        username: proxyUser.value,
+        password: proxyPassword.value,
+      },
+    };
+    if (schemaIssues('SecretInput', body).length)
+      throw Error('请填写有效的 HTTP 代理地址、端口和凭据');
+    const saved = await api<{ id: string }>('/secrets/versions', 'POST', body);
+    proxyId.value = saved.id;
+    proxyUser.value = '';
+    proxyPassword.value = '';
+    await loadProxies();
+    notice.value = '代理已加密保存，可将引用应用到草稿';
+  });
+}
+function applyProxy() {
+  void action(async () => {
+    const body = JSON.parse(props.draftText);
+    body.execution.mode = 'FULL';
+    body.execution.proxySecretVersionId = proxyId.value;
+    emit('load', JSON.stringify(body, null, 2));
+    notice.value = '草稿已切换为完整测试，仍需配置每个 APK 的注册流程并保存新版本';
+  });
+}
 async function action(work: () => Promise<void>) {
   busy.value = true;
   error.value = '';
@@ -90,18 +133,62 @@ async function load(v: Version) {
     notice.value = '历史版本已载入草稿，编辑后需另存新版本';
   });
 }
-onMounted(() => void action(() => refresh()));
+onMounted(
+  () =>
+    void action(async () => {
+      await refresh();
+      await loadProxies();
+    }),
+);
+onUnmounted(() => {
+  proxyUser.value = '';
+  proxyPassword.value = '';
+});
 </script>
 <template>
   <div class="version-manager">
     <h2>配置版本管理</h2>
-    <p class="muted">保存后版本不可修改。下载任务使用指定版本；安装注册模式暂不可执行。</p>
+    <p class="muted">
+      保存后版本不可修改。完整测试按包名匹配注册流程；没有启用流程的 APK 会跳过安装注册。
+    </p>
     <el-alert v-if="error" :title="error" type="error" :closable="false" /><el-alert
       v-if="notice"
       :title="notice"
       type="success"
       :closable="false"
     />
+    <details>
+      <summary>HTTP 代理配置</summary>
+      <label for="proxy-host">代理地址</label
+      ><el-input id="proxy-host" v-model="proxyHost" placeholder="proxy.example.com" />
+      <label for="proxy-port">端口</label
+      ><el-input-number id="proxy-port" v-model="proxyPort" :min="1" :max="65535" />
+      <label for="proxy-user">代理用户名</label
+      ><el-input id="proxy-user" v-model="proxyUser" autocomplete="off" />
+      <label for="proxy-password">代理密码</label
+      ><el-input
+        id="proxy-password"
+        v-model="proxyPassword"
+        type="password"
+        autocomplete="new-password"
+      />
+      <div class="form-actions">
+        <el-button :disabled="busy || !proxyHost || !proxyPassword" @click="saveProxy"
+          >加密保存代理</el-button
+        >
+      </div>
+      <label for="proxy-version">已保存的代理引用</label
+      ><select id="proxy-version" v-model="proxyId">
+        <option value="">请选择</option>
+        <option v-for="p in proxies" :key="p.id" :value="p.id">
+          {{ p.id }} · {{ new Date(p.createdAt).toLocaleString() }}
+        </option>
+      </select>
+      <el-button :disabled="busy || !proxyId" @click="applyProxy">将代理应用到当前草稿</el-button>
+      <p class="muted">
+        凭据不会写入配置 JSON。轮询代理的探测 IP 只代表探测当时，不保证注册请求使用相同出口。
+      </p>
+    </details>
     <label for="config-name">配置名称</label
     ><el-input id="config-name" v-model="name" maxlength="100" />
     <div class="form-actions">

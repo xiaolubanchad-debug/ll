@@ -1,8 +1,8 @@
 # HTTP 接口契约
 
-版本 1.3.4，前缀 /api/v1。已实现路由由 p0.http.json、p1.http.json 和 p2.http.json 合并生成 openapi.json，CI 比较 Controller、清单和 OpenAPI。下表保留后续阶段设计，以机器清单判定实现范围。
+版本 1.4.0，前缀 /api/v1。已实现路由由 p0.http.json 至 p3.http.json 合并生成 openapi.json，CI 比较 Controller、清单和 OpenAPI。下表保留后续阶段设计，以机器清单判定实现范围。
 
-P0 提供登录和校验基础，P1 提供服务器及部署，P2 提供配置版本、下载批次、领取、配置下发、事件和重启核验，见 [P2 契约](../docs/P2_CONTRACT.md)。配置与批次的创建、保存、停止和人工核验都要求幂等键，保存版本另需 If-Match。P2 下载模式不下发代理口令；实际安装注册尚待 P3。列表查询以各机器清单及 Controller 为准，执行事件使用分页轮询，SSE 尚未实现。
+P0 提供登录和校验基础，P1 提供服务器及部署，P2 提供配置版本、下载批次、领取、配置下发、事件和重启核验，见 [P2 契约](../docs/P2_CONTRACT.md)。P3 增加账户加密上传、脱敏 PNG、账户查看审计及人工决议，见 [P3 契约](../docs/P3_CONTRACT.md)。配置与批次的创建、保存、停止和人工核验都要求幂等键，保存版本另需 If-Match。下载模式不下发代理口令。列表查询以机器清单及 Controller 为准，执行事件使用分页轮询，SSE 尚未实现。
 
 节点平台新增接受 Ubuntu 26.04，与 24.04 共用检查和错误码；见 [兼容契约](../docs/UBUNTU_COMPATIBILITY.md)。新签名发布使用 Agent 0.3.1 / Playwright 1.64.1，不改变路由或数据库结构。
 
@@ -57,6 +57,7 @@ POST 创建批次、部署、配置版本、停止和核验必须带 Idempotency
 | GET /runs/{id}/stream                  | Last-Event-ID                                               | SSE，仅摘要和脱敏日志                                           |
 | POST /tasks/{id}/reconciliations       | outcome,reason,evidenceIds                                  | 不改变原始 UNKNOWN 记录，追加人工核验决议                       |
 | POST /tasks/{id}/account-view          | reason                                                      | 显式授权查看测试账户，短期响应且审计，Cache-Control:no-store    |
+| GET /tasks/{taskId}/artifacts          | 无                                                          | 仅截图摘要，不返回存储路径                                      |
 | GET /artifacts/{id}/content            | 无                                                          | 鉴权下载，Content-Disposition，无磁盘路径透传                   |
 | GET /audit-events                      | cursor,limit                                                | 管理操作审计                                                    |
 | GET /health/live                       | 无，公开                                                    | 进程存活，不返回内部地址或配置                                  |
@@ -71,18 +72,18 @@ NodeConnection 凭据上传上限 64 KiB；普通配置正文上限 256 KiB；�
 
 以下业务正文采用 agent.schema.json 中的消息变体。认证仍通过 HTTP Header，节点 ID 同时校验令牌绑定关系。
 
-| 方法与路径                         | 消息或输入                                                  | 返回与约束                                                               |
-| ---------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------ |
-| POST /agent/enroll                 | kind=enroll，一次性 Bootstrap Bearer                        | nodeId、credential、protocolVersion、heartbeatIntervalSeconds；no-store  |
-| POST /agent/heartbeats             | kind=heartbeat，可选 report，P1 currentDelivery 必须为 null | serverTime、desiredControl、heartbeatIntervalSeconds；执行租约随 P2 扩展 |
-| POST /agent/claims                 | kind=claim                                                  | 204 无任务；否则 Delivery，不分配其他节点任务                            |
-| POST /agent/deliveries/{id}/accept | kind=accept                                                 | 接收确认、有效租约；持久化后才能调用                                     |
-| POST /agent/deliveries/{id}/config  | 当前 fence                                                  | 固定配置与本任务 secrets；只有有效租约且未吊销身份可取                   |
-| POST /agent/events                 | kind=events                                                 | ackedEventIds、appliedThroughSequence、recordedForReview；持久化后响应   |
-| PUT /agent/tasks/{taskId}/account  | kind=account                                                | 按 accountRef 幂等保存生成账户，重复内容不同则冲突；写入后不回显密码     |
-| POST /agent/artifacts              | multipart 文件、deliveryId、fence、taskId、kind、sha256     | artifactId，类型及归属校验，不接收任意文件路径                           |
-| POST /agent/reconcile              | nodeId、bootId、未确认 delivery 和提交记录摘要              | 继续核验、停止或隔离决策；不自动重跑注册                                 |
-| POST /agent/credentials/rotate     | 旧身份认证                                                  | 新节点凭据和过渡时间，旧凭据按规则失效                                   |
+| 方法与路径                         | 消息或输入                                                                  | 返回与约束                                                                  |
+| ---------------------------------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| POST /agent/enroll                 | kind=enroll，一次性 Bootstrap Bearer                                        | nodeId、credential、protocolVersion、heartbeatIntervalSeconds；no-store     |
+| POST /agent/heartbeats             | kind=heartbeat，可选 report，P1 currentDelivery 必须为 null                 | serverTime、desiredControl、heartbeatIntervalSeconds；执行租约随 P2 扩展    |
+| POST /agent/claims                 | kind=claim                                                                  | 204 无任务；否则 Delivery，不分配其他节点任务                               |
+| POST /agent/deliveries/{id}/accept | kind=accept                                                                 | 接收确认、有效租约；持久化后才能调用                                        |
+| POST /agent/deliveries/{id}/config | 当前 fence                                                                  | 固定配置与本任务 secrets；只有有效租约且未吊销身份可取                      |
+| POST /agent/events                 | kind=events                                                                 | ackedEventIds、appliedThroughSequence、recordedForReview；持久化后响应      |
+| PUT /agent/tasks/{taskId}/account  | kind=account                                                                | 按 accountRef 幂等保存生成账户，重复内容不同则冲突；写入后不回显密码        |
+| POST /agent/artifacts              | JSON/Base64 PNG、bootId、deliveryId、fence、taskId、kind、sha256、redaction | artifactId，先鉴权后解析大正文；PNG ≤10 MiB，类型及归属校验，不接收任意路径 |
+| POST /agent/reconcile              | nodeId、bootId、未确认 delivery 和提交记录摘要                              | 继续核验、停止或隔离决策；不自动重跑注册                                    |
+| POST /agent/credentials/rotate     | 旧身份认证                                                                  | 新节点凭据和过渡时间，旧凭据按规则失效                                      |
 
 Delivery 包含 kind=delivery、protocolVersion、deliveryId、runId、nodeId、fence、configVersionId、configHash、releaseId、issuedAt、ackDeadline、leaseExpiresAt。任务领取结果不直接携带全部秘密，Agent 接收后通过受保护配置接口获取。响应有 Cache-Control:no-store。
 

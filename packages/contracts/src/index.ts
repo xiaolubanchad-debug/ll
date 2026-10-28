@@ -5,6 +5,7 @@ import type {
   LoginInput,
   PasswordChangeInput,
 } from './generated/types.js';
+export type { ArtifactInput, AccountViewInput, TaskReconcileInput } from './generated/types.js';
 export type { TestConfiguration, AgentMessage, LoginInput, PasswordChangeInput };
 export type { SessionView, NodeList, RunList, AuditList } from './generated/types.js';
 export type {
@@ -74,10 +75,26 @@ export function configurationIssues(value: unknown): Issue[] {
     issues.push({ path: '/registrationFlows', message: '同一个包名只能配置一个流程' });
   for (const [i, flow] of config.registrationFlows.entries()) {
     const index = flow.steps.findIndex((s) => s.action === 'submit');
-    if (flow.steps.slice(index + 1).some((s) => !['wait', 'back'].includes(s.action)))
-      issues.push({ path: `/registrationFlows/${i}/steps`, message: '提交后只允许等待或返回' });
+    if (flow.steps.slice(index + 1).some((s) => s.action !== 'wait'))
+      issues.push({ path: `/registrationFlows/${i}/steps`, message: '提交后只允许只读等待' });
+    for (const locator of [
+      ...flow.steps.map((s) => s.locator),
+      flow.success.locator,
+      flow.failure?.locator,
+    ]) {
+      if (locator?.by === 'androidUiAutomator' && !safeUiSelector(locator.value))
+        issues.push({
+          path: `/registrationFlows/${i}`,
+          message: '只允许无副作用的 UiSelector 链，请改用资源 ID 或 XPath',
+        });
+    }
   }
   return issues;
+}
+export function safeUiSelector(value: string) {
+  return /^new UiSelector\(\)(?:(?:\.(?:text|textContains|resourceId|description|descriptionContains|className|packageName)\("[^"\\\r\n]{0,1000}"\))|(?:\.(?:index|instance)\([0-9]{1,4}\))|(?:\.(?:enabled|clickable|checked|selected|focusable|focused|scrollable)\((?:true|false)\)))+$/.test(
+    value,
+  );
 }
 export function agentIssues(value: unknown): Issue[] {
   const issues = schemaIssues('AgentMessage', value);

@@ -1,6 +1,6 @@
 # 开发契约
 
-版本 1.3.4，日期 2026 年 10 月 28 日。MUST 表示发布必须满足，SHOULD 表示偏离时必须记录原因，MAY 表示可选。P0/P1 实现范围见对应启动文档；P2 行为由 [P2_CONTRACT.md](P2_CONTRACT.md) 细化，验证边界见 [P2_SETUP.md](P2_SETUP.md)。P3/P4 的契约不表示已完成能力。
+版本 1.4.0，日期 2026 年 10 月 28 日。MUST 表示发布必须满足，SHOULD 表示偏离时必须记录原因，MAY 表示可选。P2 行为由 [P2_CONTRACT.md](P2_CONTRACT.md) 细化；P3 以 [P3_CONTRACT.md](P3_CONTRACT.md) 为增量权威，分别记录自动化测试、真实 Android 与产品注册验证。P4 的契约不表示已完成能力。
 
 ## 契约权威与变更
 
@@ -33,20 +33,20 @@ runId 是批次，taskId 是单个图标任务，deliveryId 是一次节点分�
 
 ## 核心数据与约束
 
-| 实体 | 必要内容 | 不变量 |
-| --- | --- | --- |
-| Admin / Session | 密码摘要、会话到期、撤销时间 | 密码不明文，首次设置无默认通用密码 |
-| Node | 地址、SSH 凭据引用、主机指纹、能力、心跳、版本 | 注册令牌一次性，Agent 凭据仅授权自身 |
-| SecretVersion | 类型、密文、密钥 ID、版本、吊销状态 | 只追加版本，普通查询不返回秘密 |
-| Release | 构件摘要、签名、兼容协议、依赖清单 | 已发布版本不可变，不能引用分支 HEAD |
-| Deployment | 节点、发布、状态、步骤与事件 | 一个节点同一时刻仅一个部署，不与执行任务并行 |
-| ConfigVersion | schemaVersion、配置内容、摘要、创建者 | 保存后不可变，凭据引用固定到版本 |
-| Run | 节点、配置版本、发布版本、幂等键、状态 | 一批次一个节点，不动态换配置 |
-| Delivery / NodeSlot | 租约、fence、接收确认、节点槽 | 数据库事务互斥，失联不等于可重新占用 |
-| Task | 图标快照、包元数据、阶段、提交意图、结果 | 一个批次同一 targetKey 只有一个任务 |
-| Event / Outbox | 事件 ID、时间、sequence、已确认位置 | 同一 eventId 或同一任务 sequence 不重复生效 |
-| Artifact | 任务、类型、相对存储键、大小、SHA-256 | 不接受任意写入路径，不公开直接访问 |
-| AccountResult | 任务、账户密文、查看审计 | 不进入 SSE 和普通日志 |
+| 实体                | 必要内容                                       | 不变量                                       |
+| ------------------- | ---------------------------------------------- | -------------------------------------------- |
+| Admin / Session     | 密码摘要、会话到期、撤销时间                   | 密码不明文，首次设置无默认通用密码           |
+| Node                | 地址、SSH 凭据引用、主机指纹、能力、心跳、版本 | 注册令牌一次性，Agent 凭据仅授权自身         |
+| SecretVersion       | 类型、密文、密钥 ID、版本、吊销状态            | 只追加版本，普通查询不返回秘密               |
+| Release             | 构件摘要、签名、兼容协议、依赖清单             | 已发布版本不可变，不能引用分支 HEAD          |
+| Deployment          | 节点、发布、状态、步骤与事件                   | 一个节点同一时刻仅一个部署，不与执行任务并行 |
+| ConfigVersion       | schemaVersion、配置内容、摘要、创建者          | 保存后不可变，凭据引用固定到版本             |
+| Run                 | 节点、配置版本、发布版本、幂等键、状态         | 一批次一个节点，不动态换配置                 |
+| Delivery / NodeSlot | 租约、fence、接收确认、节点槽                  | 数据库事务互斥，失联不等于可重新占用         |
+| Task                | 图标快照、包元数据、阶段、提交意图、结果       | 一个批次同一 targetKey 只有一个任务          |
+| Event / Outbox      | 事件 ID、时间、sequence、已确认位置            | 同一 eventId 或同一任务 sequence 不重复生效  |
+| Artifact            | 任务、类型、相对存储键、大小、SHA-256          | 不接受任意写入路径，不公开直接访问           |
+| AccountResult       | 任务、账户密文、查看审计                       | 不进入 SSE 和普通日志                        |
 
 配置摘要是规范化非敏感 JSON 的 SHA-256；下发的秘密独立于配置正文，不记录到摘要样例或日志。旧 SecretVersion 被吊销时，引用它的新批次拒绝执行，不自动替换成最新版。
 
@@ -73,14 +73,14 @@ runId 是批次，taskId 是单个图标任务，deliveryId 是一次节点分�
 
 批次状态固定为：QUEUED、ASSIGNED、RUNNING、STOP_REQUESTED、SUCCEEDED、PARTIAL_FAILED、FAILED、CANCELLED、NEEDS_REVIEW。
 
-| 当前状态 | 合法后继 | 条件 |
-| --- | --- | --- |
-| QUEUED | ASSIGNED、CANCELLED、FAILED | 领取；未领取取消；前置检查失败 |
-| ASSIGNED | RUNNING、STOP_REQUESTED、NEEDS_REVIEW | 持久化接收确认；要求停止；ACK 或租约异常 |
-| RUNNING | STOP_REQUESTED、SUCCEEDED、PARTIAL_FAILED、FAILED、NEEDS_REVIEW | 以任务汇总和确认状态判定 |
-| STOP_REQUESTED | CANCELLED、NEEDS_REVIEW | 节点确认安全停止；无法确认或有未知注册结果 |
-| NEEDS_REVIEW | 终态保持 | 写入核验决议，重试必须新建关联批次 |
-| SUCCEEDED、PARTIAL_FAILED、FAILED、CANCELLED | 终态保持 | 禁止复活和原地重跑 |
+| 当前状态                                     | 合法后继                                                        | 条件                                       |
+| -------------------------------------------- | --------------------------------------------------------------- | ------------------------------------------ |
+| QUEUED                                       | ASSIGNED、CANCELLED、FAILED                                     | 领取；未领取取消；前置检查失败             |
+| ASSIGNED                                     | RUNNING、STOP_REQUESTED、NEEDS_REVIEW                           | 持久化接收确认；要求停止；ACK 或租约异常   |
+| RUNNING                                      | STOP_REQUESTED、SUCCEEDED、PARTIAL_FAILED、FAILED、NEEDS_REVIEW | 以任务汇总和确认状态判定                   |
+| STOP_REQUESTED                               | CANCELLED、NEEDS_REVIEW                                         | 节点确认安全停止；无法确认或有未知注册结果 |
+| NEEDS_REVIEW                                 | 终态保持                                                        | 写入核验决议，重试必须新建关联批次         |
+| SUCCEEDED、PARTIAL_FAILED、FAILED、CANCELLED | 终态保持                                                        | 禁止复活和原地重跑                         |
 
 单 APK 任务阶段为 QUEUED → DOWNLOADING → DOWNLOADED → PREPARING → INSTALLING → LAUNCHING → REGISTERING → VERIFYING → SUCCEEDED。下载模式在 DOWNLOADED 后可直接 SUCCEEDED。缓存命中仍产生 DOWNLOADED 事件并标记 cacheHit。
 
@@ -102,7 +102,7 @@ Agent 重启后先恢复本地记录并向中台 reconcile，不立即重跑。�
 
 创建批次、部署、保存配置版本、停止及核验接口 MUST 使用 Idempotency-Key。键按管理员或节点、HTTP 方法及路由作用域保存；相同键相同请求体返回原结果，相同键不同请求体返回 IDEMPOTENCY_CONFLICT。有效记录至少保留 7 天，运行中对象不能提前清理。
 
-浏览器发现可重试一次，但不能重复建立相同 targetKey。下载最多重试两次，使用指数退避；失败临时文件删除。Appium 点击 submit、WebdriverIO 命令重试和完整注册流程自动重试必须关闭。
+浏览器发现可重试一次，但不能重复建立相同 targetKey。下载最多重试两次，使用指数退避；失败临时文件删除。Appium 点击 submit、客户端变更命令和完整注册流程自动重试必须关闭。
 
 任务创建成功但响应丢失时，页面以原幂等键查询或重发。节点上传事件按 eventId 去重，本地 SQLite 先写后发。中台写库成功才 ACK，本地收到 ACK 后才能清理待传队列。同 eventId 或同 delivery/sequence 的正文不一致返回 EVENT_CONFLICT。
 

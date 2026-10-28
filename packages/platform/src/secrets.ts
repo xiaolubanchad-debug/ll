@@ -51,5 +51,8 @@ export async function readSecret(
     privateKey?: string;
     passphrase?: string;
     password?: string;
+    host?: string;
+    port?: number;
+    username?: string;
   };
 }

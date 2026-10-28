@@ -1,0 +1,140 @@
+<script setup lang="ts">
+import { ref, onUnmounted } from 'vue';
+import { api, mutation } from './api';
+const props = defineProps<{
+  task: {
+    id: string;
+    status: string;
+    observation?: {
+      model: string;
+      locale: string;
+      shellAndroidIdHash: string;
+      proxyObservedIp: string;
+      proxyObservedAt: string;
+    };
+    reviews?: { outcome: string; reason: string }[];
+  };
+}>();
+const emit = defineEmits<{ updated: [] }>();
+const artifacts = ref<{ id: string; recordedForReview: boolean }[]>([]),
+  reason = ref(''),
+  account = ref<{ username: string; password: string } | null>(null),
+  error = ref(''),
+  busy = ref(false),
+  outcome = ref('FAILED'),
+  reviewReason = ref(''),
+  images = ref(false);
+let clearTimer: ReturnType<typeof setTimeout> | undefined;
+function clearAccount() {
+  account.value = null;
+  clearTimeout(clearTimer);
+}
+async function work(action: () => Promise<void>) {
+  busy.value = true;
+  error.value = '';
+  try {
+    await action();
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : '操作失败';
+  } finally {
+    busy.value = false;
+  }
+}
+async function view() {
+  await work(async () => {
+    clearAccount();
+    account.value = await api('/tasks/' + props.task.id + '/account-view', 'POST', {
+      reason: reason.value,
+    });
+    reason.value = '';
+    clearTimer = setTimeout(clearAccount, 30000);
+  });
+}
+async function evidence() {
+  await work(async () => {
+    artifacts.value = (
+      await api<{ items: typeof artifacts.value }>('/tasks/' + props.task.id + '/artifacts')
+    ).items;
+    images.value = true;
+  });
+}
+async function review() {
+  await work(async () => {
+    await mutation('/tasks/' + props.task.id + '/reconciliations', {
+      outcome: outcome.value,
+      reason: reviewReason.value,
+      evidenceIds: artifacts.value.map((a) => a.id),
+    });
+    reviewReason.value = '';
+    emit('updated');
+  });
+}
+function visibility() {
+  if (document.hidden) clearAccount();
+}
+document.addEventListener('visibilitychange', visibility);
+onUnmounted(() => {
+  clearAccount();
+  document.removeEventListener('visibilitychange', visibility);
+});
+</script>
+<template>
+  <section class="surface">
+    <h3>注册证据</h3>
+    <p class="fingerprint">{{ task.id }}</p>
+    <el-alert v-if="error" :title="error" type="error" :closable="false" />
+    <template v-if="task.observation"
+      ><p>模拟器实际型号：{{ task.observation.model }} · 语言：{{ task.observation.locale }}</p>
+      <p class="fingerprint">Shell Android ID 摘要：{{ task.observation.shellAndroidIdHash }}</p>
+      <p>
+        代理探测出口：{{ task.observation.proxyObservedIp }} ·
+        {{ task.observation.proxyObservedAt }}
+      </p>
+      <p class="muted">
+        这是模拟器及 Shell 作用域的观测，不能代表真实手机或 App 读取的设备 ID。App UA
+        未验证；轮询代理的注册出口未确认。
+      </p></template
+    >
+    <el-button :disabled="busy" @click="evidence">查看脱敏截图</el-button>
+    <div v-if="images">
+      <p v-if="!artifacts.length" class="muted">尚无已上传截图</p>
+      <figure v-for="a in artifacts" :key="a.id">
+        <img
+          :src="'/api/v1/artifacts/' + a.id + '/content'"
+          alt="注册流程脱敏截图"
+          style="max-width: 100%; max-height: 640px"
+          referrerpolicy="no-referrer"
+        />
+        <figcaption v-if="a.recordedForReview">迟到证据，仅供人工核验</figcaption>
+      </figure>
+    </div>
+    <label for="account-reason">查看测试账户的原因</label
+    ><el-input id="account-reason" v-model="reason" maxlength="300" />
+    <el-button :disabled="busy || !reason.trim()" @click="view">审计后查看账户</el-button>
+    <div v-if="account">
+      <p>用户名：{{ account.username }}</p>
+      <p>密码：{{ account.password }}</p>
+      <el-button @click="clearAccount">隐藏账户</el-button
+      ><small>30 秒后自动隐藏；账户不保存在浏览器本地存储。</small>
+    </div>
+    <template v-if="task.status === 'UNKNOWN'"
+      ><p class="muted">提交结果未知，系统不会重试注册。请核对 APK 产品后台后记录决议。</p>
+      <label for="review-outcome">核验结果</label
+      ><select id="review-outcome" v-model="outcome">
+        <option value="FAILED">已确认未注册成功</option>
+        <option value="SUCCEEDED">已确认注册成功</option></select
+      ><label for="review-reason">核验说明（至少 10 字）</label
+      ><el-input
+        id="review-reason"
+        v-model="reviewReason"
+        type="textarea"
+        maxlength="1000"
+      /><el-button :disabled="busy || reviewReason.trim().length < 10" @click="review"
+        >记录人工核验决议</el-button
+      >
+      <p v-for="(r, i) in task.reviews" :key="i">
+        最近决议：{{ r.outcome === 'SUCCEEDED' ? '已确认成功' : '已确认失败' }} · {{ r.reason }}
+      </p></template
+    >
+  </section>
+</template>

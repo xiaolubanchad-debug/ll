@@ -391,6 +391,81 @@ test('all local Markdown links resolve', () => {
     }
   }
 });
+
+const p3 = read('contracts/fixtures/p3.valid.json');
+for (const [type, value] of Object.entries(p3))
+  test('P3 valid ' + type, () => assert.deepEqual(schemaIssues(type, value), []));
+for (const [label, type, mutate] of [
+  [
+    'unmasked screenshot rejected',
+    'ArtifactInput',
+    (v) => {
+      v.redaction = 'NONE';
+    },
+  ],
+  [
+    'artifact cannot contain arbitrary path',
+    'ArtifactInput',
+    (v) => {
+      v.path = '/tmp/private';
+    },
+  ],
+  [
+    'invalid screenshot digest',
+    'ArtifactInput',
+    (v) => {
+      v.sha256 = 'x';
+    },
+  ],
+  [
+    'manual unknown cannot release node',
+    'TaskReconcileInput',
+    (v) => {
+      v.outcome = 'UNKNOWN';
+    },
+  ],
+  [
+    'manual review needs explanation',
+    'TaskReconcileInput',
+    (v) => {
+      v.reason = 'ok';
+    },
+  ],
+  [
+    'account view reason required',
+    'AccountViewInput',
+    (v) => {
+      delete v.reason;
+    },
+  ],
+])
+  test('P3 ' + label, () => {
+    const value = structuredClone(p3[type]);
+    mutate(value);
+    assert.ok(schemaIssues(type, value).length);
+  });
+test('P3 explicit failure locator accepted', () => {
+  const value = structuredClone(config);
+  value.registrationFlows[0].failure = structuredClone(value.registrationFlows[0].success);
+  semanticConfig(value);
+});
+configReject('UiAutomator cannot perform hidden clicks', (v) => {
+  v.registrationFlows[0].steps[0].locator = {
+    by: 'androidUiAutomator',
+    value: 'new UiScrollable(new UiSelector()).scrollIntoView(new UiSelector().text("Submit"))',
+  };
+});
+configReject('P3 back after submit is not read-only', (v) => {
+  v.registrationFlows[0].steps.push({ action: 'back', timeoutMs: 1000, optional: false });
+});
+test('P3 immutable UiSelector accepted', () => {
+  const value = structuredClone(config);
+  value.registrationFlows[0].steps[0].locator = {
+    by: 'androidUiAutomator',
+    value: 'new UiSelector().resourceId("com.example:id/register").enabled(true)',
+  };
+  semanticConfig(value);
+});
 process.stdout.write(
   `${passed} contract checks passed${process.exitCode ? '; failures present' : ''}.\n`,
 );

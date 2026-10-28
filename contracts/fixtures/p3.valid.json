@@ -1,0 +1,23 @@
+{
+  "ArtifactInput": {
+    "protocolVersion": "1.0",
+    "nodeId": "11111111-1111-4111-8111-111111111111",
+    "bootId": "11111111-1111-4111-8111-111111111111",
+    "deliveryId": "11111111-1111-4111-8111-111111111111",
+    "fence": 1,
+    "taskId": "11111111-1111-4111-8111-111111111111",
+    "artifactId": "11111111-1111-4111-8111-111111111111",
+    "kind": "screenshot",
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "dataBase64": "iVBORw0KGgo=",
+    "redaction": "CREDENTIAL_MASKED"
+  },
+  "AccountViewInput": {
+    "reason": "核对自有测试账户"
+  },
+  "TaskReconcileInput": {
+    "outcome": "FAILED",
+    "reason": "已通过自有测试后台核验提交没有成功",
+    "evidenceIds": []
+  }
+}

@@ -6,7 +6,7 @@
 
 ## 当前状态
 
-已实现 P0 工程和登录、P1 服务器管理与部署，以及 P2 配置版本、任务领取下发、APK 下载和每日缓存。P2 使用真实 PostgreSQL、SQLite 和 Chromium 联测，支持直接下载、落地页、缓存复核、停止和失联隔离。已在 Ubuntu 26.04 / KVM EC2 验证安装流程、Agent 0.3.3 到 0.3.4 升级、空 Android 启动、注册与心跳，以及仅执行账户的出站规则。实际 APK 安装和账户注册属于尚未完成的 P3。
+已实现 P0 工程与登录、P1 服务器管理与部署、P2 配置版本与下载缓存，以及 P3 APK 安装、启动、配置式账户注册和证据回传。真实 PostgreSQL、SQLite、Chromium 和故障注入的 Appium HTTP 边界已联测；Ubuntu 26.04 / KVM EC2 上使用自有 APK 验证两个注册流程、明确拒绝、提交超时和控件变化，并确认进程及目录清理。实际产品注册和住宅代理须使用用户配置另行验收，不能用自有测试结果代替。
 
 原 Python 单机方案被本方案替代。早期本地草稿不作为实现依据，也不纳入发布。
 
@@ -27,9 +27,11 @@
 | [P1 增量契约](docs/P1_CONTRACT.md)                | 部署占用、身份注册、主机核验和重试规则       |
 | [P2 配置与下载](docs/P2_SETUP.md)                 | 升级、配置版本、下载任务、缓存与故障恢复     |
 | [P2 增量契约](docs/P2_CONTRACT.md)                | 领取、租约、事件、每日缓存和网络约束         |
+| [P3 安装注册](docs/P3_SETUP.md)                   | 代理、注册流程、结果证据与验证边界           |
+| [P3 增量契约](docs/P3_CONTRACT.md)                | 唯一提交、未知结果、账户与截图保护           |
 | [契约样例](contracts/README.md)                   | 正反例与检查方式                             |
 
-执行节点兼容 Ubuntu 24.04 / 26.04 LTS x86_64，安装使用 Agent 0.3.4 签名发布；版本沿革见 [兼容契约](docs/UBUNTU_COMPATIBILITY.md)，安装修复见 [驱动权限契约](docs/APPIUM_INSTALL_FIX.md) 和 [SDK 布局契约](docs/ANDROID_SDK_LAYOUT.md)。
+执行节点兼容 Ubuntu 24.04 / 26.04 LTS x86_64。完整安装注册使用 Agent 0.4.0 签名发布，0.3.x 继续支持下载模式；版本沿革见 [兼容契约](docs/UBUNTU_COMPATIBILITY.md)，安装修复见 [驱动权限契约](docs/APPIUM_INSTALL_FIX.md) 和 [SDK 布局契约](docs/ANDROID_SDK_LAYOUT.md)。
 
 ## 开发规则
 

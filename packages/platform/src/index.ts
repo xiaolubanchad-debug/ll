@@ -9,3 +9,4 @@ export * from './jobs.js';
 export * from './ssh.js';
 export * from './releases.js';
 export * from './agent-auth.js';
+export * from './registration.js';

@@ -122,6 +122,7 @@ try {
     RELEASE_PUBLIC_KEY_FILE: join(dir, 'release-public.key'),
     RELEASE_DIR: join(dir, 'releases'),
     P1_TEST_DIR: dir,
+    ARTIFACT_DIR: join(dir, 'artifacts'),
   };
   const keys = generateKeyPairSync('ed25519');
   await writeFile(env.MASTER_KEY_FILE, randomBytes(32), { mode: 0o600 });
@@ -162,6 +163,7 @@ try {
   await run(['--test', '--test-concurrency=1', 'tests/api.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/p1.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/p2.test.mjs'], env);
+  await run(['--test', '--test-concurrency=1', 'tests/p3.test.mjs'], env);
   const { initializeAdmin } = await import('../apps/control-api/dist/admin.js');
   const { passwordHash } = await import('../apps/control-api/dist/auth.js');
   const admin = await db.admin.findFirst();
@@ -189,7 +191,9 @@ try {
   );
   await waitFor(env.APP_ORIGIN, ui);
   await run(['--test', 'tests/web.test.mjs'], { ...env, P0_SCREENSHOT_DIR: dir });
-  console.log('P0/P1/P2 integration and browser tests passed (EC2 installer simulated; P2 download uses real Chromium).');
+  console.log(
+    'P0–P3 integration and browser tests passed (real PostgreSQL, SQLite and Chromium; EC2 installer and Appium boundary simulated here, real Android verified separately).',
+  );
 } catch (error) {
   console.error(error instanceof Error ? error.message : 'P0 tests failed');
   process.exitCode = 1;

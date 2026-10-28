@@ -1,11 +1,29 @@
 import { join, dirname } from 'node:path';
-import { agentIssues, configurationIssues } from '@apk/contracts';
+import { agentIssues, configurationIssues, schemaIssues } from '@apk/contracts';
 import type { TestConfiguration } from '@apk/contracts';
-import { canonical, sha, runDownload, cleanupBrowser, removeOwned } from '@apk/automation';
-import type { DownloadOptions } from '@apk/automation';
+import {
+  canonical,
+  sha,
+  runDownload,
+  cleanupBrowser,
+  cleanupAndroid,
+  removeOwned,
+  registerApk,
+  RegistrationError,
+} from '@apk/automation';
+import type { DownloadOptions, RegistrationHooks, ProxyCredential } from '@apk/automation';
 import { openAgentStore, lockAgent } from './store.js';
 import type { AgentStore, Delivery } from './store.js';
-export type Hub = (path: string, body: unknown) => Promise<Record<string, unknown>>;
+export type Hub = (
+  path: string,
+  body: unknown,
+  signal?: AbortSignal,
+) => Promise<Record<string, unknown>>;
+export interface ExecutionOptions extends DownloadOptions {
+  sdkRoot?: string;
+  androidFactory?: RegistrationHooks['androidFactory'];
+  proxyCheckUrl?: string;
+}
 export class TaskEngine {
   current: Delivery | null = null;
   private abort: AbortController | null = null;
@@ -21,7 +39,7 @@ export class TaskEngine {
     private readonly bootId: string,
     private readonly toolsRoot: string,
     private readonly hub: Hub,
-    private readonly options: DownloadOptions,
+    private readonly options: ExecutionOptions,
   ) {}
   static async open(
     root: string,
@@ -29,7 +47,7 @@ export class TaskEngine {
     bootId: string,
     toolsRoot: string,
     hub: Hub,
-    options: DownloadOptions = {},
+    options: ExecutionOptions = {},
   ) {
     const unlock = await lockAgent(root);
     try {
@@ -48,23 +66,37 @@ export class TaskEngine {
     let clean = true;
     for (const row of previous) {
       let cleared = row.clean;
+      if (row.android) {
+        cleared = await cleanupAndroid(join(this.store.root, 'android/jobs'), row.android);
+        if (cleared) this.store.android(row.id, null);
+      }
       if (row.browser) {
-        cleared = await cleanupBrowser(join(this.store.root, 'downloads'), row.browser.profile);
-        if (cleared)
+        let browserClean = await cleanupBrowser(
+          join(this.store.root, 'downloads'),
+          row.browser.profile,
+        );
+        if (browserClean)
           try {
             await removeOwned(
               join(this.store.root, 'downloads/jobs'),
               dirname(row.browser.profile),
             );
           } catch {
-            cleared = false;
+            browserClean = false;
           }
+        if (browserClean) this.store.browser(row.id, null);
+        cleared = browserClean && (!row.android || cleared);
       }
       if (!cleared) clean = false;
       if (cleared) this.store.browser(row.id, null);
       if (row.status !== 'DONE') this.store.status(row.id, 'REVIEW', cleared);
       await this.flush(row.payload).catch(() => {});
-      deliveries.push({ deliveryId: row.id, fence: row.payload.fence, cleanupComplete: cleared });
+      deliveries.push({
+        deliveryId: row.id,
+        fence: row.payload.fence,
+        cleanupComplete: cleared,
+        submissions: this.store.submissions(row.id),
+      });
     }
     await this.hub('reconcile', {
       protocolVersion: '1.0',
@@ -73,19 +105,63 @@ export class TaskEngine {
       deliveries: deliveries.slice(-100),
       cleanupComplete: clean,
     });
+    // The new boot identity is now bound; supplement old evidence without executing it.
+    for (const row of previous) await this.flush(row.payload).catch(() => {});
   }
-  async flush(delivery: Delivery) {
+  async flush(delivery: Delivery, signal?: AbortSignal) {
+    for (const account of this.store.pendingAccounts(delivery)) {
+      const response = await this.hub(
+        'tasks/' + account.taskId + '/account',
+        {
+          kind: 'account',
+          protocolVersion: '1.0',
+          nodeId: this.nodeId,
+          deliveryId: delivery.deliveryId,
+          fence: delivery.fence,
+          ...account,
+        },
+        signal,
+      );
+      if (response.accountRef !== account.accountRef) throw Error('HUB_RESPONSE_INVALID');
+      this.store.accountAck(account.accountRef);
+    }
+    for (const artifact of this.store.pendingEvidence(delivery.deliveryId)) {
+      const response = await this.hub(
+        'artifacts',
+        {
+          protocolVersion: '1.0',
+          nodeId: this.nodeId,
+          bootId: this.bootId,
+          deliveryId: delivery.deliveryId,
+          fence: delivery.fence,
+          taskId: artifact.task,
+          artifactId: artifact.id,
+          kind: 'screenshot',
+          sha256: artifact.sha,
+          dataBase64: artifact.data,
+          redaction: 'CREDENTIAL_MASKED',
+        },
+        signal,
+      );
+      if (response.artifactId !== artifact.id) throw Error('HUB_RESPONSE_INVALID');
+      this.store.evidenceAck(String(artifact.id));
+    }
     for (let i = 0; i < 100; i++) {
       const events = this.store.pending(delivery.deliveryId);
       if (!events.length) return;
-      const response = await this.hub('events', {
-        kind: 'events',
-        protocolVersion: '1.0',
-        nodeId: this.nodeId,
-        deliveryId: delivery.deliveryId,
-        fence: delivery.fence,
-        events,
-      });
+      const response = await this.hub(
+        'events',
+        {
+          kind: 'events',
+          protocolVersion: '1.0',
+          nodeId: this.nodeId,
+          deliveryId: delivery.deliveryId,
+          fence: delivery.fence,
+          events,
+        },
+        signal,
+      );
+      this.observe(response, delivery.deliveryId);
       if (
         !Array.isArray(response.ackedEventIds) ||
         response.ackedEventIds.some(
@@ -135,7 +211,7 @@ export class TaskEngine {
     try {
       for (const row of this.store
         .deliveries()
-        .filter((r) => r.status === 'DONE' || r.status === 'COMPLETED')) {
+        .filter((r) => ['DONE', 'COMPLETED', 'REVIEW'].includes(r.status))) {
         await this.flush(row.payload);
         if (row.status === 'COMPLETED') this.store.status(row.id, 'DONE', true);
       }
@@ -167,6 +243,7 @@ export class TaskEngine {
                 deliveryId: delivery.deliveryId,
                 fence: delivery.fence,
                 cleanupComplete: row.clean,
+                submissions: this.store.submissions(delivery.deliveryId),
               },
             ],
             cleanupComplete: row.clean,
@@ -207,26 +284,51 @@ export class TaskEngine {
     if (
       configurationIssues(snapshot.config).length ||
       snapshot.configHash !== d.configHash ||
-      sha(canonical(snapshot.config)) !== d.configHash ||
-      (snapshot.config as TestConfiguration).execution.mode !== 'DOWNLOAD_ONLY'
+      sha(canonical(snapshot.config)) !== d.configHash
     )
       throw Error('CONFIG_HASH_MISMATCH');
+    const config = snapshot.config as TestConfiguration;
+    let proxy: ProxyCredential | undefined;
+    if (config.execution.mode === 'FULL') {
+      const versions = snapshot.secretVersions;
+      if (!this.options.sdkRoot || !Array.isArray(versions) || versions.length !== 1)
+        throw Error('PROXY_CONFIG_INVALID');
+      const secret = versions[0] as { id?: unknown; type?: unknown; secretValue?: unknown };
+      if (
+        secret.id !== config.execution.proxySecretVersionId ||
+        secret.type !== 'HTTP_PROXY' ||
+        schemaIssues('SecretInput', { type: 'HTTP_PROXY', secretValue: secret.secretValue }).length
+      )
+        throw Error('PROXY_CONFIG_INVALID');
+      proxy = secret.secretValue as ProxyCredential;
+    }
     this.store.status(d.deliveryId, 'RUNNING');
     this.store.append(d, {
       type: 'RUN_STARTED',
       payload: { configHash: d.configHash, releaseId: d.releaseId },
     });
+    let review = false;
     const emit = async (event: {
       type: string;
       taskId?: string;
       payload: Record<string, unknown>;
     }) => {
+      if (event.type === 'RUN_FINISHED' && event.payload.status === 'NEEDS_REVIEW') review = true;
       this.store.append(d, event);
+      if (event.type === 'TASK_STAGE' && event.payload.stage === 'VERIFYING') return;
       await this.flush(d).catch(() => {});
+    };
+    const beforeAction = () => {
+      if (signal.aborted || Date.now() >= this.lease || this.control !== 'CONTINUE') {
+        if (this.control !== 'STOP') this.control = 'REVIEW';
+        this.abort?.abort();
+        throw new RegistrationError('CANCELLED');
+      }
+      this.options.beforeAction?.();
     };
     try {
       await runDownload(
-        snapshot.config as TestConfiguration,
+        config,
         this.nodeId,
         join(this.store.root, 'downloads'),
         this.toolsRoot,
@@ -234,14 +336,45 @@ export class TaskEngine {
         emit,
         {
           ...this.options,
-          beforeAction: () => {
-            if (Date.now() >= this.lease || this.control !== 'CONTINUE') {
-              if (this.control !== 'STOP') this.control = 'REVIEW';
-              this.abort?.abort();
-              throw Error('EXECUTION_STOPPED');
-            }
-            this.options.beforeAction?.();
-          },
+          beforeAction,
+          ...(config.execution.mode === 'FULL'
+            ? {
+                afterDownload: (target, apk, file, index) =>
+                  registerApk(config, target, apk, file, index, signal, emit, {
+                    sdkRoot: this.options.sdkRoot!,
+                    toolsRoot: this.toolsRoot,
+                    root: join(this.store.root, 'android'),
+                    proxy: proxy!,
+                    policy: this.options.policy,
+                    proxyCheckUrl: this.options.proxyCheckUrl,
+                    androidFactory: this.options.androidFactory,
+                    beforeAction,
+                    resources: async (record) => {
+                      this.store.android(d.deliveryId, record);
+                    },
+                    account: async (taskId) => {
+                      await this.flush(d);
+                      const account = this.store.account(d, taskId);
+                      try {
+                        await this.flush(d);
+                      } catch {
+                        throw new RegistrationError('ACCOUNT_SYNC_FAILED');
+                      }
+                      return account;
+                    },
+                    intent: async (taskId, ref, verificationSignal) => {
+                      beforeAction();
+                      this.store.intent(d, taskId, ref);
+                      await this.flush(d, verificationSignal).catch(() => {});
+                    },
+                    evidence: async (taskId, bytes, verificationSignal) => {
+                      const id = this.store.evidence(d, taskId, bytes);
+                      await this.flush(d, verificationSignal);
+                      return id;
+                    },
+                  }),
+              }
+            : {}),
           onBrowser: async (record) => {
             this.store.browser(d.deliveryId, record);
             await this.options.onBrowser?.(record);
@@ -252,6 +385,13 @@ export class TaskEngine {
           },
         },
       );
+      if (review || this.control === 'REVIEW') {
+        this.store.status(d.deliveryId, 'REVIEW');
+        await this.flush(d).catch(() => {});
+        await this.reconcile(d);
+        return;
+      }
+      if (signal.aborted && this.control === 'STOP') throw new RegistrationError('CANCELLED');
       this.store.status(d.deliveryId, 'COMPLETED', true);
       await this.flush(d);
       this.store.status(d.deliveryId, 'DONE', true);
@@ -267,12 +407,36 @@ export class TaskEngine {
           protocolVersion: '1.0',
           nodeId: this.nodeId,
           bootId: this.bootId,
-          deliveries: [{ deliveryId: d.deliveryId, fence: d.fence, cleanupComplete: row.clean }],
+          deliveries: [
+            {
+              deliveryId: d.deliveryId,
+              fence: d.fence,
+              cleanupComplete: row.clean,
+              submissions: this.store.submissions(d.deliveryId),
+            },
+          ],
           cleanupComplete: row.clean,
         }).catch(() => {});
         throw error;
       }
     }
+  }
+  private async reconcile(d: Delivery) {
+    const row = this.store.deliveries().find((r) => r.id === d.deliveryId)!;
+    await this.hub('reconcile', {
+      protocolVersion: '1.0',
+      nodeId: this.nodeId,
+      bootId: this.bootId,
+      deliveries: [
+        {
+          deliveryId: d.deliveryId,
+          fence: d.fence,
+          cleanupComplete: row.clean,
+          submissions: this.store.submissions(d.deliveryId),
+        },
+      ],
+      cleanupComplete: row.clean,
+    }).catch(() => {});
   }
   async close() {
     this.closed = true;

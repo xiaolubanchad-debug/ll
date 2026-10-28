@@ -93,9 +93,40 @@ test('browser login, config checks, refresh, password change and logout', async 
       path: path.join(process.env.P0_SCREENSHOT_DIR, 'p2-configs.png'),
       fullPage: true,
     });
+    await page.getByText('HTTP 代理配置', { exact: true }).click();
+    await page.getByLabel('代理地址', { exact: true }).fill('proxy.example.test');
+    await page.getByLabel('代理用户名', { exact: true }).fill('FixtureUser');
+    await page.getByLabel('代理密码', { exact: true }).fill('FixtureProxyPassword123');
+    await page.getByRole('button', { name: '加密保存代理', exact: true }).click();
+    await expect(page.getByText('代理已加密保存，可将引用应用到草稿')).toBeVisible();
+    await expect(page.getByLabel('代理密码', { exact: true })).toHaveValue('');
+    await page.getByRole('button', { name: '将代理应用到当前草稿', exact: true }).click();
+    const proxyDraft = JSON.parse(
+      await page.getByLabel('完整配置 JSON', { exact: true }).inputValue(),
+    );
+    assert.equal(proxyDraft.execution.mode, 'FULL');
+    assert.match(proxyDraft.execution.proxySecretVersionId, /^[a-f0-9-]{36}$/);
+    assert.ok(!JSON.stringify(proxyDraft).includes('FixtureProxyPassword123'));
+    assert.ok(
+      !(await page.evaluate(() =>
+        JSON.stringify({ ...window.localStorage, ...window.sessionStorage }).includes(
+          'FixtureProxyPassword123',
+        ),
+      )),
+    );
+    await page.getByRole('button', { name: '保存草稿为新版本', exact: true }).click();
+    await expect(page.getByRole('button', { name: '载入版本', exact: true })).toHaveCount(3);
     await page.getByRole('button', { name: '测试任务', exact: false }).first().click();
-    await expect(page.getByRole('heading', { name: '开始下载任务', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '开始测试任务', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: '开始下载', exact: true })).toBeDisabled();
+    await page.getByLabel('任务配置', { exact: true }).selectOption({ label: '浏览器配置版本' });
+    await expect(
+      page
+        .getByLabel('固定配置版本', { exact: true })
+        .getByRole('option', { name: '版本 3', exact: true }),
+    ).toHaveCount(1);
+    await page.getByLabel('固定配置版本', { exact: true }).selectOption({ label: '版本 3' });
+    await expect(page.getByRole('button', { name: '开始安装注册', exact: true })).toBeDisabled();
     await page.getByRole('button', { name: '账户安全', exact: false }).first().click();
     await page.getByLabel('当前密码', { exact: true }).fill(process.env.P0_TEST_PASSWORD);
     await page.getByLabel('新密码', { exact: true }).fill('BrowserChangedPassword123');

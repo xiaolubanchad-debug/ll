@@ -428,6 +428,11 @@ onUnmounted(() => {
           ><span>版本：{{ selected.agentVersion ?? '尚未注册' }}</span
           ><span>安卓：{{ selected.health?.android ? '启动已核验' : '尚未确认' }}</span
           ><span>主机身份：{{ selected.expectedFingerprint ? '已确认' : '待核对' }}</span>
+          <span
+            >注册能力：{{
+              selected.registrationProtocol === '1.0' ? '已支持' : '需部署 P3 版本'
+            }}</span
+          >
         </div>
         <p v-if="selected.expectedFingerprint" class="fingerprint">
           {{ selected.expectedFingerprint }}
