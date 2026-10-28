@@ -231,7 +231,16 @@
       environment:
         PLAYWRIGHT_BROWSERS_PATH: '{{ tools_root }}/browsers'
       changed_when: false
+    - name: Create isolated npm global prefix
+      tags: [appium_driver]
+      ansible.builtin.file:
+        path: '{{ tools_root }}/npm-global/{{ item }}'
+        state: directory
+        owner: apk-runner
+        mode: '0755'
+      loop: ['', lib, lib/node_modules, bin]
     - name: Register locked local Appium driver
+      tags: [appium_driver]
       become_user: apk-runner
       ansible.builtin.command:
         argv:
@@ -247,6 +256,7 @@
       environment:
         PATH: '{{ runtime_root }}/node/bin:/usr/bin:/bin'
         APPIUM_HOME: '{{ tools_root }}/appium-home'
+        npm_config_prefix: '{{ tools_root }}/npm-global'
     - name: Mark driver registration complete
       ansible.builtin.copy:
         dest: '{{ tools_root }}/appium-home/.driver-installed'

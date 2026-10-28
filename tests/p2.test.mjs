@@ -135,7 +135,7 @@ async function start() {
     {
       nodeId: node.id,
       releaseId: release.id,
-      agentVersion: '0.3.1',
+      agentVersion: '0.3.2',
       apiUrl: base,
       sdkRoot: '/fixture',
       toolsRoot: resolve('.'),
@@ -229,7 +229,7 @@ test('P2 acceptance with real PostgreSQL, SQLite, Chromium and owned fixture sit
         id: randomUUID(),
         artifactName: 'agent-' + randomBytes(32).toString('hex') + '.tgz',
         sha256: randomBytes(32).toString('hex'),
-        manifest: { agentVersion: '0.3.1', protocolVersion: '1.0', features: ['DOWNLOAD_V1'] },
+        manifest: { agentVersion: '0.3.2', protocolVersion: '1.0', features: ['DOWNLOAD_V1'] },
       },
     });
     token = randomBytes(32).toString('base64url');
@@ -239,7 +239,7 @@ test('P2 acceptance with real PostgreSQL, SQLite, Chromium and owned fixture sit
         host: 'p2.example.test',
         deploymentStatus: 'INSTALLED',
         agentReleaseId: release.id,
-        agentVersion: '0.3.1',
+        agentVersion: '0.3.2',
         health: report,
         lastSeenAt: new Date(),
         slot: { create: {} },

@@ -1,0 +1,8 @@
+{
+  "name": "appium-permission-fixture",
+  "private": true,
+  "dependencies": {
+    "appium": "3.9.0",
+    "appium-uiautomator2-driver": "8.7.2"
+  }
+}

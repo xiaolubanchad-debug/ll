@@ -1,6 +1,6 @@
 # 开发契约
 
-版本 1.3.1，日期 2026 年 10 月 28 日。MUST 表示发布必须满足，SHOULD 表示偏离时必须记录原因，MAY 表示可选。P0/P1 实现范围见对应启动文档；P2 行为由 [P2_CONTRACT.md](P2_CONTRACT.md) 细化，验证边界见 [P2_SETUP.md](P2_SETUP.md)。P3/P4 的契约不表示已完成能力。
+版本 1.3.2，日期 2026 年 10 月 28 日。MUST 表示发布必须满足，SHOULD 表示偏离时必须记录原因，MAY 表示可选。P0/P1 实现范围见对应启动文档；P2 行为由 [P2_CONTRACT.md](P2_CONTRACT.md) 细化，验证边界见 [P2_SETUP.md](P2_SETUP.md)。P3/P4 的契约不表示已完成能力。
 
 ## 契约权威与变更
 
@@ -11,6 +11,8 @@ contracts/ 下的 JSON Schema 是线上数据结构校验来源，HTTP_API.md �
 接口前缀为 /api/v1，节点协议 protocolVersion 为 1.0，配置 schemaVersion 为 1.0。新增可选字段必须保留默认行为；改变必填项、字段类型、状态含义、重试或提交规则属于破坏性变更，必须升级契约版本并提供迁移及兼容测试。不兼容节点拒绝接收任务，界面显示需升级。
 
 Ubuntu 24.04 与 26.04 的执行节点检查及固定浏览器版本遵循 [平台兼容契约 1.3.0](UBUNTU_COMPATIBILITY.md)；平台接受不代替 KVM 和实际安卓启动证明。
+
+部署工具的密钥选择与普通账户驱动注册分别遵循 [SSH 修复契约](SSH_RUNNER_FIX.md) 和 [驱动安装契约 1.3.2](APPIUM_INSTALL_FIX.md)，后者需要新的签名发布。
 
 ## 模块与进程边界
 
