@@ -30,4 +30,6 @@
 
 2026 年 10 月 28 日已在 Ubuntu 24.04 与 26.04 容器验证真实系统依赖安装、非 root 浏览器的直接下载/新窗口/同页落地、每日缓存和无 KVM 时的拒绝行为；79 项契约检查、代码及类型检查、P0/P1/P2 回归与管理页面测试通过。Windows 跳过的 Linux 专用进程清理仍由 Linux CI 检查。自有 APK 结构样本不代表实际产品安装或注册。
 
+后续实际验收已覆盖 Ubuntu 26.04 / KVM EC2 的空 Android 启动、Agent 注册心跳和 0.3.3 到 0.3.4 升级；0.3.4 的执行账户规则已加载且仅作用于该账户。当前安装使用 0.3.4 新签名发布，含 [SDK 布局](ANDROID_SDK_LAYOUT.md) 和 [服务能力](AGENT_SERVICE_FEATURES.md) 修复。Ubuntu 24.04 的真实 EC2 开机及实际 APK 安装注册未由本次覆盖。
+
 参考：[Playwright 系统要求](https://playwright.dev/docs/intro#system-requirements)、[Playwright 1.64.1](https://github.com/microsoft/playwright/releases/tag/v1.64.1)、[Android Linux KVM](https://developer.android.com/studio/run/emulator-acceleration)。
