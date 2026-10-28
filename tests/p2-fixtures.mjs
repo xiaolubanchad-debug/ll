@@ -7,8 +7,8 @@ const crc = (b) => {
   }
   return (c ^ 0xffffffff) >>> 0;
 };
-export function fixtureApk() {
-  const strings = ['manifest', 'package', 'versionName', 'versionCode', 'com.example.p2', '1.2.3'];
+export function fixtureApk(packageName = 'com.example.p2') {
+  const strings = ['manifest', 'package', 'versionName', 'versionCode', packageName, '1.2.3'];
   const encoded = strings.map((s) =>
     Buffer.concat([
       Buffer.from([s.length, Buffer.byteLength(s)]),

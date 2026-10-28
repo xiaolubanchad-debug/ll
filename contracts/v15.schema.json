@@ -1,0 +1,215 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.apk-platform.example/v1/v15.schema.json",
+  "$defs": {
+    "ScheduleInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nodeId",
+        "configVersionId",
+        "releaseId",
+        "enabled",
+        "autoRegister",
+        "time",
+        "timezone",
+        "successTarget",
+        "attemptLimit"
+      ],
+      "properties": {
+        "nodeId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "configVersionId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "releaseId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "autoRegister": {
+          "type": "boolean"
+        },
+        "time": {
+          "type": "string",
+          "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+        },
+        "timezone": {
+          "const": "Asia/Shanghai"
+        },
+        "successTarget": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "attemptLimit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        }
+      }
+    },
+    "ProxyObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "SUCCEEDED",
+            "FAILED"
+          ]
+        },
+        "ip": {
+          "type": "string",
+          "maxLength": 45
+        },
+        "at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "scope": {
+          "const": "PROBE_ONLY"
+        },
+        "errorCode": {
+          "const": "PROXY_CHECK_FAILED"
+        }
+      }
+    },
+    "DailyExecutionPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "purpose",
+        "cacheDay",
+        "successTarget",
+        "attemptLimit",
+        "assets"
+      ],
+      "properties": {
+        "purpose": {
+          "enum": [
+            "DOWNLOAD",
+            "REGISTER",
+            "PROXY_CHECK"
+          ]
+        },
+        "cacheDay": {
+          "type": "string",
+          "pattern": "^20[0-9]{2}-[0-9]{2}-[0-9]{2}$"
+        },
+        "successTarget": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "attemptLimit": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "proxySecretVersionId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "assets": {
+          "type": "array",
+          "maxItems": 1000,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "targetKey",
+              "label",
+              "sourceUrl",
+              "apk"
+            ],
+            "properties": {
+              "targetKey": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "label": {
+                "type": "string",
+                "maxLength": 200
+              },
+              "sourceUrl": {
+                "type": "string",
+                "format": "uri",
+                "pattern": "^https?://",
+                "maxLength": 4096
+              },
+              "apk": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "packageName",
+                  "versionName",
+                  "versionCode",
+                  "abis",
+                  "size",
+                  "apkSha256",
+                  "cacheDay"
+                ],
+                "properties": {
+                  "packageName": {
+                    "type": "string",
+                    "pattern": "^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)+$",
+                    "maxLength": 256
+                  },
+                  "versionName": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 256
+                  },
+                  "versionCode": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "abis": {
+                    "type": "array",
+                    "uniqueItems": true,
+                    "maxItems": 20,
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9_-]{1,40}$"
+                    }
+                  },
+                  "size": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 536870912
+                  },
+                  "apkSha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "cacheDay": {
+                    "type": "string",
+                    "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+                  }
+                }
+              },
+              "entryId": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9._:-]{1,100}$"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

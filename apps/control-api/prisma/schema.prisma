@@ -79,6 +79,7 @@ model Node {
   operations              Deployment[]
   enrollments             Enrollment[]
   agentCredential         AgentCredential?
+  dailySchedule           DailySchedule?
 }
 
 model SecretVersion {
@@ -202,6 +203,17 @@ model Run {
   reconciliationReason String?        @db.VarChar(300)
   reconciledBy         String?        @db.Uuid
   discovered           Boolean        @default(false)
+  purpose              String         @default("LEGACY") @db.VarChar(20)
+  cacheDay             String?        @db.VarChar(10)
+  dailyKey             String?        @unique @db.Char(64)
+  sourceDownloadId     String?        @db.Uuid
+  proxySecretVersionId String?        @db.Uuid
+  successTarget        Int            @default(0)
+  attemptLimit         Int            @default(0)
+  attemptsStarted      Int            @default(0)
+  successes            Int            @default(0)
+  executionPlan        Json?
+  proxyObservation     Json?
   tasks                Task[]
   delivery             Delivery?
 
@@ -231,84 +243,116 @@ model ConfigVersion {
 }
 
 model Delivery {
-  id                     String     @id @default(uuid()) @db.Uuid
-  runId                  String     @unique @db.Uuid
-  run                    Run        @relation(fields: [runId], references: [id], onDelete: Restrict)
-  bootId                 String     @db.Uuid
+  id                     String          @id @default(uuid()) @db.Uuid
+  runId                  String          @unique @db.Uuid
+  run                    Run             @relation(fields: [runId], references: [id], onDelete: Restrict)
+  bootId                 String          @db.Uuid
   fence                  Int
-  issuedAt               DateTime   @default(now()) @db.Timestamptz(3)
-  ackDeadline            DateTime   @db.Timestamptz(3)
-  leaseExpiresAt         DateTime   @db.Timestamptz(3)
-  acceptedAt             DateTime?  @db.Timestamptz(3)
-  appliedThroughSequence Int        @default(0)
+  issuedAt               DateTime        @default(now()) @db.Timestamptz(3)
+  ackDeadline            DateTime        @db.Timestamptz(3)
+  leaseExpiresAt         DateTime        @db.Timestamptz(3)
+  acceptedAt             DateTime?       @db.Timestamptz(3)
+  appliedThroughSequence Int             @default(0)
   events                 RunEvent[]
   accounts               AccountResult[]
   artifacts              Artifact[]
 }
 
 model Task {
-  id        String  @id @db.Uuid
-  runId     String  @db.Uuid
-  run       Run     @relation(fields: [runId], references: [id], onDelete: Restrict)
-  targetKey String  @db.Char(64)
-  label     String  @db.VarChar(200)
-  sourceUrl String  @db.VarChar(4096)
-  position  Int
-  status    String  @default("QUEUED") @db.VarChar(32)
-  apk       Json?
-  cacheHit  Boolean @default(false)
-  proof     String  @default("NONE") @db.VarChar(32)
-  errorCode String? @db.VarChar(100)
-  observation Json?
-  accountRef String? @db.Uuid
-  submissionId String? @unique @db.Uuid
-  submittedAt DateTime? @db.Timestamptz(3)
-  account AccountResult?
-  artifacts Artifact[]
-  reviews TaskReview[]
+  id             String         @id @db.Uuid
+  runId          String         @db.Uuid
+  run            Run            @relation(fields: [runId], references: [id], onDelete: Restrict)
+  targetKey      String         @db.Char(64)
+  entryId        String?        @db.VarChar(100)
+  label          String         @db.VarChar(200)
+  sourceUrl      String         @db.VarChar(4096)
+  position       Int
+  status         String         @default("QUEUED") @db.VarChar(32)
+  apk            Json?
+  cacheHit       Boolean        @default(false)
+  proof          String         @default("NONE") @db.VarChar(32)
+  errorCode      String?        @db.VarChar(100)
+  observation    Json?
+  accountRef     String?        @db.Uuid
+  submissionId   String?        @unique @db.Uuid
+  submittedAt    DateTime?      @db.Timestamptz(3)
+  attemptStarted Boolean        @default(false)
+  account        AccountResult?
+  artifacts      Artifact[]
+  reviews        TaskReview[]
 
   @@unique([runId, targetKey])
   @@unique([runId, position])
 }
 
 model AccountResult {
-  accountRef String @id @db.Uuid
-  taskId String @unique @db.Uuid
-  task Task @relation(fields: [taskId], references: [id], onDelete: Restrict)
-  deliveryId String @db.Uuid
-  delivery Delivery @relation(fields: [deliveryId], references: [id], onDelete: Restrict)
-  fence Int
-  encrypted Json
-  contentHash String @db.Char(64)
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  accountRef  String   @id @db.Uuid
+  taskId      String   @unique @db.Uuid
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Restrict)
+  deliveryId  String   @db.Uuid
+  delivery    Delivery @relation(fields: [deliveryId], references: [id], onDelete: Restrict)
+  fence       Int
+  encrypted   Json
+  contentHash String   @db.Char(64)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
 }
 
 model Artifact {
-  id String @id @db.Uuid
-  taskId String @db.Uuid
-  task Task @relation(fields: [taskId], references: [id], onDelete: Restrict)
-  deliveryId String @db.Uuid
-  delivery Delivery @relation(fields: [deliveryId], references: [id], onDelete: Restrict)
-  fence Int
-  kind String @db.VarChar(32)
-  sha256 String @db.Char(64)
-  bytes Int
-  storageKey String @unique @db.VarChar(100)
-  recordedForReview Boolean @default(false)
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  id                String   @id @db.Uuid
+  taskId            String   @db.Uuid
+  task              Task     @relation(fields: [taskId], references: [id], onDelete: Restrict)
+  deliveryId        String   @db.Uuid
+  delivery          Delivery @relation(fields: [deliveryId], references: [id], onDelete: Restrict)
+  fence             Int
+  kind              String   @db.VarChar(32)
+  sha256            String   @db.Char(64)
+  bytes             Int
+  storageKey        String   @unique @db.VarChar(100)
+  recordedForReview Boolean  @default(false)
+  createdAt         DateTime @default(now()) @db.Timestamptz(3)
+
   @@index([taskId, createdAt])
 }
 
 model TaskReview {
-  id String @id @default(uuid()) @db.Uuid
-  taskId String @db.Uuid
-  task Task @relation(fields: [taskId], references: [id], onDelete: Restrict)
-  outcome String @db.VarChar(32)
-  reason String @db.VarChar(1000)
+  id          String   @id @default(uuid()) @db.Uuid
+  taskId      String   @db.Uuid
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Restrict)
+  outcome     String   @db.VarChar(32)
+  reason      String   @db.VarChar(1000)
   evidenceIds String[] @db.Uuid
-  createdBy String @db.Uuid
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  createdBy   String   @db.Uuid
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+
   @@index([taskId, createdAt])
+}
+
+model DailySchedule {
+  id          String            @id @default(uuid()) @db.Uuid
+  nodeId      String            @unique @db.Uuid
+  node        Node              @relation(fields: [nodeId], references: [id], onDelete: Restrict)
+  body        Json
+  version     Int               @default(1)
+  enabled     Boolean           @default(false)
+  createdBy   String            @db.Uuid
+  createdAt   DateTime          @default(now()) @db.Timestamptz(3)
+  occurrences DailyOccurrence[]
+}
+
+model DailyOccurrence {
+  id            String        @id @default(uuid()) @db.Uuid
+  scheduleId    String        @db.Uuid
+  schedule      DailySchedule @relation(fields: [scheduleId], references: [id], onDelete: Restrict)
+  day           String        @db.VarChar(10)
+  snapshot      Json
+  downloadRunId String?       @db.Uuid
+  registerRunId String?       @db.Uuid
+  status        String        @default("WAITING_DOWNLOAD") @db.VarChar(32)
+  errorCode     String?       @db.VarChar(100)
+  createdAt     DateTime      @default(now()) @db.Timestamptz(3)
+
+  @@unique([scheduleId, day])
+  @@index([day, createdAt])
 }
 
 model RunEvent {

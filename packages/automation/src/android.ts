@@ -411,18 +411,38 @@ export async function startAndroid(
       },
       async launch(pkg, activity) {
         options.beforeAction();
+        let component = pkg + '/' + activity;
+        if (activity === '@launcher') {
+          const resolved = await command(
+            adb,
+            [
+              '-s',
+              record.serial!,
+              'shell',
+              'cmd',
+              'package',
+              'resolve-activity',
+              '--brief',
+              '-a',
+              'android.intent.action.MAIN',
+              '-c',
+              'android.intent.category.LAUNCHER',
+              '-p',
+              pkg,
+            ],
+            10000,
+            'APP_LAUNCH_FAILED',
+          );
+          const found = resolved
+            .split(/\r?\n/)
+            .map((s) => s.trim())
+            .find((s) => s.startsWith(pkg + '/') && /^[A-Za-z0-9_.$]+\/[A-Za-z0-9_.$]+$/.test(s));
+          if (!found) throw new RegistrationError('APP_LAUNCH_FAILED');
+          component = found;
+        }
         const value = await command(
           adb,
-          [
-            '-s',
-            record.serial!,
-            'shell',
-            'am',
-            'start',
-            '-W',
-            '-n',
-            "'" + pkg + '/' + activity + "'",
-          ],
+          ['-s', record.serial!, 'shell', 'am', 'start', '-W', '-n', "'" + component + "'"],
           30000,
           'APP_LAUNCH_FAILED',
         );

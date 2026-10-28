@@ -5,7 +5,13 @@
     "NodeInput": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "host", "port", "username", "credentialVersionId"],
+      "required": [
+        "name",
+        "host",
+        "port",
+        "username",
+        "credentialVersionId"
+      ],
       "properties": {
         "name": {
           "type": "string",
@@ -32,7 +38,10 @@
           "format": "uuid"
         },
         "sudoCredentialVersionId": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "format": "uuid"
         }
       }
@@ -40,10 +49,18 @@
     "SecretInput": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["type", "secretValue"],
+      "required": [
+        "type",
+        "secretValue"
+      ],
       "properties": {
         "type": {
-          "enum": ["SSH_KEY", "SSH_PASSWORD", "SUDO_PASSWORD", "HTTP_PROXY"]
+          "enum": [
+            "SSH_KEY",
+            "SSH_PASSWORD",
+            "SUDO_PASSWORD",
+            "HTTP_PROXY"
+          ]
         },
         "secretValue": {
           "type": "object",
@@ -92,20 +109,30 @@
           "then": {
             "properties": {
               "secretValue": {
-                "required": ["privateKey"],
+                "required": [
+                  "privateKey"
+                ],
                 "not": {
                   "anyOf": [
                     {
-                      "required": ["password"]
+                      "required": [
+                        "password"
+                      ]
                     },
                     {
-                      "required": ["host"]
+                      "required": [
+                        "host"
+                      ]
                     },
                     {
-                      "required": ["port"]
+                      "required": [
+                        "port"
+                      ]
                     },
                     {
-                      "required": ["username"]
+                      "required": [
+                        "username"
+                      ]
                     }
                   ]
                 },
@@ -118,30 +145,45 @@
           "if": {
             "properties": {
               "type": {
-                "enum": ["SSH_PASSWORD", "SUDO_PASSWORD"]
+                "enum": [
+                  "SSH_PASSWORD",
+                  "SUDO_PASSWORD"
+                ]
               }
             }
           },
           "then": {
             "properties": {
               "secretValue": {
-                "required": ["password"],
+                "required": [
+                  "password"
+                ],
                 "not": {
                   "anyOf": [
                     {
-                      "required": ["privateKey"]
+                      "required": [
+                        "privateKey"
+                      ]
                     },
                     {
-                      "required": ["passphrase"]
+                      "required": [
+                        "passphrase"
+                      ]
                     },
                     {
-                      "required": ["host"]
+                      "required": [
+                        "host"
+                      ]
                     },
                     {
-                      "required": ["port"]
+                      "required": [
+                        "port"
+                      ]
                     },
                     {
-                      "required": ["username"]
+                      "required": [
+                        "username"
+                      ]
                     }
                   ]
                 },
@@ -161,14 +203,23 @@
           "then": {
             "properties": {
               "secretValue": {
-                "required": ["host", "port", "username", "password"],
+                "required": [
+                  "host",
+                  "port",
+                  "username",
+                  "password"
+                ],
                 "not": {
                   "anyOf": [
                     {
-                      "required": ["privateKey"]
+                      "required": [
+                        "privateKey"
+                      ]
                     },
                     {
-                      "required": ["passphrase"]
+                      "required": [
+                        "passphrase"
+                      ]
                     }
                   ]
                 },
@@ -182,7 +233,10 @@
     "HostKeyInput": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["probeId", "expectedFingerprint"],
+      "required": [
+        "probeId",
+        "expectedFingerprint"
+      ],
       "properties": {
         "probeId": {
           "type": "string",
@@ -197,7 +251,11 @@
     "DeploymentInput": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["nodeId", "releaseId", "licenseAccepted"],
+      "required": [
+        "nodeId",
+        "releaseId",
+        "licenseAccepted"
+      ],
       "properties": {
         "nodeId": {
           "type": "string",
@@ -215,7 +273,9 @@
     "ReasonInput": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["reason"],
+      "required": [
+        "reason"
+      ],
       "properties": {
         "reason": {
           "type": "string",
@@ -227,7 +287,10 @@
     "ReconcileInput": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["checkId", "reason"],
+      "required": [
+        "checkId",
+        "reason"
+      ],
       "properties": {
         "checkId": {
           "type": "string",
@@ -333,10 +396,20 @@
               "items": {
                 "type": "object",
                 "additionalProperties": false,
-                "required": ["role", "url", "checksum", "revision"],
+                "required": [
+                  "role",
+                  "url",
+                  "checksum",
+                  "revision"
+                ],
                 "properties": {
                   "role": {
-                    "enum": ["cmdlineTools", "emulator", "platformTools", "systemImage"]
+                    "enum": [
+                      "cmdlineTools",
+                      "emulator",
+                      "platformTools",
+                      "systemImage"
+                    ]
                   },
                   "url": {
                     "type": "string",
@@ -363,10 +436,14 @@
         },
         "features": {
           "type": "array",
-          "maxItems": 2,
+          "maxItems": 3,
           "uniqueItems": true,
           "items": {
-            "enum": ["DOWNLOAD_V1", "REGISTRATION_V1"]
+            "enum": [
+              "DOWNLOAD_V1",
+              "REGISTRATION_V1",
+              "DAILY_V1"
+            ]
           }
         }
       }
@@ -509,57 +586,100 @@
           "type": "integer"
         },
         "credentialVersionId": {
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "sudoCredentialVersionId": {
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "expectedFingerprint": {
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "deploymentStatus": {
           "type": "string"
         },
         "connection": {
-          "enum": ["ONLINE", "OFFLINE"]
+          "enum": [
+            "ONLINE",
+            "OFFLINE"
+          ]
         },
         "occupancy": {
-          "enum": ["IDLE", "BUSY", "QUARANTINED"]
+          "enum": [
+            "IDLE",
+            "BUSY",
+            "QUARANTINED"
+          ]
         },
         "lastSeenAt": {
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "agentVersion": {
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "agentReleaseId": {
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "health": {
-          "type": ["object", "null"]
+          "type": [
+            "object",
+            "null"
+          ]
         },
         "createdAt": {
           "type": "string"
         },
         "downloadProtocol": {
-          "type": ["string", "null"],
-          "enum": ["1.0", null]
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "1.0",
+            null
+          ]
         },
         "registrationProtocol": {
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
         }
       }
     },
     "ExecutionOS": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["distribution", "version"],
+      "required": [
+        "distribution",
+        "version"
+      ],
       "properties": {
         "distribution": {
           "const": "ubuntu"
         },
         "version": {
-          "enum": ["24.04", "26.04"]
+          "enum": [
+            "24.04",
+            "26.04"
+          ]
         }
       }
     }

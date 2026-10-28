@@ -24,6 +24,10 @@ const p3 = await json('contracts/p3.schema.json'),
   p3Http = await json('contracts/p3.http.json');
 manifest.routes.push(...p3Http.routes);
 manifest.version = p3Http.version;
+const v15 = await json('contracts/v15.schema.json'),
+  v15Http = await json('contracts/v15.http.json');
+manifest.routes.push(...v15Http.routes);
+manifest.version = v15Http.version;
 const schemas = {
   TestConfiguration: config,
   AgentMessage: agent,
@@ -37,6 +41,12 @@ const schemas = {
   ),
   ...Object.fromEntries(
     Object.entries(p3.$defs).map(([name, value]) => [name, { ...value, $id: p3.$id + '/' + name }]),
+  ),
+  ...Object.fromEntries(
+    Object.entries(v15.$defs).map(([name, value]) => [
+      name,
+      { ...value, $id: v15.$id + '/' + name },
+    ]),
   ),
 };
 const ajv = new Ajv({
@@ -136,6 +146,13 @@ const apiSchemas = {
       id: str,
       nodeId: str,
       status: str,
+      purpose: str,
+      cacheDay: { type: ['string', 'null'] },
+      configVersionId: { type: ['string', 'null'] },
+      successTarget: { type: 'integer' },
+      attemptLimit: { type: 'integer' },
+      attemptsStarted: { type: 'integer' },
+      successes: { type: 'integer' },
       createdAt: { type: 'string', format: 'date-time' },
     }),
   ),
@@ -168,13 +185,15 @@ const paths = {};
 for (const route of manifest.routes) {
   const operation = {
     operationId: route.operationId,
-    'x-phase': p3Http.routes.some((r) => r.operationId === route.operationId)
-      ? 'P3'
-      : p2Http.routes.some((r) => r.operationId === route.operationId)
-        ? 'P2'
-        : p1Http.routes.some((r) => r.operationId === route.operationId)
-          ? 'P1'
-          : 'P0',
+    'x-phase': v15Http.routes.some((r) => r.operationId === route.operationId)
+      ? '1.5'
+      : p3Http.routes.some((r) => r.operationId === route.operationId)
+        ? 'P3'
+        : p2Http.routes.some((r) => r.operationId === route.operationId)
+          ? 'P2'
+          : p1Http.routes.some((r) => r.operationId === route.operationId)
+            ? 'P1'
+            : 'P0',
     security: route.node
       ? [{ NodeBearer: [] }]
       : route.public || route.internal

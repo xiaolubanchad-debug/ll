@@ -61,14 +61,15 @@ export async function mutation<T = unknown>(
   path: string,
   body: unknown,
   headers: Record<string, string> = {},
+  method = 'POST',
 ) {
-  const intent = JSON.stringify([path, body, headers]);
+  const intent = JSON.stringify([method, path, body, headers]);
   let key = pendingMutations.get(intent);
   if (!key) {
     key = crypto.randomUUID();
     pendingMutations.set(intent, key);
   }
-  const result = await api<T>(path, 'POST', body, { ...headers, 'Idempotency-Key': key });
+  const result = await api<T>(path, method, body, { ...headers, 'Idempotency-Key': key });
   pendingMutations.delete(intent);
   return result;
 }

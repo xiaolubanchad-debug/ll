@@ -2,6 +2,7 @@
 import { ref, onMounted, onUnmounted } from 'vue';
 import { configurationIssues, schemaIssues } from '@apk/contracts';
 import { api, mutation } from './api';
+import RegistrationFlowEditor from './RegistrationFlowEditor.vue';
 const props = defineProps<{ draftText: string }>();
 const emit = defineEmits<{ load: [value: string] }>();
 interface Config {
@@ -189,6 +190,7 @@ onUnmounted(() => {
         凭据不会写入配置 JSON。轮询代理的探测 IP 只代表探测当时，不保证注册请求使用相同出口。
       </p>
     </details>
+    <RegistrationFlowEditor :draft-text="draftText" @load="(value) => emit('load', value)" />
     <label for="config-name">配置名称</label
     ><el-input id="config-name" v-model="name" maxlength="100" />
     <div class="form-actions">

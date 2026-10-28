@@ -1,4 +1,5 @@
 import type { ApkMetadata, TestConfiguration } from '@apk/contracts';
+import { registrationFlowFor } from '@apk/contracts';
 import { startAndroid } from './android.js';
 import type { AndroidOptions } from './android.js';
 import { inspectApk } from './apk.js';
@@ -24,8 +25,8 @@ export async function registerApk(
   emit: (event: AutomationEvent) => Promise<void>,
   hooks: RegistrationHooks,
 ): Promise<RegistrationCompletion> {
-  const flow = config.registrationFlows.find((f) => f.packageName === apk.packageName && f.enabled);
-  if (!flow)
+  const template = registrationFlowFor(config, apk.packageName, target.entryId);
+  if (!template)
     return {
       status: 'SKIPPED',
       proof: 'NONE',
@@ -33,6 +34,14 @@ export async function registerApk(
       errorCode: 'FLOW_NOT_CONFIGURED',
       cleanupComplete: true,
     };
+  const flow = structuredClone(template);
+  flow.packageName = apk.packageName;
+  for (const locator of [
+    ...flow.steps.map((s) => s.locator),
+    flow.success.locator,
+    flow.failure?.locator,
+  ])
+    if (locator) locator.value = locator.value.replaceAll('{packageName}', apk.packageName);
   let session: AndroidSession | undefined,
     account: Account | undefined,
     submitted = false,

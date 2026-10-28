@@ -1,0 +1,33 @@
+{
+  "version": "1.5.0",
+  "routes": [
+    {
+      "method": "get",
+      "path": "/schedules",
+      "operationId": "schedules",
+      "status": 200
+    },
+    {
+      "method": "post",
+      "path": "/schedules",
+      "operationId": "createSchedule",
+      "request": "ScheduleInput",
+      "idempotent": true,
+      "status": 201
+    },
+    {
+      "method": "put",
+      "path": "/schedules/{id}",
+      "operationId": "updateSchedule",
+      "request": "ScheduleInput",
+      "idempotent": true,
+      "status": 200
+    },
+    {
+      "method": "get",
+      "path": "/schedules/{id}/days",
+      "operationId": "scheduleDays",
+      "status": 200
+    }
+  ]
+}

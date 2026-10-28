@@ -18,6 +18,7 @@ import { settings } from '../apps/control-api/dist/settings.js';
 import { configurationIssues } from '@apk/contracts';
 import { P2Controller, P2AgentController } from '../apps/control-api/dist/p2-controllers.js';
 import { P3Controller, P3AgentController } from '../apps/control-api/dist/p3-controllers.js';
+import { V15Controller } from '../apps/control-api/dist/v15-controllers.js';
 
 const db = new PrismaClient();
 const origin = process.env.APP_ORIGIN;
@@ -323,6 +324,9 @@ test('P0 real PostgreSQL acceptance', async (t) => {
       manifest.routes.push(...JSON.parse(fs.readFileSync('contracts/p1.http.json', 'utf8')).routes);
       manifest.routes.push(...JSON.parse(fs.readFileSync('contracts/p2.http.json', 'utf8')).routes);
       manifest.routes.push(...JSON.parse(fs.readFileSync('contracts/p3.http.json', 'utf8')).routes);
+      manifest.routes.push(
+        ...JSON.parse(fs.readFileSync('contracts/v15.http.json', 'utf8')).routes,
+      );
       const actual = [];
       for (const C of [
         AuthController,
@@ -334,6 +338,7 @@ test('P0 real PostgreSQL acceptance', async (t) => {
         P2AgentController,
         P3Controller,
         P3AgentController,
+        V15Controller,
       ])
         for (const key of Object.getOwnPropertyNames(C.prototype)) {
           const handler = C.prototype[key];

@@ -118,8 +118,8 @@ export async function startAgent(
   let report = await health(config.sdkRoot, config.toolsRoot, config.releaseId),
     checkedAt = Date.now(),
     refreshing = false;
-  const registration = ['0.4.0', '0.4.1'].includes(config.agentVersion);
-  const engine = ['0.3.0', '0.3.1', '0.3.2', '0.3.3', '0.3.4', '0.4.0', '0.4.1'].includes(
+  const registration = ['0.4.0', '0.4.1', '0.5.0'].includes(config.agentVersion);
+  const engine = ['0.3.0', '0.3.1', '0.3.2', '0.3.3', '0.3.4', '0.4.0', '0.4.1', '0.5.0'].includes(
     config.agentVersion,
   )
     ? await TaskEngine.open(

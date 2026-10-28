@@ -8,6 +8,7 @@ import {
   configurationIssues,
   agentIssues,
   schemaIssues,
+  registrationFlowFor,
 } from '../packages/contracts/dist/index.js';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
@@ -20,6 +21,33 @@ const agentCheck = ajv.compile(read('contracts/agent.schema.json'));
 const config = read('contracts/fixtures/config.valid.json');
 const messages = read('contracts/fixtures/agent.valid.json');
 let passed = 0;
+const v15Examples = read('contracts/fixtures/v15.valid.json');
+for (const [name, value] of Object.entries(v15Examples)) {
+  test('1.5 valid ' + name, () => assert.deepEqual(schemaIssues(name, value), []));
+}
+test('1.5 capability list accepts three declared capabilities', () => {
+  const validate = ajv.compile(
+    read('contracts/p1.schema.json').$defs.ReleaseInput.properties.features,
+  );
+  assert.ok(validate(['DOWNLOAD_V1', 'REGISTRATION_V1', 'DAILY_V1']));
+  assert.equal(validate(['DOWNLOAD_V1', 'ARBITRARY_CODE']), false);
+});
+test('1.5 invalid local time rejected', () =>
+  assert.ok(schemaIssues('ScheduleInput', { ...v15Examples.ScheduleInput, time: '24:05' }).length));
+test('1.5 zero attempt limit rejected', () =>
+  assert.ok(
+    schemaIssues('ScheduleInput', { ...v15Examples.ScheduleInput, attemptLimit: 0 }).length,
+  ));
+test('1.5 plaintext schedule secret rejected', () =>
+  assert.ok(
+    schemaIssues('ScheduleInput', { ...v15Examples.ScheduleInput, proxyPassword: 'forbidden' })
+      .length,
+  ));
+test('1.5 arbitrary execution purpose rejected', () =>
+  assert.ok(
+    schemaIssues('DailyExecutionPlan', { ...v15Examples.DailyExecutionPlan, purpose: 'EXEC_SHELL' })
+      .length,
+  ));
 
 function semanticConfig(value) {
   assert.deepEqual(configurationIssues(value), []);
@@ -65,6 +93,27 @@ for (const message of messages)
   test(`agent ${message.kind}`, () => valid(agentCheck, semanticAgent, message));
 
 const configReject = (name, fn) => reject(name, config, fn, configCheck, semanticConfig);
+test('1.5 entry template supports changing package names', () => {
+  const c = structuredClone(config);
+  c.registrationFlows[0].entryId = '2692';
+  c.registrationFlows[0].packageName = '*';
+  c.registrationFlows[0].activity = '@launcher';
+  valid(configCheck, semanticConfig, c);
+  assert.ok(registrationFlowFor(c, 'com.example.today', '2692') === undefined); // Fixture stays disabled until explicitly enabled.
+  c.registrationFlows[0].enabled = true;
+  assert.ok(registrationFlowFor(c, 'com.example.today', '2692'));
+  assert.ok(registrationFlowFor(c, 'com.example.tomorrow', '2692'));
+  assert.equal(registrationFlowFor(c, 'com.example.today', 'other'), undefined);
+});
+configReject('1.5 unscoped package wildcard rejected', (c) => {
+  c.registrationFlows[0].packageName = '*';
+});
+configReject('1.5 duplicate entry templates rejected', (c) => {
+  c.registrationFlows[0].entryId = '2692';
+  const second = structuredClone(c.registrationFlows[0]);
+  second.packageName = 'com.example.other';
+  c.registrationFlows.push(second);
+});
 configReject('full mode requires proxy reference', (v) => delete v.execution.proxySecretVersionId);
 configReject('plaintext proxy password forbidden', (v) => {
   v.execution.proxyPassword = 'example-only';

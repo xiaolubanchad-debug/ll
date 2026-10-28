@@ -6,6 +6,7 @@ import type {
   PasswordChangeInput,
 } from './generated/types.js';
 export type { ArtifactInput, AccountViewInput, TaskReconcileInput } from './generated/types.js';
+export type { ScheduleInput, DailyExecutionPlan, ProxyObservation } from './generated/types.js';
 export type { TestConfiguration, AgentMessage, LoginInput, PasswordChangeInput };
 export type { SessionView, NodeList, RunList, AuditList } from './generated/types.js';
 export type {
@@ -70,9 +71,11 @@ export function configurationIssues(value: unknown): Issue[] {
   const profiles = config.execution.deviceProfiles.map((p) => p.id);
   if (new Set(profiles).size !== profiles.length)
     issues.push({ path: '/execution/deviceProfiles', message: '设备配置编号不能重复' });
-  const packages = config.registrationFlows.map((f) => f.packageName);
+  const packages = config.registrationFlows.map((f) =>
+    f.entryId ? 'entry:' + f.entryId : 'package:' + f.packageName,
+  );
   if (new Set(packages).size !== packages.length)
-    issues.push({ path: '/registrationFlows', message: '同一个包名只能配置一个流程' });
+    issues.push({ path: '/registrationFlows', message: '同一个入口或包名只能配置一个流程' });
   for (const [i, flow] of config.registrationFlows.entries()) {
     const index = flow.steps.findIndex((s) => s.action === 'submit');
     if (flow.steps.slice(index + 1).some((s) => s.action !== 'wait'))
@@ -94,6 +97,21 @@ export function configurationIssues(value: unknown): Issue[] {
 export function safeUiSelector(value: string) {
   return /^new UiSelector\(\)(?:(?:\.(?:text|textContains|resourceId|description|descriptionContains|className|packageName)\("[^"\\\r\n]{0,1000}"\))|(?:\.(?:index|instance)\([0-9]{1,4}\))|(?:\.(?:enabled|clickable|checked|selected|focusable|focused|scrollable)\((?:true|false)\)))+$/.test(
     value,
+  );
+}
+export function registrationFlowFor(
+  config: TestConfiguration,
+  packageName: string,
+  entryId?: string,
+) {
+  const matches = config.registrationFlows.filter((f) => f.enabled);
+  return (
+    matches.find(
+      (f) =>
+        !!entryId &&
+        f.entryId === entryId &&
+        (f.packageName === '*' || f.packageName === packageName),
+    ) ?? matches.find((f) => !f.entryId && f.packageName === packageName)
   );
 }
 export function agentIssues(value: unknown): Issue[] {

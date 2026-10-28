@@ -21,6 +21,8 @@ export interface TestConfiguration {
       host: string;
       by: 'css' | 'xpath';
       selector: string;
+      mode?: 'AUTO' | 'CLICK' | 'AUTO_THEN_CLICK';
+      autoWaitMs?: number;
     }[];
     maxApkBytes?: number;
   };
@@ -62,6 +64,7 @@ export interface Flow {
     locator: Locator;
     timeoutMs: number;
   };
+  entryId?: string;
 }
 export interface Step {
   action: 'click' | 'input' | 'wait' | 'back' | 'submit';
@@ -197,7 +200,8 @@ export interface Event {
     | 'TASK_FINISHED'
     | 'RUN_FINISHED'
     | 'STOP_ACK'
-    | 'LOG';
+    | 'LOG'
+    | 'PROXY_CHECKED';
   payload: {
     [k: string]: unknown;
   };
@@ -295,9 +299,9 @@ export interface ReleaseInput {
     npmLockSha256: string;
   };
   /**
-   * @maxItems 2
+   * @maxItems 3
    */
-  features?: ('DOWNLOAD_V1' | 'REGISTRATION_V1')[];
+  features?: ('DOWNLOAD_V1' | 'REGISTRATION_V1' | 'DAILY_V1')[];
 }
 
 export interface HealthReport {
@@ -370,6 +374,11 @@ export interface RunInput {
   configVersionId: string;
   releaseId: string;
   supersedesRunId?: string;
+  purpose?: 'DOWNLOAD' | 'REGISTER' | 'PROXY_CHECK';
+  sourceDownloadId?: string;
+  successTarget?: number;
+  attemptLimit?: number;
+  proxySecretVersionId?: string;
 }
 
 export interface RunReconcileInput {
@@ -447,6 +456,55 @@ export interface TaskReconcileInput {
   evidenceIds: string[];
 }
 
+export interface ScheduleInput {
+  nodeId: string;
+  configVersionId: string;
+  releaseId: string;
+  enabled: boolean;
+  autoRegister: boolean;
+  time: string;
+  timezone: 'Asia/Shanghai';
+  successTarget: number;
+  attemptLimit: number;
+}
+
+export interface ProxyObservation {
+  status: 'SUCCEEDED' | 'FAILED';
+  ip?: string;
+  at?: string;
+  scope?: 'PROBE_ONLY';
+  errorCode?: 'PROXY_CHECK_FAILED';
+}
+
+export interface DailyExecutionPlan {
+  purpose: 'DOWNLOAD' | 'REGISTER' | 'PROXY_CHECK';
+  cacheDay: string;
+  successTarget: number;
+  attemptLimit: number;
+  proxySecretVersionId?: string;
+  /**
+   * @maxItems 1000
+   */
+  assets: {
+    targetKey: string;
+    label: string;
+    sourceUrl: string;
+    apk: {
+      packageName: string;
+      versionName: string | null;
+      versionCode: number | null;
+      /**
+       * @maxItems 20
+       */
+      abis: string[];
+      size: number;
+      apkSha256: string;
+      cacheDay: string;
+    };
+    entryId?: string;
+  }[];
+}
+
 export interface SessionView {
   admin: {
     id: string;
@@ -492,6 +550,13 @@ export interface RunList {
     id: string;
     nodeId: string;
     status: string;
+    purpose: string;
+    cacheDay: string | null;
+    configVersionId: string | null;
+    successTarget: number;
+    attemptLimit: number;
+    attemptsStarted: number;
+    successes: number;
     createdAt: string;
   }[];
   nextCursor: string | null;

@@ -1,0 +1,26 @@
+{
+  "ScheduleInput": {
+    "nodeId": "11111111-1111-4111-8111-111111111111",
+    "configVersionId": "22222222-2222-4222-8222-222222222222",
+    "releaseId": "33333333-3333-4333-8333-333333333333",
+    "enabled": false,
+    "autoRegister": true,
+    "time": "00:05",
+    "timezone": "Asia/Shanghai",
+    "successTarget": 10,
+    "attemptLimit": 30
+  },
+  "DailyExecutionPlan": {
+    "purpose": "DOWNLOAD",
+    "cacheDay": "2026-10-28",
+    "successTarget": 0,
+    "attemptLimit": 0,
+    "assets": []
+  },
+  "ProxyObservation": {
+    "status": "SUCCEEDED",
+    "ip": "203.0.113.1",
+    "at": "2026-10-28T00:00:00Z",
+    "scope": "PROBE_ONLY"
+  }
+}

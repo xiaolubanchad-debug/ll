@@ -14,6 +14,8 @@ import { idempotent } from './jobs.js';
 import { configSecrets } from './configurations.js';
 import { fault } from './errors.js';
 import { isIP } from 'node:net';
+import { beijingDay, prepareDailyPlan, dailyTargetKey } from './daily-plan.js';
+import type { DailyExecutionPlan } from '@apk/contracts';
 type Tx = P.TransactionClient;
 export const ACTIVE_RUNS = ['ASSIGNED', 'RUNNING', 'STOP_REQUESTED'] as const;
 export const RUN_END = ['SUCCEEDED', 'PARTIAL_FAILED', 'FAILED', 'CANCELLED', 'NEEDS_REVIEW'];
@@ -34,6 +36,11 @@ export async function reviewRun(tx: Tx, run: Run, code: string) {
     where: { nodeId: run.nodeId, runId: run.id },
     data: { quarantined: true },
   });
+  if (run.purpose === 'REGISTER')
+    await tx.task.updateMany({
+      where: { runId: run.id, status: 'QUEUED', attemptStarted: false },
+      data: { status: 'SKIPPED', errorCode: 'BATCH_NEEDS_REVIEW' },
+    });
 }
 export async function expireNodeRun(tx: Tx, nodeId: string) {
   const slot = await tx.nodeSlot.findUnique({ where: { nodeId } });
@@ -72,11 +79,29 @@ export async function createRun(
   actor: string,
   requestId: string,
   key: string,
+  now = new Date(),
+  scheduleId?: string,
 ) {
   const input = checked<RunInput>('RunInput', body);
   return idempotent(db, actor, 'POST:/runs', key, input, async (tx) => {
     const node = await lockNode(tx, input.nodeId);
+    if (scheduleId) {
+      const schedule = await tx.dailySchedule.findUnique({ where: { id: scheduleId } });
+      if (!schedule?.enabled || schedule.nodeId !== node.id)
+        fault('SCHEDULE_DISABLED', '每日计划已关闭');
+    }
     await expireNodeRun(tx, node.id);
+    const config = await tx.configVersion.findUnique({ where: { id: input.configVersionId } });
+    if (!config) fault('NOT_FOUND', '配置版本不存在', 404);
+    const dailyKey =
+      input.purpose === 'DOWNLOAD'
+        ? digest(canonical([node.id, config.configId, beijingDay(now)]))
+        : null;
+    if (dailyKey) {
+      const existing = await tx.run.findUnique({ where: { dailyKey } });
+      if (existing)
+        return { operationId: existing.id, resourceId: existing.id, status: existing.status };
+    }
     await idle(tx, node.id);
     if (!node.lastSeenAt || node.lastSeenAt.getTime() < Date.now() - 45000)
       fault('NODE_OFFLINE', '节点尚未在线');
@@ -93,11 +118,32 @@ export async function createRun(
       !health?.download
     )
       fault('NODE_UPGRADE_REQUIRED', '请部署支持下载任务的 Agent 版本');
-    const config = await tx.configVersion.findUnique({ where: { id: input.configVersionId } });
-    if (!config) fault('NOT_FOUND', '配置版本不存在', 404);
     const configuration = config.body as unknown as TestConfiguration;
-    await configSecrets(tx, configuration);
-    if (configuration.execution.mode === 'FULL') {
+    if (
+      (input.purpose ||
+        configuration.registrationFlows.some(
+          (f) =>
+            f.entryId ||
+            f.packageName === '*' ||
+            f.activity === '@launcher' ||
+            [...f.steps.map((s) => s.locator), f.success.locator, f.failure?.locator].some((l) =>
+              l?.value.includes('{packageName}'),
+            ),
+        ) ||
+        configuration.download.landingRules.some(
+          (r) => r.mode !== undefined || r.autoWaitMs !== undefined,
+        )) &&
+      (!manifest?.features?.includes('DAILY_V1') || node.agentVersion !== '0.5.0')
+    )
+      fault('NODE_UPGRADE_REQUIRED', '请部署支持每日下载与循环注册的 Agent');
+    const plan = await prepareDailyPlan(tx, input, config, now);
+    if (input.purpose === 'PROXY_CHECK')
+      await readSecret(tx, input.proxySecretVersionId!, ['HTTP_PROXY']);
+    else if (input.purpose !== 'DOWNLOAD') await configSecrets(tx, configuration);
+    if (
+      input.purpose === 'REGISTER' ||
+      (!input.purpose && configuration.execution.mode === 'FULL')
+    ) {
       if (!manifest.features?.includes('REGISTRATION_V1') || node.registrationProtocol !== '1.0')
         fault('NODE_UPGRADE_REQUIRED', '完整测试需要支持注册的 Agent 版本');
       if (!health?.android || !health.kvm) fault('NODE_NOT_READY', '安卓环境尚未就绪');
@@ -114,7 +160,15 @@ export async function createRun(
         fault('VALIDATION_FAILED', '关联批次无效', 422);
     }
     const run = await tx.run.create({
-      data: { ...input, configHash: config.configHash, createdBy: actor },
+      data: {
+        ...input,
+        configHash: config.configHash,
+        createdBy: actor,
+        ...(plan
+          ? { executionPlan: plan as unknown as Prisma.InputJsonValue, cacheDay: plan.cacheDay }
+          : {}),
+        ...(dailyKey ? { dailyKey } : {}),
+      },
     });
     await tx.nodeSlot.update({
       where: { nodeId: node.id },
@@ -241,7 +295,13 @@ export async function deliveryConfig(db: PrismaClient, token: string, id: string
     const config = v.body as unknown as TestConfiguration;
     await configSecrets(tx, config);
     const proxyId =
-      config.execution.mode === 'FULL' ? config.execution.proxySecretVersionId : undefined;
+      d.run.purpose === 'DOWNLOAD'
+        ? undefined
+        : d.run.purpose === 'PROXY_CHECK'
+          ? d.run.proxySecretVersionId!
+          : config.execution.mode === 'FULL'
+            ? config.execution.proxySecretVersionId
+            : undefined;
     const secretVersions = proxyId
       ? [
           {
@@ -251,7 +311,13 @@ export async function deliveryConfig(db: PrismaClient, token: string, id: string
           },
         ]
       : [];
-    return { deliveryId: id, configHash: v.configHash, config, secretVersions };
+    return {
+      deliveryId: id,
+      configHash: v.configHash,
+      config,
+      secretVersions,
+      ...(d.run.executionPlan ? { executionPlan: d.run.executionPlan } : {}),
+    };
   });
 }
 export async function closeRun(
@@ -311,7 +377,9 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
     ? await tx.configVersion.findUnique({ where: { id: run.configVersionId } })
     : null;
   const config = version?.body as unknown as TestConfiguration;
-  const full = config?.execution.mode === 'FULL';
+  const full =
+    run.purpose === 'REGISTER' || (run.purpose === 'LEGACY' && config?.execution.mode === 'FULL');
+  const plan = run.executionPlan as unknown as DailyExecutionPlan | null;
   const p = event.payload as Record<string, unknown>;
   if (event.type === 'RUN_STARTED') {
     if (event.sequence !== 1 || p.configHash !== run.configHash || p.releaseId !== run.releaseId)
@@ -319,17 +387,22 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
     return;
   }
   if (event.type === 'TARGETS_DISCOVERED') {
+    if (run.purpose === 'PROXY_CHECK') fault('EVENT_CONFLICT', '代理检查不接受 APK 目标');
     if (run.discovered) fault('EVENT_CONFLICT', '目标发现不可重复');
     const targets = p.targets as {
       taskId: string;
       targetKey: string;
       label: string;
       sourceUrl: string;
+      entryId?: string;
     }[];
     const config = await tx.configVersion.findUniqueOrThrow({
       where: { id: run.configVersionId! },
     });
-    const max = (config.body as unknown as TestConfiguration).download.maxTargets;
+    const max =
+      run.purpose === 'REGISTER'
+        ? run.attemptLimit
+        : (config.body as unknown as TestConfiguration).download.maxTargets;
     const start = await tx.task.count({ where: { runId } });
     if (
       (p.startIndex ?? 0) !== start ||
@@ -339,6 +412,16 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
     )
       fault('EVENT_CONFLICT', '目标数量或编号冲突');
     for (const [offset, t] of targets.entries()) {
+      if (run.purpose === 'REGISTER') {
+        const asset = plan?.assets[(start + offset) % plan.assets.length];
+        if (
+          !asset ||
+          t.targetKey !== dailyTargetKey(asset.targetKey, start + offset) ||
+          t.sourceUrl !== asset.sourceUrl ||
+          t.entryId !== asset.entryId
+        )
+          fault('EVENT_CONFLICT', '注册轮次与下载资产不一致');
+      }
       const url = new URL(t.sourceUrl);
       if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password)
         fault('EVENT_CONFLICT', '目标地址无效');
@@ -350,6 +433,7 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
           label: t.label,
           sourceUrl: t.sourceUrl,
           position: start + offset,
+          ...(t.entryId ? { entryId: t.entryId } : {}),
         },
       });
     }
@@ -360,6 +444,21 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
         discovered: complete,
         ...(complete && !targets.length && !start ? { errorCode: 'NO_TARGETS' } : {}),
       },
+    });
+    return;
+  }
+  if (event.type === 'PROXY_CHECKED') {
+    if (
+      run.purpose !== 'PROXY_CHECK' ||
+      run.proxyObservation ||
+      schemaIssues('ProxyObservation', p).length ||
+      (p.status === 'SUCCEEDED' &&
+        (!isIP(String(p.ip ?? '')) || p.scope !== 'PROBE_ONLY' || typeof p.at !== 'string'))
+    )
+      fault('EVENT_CONFLICT', '代理检查结果无效');
+    await tx.run.update({
+      where: { id: runId },
+      data: { proxyObservation: p as Prisma.InputJsonValue },
     });
     return;
   }
@@ -395,6 +494,26 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
       fault('EVENT_CONFLICT', '目标不属于本批次或发现尚未完成');
     if (event.type === 'TASK_STAGE') {
       const stage = String(p.stage);
+      if (run.purpose === 'REGISTER' && stage === 'DOWNLOADING') {
+        const active = await tx.task.count({
+          where: {
+            runId,
+            attemptStarted: true,
+            status: { notIn: ['SUCCEEDED', 'FAILED', 'SKIPPED', 'CANCELLED'] },
+          },
+        });
+        if (
+          task.status !== 'QUEUED' ||
+          task.attemptStarted ||
+          task.position !== run.attemptsStarted ||
+          active ||
+          run.attemptsStarted >= run.attemptLimit ||
+          run.successes >= run.successTarget
+        )
+          fault('EVENT_CONFLICT', '上一轮尚未结束或已达到注册配额');
+        await tx.run.update({ where: { id: runId }, data: { attemptsStarted: { increment: 1 } } });
+        await tx.task.update({ where: { id: task.id }, data: { attemptStarted: true } });
+      }
       const androidStages = [
         'DOWNLOADED',
         'PREPARING',
@@ -415,6 +534,11 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
         fault('EVENT_CONFLICT', '任务阶段不能跳过或倒退');
       if (stage === 'DOWNLOADED' && schemaIssues('ApkMetadata', p.apk).length)
         fault('EVENT_CONFLICT', '缺少 APK 校验元数据');
+      if (stage === 'DOWNLOADED' && run.purpose === 'REGISTER') {
+        const expected = plan?.assets[task.position % plan.assets.length]?.apk;
+        if (!expected || canonical(expected) !== canonical(p.apk))
+          fault('EVENT_CONFLICT', '缓存资产元数据被修改');
+      }
       if (stage === 'INSTALLING') {
         const observation = p.observation as
           | { profileId?: string; proxyObservedIp?: string }
@@ -510,6 +634,8 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
         ...(typeof p.accountRef === 'string' ? { accountRef: p.accountRef } : {}),
       },
     });
+    if (run.purpose === 'REGISTER' && status === 'SUCCEEDED')
+      await tx.run.update({ where: { id: runId }, data: { successes: { increment: 1 } } });
     return;
   }
   if (event.type === 'STOP_ACK') {
@@ -561,6 +687,54 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
       return;
     }
     if (run.stopRequested) return; // Acknowledge the race, but only STOP_ACK can release this slot.
+    if (run.purpose === 'PROXY_CHECK') {
+      const observation = run.proxyObservation as { status?: string } | null;
+      const expected = observation?.status === 'SUCCEEDED' ? 'SUCCEEDED' : 'FAILED';
+      if (!observation || tasks.length || p.status !== expected)
+        fault('EVENT_CONFLICT', '代理检查汇总不一致');
+      await closeRun(tx, run, expected, expected === 'FAILED' ? 'PROXY_CHECK_FAILED' : undefined);
+      return;
+    }
+    if (run.purpose === 'REGISTER') {
+      const active = tasks.filter(
+        (t) =>
+          t.attemptStarted && !['SUCCEEDED', 'FAILED', 'SKIPPED', 'CANCELLED'].includes(t.status),
+      );
+      const reached = run.successes >= run.successTarget;
+      const empty = !plan?.assets.length;
+      const missing =
+        p.errorCode === 'CACHE_MISSING' &&
+        tasks.some((t) => t.attemptStarted && t.errorCode === 'CACHE_MISSING');
+      const changed =
+        p.errorCode === 'FLOW_LAYOUT_CHANGED' &&
+        tasks.some(
+          (t) => t.attemptStarted && !t.submissionId && t.errorCode === 'FLOW_STEP_FAILED',
+        );
+      if (
+        !run.discovered ||
+        active.length ||
+        (!reached && !empty && !missing && !changed && run.attemptsStarted < run.attemptLimit)
+      )
+        fault('EVENT_CONFLICT', '注册循环尚未达到终止条件');
+      const expected = reached ? 'SUCCEEDED' : run.successes ? 'PARTIAL_FAILED' : 'FAILED';
+      const code = reached
+        ? undefined
+        : empty
+          ? 'NO_ADAPTED_APKS'
+          : changed
+            ? 'FLOW_LAYOUT_CHANGED'
+            : missing
+              ? 'CACHE_MISSING'
+              : 'ATTEMPT_LIMIT';
+      if (p.status !== expected || p.errorCode !== code)
+        fault('EVENT_CONFLICT', '配额结果或原因不一致');
+      await tx.task.updateMany({
+        where: { runId, status: 'QUEUED', attemptStarted: false },
+        data: { status: 'SKIPPED', errorCode: reached ? 'QUOTA_NOT_USED' : 'BATCH_ENDED' },
+      });
+      await closeRun(tx, run, expected, code);
+      return;
+    }
     if (tasks.some((t) => !['SUCCEEDED', 'FAILED', 'SKIPPED', 'CANCELLED'].includes(t.status)))
       fault('EVENT_CONFLICT', '目标尚未全部结束');
     const count = tasks.filter((t) => t.status === 'SUCCEEDED').length;
@@ -603,6 +777,7 @@ export async function runEvents(db: PrismaClient, token: string, body: unknown) 
             'TASK_FINISHED',
             'RUN_FINISHED',
             'STOP_ACK',
+            'PROXY_CHECKED',
           ].includes(event.type)
         )
           fault('FEATURE_UNAVAILABLE', 'P2 不接受此事件', 422);

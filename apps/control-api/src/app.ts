@@ -16,6 +16,7 @@ import { settings } from './settings.js';
 import { NodesController, DeploymentController, AgentController } from './p1-controllers.js';
 import { P2Controller, P2AgentController } from './p2-controllers.js';
 import { P3Controller, P3AgentController } from './p3-controllers.js';
+import { V15Controller, DailyScheduler } from './v15-controllers.js';
 import { digest } from '@apk/platform';
 import { ApiError } from './errors.js';
 
@@ -30,8 +31,14 @@ import { ApiError } from './errors.js';
     P2AgentController,
     P3Controller,
     P3AgentController,
+    V15Controller,
   ],
-  providers: [Database, AuthService, { provide: APP_GUARD, useClass: SessionGuard }],
+  providers: [
+    Database,
+    AuthService,
+    DailyScheduler,
+    { provide: APP_GUARD, useClass: SessionGuard },
+  ],
 })
 export class AppModule {}
 export async function createApp() {

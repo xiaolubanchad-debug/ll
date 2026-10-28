@@ -1,6 +1,6 @@
 import { join, dirname } from 'node:path';
 import { agentIssues, configurationIssues, schemaIssues } from '@apk/contracts';
-import type { TestConfiguration } from '@apk/contracts';
+import type { TestConfiguration, DailyExecutionPlan } from '@apk/contracts';
 import {
   canonical,
   sha,
@@ -10,6 +10,8 @@ import {
   removeOwned,
   registerApk,
   RegistrationError,
+  runCachedRegistrations,
+  runProxyCheck,
 } from '@apk/automation';
 import type { DownloadOptions, RegistrationHooks, ProxyCredential } from '@apk/automation';
 import { openAgentStore, lockAgent } from './store.js';
@@ -288,14 +290,32 @@ export class TaskEngine {
     )
       throw Error('CONFIG_HASH_MISMATCH');
     const config = snapshot.config as TestConfiguration;
+    const plan = snapshot.executionPlan as DailyExecutionPlan | undefined;
+    if (
+      plan &&
+      (schemaIssues('DailyExecutionPlan', plan).length ||
+        (plan.purpose === 'REGISTER' &&
+          (plan.successTarget < 1 ||
+            plan.attemptLimit < plan.successTarget ||
+            plan.assets.some((a) => a.apk.cacheDay !== plan.cacheDay))))
+    )
+      throw Error('EXECUTION_PLAN_INVALID');
     let proxy: ProxyCredential | undefined;
-    if (config.execution.mode === 'FULL') {
+    if (
+      plan?.purpose === 'PROXY_CHECK' ||
+      plan?.purpose === 'REGISTER' ||
+      (!plan && config.execution.mode === 'FULL')
+    ) {
       const versions = snapshot.secretVersions;
-      if (!this.options.sdkRoot || !Array.isArray(versions) || versions.length !== 1)
+      if (
+        (!this.options.sdkRoot && plan?.purpose !== 'PROXY_CHECK') ||
+        !Array.isArray(versions) ||
+        versions.length !== 1
+      )
         throw Error('PROXY_CONFIG_INVALID');
       const secret = versions[0] as { id?: unknown; type?: unknown; secretValue?: unknown };
       if (
-        secret.id !== config.execution.proxySecretVersionId ||
+        secret.id !== (plan?.proxySecretVersionId ?? config.execution.proxySecretVersionId) ||
         secret.type !== 'HTTP_PROXY' ||
         schemaIssues('SecretInput', { type: 'HTTP_PROXY', secretValue: secret.secretValue }).length
       )
@@ -327,64 +347,83 @@ export class TaskEngine {
       this.options.beforeAction?.();
     };
     try {
-      await runDownload(
-        config,
-        this.nodeId,
-        join(this.store.root, 'downloads'),
-        this.toolsRoot,
-        signal,
-        emit,
-        {
-          ...this.options,
-          beforeAction,
-          ...(config.execution.mode === 'FULL'
-            ? {
-                afterDownload: (target, apk, file, index) =>
-                  registerApk(config, target, apk, file, index, signal, emit, {
-                    sdkRoot: this.options.sdkRoot!,
-                    toolsRoot: this.toolsRoot,
-                    root: join(this.store.root, 'android'),
-                    proxy: proxy!,
-                    policy: this.options.policy,
-                    proxyCheckUrl: this.options.proxyCheckUrl,
-                    androidFactory: this.options.androidFactory,
-                    beforeAction,
-                    resources: async (record) => {
-                      this.store.android(d.deliveryId, record);
-                    },
-                    account: async (taskId) => {
+      const runOptions: DownloadOptions = {
+        ...this.options,
+        beforeAction,
+        ...(plan?.purpose === 'REGISTER' || (!plan && config.execution.mode === 'FULL')
+          ? {
+              afterDownload: (target, apk, file, index) =>
+                registerApk(config, target, apk, file, index, signal, emit, {
+                  sdkRoot: this.options.sdkRoot!,
+                  toolsRoot: this.toolsRoot,
+                  root: join(this.store.root, 'android'),
+                  proxy: proxy!,
+                  policy: this.options.policy,
+                  proxyCheckUrl: this.options.proxyCheckUrl,
+                  androidFactory: this.options.androidFactory,
+                  beforeAction,
+                  resources: async (record) => {
+                    this.store.android(d.deliveryId, record);
+                  },
+                  account: async (taskId) => {
+                    await this.flush(d);
+                    const account = this.store.account(d, taskId);
+                    try {
                       await this.flush(d);
-                      const account = this.store.account(d, taskId);
-                      try {
-                        await this.flush(d);
-                      } catch {
-                        throw new RegistrationError('ACCOUNT_SYNC_FAILED');
-                      }
-                      return account;
-                    },
-                    intent: async (taskId, ref, verificationSignal) => {
-                      beforeAction();
-                      this.store.intent(d, taskId, ref);
-                      await this.flush(d, verificationSignal).catch(() => {});
-                    },
-                    evidence: async (taskId, bytes, verificationSignal) => {
-                      const id = this.store.evidence(d, taskId, bytes);
-                      await this.flush(d, verificationSignal);
-                      return id;
-                    },
-                  }),
-              }
-            : {}),
-          onBrowser: async (record) => {
-            this.store.browser(d.deliveryId, record);
-            await this.options.onBrowser?.(record);
-          },
-          onClosed: async () => {
-            this.store.browser(d.deliveryId, null);
-            await this.options.onClosed?.();
-          },
+                    } catch {
+                      throw new RegistrationError('ACCOUNT_SYNC_FAILED');
+                    }
+                    return account;
+                  },
+                  intent: async (taskId, ref, verificationSignal) => {
+                    beforeAction();
+                    this.store.intent(d, taskId, ref);
+                    await this.flush(d, verificationSignal).catch(() => {});
+                  },
+                  evidence: async (taskId, bytes, verificationSignal) => {
+                    const id = this.store.evidence(d, taskId, bytes);
+                    await this.flush(d, verificationSignal);
+                    return id;
+                  },
+                }),
+            }
+          : {}),
+        onBrowser: async (record) => {
+          this.store.browser(d.deliveryId, record);
+          await this.options.onBrowser?.(record);
         },
-      );
+        onClosed: async () => {
+          this.store.browser(d.deliveryId, null);
+          await this.options.onClosed?.();
+        },
+      };
+      if (plan?.purpose === 'REGISTER')
+        await runCachedRegistrations(
+          config,
+          plan,
+          this.nodeId,
+          join(this.store.root, 'downloads'),
+          signal,
+          emit,
+          beforeAction,
+          runOptions.afterDownload!,
+        );
+      else if (plan?.purpose === 'PROXY_CHECK') {
+        beforeAction();
+        await runProxyCheck(proxy!, signal, emit, this.options.policy, this.options.proxyCheckUrl);
+      } else
+        await runDownload(
+          plan ? { ...config, execution: { ...config.execution, mode: 'DOWNLOAD_ONLY' } } : config,
+          this.nodeId,
+          join(this.store.root, 'downloads'),
+          this.toolsRoot,
+          signal,
+          emit,
+          {
+            ...runOptions,
+            ...(plan ? { dailyDownload: true, fixedCacheDay: plan.cacheDay } : {}),
+          },
+        );
       if (review || this.control === 'REVIEW') {
         this.store.status(d.deliveryId, 'REVIEW');
         await this.flush(d).catch(() => {});

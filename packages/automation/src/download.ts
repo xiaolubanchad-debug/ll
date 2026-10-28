@@ -13,13 +13,14 @@ import { NetworkPolicy, startEgress } from './network.js';
 import { sha, canonical, normalizeUrl, cacheDay, DownloadError } from './common.js';
 import type { RegistrationCompletion } from './registration.js';
 export interface AutomationEvent {
-  type: 'TARGETS_DISCOVERED' | 'TASK_STAGE' | 'TASK_FINISHED' | 'RUN_FINISHED';
+  type: 'TARGETS_DISCOVERED' | 'TASK_STAGE' | 'TASK_FINISHED' | 'RUN_FINISHED' | 'PROXY_CHECKED';
   taskId?: string;
   payload: Record<string, unknown>;
 }
 export interface Target {
   taskId: string;
   targetKey: string;
+  entryId?: string;
   label: string;
   sourceUrl: string;
   pid: string;
@@ -31,6 +32,8 @@ export interface BrowserRecord {
   profile: string;
 }
 export interface DownloadOptions {
+  dailyDownload?: boolean;
+  fixedCacheDay?: string;
   beforeAction?: () => void;
   chromium?: BrowserType;
   policy?: NetworkPolicy;
@@ -91,6 +94,7 @@ async function discover(page: Page, config: TestConfiguration): Promise<Target[]
     seen.add(key);
     targets.push({
       ...item,
+      ...(/^[A-Za-z0-9._:-]{1,100}$/.test(item.pid.trim()) ? { entryId: item.pid.trim() } : {}),
       href,
       taskId: randomUUID(),
       targetKey: key,
@@ -134,6 +138,7 @@ async function capture(
   const pages = new Set<Page>([source]),
     clicks = new Map<Page, number>();
   let landingClicks = 0;
+  const arrived = new Map<Page, { url: string; at: number }>();
   const listener = (download: Download) => {
     if (!result) result = download;
     else void download.cancel();
@@ -179,7 +184,14 @@ async function capture(
           ),
           ...config.download.landingRules.filter((r) => r.host === '*'),
         ];
+        const previous = arrived.get(page);
+        if (!previous || previous.url !== page.url())
+          arrived.set(page, { url: page.url(), at: Date.now() });
+        if (rules[0]?.mode === 'AUTO') continue;
         for (const rule of rules) {
+          if (rule.mode === 'AUTO') continue;
+          const elapsed = Date.now() - arrived.get(page)!.at;
+          if (rule.mode !== 'CLICK' && elapsed < (rule.autoWaitMs ?? 1500)) continue;
           const candidates = page.locator(rule.by + '=' + rule.selector);
           const n = await candidates.count().catch(() => 0);
           let clicked = false;
@@ -347,11 +359,12 @@ export async function runDownload(
         payload: {
           targets: targets!
             .slice(start, start + 20)
-            .map(({ taskId, targetKey, label, sourceUrl }) => ({
+            .map(({ taskId, targetKey, label, sourceUrl, entryId }) => ({
               taskId,
               targetKey,
               label,
               sourceUrl,
+              ...(entryId ? { entryId } : {}),
             })),
           startIndex: start,
           complete: start + 20 >= targets!.length,
@@ -362,7 +375,7 @@ export async function runDownload(
       cleanupIncomplete = false;
     for (const [index, target] of targets!.entries()) {
       beforeAction();
-      const day = cacheDay(now());
+      const day = options.fixedCacheDay ?? cacheDay(now());
       await emit({ type: 'TASK_STAGE', taskId: target.taskId, payload: { stage: 'DOWNLOADING' } });
       let apk: ApkMetadata | null = null,
         hit = false,
@@ -373,7 +386,11 @@ export async function runDownload(
           hit = true;
           cache.pin(nodeId, day, target.targetKey);
         } else {
-          for (let attempt = 0; attempt <= config.download.retries; attempt++) {
+          for (
+            let attempt = 0;
+            attempt <= (options.dailyDownload ? 0 : config.download.retries);
+            attempt++
+          ) {
             const work = await mkdtemp(join(temp, 'target-'));
             let download: Download | undefined;
             try {
@@ -469,8 +486,11 @@ export async function runDownload(
       }
     }
     cache.releasePins();
-    const cutoff = cacheDay(new Date(now().getTime() - 7 * 86400000));
-    await cache.prune(cutoff);
+    const cutoff = options.dailyDownload
+      ? (options.fixedCacheDay ?? cacheDay(now()))
+      : cacheDay(new Date(now().getTime() - 7 * 86400000));
+    if (!options.dailyDownload || (targets!.length > 0 && succeeded === targets!.length))
+      await cache.prune(cutoff);
     await cleanup();
     await emit({
       type: 'RUN_FINISHED',

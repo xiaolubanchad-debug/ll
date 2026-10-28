@@ -10,7 +10,9 @@ import {
   createHash,
 } from 'node:crypto';
 import type { AgentMessage } from '@apk/contracts';
+import { RegistrationError } from '@apk/automation';
 import type { Account, AndroidRecord } from '@apk/automation';
+import { pinyinUsername } from './accounts.js';
 export type Delivery = Extract<AgentMessage, { kind: 'delivery' }>;
 export interface LocalDelivery {
   id: string;
@@ -39,6 +41,16 @@ export class AgentStore {
       this.db.exec('ALTER TABLE deliveries ADD COLUMN android TEXT');
     this.db.exec(
       'CREATE TABLE IF NOT EXISTS accounts(task TEXT PRIMARY KEY,delivery TEXT NOT NULL,ref TEXT NOT NULL UNIQUE,sealed BLOB NOT NULL,sent INTEGER NOT NULL DEFAULT 0); CREATE TABLE IF NOT EXISTS submissions(task TEXT PRIMARY KEY,delivery TEXT NOT NULL,id TEXT NOT NULL UNIQUE,ref TEXT NOT NULL,outcome TEXT); CREATE TABLE IF NOT EXISTS evidence(id TEXT PRIMARY KEY,delivery TEXT NOT NULL,task TEXT NOT NULL,sha TEXT NOT NULL,data TEXT NOT NULL,sent INTEGER NOT NULL DEFAULT 0);',
+    );
+    if (
+      !this.db
+        .prepare('PRAGMA table_info(accounts)')
+        .all()
+        .some((r) => r.name === 'username_hash')
+    )
+      this.db.exec('ALTER TABLE accounts ADD COLUMN username_hash TEXT');
+    this.db.exec(
+      'CREATE UNIQUE INDEX IF NOT EXISTS accounts_username_hash ON accounts(username_hash)',
     );
   }
   deliveries(): LocalDelivery[] {
@@ -112,9 +124,16 @@ export class AgentStore {
       do {
         password = generate(chars, randomInt(8, 13));
       } while (!/[0-9]/.test(password) || !/[a-zA-Z]/.test(password));
+      let username: string, usernameHash: string;
+      let candidates = 0;
+      do {
+        if (++candidates > 1000) throw new RegistrationError('ACCOUNT_NAME_POOL_EXHAUSTED');
+        username = pinyinUsername();
+        usernameHash = createHash('sha256').update(username).digest('hex');
+      } while (this.db.prepare('SELECT 1 FROM accounts WHERE username_hash=?').get(usernameHash));
       const account: Account = {
         accountRef: randomUUID(),
-        username: generate(letters, randomInt(6, 11)),
+        username,
         password,
       };
       const iv = randomBytes(12),
@@ -122,12 +141,13 @@ export class AgentStore {
       cipher.setAAD(Buffer.from(task));
       const bytes = Buffer.concat([cipher.update(JSON.stringify(account)), cipher.final()]);
       this.db
-        .prepare('INSERT INTO accounts(task,delivery,ref,sealed) VALUES(?,?,?,?)')
+        .prepare('INSERT INTO accounts(task,delivery,ref,sealed,username_hash) VALUES(?,?,?,?,?)')
         .run(
           task,
           delivery.deliveryId,
           account.accountRef,
           Buffer.concat([iv, cipher.getAuthTag(), bytes]),
+          usernameHash,
         );
       row = this.db.prepare('SELECT * FROM accounts WHERE task=?').get(task)!;
     }

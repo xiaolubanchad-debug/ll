@@ -23,7 +23,7 @@ import {
   inspectApk,
   RegistrationError,
 } from '@apk/automation';
-import { digest } from '@apk/platform';
+import { digest, tickSchedules } from '@apk/platform';
 import { fixtureSite, fixtureApk } from './p2-fixtures.mjs';
 const db = new PrismaClient(),
   root = process.env.P1_TEST_DIR;
@@ -190,6 +190,9 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
     engineBoot,
     activeRunId;
   const sessions = new Map();
+  let activeSessions = 0,
+    openedSessions = 0,
+    closedSessions = 0;
   const configurationIds = [];
   const appium = createServer((req, res) => {
     let raw = '';
@@ -245,6 +248,9 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
   });
   const appiumPort = await listen(appium);
   const factory = async (_profile, signal, options) => {
+    assert.equal(activeSessions, 0, 'previous emulator must be closed before a new one opens');
+    activeSessions++;
+    openedSessions++;
     const c = new AppiumClient(appiumPort, signal);
     await c.start({ platformName: 'Android' });
     if (mode === 'cleanup')
@@ -272,6 +278,8 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
       source: () => c.source(),
       close: async () => {
         await c.close();
+        activeSessions--;
+        closedSessions++;
         if (mode === 'cleanup') return false;
         await options.resources(null);
         return true;
@@ -317,14 +325,36 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
     assert.equal(v.status, 201, JSON.stringify(v.data));
     return v.data;
   }
-  async function run() {
-    const v = await save(),
-      r = await req(
+  async function run(cycle = false) {
+    const v = await save();
+    let sourceDownloadId;
+    if (cycle) {
+      const download = await req(
         '/runs',
         'POST',
-        { nodeId: node.id, configVersionId: v.id, releaseId: release.id },
+        { nodeId: node.id, configVersionId: v.id, releaseId: release.id, purpose: 'DOWNLOAD' },
         idem(),
       );
+      assert.equal(download.status, 202);
+      await wait(async () => {
+        const r = await db.run.findUnique({ where: { id: download.data.resourceId } });
+        return r.status === 'SUCCEEDED';
+      });
+      sourceDownloadId = download.data.resourceId;
+    }
+    const r = await req(
+      '/runs',
+      'POST',
+      {
+        nodeId: node.id,
+        configVersionId: v.id,
+        releaseId: release.id,
+        ...(cycle
+          ? { purpose: 'REGISTER', sourceDownloadId, successTarget: 3, attemptLimit: 5 }
+          : {}),
+      },
+      idem(),
+    );
     assert.equal(r.status, 202, JSON.stringify(r.data));
     activeRunId = r.data.resourceId;
     return wait(async () => {
@@ -341,7 +371,7 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
       {
         nodeId: node.id,
         releaseId: release.id,
-        agentVersion: '0.4.1',
+        agentVersion: '0.5.0',
         apiUrl: base,
         sdkRoot: '/fixture',
         toolsRoot: resolve('.'),
@@ -445,8 +475,8 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
         artifactName: 'agent-' + randomBytes(32).toString('hex') + '.tgz',
         sha256: randomBytes(32).toString('hex'),
         manifest: {
-          agentVersion: '0.4.1',
-          features: ['DOWNLOAD_V1', 'REGISTRATION_V1'],
+          agentVersion: '0.5.0',
+          features: ['DOWNLOAD_V1', 'REGISTRATION_V1', 'DAILY_V1'],
           toolchain: { systemImage: body.execution.deviceProfiles[0].systemImage },
         },
       },
@@ -457,7 +487,7 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
         host: 'p3.example.test',
         deploymentStatus: 'INSTALLED',
         agentReleaseId: release.id,
-        agentVersion: '0.4.1',
+        agentVersion: '0.5.0',
         downloadProtocol: '1.0',
         health: report,
         lastSeenAt: new Date(),
@@ -641,6 +671,337 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
       },
     );
     await t.test(
+      '1.5 daily download, cached global quotas, lifecycle, proxy check and durable schedule',
+      async (t) => {
+        const original = structuredClone(body.source);
+        body.source.xpath = '//a[@class="jgg-item"]';
+        mode = 'success';
+        const version = await save();
+        body.source = original;
+        const apkRequests = () =>
+          ['/direct.apk', '/second.apk', '/third.apk'].reduce(
+            (n, p) => n + (site.counts.get(p) ?? 0),
+            0,
+          );
+        const purpose = async (extra, waitEnd = true) => {
+          const r = await req(
+            '/runs',
+            'POST',
+            { nodeId: node.id, configVersionId: version.id, releaseId: release.id, ...extra },
+            idem(),
+          );
+          assert.equal(r.status, 202, JSON.stringify(r.data));
+          activeRunId = r.data.resourceId;
+          return waitEnd
+            ? wait(async () => {
+                const run = await db.run.findUnique({ where: { id: r.data.resourceId } });
+                return [
+                  'SUCCEEDED',
+                  'PARTIAL_FAILED',
+                  'FAILED',
+                  'CANCELLED',
+                  'NEEDS_REVIEW',
+                ].includes(run.status)
+                  ? run
+                  : false;
+              })
+            : r.data;
+        };
+        let downloaded, entryVersion;
+        await t.test(
+          'daily download never installs and duplicate start does not revisit source',
+          async () => {
+            const before = installed;
+            downloaded = await purpose({ purpose: 'DOWNLOAD' });
+            assert.equal(downloaded.status, 'SUCCEEDED');
+            assert.equal(installed, before);
+            const requests = apkRequests();
+            const again = await purpose({ purpose: 'DOWNLOAD' });
+            assert.equal(again.id, downloaded.id);
+            assert.equal(apkRequests(), requests);
+            assert.equal(await db.task.count({ where: { runId: downloaded.id } }), 3);
+          },
+        );
+        await t.test(
+          'entry-bound templates select the daily assets without fixed package names',
+          async () => {
+            const stored = await db.configVersion.findUniqueOrThrow({ where: { id: version.id } });
+            const entryBody = structuredClone(stored.body);
+            entryBody.registrationFlows = ['1', '2', '3'].map((entryId) => ({
+              ...structuredClone(entryBody.registrationFlows[0]),
+              entryId,
+              packageName: '*',
+              activity: '@launcher',
+            }));
+            const container = (await req('/configs/' + version.configId)).data;
+            const saved = await req(
+              '/configs/' + version.configId + '/versions',
+              'POST',
+              entryBody,
+              { ...idem(), 'If-Match': String(container.version) },
+            );
+            assert.equal(saved.status, 201, JSON.stringify(saved.data));
+            entryVersion = saved.data;
+            const r = await purpose({
+              purpose: 'REGISTER',
+              configVersionId: entryVersion.id,
+              sourceDownloadId: downloaded.id,
+              successTarget: 3,
+              attemptLimit: 3,
+            });
+            assert.equal(r.status, 'SUCCEEDED', JSON.stringify(r));
+            assert.equal(r.successes, 3);
+            assert.deepEqual(
+              r.executionPlan.assets.map((a) => a.entryId),
+              ['1', '2', '3'],
+            );
+          },
+        );
+        const registration = {
+          purpose: 'REGISTER',
+          sourceDownloadId: downloaded.id,
+          successTarget: 3,
+          attemptLimit: 5,
+        };
+        await t.test(
+          'all APKs share target; each attempt has a closed previous session; unused slots do not count',
+          async () => {
+            const requests = apkRequests(),
+              before = submitted,
+              opened = openedSessions;
+            const r = await purpose(registration);
+            assert.equal(r.status, 'SUCCEEDED', JSON.stringify(r));
+            assert.equal(r.successes, 3);
+            assert.equal(r.attemptsStarted, 3);
+            assert.equal(submitted - before, 3);
+            assert.equal(openedSessions - opened, 3);
+            assert.equal(activeSessions, 0);
+            assert.equal(openedSessions, closedSessions);
+            assert.equal(apkRequests(), requests, 'registration must never download again');
+            const tasks = await db.task.findMany({
+              where: { runId: r.id },
+              orderBy: { position: 'asc' },
+            });
+            assert.equal(tasks.filter((t) => t.errorCode === 'QUOTA_NOT_USED').length, 2);
+            assert.ok(tasks.slice(0, 3).every((t) => t.cacheHit && t.attemptStarted));
+            const delivery = await db.delivery.findUnique({ where: { runId: r.id } });
+            const event = await db.runEvent.findFirst({
+              where: { deliveryId: delivery.id, body: { path: ['type'], equals: 'TASK_FINISHED' } },
+              orderBy: { sequence: 'desc' },
+            });
+            const replay = await fetch(base + '/api/v1/agent/events', {
+              method: 'POST',
+              headers: { authorization: 'Bearer ' + token, 'content-type': 'application/json' },
+              body: JSON.stringify({
+                kind: 'events',
+                protocolVersion: '1.0',
+                nodeId: node.id,
+                deliveryId: delivery.id,
+                fence: delivery.fence,
+                events: [event.body],
+              }),
+            });
+            assert.equal(replay.status, 200);
+            assert.equal((await db.run.findUnique({ where: { id: r.id } })).successes, 3);
+          },
+        );
+        await t.test(
+          'explicit rejection consumes bounded attempts and invalid budget cannot start',
+          async () => {
+            mode = 'reject';
+            const before = submitted;
+            const r = await purpose({ ...registration, successTarget: 2, attemptLimit: 3 });
+            assert.equal(r.status, 'FAILED');
+            assert.equal(r.errorCode, 'ATTEMPT_LIMIT');
+            assert.equal(r.attemptsStarted, 3);
+            assert.equal(submitted - before, 3);
+            const bad = await req(
+              '/runs',
+              'POST',
+              {
+                nodeId: node.id,
+                configVersionId: version.id,
+                releaseId: release.id,
+                ...registration,
+                successTarget: 5,
+                attemptLimit: 2,
+              },
+              idem(),
+            );
+            assert.equal(bad.status, 422);
+            mode = 'success';
+          },
+        );
+        await t.test('proxy-only failure never starts an emulator or opens a product', async () => {
+          const before = installed,
+            opened = openedSessions;
+          const r = await purpose({
+            purpose: 'PROXY_CHECK',
+            proxySecretVersionId: body.execution.proxySecretVersionId,
+          });
+          assert.equal(r.status, 'FAILED');
+          assert.equal(r.errorCode, 'PROXY_CHECK_FAILED');
+          assert.equal(r.proxyObservation.status, 'FAILED');
+          assert.equal(installed, before);
+          assert.equal(openedSessions, opened);
+        });
+        await t.test(
+          'concurrent daily ticks create one persistent occurrence and one registration; disable is versioned',
+          async () => {
+            const input = {
+              nodeId: node.id,
+              configVersionId: version.id,
+              releaseId: release.id,
+              time: '00:00',
+              timezone: 'Asia/Shanghai',
+              successTarget: 2,
+              attemptLimit: 4,
+              enabled: true,
+              autoRegister: true,
+            };
+            const saved = await req('/schedules', 'POST', input, idem());
+            assert.equal(saved.status, 201, JSON.stringify(saved.data));
+            await Promise.all([tickSchedules(db), tickSchedules(db)]);
+            const rows = await db.dailyOccurrence.findMany({
+              where: { scheduleId: saved.data.id },
+            });
+            assert.equal(rows.length, 1);
+            assert.equal(rows[0].downloadRunId, downloaded.id);
+            assert.ok(rows[0].registerRunId);
+            const r = await wait(async () => {
+              const r = await db.run.findUnique({ where: { id: rows[0].registerRunId } });
+              return r.status === 'SUCCEEDED' ? r : false;
+            });
+            assert.equal(r.successes, 2);
+            await tickSchedules(db);
+            assert.equal(
+              (await db.dailyOccurrence.findUnique({ where: { id: rows[0].id } })).status,
+              'FINISHED',
+            );
+            const disabled = await req(
+              '/schedules/' + saved.data.id,
+              'PUT',
+              { ...input, enabled: false },
+              { ...idem(), 'If-Match': '1' },
+            );
+            assert.equal(disabled.status, 200);
+            assert.equal(
+              (
+                await req('/schedules/' + saved.data.id, 'PUT', input, {
+                  ...idem(),
+                  'If-Match': '1',
+                })
+              ).status,
+              409,
+            );
+            await tickSchedules(db, new Date(Date.now() + 86400000));
+            assert.equal(
+              await db.dailyOccurrence.count({ where: { scheduleId: saved.data.id } }),
+              1,
+            );
+          },
+        );
+        await t.test(
+          'cross-day stops the previous queued daily batch; disabled plan stays stopped after restart',
+          async () => {
+            const schedule = await db.dailySchedule.findUniqueOrThrow({
+              where: { nodeId: node.id },
+            });
+            const enabled = await req(
+              '/schedules/' + schedule.id,
+              'PUT',
+              { ...schedule.body, enabled: true },
+              { ...idem(), 'If-Match': String(schedule.version) },
+            );
+            assert.equal(enabled.status, 200);
+            abort.abort();
+            await agentRun;
+            const tomorrow = new Date(Date.now() + 86400000),
+              after = new Date(Date.now() + 2 * 86400000);
+            await tickSchedules(db, tomorrow);
+            const one = await db.dailyOccurrence.findFirst({
+              where: { scheduleId: schedule.id, day: { gt: downloaded.cacheDay } },
+              orderBy: { day: 'asc' },
+            });
+            assert.equal(
+              (await db.run.findUnique({ where: { id: one.downloadRunId } })).status,
+              'QUEUED',
+            );
+            await tickSchedules(db, after);
+            assert.equal(
+              (await db.run.findUnique({ where: { id: one.downloadRunId } })).status,
+              'CANCELLED',
+            );
+            assert.equal(
+              (await db.dailyOccurrence.findUnique({ where: { id: one.id } })).status,
+              'STOPPED',
+            );
+            const disabled = await req(
+              '/schedules/' + schedule.id,
+              'PUT',
+              { ...schedule.body, enabled: false },
+              { ...idem(), 'If-Match': String(enabled.data.version) },
+            );
+            assert.equal(disabled.status, 200);
+            await tickSchedules(db, after);
+            assert.equal(
+              (await db.nodeSlot.findUnique({ where: { nodeId: node.id } })).runId,
+              null,
+            );
+            const count = await db.dailyOccurrence.count({ where: { scheduleId: schedule.id } });
+            await tickSchedules(db, new Date(Date.now() + 3 * 86400000));
+            assert.equal(
+              await db.dailyOccurrence.count({ where: { scheduleId: schedule.id } }),
+              count,
+            );
+            await start();
+          },
+        );
+        await t.test(
+          'changed entry layout stops before submission without burning the remaining budget',
+          async () => {
+            const entryBody = structuredClone(
+              (await db.configVersion.findUniqueOrThrow({ where: { id: entryVersion.id } })).body,
+            );
+            for (const f of entryBody.registrationFlows) f.steps[0].locator.value = 'changed';
+            const container = (await req('/configs/' + version.configId)).data;
+            const saved = await req(
+              '/configs/' + version.configId + '/versions',
+              'POST',
+              entryBody,
+              { ...idem(), 'If-Match': String(container.version) },
+            );
+            assert.equal(saved.status, 201);
+            const before = submitted;
+            const r = await purpose({ ...registration, configVersionId: saved.data.id });
+            assert.equal(r.status, 'FAILED');
+            assert.equal(r.errorCode, 'FLOW_LAYOUT_CHANGED');
+            assert.equal(r.attemptsStarted, 1);
+            assert.equal(submitted, before);
+          },
+        );
+        await t.test('missing cached APK ends early and never downloads as a repair', async () => {
+          const source = await db.task.findFirst({
+            where: { runId: downloaded.id },
+            orderBy: { position: 'asc' },
+          });
+          const key = digest(JSON.stringify([node.id, downloaded.cacheDay, source.targetKey]));
+          await writeFile(
+            join(root, 'p3-execution/downloads/cache/files', key + '.apk'),
+            'corrupted fixture',
+          );
+          const requests = apkRequests(),
+            before = installed;
+          const r = await purpose(registration);
+          assert.equal(r.status, 'FAILED');
+          assert.equal(r.errorCode, 'CACHE_MISSING');
+          assert.equal(r.attemptsStarted, 1);
+          assert.equal(installed, before);
+          assert.equal(apkRequests(), requests);
+        });
+      },
+    );
+    await t.test(
       'second page flow and lost submit response still submit exactly once',
       async () => {
         mode = 'lost-success';
@@ -688,21 +1049,24 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
     await t.test('stop before intent confirms cleanup and sends no submission', async () => {
       mode = 'stop-before';
       const before = submitted,
-        r = await run();
+        r = await run(true);
       assert.equal(r.status, 'CANCELLED', JSON.stringify(r));
       assert.equal(submitted, before);
       assert.equal((await db.task.findFirst({ where: { runId: r.id } })).submissionId, null);
     });
     await t.test(
-      'unknown remains quarantined across stop and restart and requires explicit task decision',
+      '1.5 unknown stops the loop across stop and restart and requires explicit task decision',
       async () => {
         mode = 'unknown';
         const before = submitted,
-          r = await run();
+          r = await run(true);
         assert.equal(r.status, 'NEEDS_REVIEW');
         assert.equal(submitted - before, 1);
-        const task = await db.task.findFirst({ where: { runId: r.id } });
+        const task = await db.task.findFirst({
+          where: { runId: r.id, submissionId: { not: null } },
+        });
         assert.equal(task.status, 'UNKNOWN');
+        assert.equal(await db.task.count({ where: { runId: r.id, attemptStarted: true } }), 1);
         assert.ok(await db.accountResult.findUnique({ where: { taskId: task.id } }));
         abort.abort();
         await agentRun;
@@ -800,6 +1164,8 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
     await site?.close();
     await close(appium);
     if (node) {
+      await db.dailyOccurrence.deleteMany({ where: { schedule: { nodeId: node.id } } });
+      await db.dailySchedule.deleteMany({ where: { nodeId: node.id } });
       const taskWhere = { task: { run: { nodeId: node.id } } };
       await db.artifact.deleteMany({ where: taskWhere });
       await db.taskReview.deleteMany({ where: taskWhere });

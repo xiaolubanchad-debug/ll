@@ -114,7 +114,19 @@ export class ConsoleController {
       await this.db.run.findMany({
         ...args,
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-        select: { id: true, nodeId: true, status: true, createdAt: true },
+        select: {
+          id: true,
+          nodeId: true,
+          status: true,
+          createdAt: true,
+          purpose: true,
+          cacheDay: true,
+          configVersionId: true,
+          successTarget: true,
+          attemptLimit: true,
+          attemptsStarted: true,
+          successes: true,
+        },
       }),
       limit,
     );

@@ -299,7 +299,7 @@ onMounted(async () => {
       </nav>
       <div class="sidebar-bottom">
         <span class="status-dot"></span> 工程基础已就绪
-        <p>P3 · 下载、安装与注册</p>
+        <p>1.5 · 每日下载与循环注册</p>
       </div>
     </aside>
     <div class="main-area">
@@ -326,7 +326,7 @@ onMounted(async () => {
               }}
             </p>
           </div>
-          <span class="phase-tag">P3 自动化测试</span>
+          <span class="phase-tag">1.5 自动化测试</span>
         </div>
         <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon />
         <el-alert v-if="notice" :title="notice" type="success" :closable="false" show-icon />
@@ -374,8 +374,8 @@ onMounted(async () => {
           <h2>测试配置草稿</h2>
           <p class="muted">仅执行格式校验，不访问网站、不下载或注册。</p>
           <p class="muted">
-            Agent 0.4.1 使用手机竖屏和触屏访问网站、打开落地页及下载。browserUserAgent 留空使用默认
-            Android 手机浏览器；此配置不改变 APK 内的请求 UA。
+            网页与落地页使用手机竖屏和触屏。网页 UA 留空时使用默认 Android 手机浏览器。 Agent 0.5.0
+            支持每日下载及循环注册；APP 画像和 UA 的采集情况不影响注册验收。
           </p>
           <label for="source-url">网站 URL</label
           ><el-input

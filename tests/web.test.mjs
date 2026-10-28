@@ -107,6 +107,34 @@ test('browser login, config checks, refresh, password change and logout', async 
     assert.equal(proxyDraft.execution.mode, 'FULL');
     assert.match(proxyDraft.execution.proxySecretVersionId, /^[a-f0-9-]{36}$/);
     assert.ok(!JSON.stringify(proxyDraft).includes('FixtureProxyPassword123'));
+    await page.getByText('添加基础注册流程', { exact: true }).click();
+    await page.getByRole('button', { name: '应用基础注册流程到草稿', exact: true }).click();
+    await expect(
+      page.getByText('请填写包名、启动页面和所有必填控件', { exact: true }),
+    ).toBeVisible();
+    await page.getByLabel('APK 包名', { exact: true }).fill('com.example.signup');
+    await page.getByLabel('APP 启动页面', { exact: true }).fill('.MainActivity');
+    for (const key of ['username', 'password', 'submit', 'success'])
+      await page.locator('#flow-value-' + key).fill('com.example.signup:id/' + key);
+    await page.getByRole('button', { name: '应用基础注册流程到草稿', exact: true }).click();
+    const flowDraft = JSON.parse(
+      await page.getByLabel('完整配置 JSON', { exact: true }).inputValue(),
+    );
+    const basic = flowDraft.registrationFlows.find((f) => f.packageName === 'com.example.signup');
+    assert.ok(basic.enabled);
+    assert.equal(basic.steps.filter((s) => s.action === 'submit').length, 1);
+    assert.equal(basic.steps[0].text, '{username}');
+    await page.getByLabel('图标入口 PID（每日换包时填写）', { exact: true }).fill('2692');
+    for (const key of ['username', 'password', 'submit', 'success'])
+      await page.locator('#flow-value-' + key).fill('{packageName}:id/' + key);
+    await page.getByRole('button', { name: '应用基础注册流程到草稿', exact: true }).click();
+    const entryDraft = JSON.parse(
+      await page.getByLabel('完整配置 JSON', { exact: true }).inputValue(),
+    );
+    const entryFlow = entryDraft.registrationFlows.find((f) => f.entryId === '2692');
+    assert.equal(entryFlow.packageName, '*');
+    assert.equal(entryFlow.activity, '@launcher');
+    assert.ok(entryDraft.registrationFlows.some((f) => f.packageName === 'com.example.signup'));
     assert.ok(
       !(await page.evaluate(() =>
         JSON.stringify({ ...window.localStorage, ...window.sessionStorage }).includes(
@@ -126,6 +154,13 @@ test('browser login, config checks, refresh, password change and logout', async 
         .getByRole('option', { name: '版本 3', exact: true }),
     ).toHaveCount(1);
     await page.getByLabel('固定配置版本', { exact: true }).selectOption({ label: '版本 3' });
+    await expect(
+      page.getByRole('heading', { name: '每日下载与注册计划', exact: true }),
+    ).toBeVisible();
+    await expect(page.getByLabel('每日下载时间（北京时间）', { exact: true })).toHaveValue('00:05');
+    await page.getByLabel('执行内容', { exact: true }).selectOption('REGISTER');
+    await expect(page.getByRole('button', { name: '开始循环注册', exact: true })).toBeDisabled();
+    await page.getByLabel('执行内容', { exact: true }).selectOption('LEGACY');
     await expect(page.getByRole('button', { name: '开始安装注册', exact: true })).toBeDisabled();
     await page.getByRole('button', { name: '账户安全', exact: false }).first().click();
     await page.getByLabel('当前密码', { exact: true }).fill(process.env.P0_TEST_PASSWORD);

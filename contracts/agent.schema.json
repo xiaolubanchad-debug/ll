@@ -45,7 +45,14 @@
     "enroll": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["kind", "protocolVersion", "nodeId", "bootId", "agentVersion", "releaseId"],
+      "required": [
+        "kind",
+        "protocolVersion",
+        "nodeId",
+        "bootId",
+        "agentVersion",
+        "releaseId"
+      ],
       "properties": {
         "kind": {
           "const": "enroll"
@@ -70,7 +77,11 @@
     "currentDelivery": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["deliveryId", "runId", "fence"],
+      "required": [
+        "deliveryId",
+        "runId",
+        "fence"
+      ],
       "properties": {
         "deliveryId": {
           "$ref": "#/$defs/uuid"
@@ -123,7 +134,12 @@
         "capabilities": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["download", "android", "kvm", "freeDiskBytes"],
+          "required": [
+            "download",
+            "android",
+            "kvm",
+            "freeDiskBytes"
+          ],
           "properties": {
             "download": {
               "type": "boolean"
@@ -256,7 +272,12 @@
     "claim": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["kind", "protocolVersion", "nodeId", "bootId"],
+      "required": [
+        "kind",
+        "protocolVersion",
+        "nodeId",
+        "bootId"
+      ],
       "properties": {
         "kind": {
           "const": "claim"
@@ -332,7 +353,14 @@
     "accept": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["kind", "protocolVersion", "nodeId", "bootId", "deliveryId", "fence"],
+      "required": [
+        "kind",
+        "protocolVersion",
+        "nodeId",
+        "bootId",
+        "deliveryId",
+        "fence"
+      ],
       "properties": {
         "kind": {
           "const": "accept"
@@ -358,7 +386,14 @@
     "events": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["kind", "protocolVersion", "nodeId", "deliveryId", "fence", "events"],
+      "required": [
+        "kind",
+        "protocolVersion",
+        "nodeId",
+        "deliveryId",
+        "fence",
+        "events"
+      ],
       "properties": {
         "kind": {
           "const": "events"
@@ -438,7 +473,14 @@
     "event": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["eventId", "runId", "sequence", "occurredAt", "type", "payload"],
+      "required": [
+        "eventId",
+        "runId",
+        "sequence",
+        "occurredAt",
+        "type",
+        "payload"
+      ],
       "properties": {
         "eventId": {
           "$ref": "#/$defs/uuid"
@@ -465,7 +507,8 @@
             "TASK_FINISHED",
             "RUN_FINISHED",
             "STOP_ACK",
-            "LOG"
+            "LOG",
+            "PROXY_CHECKED"
           ]
         },
         "payload": {
@@ -480,7 +523,9 @@
                 "const": "RUN_STARTED"
               }
             },
-            "required": ["type"]
+            "required": [
+              "type"
+            ]
           },
           "then": {
             "properties": {
@@ -497,7 +542,9 @@
                 "const": "TARGETS_DISCOVERED"
               }
             },
-            "required": ["type"]
+            "required": [
+              "type"
+            ]
           },
           "then": {
             "properties": {
@@ -514,10 +561,14 @@
                 "const": "TASK_STAGE"
               }
             },
-            "required": ["type"]
+            "required": [
+              "type"
+            ]
           },
           "then": {
-            "required": ["taskId"],
+            "required": [
+              "taskId"
+            ],
             "properties": {
               "payload": {
                 "$ref": "#/$defs/taskStage"
@@ -532,10 +583,14 @@
                 "const": "SUBMISSION_INTENT"
               }
             },
-            "required": ["type"]
+            "required": [
+              "type"
+            ]
           },
           "then": {
-            "required": ["taskId"],
+            "required": [
+              "taskId"
+            ],
             "properties": {
               "payload": {
                 "$ref": "#/$defs/submission"
@@ -550,10 +605,14 @@
                 "const": "TASK_FINISHED"
               }
             },
-            "required": ["type"]
+            "required": [
+              "type"
+            ]
           },
           "then": {
-            "required": ["taskId"],
+            "required": [
+              "taskId"
+            ],
             "properties": {
               "payload": {
                 "$ref": "#/$defs/taskFinished"
@@ -568,7 +627,9 @@
                 "const": "RUN_FINISHED"
               }
             },
-            "required": ["type"]
+            "required": [
+              "type"
+            ]
           },
           "then": {
             "properties": {
@@ -585,7 +646,9 @@
                 "const": "STOP_ACK"
               }
             },
-            "required": ["type"]
+            "required": [
+              "type"
+            ]
           },
           "then": {
             "properties": {
@@ -602,12 +665,33 @@
                 "const": "LOG"
               }
             },
-            "required": ["type"]
+            "required": [
+              "type"
+            ]
           },
           "then": {
             "properties": {
               "payload": {
                 "$ref": "#/$defs/log"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "PROXY_CHECKED"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "payload": {
+                "$ref": "#/$defs/proxyChecked"
               }
             }
           }
@@ -617,7 +701,10 @@
     "runStarted": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["configHash", "releaseId"],
+      "required": [
+        "configHash",
+        "releaseId"
+      ],
       "properties": {
         "configHash": {
           "$ref": "#/$defs/hash"
@@ -630,7 +717,9 @@
     "targets": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["targets"],
+      "required": [
+        "targets"
+      ],
       "properties": {
         "targets": {
           "type": "array",
@@ -638,7 +727,12 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["taskId", "targetKey", "label", "sourceUrl"],
+            "required": [
+              "taskId",
+              "targetKey",
+              "label",
+              "sourceUrl"
+            ],
             "properties": {
               "taskId": {
                 "$ref": "#/$defs/uuid"
@@ -655,6 +749,10 @@
                 "format": "uri",
                 "pattern": "^https?://",
                 "maxLength": 4096
+              },
+              "entryId": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9._:-]{1,100}$"
               }
             }
           }
@@ -672,7 +770,9 @@
     "taskStage": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["stage"],
+      "required": [
+        "stage"
+      ],
       "properties": {
         "stage": {
           "enum": [
@@ -719,11 +819,17 @@
               "maxLength": 256
             },
             "versionName": {
-              "type": ["string", "null"],
+              "type": [
+                "string",
+                "null"
+              ],
               "maxLength": 256
             },
             "versionCode": {
-              "type": ["integer", "null"],
+              "type": [
+                "integer",
+                "null"
+              ],
               "minimum": 0
             },
             "abis": {
@@ -758,7 +864,10 @@
     "submission": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["submissionId", "accountRef"],
+      "required": [
+        "submissionId",
+        "accountRef"
+      ],
       "properties": {
         "submissionId": {
           "$ref": "#/$defs/uuid"
@@ -771,13 +880,27 @@
     "taskFinished": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["status", "proof", "artifactIds"],
+      "required": [
+        "status",
+        "proof",
+        "artifactIds"
+      ],
       "properties": {
         "status": {
-          "enum": ["SUCCEEDED", "FAILED", "SKIPPED", "CANCELLED", "UNKNOWN"]
+          "enum": [
+            "SUCCEEDED",
+            "FAILED",
+            "SKIPPED",
+            "CANCELLED",
+            "UNKNOWN"
+          ]
         },
         "proof": {
-          "enum": ["APP_UI", "FILE_VALIDATION", "NONE"]
+          "enum": [
+            "APP_UI",
+            "FILE_VALIDATION",
+            "NONE"
+          ]
         },
         "artifactIds": {
           "type": "array",
@@ -804,12 +927,17 @@
                 "const": "SUCCEEDED"
               }
             },
-            "required": ["status"]
+            "required": [
+              "status"
+            ]
           },
           "then": {
             "properties": {
               "proof": {
-                "enum": ["APP_UI", "FILE_VALIDATION"]
+                "enum": [
+                  "APP_UI",
+                  "FILE_VALIDATION"
+                ]
               }
             }
           }
@@ -821,10 +949,14 @@
                 "const": "APP_UI"
               }
             },
-            "required": ["proof"]
+            "required": [
+              "proof"
+            ]
           },
           "then": {
-            "required": ["accountRef"],
+            "required": [
+              "accountRef"
+            ],
             "properties": {
               "artifactIds": {
                 "type": "array",
@@ -838,10 +970,18 @@
     "runFinished": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["status"],
+      "required": [
+        "status"
+      ],
       "properties": {
         "status": {
-          "enum": ["SUCCEEDED", "PARTIAL_FAILED", "FAILED", "CANCELLED", "NEEDS_REVIEW"]
+          "enum": [
+            "SUCCEEDED",
+            "PARTIAL_FAILED",
+            "FAILED",
+            "CANCELLED",
+            "NEEDS_REVIEW"
+          ]
         },
         "errorCode": {
           "enum": [
@@ -855,7 +995,12 @@
             "CLEANUP_INCOMPLETE",
             "REGISTRATION_UNKNOWN",
             "ANDROID_FAILED",
-            "ACCOUNT_SYNC_FAILED"
+            "ACCOUNT_SYNC_FAILED",
+            "ATTEMPT_LIMIT",
+            "CACHE_MISSING",
+            "NO_ADAPTED_APKS",
+            "PROXY_CHECK_FAILED",
+            "FLOW_LAYOUT_CHANGED"
           ]
         }
       }
@@ -863,7 +1008,9 @@
     "stopAck": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["cleanupComplete"],
+      "required": [
+        "cleanupComplete"
+      ],
       "properties": {
         "cleanupComplete": {
           "type": "boolean"
@@ -873,10 +1020,17 @@
     "log": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["level", "message"],
+      "required": [
+        "level",
+        "message"
+      ],
       "properties": {
         "level": {
-          "enum": ["INFO", "WARN", "ERROR"]
+          "enum": [
+            "INFO",
+            "WARN",
+            "ERROR"
+          ]
         },
         "message": {
           "type": "string",
@@ -944,6 +1098,35 @@
         },
         "identitySource": {
           "const": "EMULATOR_NOT_REAL_DEVICE"
+        }
+      }
+    },
+    "proxyChecked": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "SUCCEEDED",
+            "FAILED"
+          ]
+        },
+        "ip": {
+          "type": "string",
+          "maxLength": 45
+        },
+        "at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "scope": {
+          "const": "PROBE_ONLY"
+        },
+        "errorCode": {
+          "const": "PROXY_CHECK_FAILED"
         }
       }
     }
