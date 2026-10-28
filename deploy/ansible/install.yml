@@ -166,11 +166,37 @@
         content: '{{ item.checksum }}'
         mode: '0644'
       loop: '{{ toolchain.archives }}'
+    - name: Place command line tools in canonical SDK layout
+      tags: [sdk_layout]
+      ansible.builtin.command:
+        argv:
+          [
+            /usr/bin/mv,
+            '{{ sdk_root }}/cmdline-tools/archive/cmdline-tools',
+            '{{ sdk_root }}/cmdline-tools/19.0',
+          ]
+        creates: '{{ sdk_root }}/cmdline-tools/19.0/bin/avdmanager'
     - name: Select command line tools
+      tags: [sdk_layout]
       ansible.builtin.file:
-        src: '{{ sdk_root }}/cmdline-tools/archive/cmdline-tools'
+        src: '{{ sdk_root }}/cmdline-tools/19.0'
         dest: '{{ sdk_root }}/cmdline-tools/current'
         state: link
+        force: true
+    - name: Require numeric generic SDK package revisions
+      tags: [sdk_layout]
+      ansible.builtin.assert:
+        that: item.revision is match('^[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}$')
+        fail_msg: TOOLCHAIN_MISMATCH
+      loop: "{{ toolchain.archives | selectattr('role', 'in', ['cmdlineTools', 'emulator']) | list }}"
+    - name: Describe verified generic SDK packages
+      tags: [sdk_layout]
+      ansible.builtin.template:
+        src: android-generic-package.xml.j2
+        dest: "{{ sdk_root + '/cmdline-tools/19.0' if item.role == 'cmdlineTools' else sdk_root + '/emulator' }}/package.xml"
+        owner: root
+        mode: '0644'
+      loop: "{{ toolchain.archives | selectattr('role', 'in', ['cmdlineTools', 'emulator']) | list }}"
     - name: Create tools directory owned by Agent
       ansible.builtin.file:
         path: '{{ tools_root }}'

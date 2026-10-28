@@ -48,7 +48,7 @@ npm run release:agent
 
 发布固定 Node 24.18.0、Playwright 1.64.1（新发布；旧 P1 清单保持 1.56.1）、Appium 3.9.0、UiAutomator2 driver 8.7.2、Android API 35/google_apis/x86_64，Android 档案版本以本次签名清单为准。后续部署不重新解析 latest。Agent 构件和 npm lock 使用 SHA256；部分 Google 元数据仅提供 SHA1，按其官方值校验并在签名清单中固定。
 
-首次安装选择 Agent 0.3.2 的新签名发布，包含普通账户驱动注册的独立 npm 前缀，见 [驱动安装契约](APPIUM_INSTALL_FIX.md)。旧 0.3.1 发布保留历史，不覆盖其 Playbook 摘要。
+首次安装选择 Agent 0.3.3 的新签名发布，包含普通账户驱动注册的独立 npm 前缀及 SDK 规范布局和包描述，见 [驱动安装契约](APPIUM_INSTALL_FIX.md) 和 [SDK 安装契约](ANDROID_SDK_LAYOUT.md)。旧发布保留历史，不覆盖其 Playbook 摘要。
 
 在服务器页面展开“登记签名发布版本”，粘贴输出的 manifest JSON。API 校验签名、本地构件摘要、归档文件白名单及 npm lock 摘要后登记。发布包必须已放在 API 和 Worker 共用的 RELEASE_DIR，页面不能上传任意脚本或远程下载地址。Playbook 内容变化后必须生成新发布，旧清单不能用于新脚本。
 

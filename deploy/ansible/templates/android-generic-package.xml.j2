@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<repository:repository xmlns:repository="http://schemas.android.com/repository/android/common/02" xmlns:generic="http://schemas.android.com/repository/android/generic/02" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <localPackage path="{{ 'cmdline-tools;19.0' if item.role == 'cmdlineTools' else 'emulator' }}" obsolete="false">
+    <type-details xsi:type="generic:genericDetailsType"/>
+    <revision>
+      <major>{{ item.revision.split('.')[0] | int }}</major>
+      <minor>{{ item.revision.split('.')[1] | int }}</minor>
+      <micro>{{ item.revision.split('.')[2] | int }}</micro>
+    </revision>
+    <display-name>{{ 'Android SDK Command-line Tools' if item.role == 'cmdlineTools' else 'Android Emulator' }}</display-name>
+  </localPackage>
+</repository:repository>

@@ -16,6 +16,8 @@ SSH 使用固定检查脚本和严格主机公钥验证。Ansible Runner 使用�
 
 普通账户注册安卓驱动遵循 [驱动安装契约 1.3.2](APPIUM_INSTALL_FIX.md)，使用独立 npm 全局链接目录，保持 Node 运行时由 root 保护。Playbook 修复使用新的 Agent 0.3.2 签名发布。
 
+SDK 规范目录和离线包元数据遵循 [SDK 安装契约 1.3.3](ANDROID_SDK_LAYOUT.md)，安装使用 Agent 0.3.3 的新签名发布；仅创建 AVD 不构成启动证明。
+
 Inventory 中的字符串使用 Ansible 的 !unsafe 标记，确保特殊符号和模板片段作为原文传递；SSH 密码机制固定使用 sshpass。Linux CI 通过真实 Ansible 本地连接检查 SSH 与 sudo 密码的原文保持。
 
 发布由本地命令打包 Agent 并签名，包含源提交、Agent SHA256、Playbook 摘要、协议版本和固定工具档案。管理员登记时验证签名和本地构件，不接受任意下载地址。依赖档案限定官方 Node 与 Android 主机、固定 URL 和校验值。Google 档案可使用其官方元数据中的 SHA1；Node 与 Agent 使用 SHA256。主版本、档案 revision 和 URL 固定到发布，不在部署时重新解析 latest。
