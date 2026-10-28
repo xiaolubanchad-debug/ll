@@ -97,7 +97,14 @@ test('browser login, config checks, refresh, password change and logout', async 
     await page.getByLabel('代理地址', { exact: true }).fill('proxy.example.test');
     await page.getByLabel('代理用户名', { exact: true }).fill('FixtureUser');
     await page.getByLabel('代理密码', { exact: true }).fill('FixtureProxyPassword123');
+    await expect(page.getByLabel('端口', { exact: true })).toHaveValue('');
+    await expect(page.getByRole('button', { name: '加密保存代理', exact: true })).toBeDisabled();
+    await page.getByLabel('端口', { exact: true }).fill('10000');
+    const savedProxyRequest = page.waitForRequest(
+      (r) => r.method() === 'POST' && r.url().endsWith('/secrets/versions'),
+    );
     await page.getByRole('button', { name: '加密保存代理', exact: true }).click();
+    assert.equal((await savedProxyRequest).postDataJSON().secretValue.port, 10000);
     await expect(page.getByText('代理已加密保存，可将引用应用到草稿')).toBeVisible();
     await expect(page.getByLabel('代理密码', { exact: true })).toHaveValue('');
     await page.getByRole('button', { name: '将代理应用到当前草稿', exact: true }).click();

@@ -152,10 +152,41 @@ export async function startProxyBridge(credential: ProxyCredential, policy = new
     },
   };
 }
-export async function proxyObservation(
+export async function proxyObservation(port: number, signal: AbortSignal, url?: string) {
+  return probeProxyEndpoints(
+    port,
+    signal,
+    url
+      ? [{ url, format: 'JSON' }]
+      : [
+          { url: 'https://api.ipify.org?format=json', format: 'JSON' },
+          { url: 'https://www.cloudflare.com/cdn-cgi/trace', format: 'TRACE' },
+        ],
+  );
+}
+
+// Endpoint overrides are for owned boundary tests; execution configuration cannot supply them.
+export async function probeProxyEndpoints(
   port: number,
   signal: AbortSignal,
-  url = 'https://api.ipify.org?format=json',
+  endpoints: readonly { url: string; format: 'JSON' | 'TRACE' }[],
+) {
+  for (const endpoint of endpoints) {
+    if (signal.aborted) throw new RegistrationError('CANCELLED');
+    try {
+      return await observeProxyEndpoint(port, signal, endpoint.url, endpoint.format);
+    } catch {
+      if (signal.aborted) throw new RegistrationError('CANCELLED');
+    }
+  }
+  throw new RegistrationError('PROXY_CHECK_FAILED');
+}
+
+async function observeProxyEndpoint(
+  port: number,
+  signal: AbortSignal,
+  url: string,
+  format: 'JSON' | 'TRACE',
 ) {
   const u = new URL(url),
     abort = AbortSignal.any([signal, AbortSignal.timeout(10000)]);
@@ -167,7 +198,7 @@ export async function proxyObservation(
           host: '127.0.0.1',
           port,
           method: 'CONNECT',
-          path: u.host,
+          path: authority(u.hostname.replace(/^\[|\]$/g, ''), Number(u.port || 443)),
           signal: abort,
           agent: false,
         });
@@ -189,13 +220,20 @@ export async function proxyObservation(
       });
       socket = secure;
       await new Promise<void>((ok, no) => {
-        const cancel = () => secure.destroy();
+        const cancel = () => secure.destroy(Error('PROBE_ABORTED'));
         abort.addEventListener('abort', cancel, { once: true });
         secure.once('secureConnect', () => {
           abort.removeEventListener('abort', cancel);
           ok();
         });
-        secure.once('error', no);
+        secure.once('error', (error) => {
+          abort.removeEventListener('abort', cancel);
+          no(error);
+        });
+        secure.once('close', () => {
+          abort.removeEventListener('abort', cancel);
+          no(Error('PROBE_CLOSED'));
+        });
         if (abort.aborted) cancel();
       });
       agent = new Agent({ keepAlive: false });
@@ -237,7 +275,14 @@ export async function proxyObservation(
       req.on('error', no);
       req.end();
     });
-    const ip = (JSON.parse(text) as { ip?: unknown }).ip;
+    const lines =
+      format === 'TRACE' ? text.split(/\r?\n/).filter((line) => line.startsWith('ip=')) : [];
+    const ip =
+      format === 'JSON'
+        ? (JSON.parse(text) as { ip?: unknown }).ip
+        : lines.length === 1
+          ? lines[0].slice(3)
+          : undefined;
     if (typeof ip !== 'string' || !isIP(ip)) throw Error();
     return { ip, at: new Date().toISOString() };
   } catch {

@@ -1,8 +1,10 @@
 # HTTP 接口契约
 
-版本 1.5.0，前缀 /api/v1。已实现路由由 p0.http.json 至 v15.http.json 合并生成 openapi.json，CI 比较 Controller、清单和 OpenAPI。下表保留后续阶段设计，以机器清单判定实现范围。
+版本 1.5.1，前缀 /api/v1。已实现路由由 p0.http.json 至 v15.http.json 合并生成 openapi.json，CI 比较 Controller、清单和 OpenAPI。下表保留后续阶段设计，以机器清单判定实现范围。
 
 1.5 的 purpose=DOWNLOAD/REGISTER/PROXY_CHECK、N/M、来源下载资产、每日计划 CRUD 和代理探测规则见 [1.5 契约](../docs/V15_CONTRACT.md)。/runs 缺省 purpose 仍为 LEGACY，旧客户端保持原行为；新目的要求签名发布 DAILY_V1。计划更新使用 If-Match 和 Idempotency-Key；配置响应新增受运行时 Schema 校验的 executionPlan，不包含代理口令，秘密仍只在 secretVersions 中下发。App 画像或 UA 是否采集不影响注册成功判定。
+
+1.5.1 不改变请求或响应结构；Agent 0.5.1 的出口检测最多依次请求两个固定 HTTPS 站点，任一返回合法 IP 才成功，仍标记 PROBE_ONLY。停止和无直连回退规则见 1.5 契约。
 
 Agent 0.4.1 的 [移动端屏幕增量 1.4.1](../docs/MOBILE_SCREEN_CONTRACT.md) 不改变本接口版本：browserUserAgent 为空时使用固定 Android 手机浏览器默认值；非空时仅覆盖网页 UA，所有网页仍使用手机屏幕及触屏。
 

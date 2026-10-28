@@ -27,7 +27,7 @@ const configs = ref<Config[]>([]),
   notice = ref(''),
   cursor = ref<string | null>(null);
 const proxyHost = ref(''),
-  proxyPort = ref(8080),
+  proxyPort = ref<number | undefined>(undefined),
   proxyUser = ref(''),
   proxyPassword = ref(''),
   proxyId = ref('');
@@ -163,7 +163,16 @@ onUnmounted(() => {
       <label for="proxy-host">代理地址</label
       ><el-input id="proxy-host" v-model="proxyHost" placeholder="proxy.example.com" />
       <label for="proxy-port">端口</label
-      ><el-input-number id="proxy-port" v-model="proxyPort" :min="1" :max="65535" />
+      ><el-input-number
+        id="proxy-port"
+        v-model="proxyPort"
+        :min="1"
+        :max="65535"
+        placeholder="填写服务商提供的单个端口"
+      />
+      <p class="muted">
+        端口范围需选一个填写，例如 10000–10199 可填写 10000。地址只填主机名或 IP。
+      </p>
       <label for="proxy-user">代理用户名</label
       ><el-input id="proxy-user" v-model="proxyUser" autocomplete="off" />
       <label for="proxy-password">代理密码</label
@@ -174,7 +183,7 @@ onUnmounted(() => {
         autocomplete="new-password"
       />
       <div class="form-actions">
-        <el-button :disabled="busy || !proxyHost || !proxyPassword" @click="saveProxy"
+        <el-button :disabled="busy || !proxyHost || !proxyPort || !proxyPassword" @click="saveProxy"
           >加密保存代理</el-button
         >
       </div>

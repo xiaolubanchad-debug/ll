@@ -133,7 +133,8 @@ export async function createRun(
         configuration.download.landingRules.some(
           (r) => r.mode !== undefined || r.autoWaitMs !== undefined,
         )) &&
-      (!manifest?.features?.includes('DAILY_V1') || node.agentVersion !== '0.5.0')
+      (!manifest?.features?.includes('DAILY_V1') ||
+        !['0.5.0', '0.5.1'].includes(node.agentVersion ?? ''))
     )
       fault('NODE_UPGRADE_REQUIRED', '请部署支持每日下载与循环注册的 Agent');
     const plan = await prepareDailyPlan(tx, input, config, now);
