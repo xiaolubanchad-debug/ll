@@ -46,6 +46,7 @@ const draft = computed(() => {
   v.name = name.value || 'APK 测试任务';
   v.source = { ...v.source, url: source.value, xpath: xpath.value };
   v.execution.mode = mode.value;
+  v.execution.contentIsolation = true;
   if (mode.value === 'FULL') {
     v.execution.proxySecretVersionId = proxyId.value;
     if (autoEntry.value)
@@ -221,6 +222,7 @@ onUnmounted(() => {
     </ol>
     <el-alert v-if="error" :title="error" type="error" :closable="false" />
     <fieldset :disabled="busy" class="wizard-fields">
+      <p class="muted">内容隔离默认开启：保留真实功能操作，仅展示功能记录，不回传原始 APP 画面。</p>
       <template v-if="step === 1">
         <details v-if="!initial">
           <summary>从已有方案接入（可选）</summary>
@@ -285,7 +287,7 @@ onUnmounted(() => {
             ><input v-model="autoEntry" type="checkbox" />自动寻找各 APP 的注册入口</label
           >
           <p class="muted">
-            无法可靠识别的 APP 会提示待适配，可查看截图并补充规则。注册前自动检查代理。
+            无法可靠识别的 APP 会提示待适配，可查看功能记录并补充规则。注册前自动检查代理。
           </p></template
         >
       </template>

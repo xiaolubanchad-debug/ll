@@ -57,6 +57,10 @@ export interface APKTestConfigurationVersion10 {
       timeoutMs: number;
       successTimeoutMs: number;
     };
+    /**
+     * 默认开启，仅保留功能证据，不上传或展示原始业务画面
+     */
+    contentIsolation?: true;
   };
   /**
    * @maxItems 100
@@ -264,6 +268,10 @@ export interface APKTestConfigurationVersion10 {
       timeoutMs: number;
       successTimeoutMs: number;
     };
+    /**
+     * 默认开启，仅保留功能证据，不上传或展示原始业务画面
+     */
+    contentIsolation?: true;
   };
   /**
    * @maxItems 100
@@ -818,6 +826,10 @@ export interface TestConfiguration {
       timeoutMs: number;
       successTimeoutMs: number;
     };
+    /**
+     * 默认开启，仅保留功能证据，不上传或展示原始业务画面
+     */
+    contentIsolation?: true;
   };
   /**
    * @maxItems 100
@@ -1075,9 +1087,9 @@ export interface ReleaseInput {
     npmLockSha256: string;
   };
   /**
-   * @maxItems 4
+   * @maxItems 5
    */
-  features?: ('DOWNLOAD_V1' | 'REGISTRATION_V1' | 'DAILY_V1' | 'AUTO_REGISTRATION_V1')[];
+  features?: ('DOWNLOAD_V1' | 'REGISTRATION_V1' | 'DAILY_V1' | 'AUTO_REGISTRATION_V1' | 'CONTENT_ISOLATION_V1')[];
 }
 
 export interface HealthReport {
@@ -1213,10 +1225,10 @@ export interface ArtifactInput {
   fence: number;
   taskId: string;
   artifactId: string;
-  kind: 'screenshot';
+  kind: 'functional-evidence';
   sha256: string;
   dataBase64: string;
-  redaction: 'CREDENTIAL_MASKED';
+  redaction: 'CONTENT_ISOLATED';
 }
 
 export interface AccountViewInput {
@@ -1230,6 +1242,27 @@ export interface TaskReconcileInput {
    * @maxItems 100
    */
   evidenceIds: string[];
+}
+
+export interface FunctionalEvidence {
+  schemaVersion: '1.0';
+  kind: 'FUNCTIONAL_EVIDENCE';
+  stage: 'RESULT' | 'DISCOVERY';
+  outcome: 'SUCCEEDED' | 'FAILED' | 'UNVERIFIED';
+  verification: 'AUTO_EXPLICIT_UI' | 'CONFIGURED_LOCATOR' | 'NO_SUBMISSION';
+  sourceDigest: string;
+  /**
+   * @maxItems 64
+   */
+  controls: {
+    role: 'USERNAME' | 'PASSWORD' | 'PASSWORD_CONFIRM' | 'REGISTER' | 'LOGIN' | 'ACCOUNT' | 'CONSENT' | 'RESULT';
+    rect: {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+    };
+  }[];
 }
 
 export interface ScheduleInput {

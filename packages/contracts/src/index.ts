@@ -22,7 +22,13 @@ import type {
   LoginInput,
   PasswordChangeInput,
 } from './generated/types.js';
-export type { ArtifactInput, AccountViewInput, TaskReconcileInput } from './generated/types.js';
+export type {
+  ArtifactInput,
+  FunctionalEvidence,
+  AccountViewInput,
+  TaskReconcileInput,
+} from './generated/types.js';
+import type { FunctionalEvidence } from './generated/types.js';
 export type { ScheduleInput, DailyExecutionPlan, ProxyObservation } from './generated/types.js';
 export type {
   AutoRegistration,
@@ -52,6 +58,36 @@ export type {
 export interface Issue {
   path: string;
   message: string;
+}
+const evidenceCanonical = (value: unknown): string =>
+  JSON.stringify(value, (_key, entry) =>
+    entry && typeof entry === 'object' && !Array.isArray(entry)
+      ? Object.fromEntries(Object.entries(entry).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
+      : entry,
+  );
+export function parseFunctionalEvidence(text: string): FunctionalEvidence | undefined {
+  if (!text || text.length > 65536) return undefined;
+  try {
+    const value = JSON.parse(text) as FunctionalEvidence;
+    if (schemaIssues('FunctionalEvidence', value).length || evidenceCanonical(value) !== text)
+      return undefined;
+    if (value.controls.some(({ rect: r }) => r.x + r.width > 16384 || r.y + r.height > 16384))
+      return undefined;
+    return value;
+  } catch {
+    return undefined;
+  }
+}
+export function functionalEvidenceText(value: FunctionalEvidence): string {
+  const text = evidenceCanonical(value);
+  if (!parseFunctionalEvidence(text)) throw Error('CONTENT_ISOLATION_REQUIRED');
+  return text;
+}
+export function contentIsolationSupported(
+  features: readonly string[] | undefined,
+  version: string | null | undefined,
+): boolean {
+  return version === '0.8.0' && features?.includes('CONTENT_ISOLATION_V1') === true;
 }
 export function executionOSSupported(distribution: string, version: string): boolean {
   return schemaIssues('ExecutionOS', { distribution, version }).length === 0;

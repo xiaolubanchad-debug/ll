@@ -207,6 +207,7 @@ watch(
 <template>
   <div class="version-manager">
     <h2>代理、注册方式与方案版本</h2>
+    <p class="muted">内容隔离默认开启，旧配置同样生效。仅保存受限功能证据，不展示原始 APP 内容。</p>
     <p class="muted">
       保存产生新版本，运行中的任务继续使用原版本。手工流程优先；开启自动识别后，其余 APK
       自动寻找入口，无法识别时待适配。

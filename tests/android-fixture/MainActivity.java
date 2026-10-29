@@ -11,6 +11,8 @@ import android.widget.TextView;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Color;
+import android.graphics.Bitmap;
+import android.graphics.drawable.BitmapDrawable;
 import android.view.View;
 import android.view.MotionEvent;
 import java.net.HttpURLConnection;
@@ -26,6 +28,13 @@ public final class MainActivity extends Activity {
     private void label(String text) { TextView view = new TextView(this); view.setText(text); layout.addView(view); }
     private void page(String title) {
         layout = new LinearLayout(this); layout.setOrientation(LinearLayout.VERTICAL);
+        if (FIXTURE_EPSILON || FIXTURE_ZETA || FIXTURE_ETA) {
+            Bitmap image = Bitmap.createBitmap(320, 320, Bitmap.Config.ARGB_8888);
+            Canvas canvas = new Canvas(image); canvas.drawColor(Color.rgb(230, 240, 250));
+            Paint ink = new Paint(); ink.setColor(Color.rgb(90, 130, 160)); ink.setTextSize(18);
+            canvas.drawCircle(260, 260, 40, ink); canvas.drawText("Owned visual content", 8, 300, ink);
+            layout.setBackground(new BitmapDrawable(getResources(), image));
+        }
         // API 35 enforces edge-to-edge; keep the fixture title below the status bar.
         layout.setPadding(32, Math.round(64 * getResources().getDisplayMetrics().density), 32, 32); TextView heading = new TextView(this);
         heading.setText(title); layout.addView(heading); setContentView(layout);

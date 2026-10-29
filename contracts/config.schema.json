@@ -194,6 +194,11 @@
               "maximum": 60000
             }
           }
+        },
+        "contentIsolation": {
+          "const": true,
+          "default": true,
+          "description": "默认开启，仅保留功能证据，不上传或展示原始业务画面"
         }
       },
       "allOf": [

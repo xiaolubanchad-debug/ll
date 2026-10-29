@@ -1,5 +1,10 @@
 import { join, dirname } from 'node:path';
-import { agentIssues, configurationIssues, schemaIssues } from '@apk/contracts';
+import {
+  agentIssues,
+  configurationIssues,
+  schemaIssues,
+  parseFunctionalEvidence,
+} from '@apk/contracts';
 import type { TestConfiguration, DailyExecutionPlan } from '@apk/contracts';
 import {
   canonical,
@@ -128,6 +133,8 @@ export class TaskEngine {
       this.store.accountAck(account.accountRef);
     }
     for (const artifact of this.store.pendingEvidence(delivery.deliveryId)) {
+      if (!parseFunctionalEvidence(Buffer.from(String(artifact.data), 'base64').toString('utf8')))
+        throw new RegistrationError('CONTENT_ISOLATION_REQUIRED');
       const response = await this.hub(
         'artifacts',
         {
@@ -138,10 +145,10 @@ export class TaskEngine {
           fence: delivery.fence,
           taskId: artifact.task,
           artifactId: artifact.id,
-          kind: 'screenshot',
+          kind: 'functional-evidence',
           sha256: artifact.sha,
           dataBase64: artifact.data,
-          redaction: 'CREDENTIAL_MASKED',
+          redaction: 'CONTENT_ISOLATED',
         },
         signal,
       );

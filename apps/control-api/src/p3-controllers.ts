@@ -45,7 +45,7 @@ export class P3Controller {
   @Get('tasks/:taskId/artifacts') async artifacts(@Param('taskId') id: string) {
     return {
       items: await this.db.artifact.findMany({
-        where: { taskId: uuid(id) },
+        where: { taskId: uuid(id), kind: 'functional-evidence' },
         orderBy: { createdAt: 'asc' },
         select: {
           id: true,
@@ -63,8 +63,8 @@ export class P3Controller {
     @Res() res: Response,
   ) {
     const bytes = await artifactContent(this.db, uuid(id));
-    res.setHeader('Content-Type', 'image/png');
-    res.setHeader('Content-Disposition', 'inline; filename="screenshot.png"');
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Content-Disposition', 'inline; filename="functional-evidence.json"');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.send(bytes);
   }

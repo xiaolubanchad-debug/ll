@@ -740,6 +740,34 @@ for (const errorCode of ['NAVIGATION_SITE', 'APP_NAVIGATION_ONLY', 'APP_AUTO_IDE
     ),
   );
 }
+for (const isolation of [undefined, true])
+  test('1.10 default isolation ' + String(isolation), () => {
+    const c = structuredClone(config);
+    if (isolation === undefined) delete c.execution.contentIsolation;
+    else c.execution.contentIsolation = isolation;
+    assert.deepEqual(configurationIssues(c), []);
+  });
+test('1.10 cannot disable isolation', () =>
+  assert.ok(
+    configurationIssues({ ...config, execution: { ...config.execution, contentIsolation: false } })
+      .length,
+  ));
+for (const patch of [
+  { image: 'data:image/png;base64,abc' },
+  { stage: 'DISCOVERY' },
+  { controls: [{ role: 'BODY', rect: { x: 0, y: 0, width: 10, height: 10 } }] },
+])
+  test('1.10 rejects raw or misleading functional evidence ' + JSON.stringify(patch), () =>
+    assert.ok(schemaIssues('FunctionalEvidence', { ...p3.FunctionalEvidence, ...patch }).length),
+  );
+test('1.10 legacy image upload disabled', () =>
+  assert.ok(
+    schemaIssues('ArtifactInput', {
+      ...p3.ArtifactInput,
+      kind: 'screenshot',
+      redaction: 'CREDENTIAL_MASKED',
+    }).length,
+  ));
 process.stdout.write(
   `${passed} contract checks passed${process.exitCode ? '; failures present' : ''}.\n`,
 );

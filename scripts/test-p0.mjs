@@ -170,6 +170,8 @@ try {
   await run(['--test', '--test-concurrency=1', 'tests/registration-discovery.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/app-obstructions.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/v192.test.mjs'], env);
+  await run(['--test', '--test-concurrency=1', 'tests/v110.test.mjs'], env);
+  await run(['--test', '--test-concurrency=1', 'tests/v110-api.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/p3.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/v17.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/v18.test.mjs'], env);
@@ -201,6 +203,7 @@ try {
   );
   await waitFor(env.APP_ORIGIN, ui);
   await run(['--test', 'tests/web.test.mjs'], { ...env, P0_SCREENSHOT_DIR: dir });
+  await run(['--test', 'tests/v110-web.test.mjs'], { ...env, P0_SCREENSHOT_DIR: dir });
   console.log(
     'P0–P3 integration and browser tests passed (real PostgreSQL, SQLite and Chromium; EC2 installer and Appium boundary simulated here, real Android verified separately).',
   );

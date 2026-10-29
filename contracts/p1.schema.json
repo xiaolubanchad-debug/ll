@@ -441,14 +441,15 @@
         },
         "features": {
           "type": "array",
-          "maxItems": 4,
+          "maxItems": 5,
           "uniqueItems": true,
           "items": {
             "enum": [
               "DOWNLOAD_V1",
               "REGISTRATION_V1",
               "DAILY_V1",
-              "AUTO_REGISTRATION_V1"
+              "AUTO_REGISTRATION_V1",
+              "CONTENT_ISOLATION_V1"
             ]
           }
         }

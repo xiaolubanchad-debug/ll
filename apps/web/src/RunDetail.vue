@@ -196,6 +196,7 @@ onUnmounted(() => {
           }}</el-button
         >
       </div>
+      <p class="muted">内容隔离已开启。真实操作与结果判定保留，原始 APP 画面不回传、不展示。</p>
       <p v-if="summary.run.errorCode" class="result-explanation">
         {{ reasonLabels[summary.run.errorCode] ?? summary.run.errorCode }}
       </p>

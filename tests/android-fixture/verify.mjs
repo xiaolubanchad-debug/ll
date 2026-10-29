@@ -5,7 +5,7 @@ import { readFile, writeFile, mkdir, readdir, access } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { randomUUID, randomBytes, createHash } from 'node:crypto';
 import { URLSearchParams } from 'node:url';
-import { PNG } from 'pngjs';
+import { parseFunctionalEvidence } from '@apk/contracts';
 import {
   registerApk,
   inspectApk,
@@ -13,13 +13,12 @@ import {
   cacheDay,
   startAndroid,
   readRegistrationPage,
-  automaticIdentity,
 } from '@apk/automation';
 import { openAgentStore } from '../../apps/agent/src/store.js';
 process.umask(0o077);
 const root = resolve(process.argv[2]),
   config = JSON.parse(await readFile('/var/lib/apk-platform/agent-config.json', 'utf8'));
-const v192 = process.argv[3] === '--v192';
+const v192 = ['--v192', '--v110'].includes(process.argv[3]);
 const automatic = process.argv[3] === '--auto' || v192;
 assert.match(
   root,
@@ -298,19 +297,8 @@ try {
               },
               androidFactory: async (...args) => {
                 const session = await startAndroid(...args);
-                let inputStarted = false;
                 return {
                   ...session,
-                  source: async (signal) => {
-                    const text = await session.source(signal);
-                    if (!inputStarted)
-                      await writeFile(join(root, 'last-before-input.xml'), text, { mode: 0o600 });
-                    return text;
-                  },
-                  input: async (...values) => {
-                    inputStarted = true;
-                    return session.input(...values);
-                  },
                   submit: async (...values) => {
                     const started = Date.now();
                     try {
@@ -367,13 +355,6 @@ try {
                     }
                     return session.close();
                   },
-                  ocr: async (bytes, signal) => {
-                    const lines = await session.ocr(bytes, signal);
-                    await writeFile(join(root, 'owned-ocr-lines.json'), JSON.stringify(lines), {
-                      mode: 0o600,
-                    });
-                    return lines;
-                  },
                 };
               },
             }
@@ -393,8 +374,10 @@ try {
           return store.intent(d, id, ref);
         },
         evidence: async (id, bytes) => {
-          const artifactId = randomUUID();
-          await writeFile(join(root, artifactId + '.png'), bytes, { flag: 'wx', mode: 0o600 });
+          assert.ok(parseFunctionalEvidence(bytes.toString()));
+          assert.ok(!bytes.includes(Buffer.from('12345678')));
+          const artifactId = store.evidence(d, id, bytes);
+          await writeFile(join(root, artifactId + '.json'), bytes, { flag: 'wx', mode: 0o600 });
           return artifactId;
         },
       },
@@ -430,15 +413,11 @@ try {
       assert.equal(result.recognition.automaticIdentity.kind, 'GUEST');
       assert.equal(result.recognition.automaticIdentity.scope, 'APP_UI_ONLY');
       assert.ok(result.artifactIds.length);
-      const tree = await readFile(join(root, 'last-before-input.xml'), 'utf8'),
-        identity = automaticIdentity(readRegistrationPage(tree, pkg));
-      assert.ok(identity);
-      const pic = PNG.sync.read(await readFile(join(root, result.artifactIds[0] + '.png'))),
-        r = identity.rects[0];
-      assert.equal(
-        pic.data[(Math.floor(r.y + r.height / 2) * pic.width + Math.floor(r.x + r.width / 2)) * 4],
-        0,
+      const evidence = parseFunctionalEvidence(
+        await readFile(join(root, result.artifactIds[0] + '.json'), 'utf8'),
       );
+      assert.equal(evidence.stage, 'DISCOVERY');
+      assert.equal(evidence.outcome, 'UNVERIFIED');
     }
     if (behavior === 'DIRECTORY') assert.equal(result.errorCode, 'APP_NAVIGATION_ONLY');
     if (expected === 'SUCCEEDED') assert.equal(result.proof, 'APP_UI');
@@ -450,6 +429,14 @@ try {
     assert.equal((await readdir(join(root, 'android/jobs'))).length, 0);
   }
   assert.equal(new Set(reports.map((r) => r.appAndroidIdHash)).size, reports.length);
+  assert.ok(
+    !(await readdir(root)).some(
+      (name) => /\.(png|xml)$/.test(name) || name === 'owned-ocr-lines.json',
+    ),
+  );
+  for (const d of store.deliveries())
+    for (const record of store.pendingEvidence(d.id))
+      assert.ok(parseFunctionalEvidence(Buffer.from(record.data, 'base64').toString()));
   passed = true;
   console.log(
     JSON.stringify({

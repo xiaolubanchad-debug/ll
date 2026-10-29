@@ -6,7 +6,13 @@ import type {
   AgentReconcileInput,
   TestConfiguration,
 } from '@apk/contracts';
-import { agentIssues, schemaIssues, registrationFlowFor } from '@apk/contracts';
+import {
+  agentIssues,
+  schemaIssues,
+  registrationFlowFor,
+  contentIsolationSupported,
+} from '@apk/contracts';
+import { readFunctionalArtifact } from './functional-artifacts.js';
 import { checked, readSecret } from './secrets.js';
 import { digest, canonical } from './security.js';
 import { lockNode, idle } from './nodes.js';
@@ -245,7 +251,7 @@ export async function createRun(
           (r) => r.mode !== undefined || r.autoWaitMs !== undefined,
         )) &&
       (!manifest?.features?.includes('DAILY_V1') ||
-        !['0.5.0', '0.5.1', '0.6.0', '0.6.1', '0.7.0', '0.7.1', '0.7.2'].includes(
+        !['0.5.0', '0.5.1', '0.6.0', '0.6.1', '0.7.0', '0.7.1', '0.7.2', '0.8.0'].includes(
           node.agentVersion ?? '',
         ))
     )
@@ -253,7 +259,7 @@ export async function createRun(
     if (
       configuration.execution.autoRegistration !== undefined &&
       (!manifest?.features?.includes('AUTO_REGISTRATION_V1') ||
-        !['0.6.0', '0.6.1', '0.7.0', '0.7.1', '0.7.2'].includes(node.agentVersion ?? ''))
+        !['0.6.0', '0.6.1', '0.7.0', '0.7.1', '0.7.2', '0.8.0'].includes(node.agentVersion ?? ''))
     )
       fault('NODE_UPGRADE_REQUIRED', '自动识别注册入口需要 Agent 0.6.0');
     const plan = await prepareDailyPlan(tx, input, config, now);
@@ -266,6 +272,8 @@ export async function createRun(
     ) {
       if (!manifest.features?.includes('REGISTRATION_V1') || node.registrationProtocol !== '1.0')
         fault('NODE_UPGRADE_REQUIRED', '完整测试需要支持注册的 Agent 版本');
+      if (!contentIsolationSupported(manifest.features, node.agentVersion))
+        fault('NODE_UPGRADE_REQUIRED', '注册测试需要升级到默认内容隔离的 Agent 0.8.0');
       if (!health?.android || !health.kvm) fault('NODE_NOT_READY', '安卓环境尚未就绪');
       if (
         configuration.execution.deviceProfiles.some(
@@ -341,7 +349,7 @@ export async function claimRun(db: PrismaClient, token: string, body: unknown) {
     if (!slot?.runId) return null;
     const run = await tx.run.findUniqueOrThrow({
       where: { id: slot.runId },
-      include: { delivery: true },
+      include: { delivery: true, configVersion: true },
     });
     if (
       run.releaseId !== auth.releaseId ||
@@ -349,6 +357,8 @@ export async function claimRun(db: PrismaClient, token: string, body: unknown) {
       node.downloadProtocol !== '1.0'
     )
       fault('NODE_NOT_READY', '节点不满足固定任务版本');
+    if (RUN_END.includes(run.status)) return null;
+    await assertIsolatedRun(tx, run);
     if (run.delivery) {
       if (run.delivery.bootId !== input.bootId) fault('AGENT_RECONCILE_REQUIRED', '旧任务需要核验');
       if (RUN_END.includes(run.status)) return null;
@@ -385,6 +395,26 @@ export async function boundDelivery(
   return d;
 }
 const bound = boundDelivery;
+async function assertIsolatedRun(tx: Tx, run: Run) {
+  if (run.purpose === 'DOWNLOAD' || run.purpose === 'PROXY_CHECK') return;
+  if (run.purpose !== 'REGISTER') {
+    const config = run.configVersionId
+      ? await tx.configVersion.findUnique({ where: { id: run.configVersionId } })
+      : null;
+    if ((config?.body as unknown as TestConfiguration)?.execution.mode !== 'FULL') return;
+  }
+  const [node, release] = await Promise.all([
+    tx.node.findUniqueOrThrow({ where: { id: run.nodeId } }),
+    tx.release.findUnique({ where: { id: run.releaseId ?? '' } }),
+  ]);
+  if (
+    !contentIsolationSupported(
+      (release?.manifest as { features?: string[] } | null)?.features,
+      node.agentVersion,
+    )
+  )
+    fault('NODE_UPGRADE_REQUIRED', '注册任务需要默认内容隔离的 Agent 0.8.0');
+}
 function authorized(d: Delivery & { run: Run }) {
   if (
     !ACTIVE_RUNS.includes(d.run.status as (typeof ACTIVE_RUNS)[number]) ||
@@ -398,6 +428,7 @@ export async function acceptRun(db: PrismaClient, token: string, id: string, bod
   return db.$transaction(async (tx) => {
     const d = await bound(tx, token, input.nodeId, id, input.fence, input.bootId);
     authorized(d);
+    await assertIsolatedRun(tx, d.run);
     if (!d.acceptedAt) {
       if (d.ackDeadline.getTime() <= Date.now()) fault('LEASE_EXPIRED', '接收期限已过');
       await tx.delivery.update({ where: { id }, data: { acceptedAt: new Date() } });
@@ -421,6 +452,7 @@ export async function deliveryConfig(db: PrismaClient, token: string, id: string
   return db.$transaction(async (tx) => {
     const d = await bound(tx, token, input.nodeId, id, input.fence, input.bootId);
     authorized(d);
+    await assertIsolatedRun(tx, d.run);
     if (!d.acceptedAt || d.run.stopRequested) fault('NODE_NOT_READY', '任务尚未接收或已请求停止');
     const v = await tx.configVersion.findUniqueOrThrow({ where: { id: d.run.configVersionId! } });
     const config = v.body as unknown as TestConfiguration;
@@ -830,7 +862,18 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
           where: { id: { in: ids }, taskId: task.id, recordedForReview: false },
         })) !== ids.length
       )
-        fault('EVENT_CONFLICT', '截图不属于本次有效任务');
+        fault('EVENT_CONFLICT', '功能证据不属于本次有效任务');
+      if (p.proof === 'APP_UI') {
+        if (!ids.length) fault('EVENT_CONFLICT', '注册结果缺少功能证据');
+        const records = await tx.artifact.findMany({
+          where: { id: { in: ids }, taskId: task.id, recordedForReview: false },
+        });
+        for (const record of records) {
+          const { evidence } = await readFunctionalArtifact(record);
+          if (evidence.stage !== 'RESULT' || evidence.outcome !== status)
+            fault('EVENT_CONFLICT', '功能证据与注册结果不一致');
+        }
+      }
     }
     await tx.task.update({
       where: { id: task.id },

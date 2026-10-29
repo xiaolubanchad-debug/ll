@@ -74,7 +74,7 @@ export async function createApp() {
         next(error);
       }
     },
-    json({ limit: '14mb' }),
+    json({ limit: '128kb' }),
   );
   app.use(json({ limit: '256kb' }));
   app.use(cookieParser());

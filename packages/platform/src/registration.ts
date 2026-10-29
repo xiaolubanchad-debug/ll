@@ -1,9 +1,13 @@
 import type { PrismaClient, Prisma } from '@prisma/client';
 import type { AgentMessage, ArtifactInput, TaskReconcileInput } from '@apk/contracts';
 import { agentIssues } from '@apk/contracts';
-import { PNG } from 'pngjs';
 import { mkdir, writeFile, readFile, lstat } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
+import {
+  artifactRoot,
+  readFunctionalArtifact,
+  validateFunctionalBytes,
+} from './functional-artifacts.js';
 import { checked } from './secrets.js';
 import { boundDelivery, ACTIVE_RUNS, nodeAuth } from './runs.js';
 import { encrypt, decrypt, digest, canonical } from './security.js';
@@ -11,7 +15,6 @@ import { fault } from './errors.js';
 import { idempotent } from './jobs.js';
 import { lockNode } from './nodes.js';
 
-const artifactRoot = () => resolve(process.env.ARTIFACT_DIR ?? 'data/artifacts');
 async function fullTask(tx: Prisma.TransactionClient, runId: string, taskId: string) {
   const task = await tx.task.findUnique({
     where: { id: taskId },
@@ -67,29 +70,12 @@ export async function storeAccount(db: PrismaClient, token: string, taskId: stri
     };
   });
 }
-export function validatePng(bytes: Buffer) {
-  if (
-    bytes.length < 45 ||
-    bytes.length > 10485760 ||
-    bytes.subarray(0, 8).toString('hex') !== '89504e470d0a1a0a' ||
-    bytes.subarray(12, 16).toString() !== 'IHDR'
-  )
-    fault('ARTIFACT_INVALID', '截图格式无效', 422);
-  const w = bytes.readUInt32BE(16),
-    h = bytes.readUInt32BE(20);
-  if (!w || !h || w > 4096 || h > 4096) fault('ARTIFACT_INVALID', '截图尺寸超出范围', 422);
-  try {
-    PNG.sync.read(bytes, { checkCRC: true });
-  } catch {
-    fault('ARTIFACT_INVALID', '截图数据无效', 422);
-  }
-}
 export async function uploadArtifact(db: PrismaClient, token: string, body: unknown) {
   const input = checked<ArtifactInput>('ArtifactInput', body);
   const bytes = Buffer.from(input.dataBase64, 'base64');
   if (bytes.toString('base64') !== input.dataBase64 || digest(bytes) !== input.sha256)
-    fault('ARTIFACT_INVALID', '截图摘要不匹配', 422);
-  validatePng(bytes);
+    fault('ARTIFACT_INVALID', '功能证据摘要不匹配', 422);
+  validateFunctionalBytes(bytes);
   return db.$transaction(
     async (tx) => {
       const d = await boundDelivery(tx, token, input.nodeId, input.deliveryId, input.fence);
@@ -102,15 +88,16 @@ export async function uploadArtifact(db: PrismaClient, token: string, body: unkn
           old.taskId !== input.taskId ||
           old.deliveryId !== d.id ||
           old.fence !== d.fence ||
-          old.sha256 !== input.sha256
+          old.sha256 !== input.sha256 ||
+          old.kind !== 'functional-evidence'
         )
-          fault('EVENT_CONFLICT', '截图编号冲突');
+          fault('EVENT_CONFLICT', '证据编号冲突');
         return { artifactId: old.id, recordedForReview: old.recordedForReview };
       }
       if ((await tx.artifact.count({ where: { taskId: input.taskId } })) >= 20)
-        fault('ARTIFACT_LIMIT', '任务截图数量超限', 422);
+        fault('ARTIFACT_LIMIT', '任务证据数量超限', 422);
       await mkdir(artifactRoot(), { recursive: true, mode: 0o700 });
-      const storageKey = input.artifactId + '.png',
+      const storageKey = input.artifactId + '.json',
         file = join(artifactRoot(), storageKey);
       try {
         await writeFile(file, bytes, { flag: 'wx', mode: 0o600 });
@@ -123,7 +110,7 @@ export async function uploadArtifact(db: PrismaClient, token: string, body: unkn
           info.size !== bytes.length ||
           digest(await readFile(file)) !== input.sha256
         )
-          fault('ARTIFACT_INVALID', '截图存储冲突', 422);
+          fault('ARTIFACT_INVALID', '证据存储冲突', 422);
       }
       const late =
         !ACTIVE_RUNS.includes(d.run.status as (typeof ACTIVE_RUNS)[number]) ||
@@ -134,7 +121,7 @@ export async function uploadArtifact(db: PrismaClient, token: string, body: unkn
           taskId: input.taskId,
           deliveryId: d.id,
           fence: d.fence,
-          kind: 'screenshot',
+          kind: 'functional-evidence',
           sha256: input.sha256,
           bytes: bytes.length,
           storageKey,
@@ -148,16 +135,8 @@ export async function uploadArtifact(db: PrismaClient, token: string, body: unkn
 }
 export async function artifactContent(db: PrismaClient, id: string) {
   const artifact = await db.artifact.findUnique({ where: { id } });
-  if (!artifact) fault('NOT_FOUND', '截图不存在', 404);
-  if (!/^[a-f0-9-]{36}\.png$/.test(artifact.storageKey))
-    fault('ARTIFACT_INVALID', '截图记录无效', 422);
-  const path = join(artifactRoot(), artifact.storageKey),
-    info = await lstat(path).catch(() => null);
-  if (!info?.isFile() || info.isSymbolicLink() || info.size !== artifact.bytes)
-    fault('ARTIFACT_INVALID', '截图不可用', 410);
-  const bytes = await readFile(path);
-  if (digest(bytes) !== artifact.sha256) fault('ARTIFACT_INVALID', '截图已损坏', 410);
-  return bytes;
+  if (!artifact) fault('NOT_FOUND', '证据不存在', 404);
+  return (await readFunctionalArtifact(artifact)).bytes;
 }
 export async function viewAccount(
   db: PrismaClient,

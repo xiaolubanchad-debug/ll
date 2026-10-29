@@ -180,9 +180,15 @@ export async function publishAgent() {
   const body = {
     id: randomUUID(),
     gitCommit,
-    agentVersion: '0.7.2',
+    agentVersion: '0.8.0',
     protocolVersion: '1.0',
-    features: ['DOWNLOAD_V1', 'REGISTRATION_V1', 'DAILY_V1', 'AUTO_REGISTRATION_V1'],
+    features: [
+      'DOWNLOAD_V1',
+      'REGISTRATION_V1',
+      'DAILY_V1',
+      'AUTO_REGISTRATION_V1',
+      'CONTENT_ISOLATION_V1',
+    ],
     artifactName,
     sha256,
     playbookSha256: await playbookDigest(join(root, 'deploy/ansible')),

@@ -4,10 +4,10 @@ import { appObstructions } from './app-obstructions.js';
 import { startAndroid } from './android.js';
 import type { AndroidOptions } from './android.js';
 import { inspectApk } from './apk.js';
-import { redactScreenshot } from './screenshot.js';
+import { functionalEvidence } from './functional-evidence.js';
 import type { Target, AutomationEvent } from './download.js';
 import { RegistrationError } from './registration-types.js';
-import type { Account, AndroidSession, Rect, TaskCompletion } from './registration-types.js';
+import type { Account, AndroidSession, TaskCompletion } from './registration-types.js';
 import { canonical, sha } from './common.js';
 import { discoverRegistration } from './registration-discovery.js';
 import type { RegistrationDiscovery, RegistrationLearning } from './registration-discovery.js';
@@ -80,7 +80,6 @@ export async function registerApk(
     beforeSubmit = '',
     discovering = false;
   let readiness: ReturnType<typeof appObstructions> | undefined;
-  const inputs: Rect[] = [];
   const stage = async (name: string, extra: Record<string, unknown> = {}) =>
     emit({ type: 'TASK_STAGE', taskId: target.taskId, payload: { stage: name, ...extra } });
   const action = () => {
@@ -232,7 +231,6 @@ export async function registerApk(
       }
       action();
       if (step.action === 'input') {
-        inputs.push(await session.rect(id));
         await session.input(id, step.text === '{username}' ? account.username : account.password);
       } else if (step.action === 'click') await session.click(id, Math.min(step.timeoutMs, 10000));
       else if (step.action === 'submit') {
@@ -307,16 +305,39 @@ export async function registerApk(
           errorCode: 'REGISTRATION_UNKNOWN',
         };
         if (outcome) {
-          const tree = await session.source(verificationSignal),
-            screenshot = await session.screenshot(verificationSignal);
-          if (tree !== (await session.source(verificationSignal)))
-            throw new RegistrationError('EVIDENCE_UNSAFE');
+          const tree = await session.source(verificationSignal);
           if (
             automatic &&
             registrationOutcome(tree, apk.packageName, account, beforeSubmit) !== outcome
           )
             throw new RegistrationError('EVIDENCE_UNSAFE');
-          const bytes = redactScreenshot(screenshot, tree, account, inputs, apk.packageName);
+          if (!automatic) {
+            const selected = outcome === 'SUCCEEDED' ? flow.success : flow.failure;
+            if (!selected) throw new RegistrationError('EVIDENCE_UNSAFE');
+            await session.find(
+              selected.locator,
+              Math.min(500, Math.max(1, deadline - Date.now())),
+              verificationSignal,
+            );
+            const opposite = outcome === 'SUCCEEDED' ? flow.failure : flow.success;
+            if (
+              opposite &&
+              (await session
+                .find(
+                  opposite.locator,
+                  Math.min(500, Math.max(1, deadline - Date.now())),
+                  verificationSignal,
+                )
+                .then(
+                  () => true,
+                  () => false,
+                ))
+            )
+              throw new RegistrationError('EVIDENCE_UNSAFE');
+          }
+          if (tree !== (await session.source(verificationSignal)))
+            throw new RegistrationError('EVIDENCE_UNSAFE');
+          const bytes = functionalEvidence(tree, apk.packageName, { outcome, automatic });
           if (Date.now() >= deadline) throw new RegistrationError('REGISTRATION_UNKNOWN');
           const artifactId = await hooks.evidence(target.taskId, bytes, verificationSignal);
           result = {
@@ -364,27 +385,13 @@ export async function registerApk(
         try {
           action();
           const proofSignal = AbortSignal.timeout(5000),
-            tree = await session!.source(proofSignal),
-            shot = await session!.screenshot(proofSignal);
+            tree = await session!.source(proofSignal);
           if (tree !== (await session!.source(proofSignal)))
             throw new RegistrationError('EVIDENCE_UNSAFE');
-          const fields = readRegistrationPage(tree, apk.packageName)
-            .controls.filter((e) => e.editable)
-            .map((e) => e.rect);
-          const bytes = redactScreenshot(
-            shot,
-            tree,
-            account ?? {
-              accountRef: '',
-              username: '__NO_GENERATED_ACCOUNT__',
-              password: '__NO_GENERATED_PASSWORD__',
-            },
-            [...inputs, ...fields],
-            apk.packageName,
-          );
+          const bytes = functionalEvidence(tree, apk.packageName);
           result.artifactIds.push(await hooks.evidence(target.taskId, bytes, proofSignal));
         } catch {
-          /* Unsafe or unavailable diagnostic screenshots are withheld. */
+          /* Unsafe or unavailable diagnostic structures are withheld. */
         }
       }
     }

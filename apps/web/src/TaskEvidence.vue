@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { ref, onUnmounted } from 'vue';
 import { api, mutation } from './api';
-import type { RegistrationRecognition } from '@apk/contracts';
+import type { RegistrationRecognition, FunctionalEvidence } from '@apk/contracts';
+import { functionalEvidenceText } from '@apk/contracts';
+import FunctionalEvidenceView from './FunctionalEvidenceView.vue';
 const props = defineProps<{
   task: {
     id: string;
@@ -20,6 +22,7 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ updated: [] }>();
 const artifacts = ref<{ id: string; recordedForReview: boolean }[]>([]),
+  records = ref<{ id: string; evidence: FunctionalEvidence; recordedForReview: boolean }[]>([]),
   reason = ref(''),
   account = ref<{ username: string; password: string } | null>(null),
   error = ref(''),
@@ -58,6 +61,12 @@ async function evidence() {
     artifacts.value = (
       await api<{ items: typeof artifacts.value }>('/tasks/' + props.task.id + '/artifacts')
     ).items;
+    records.value = [];
+    for (const a of artifacts.value) {
+      const value = await api<FunctionalEvidence>('/artifacts/' + a.id + '/content');
+      functionalEvidenceText(value);
+      records.value.push({ ...a, evidence: value });
+    }
     images.value = true;
   });
 }
@@ -103,7 +112,7 @@ onUnmounted(() => {
         · {{ task.recognition.learned ? '已保存成功路径' : '未保存新的成功路径' }}
       </p>
       <p v-if="task.recognition.needsAdaptation">
-        当前页面需要适配，可查看下方脱敏截图；剩余未执行次数未计入尝试。
+        当前页面需要适配，可查看下方功能记录；剩余未执行次数未计入尝试。
       </p>
       <p v-if="task.recognition.automaticIdentity">
         自动身份：{{
@@ -124,18 +133,14 @@ onUnmounted(() => {
         未验证；轮询代理的注册出口未确认。
       </p></template
     >
-    <el-button :disabled="busy" @click="evidence">查看脱敏截图</el-button>
+    <p class="muted">内容隔离已开启：仅显示功能记录，历史原始画面已隔离。</p>
+    <el-button :disabled="busy" @click="evidence">查看功能证据</el-button>
     <div v-if="images">
-      <p v-if="!artifacts.length" class="muted">尚无已上传截图</p>
-      <figure v-for="a in artifacts" :key="a.id">
-        <img
-          :src="'/api/v1/artifacts/' + a.id + '/content'"
-          alt="注册流程脱敏截图"
-          style="max-width: 100%; max-height: 640px"
-          referrerpolicy="no-referrer"
-        />
-        <figcaption v-if="a.recordedForReview">迟到证据，仅供人工核验</figcaption>
-      </figure>
+      <p v-if="!records.length" class="muted">尚无功能证据；历史截图不再展示。</p>
+      <div v-for="a in records" :key="a.id">
+        <FunctionalEvidenceView :evidence="a.evidence" />
+        <p v-if="a.recordedForReview">迟到证据，仅供人工核验</p>
+      </div>
     </div>
     <label for="account-reason">查看测试账户的原因</label
     ><el-input id="account-reason" v-model="reason" maxlength="300" />

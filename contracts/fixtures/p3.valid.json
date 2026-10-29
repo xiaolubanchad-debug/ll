@@ -7,10 +7,10 @@
     "fence": 1,
     "taskId": "11111111-1111-4111-8111-111111111111",
     "artifactId": "11111111-1111-4111-8111-111111111111",
-    "kind": "screenshot",
-    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    "dataBase64": "iVBORw0KGgo=",
-    "redaction": "CREDENTIAL_MASKED"
+    "kind": "functional-evidence",
+    "sha256": "886cf4b65dea0cecc3426368b540b214054cd86c709a30c81e89a462aa6c977d",
+    "dataBase64": "eyJjb250cm9scyI6W10sImtpbmQiOiJGVU5DVElPTkFMX0VWSURFTkNFIiwib3V0Y29tZSI6IlNVQ0NFRURFRCIsInNjaGVtYVZlcnNpb24iOiIxLjAiLCJzb3VyY2VEaWdlc3QiOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwic3RhZ2UiOiJSRVNVTFQiLCJ2ZXJpZmljYXRpb24iOiJBVVRPX0VYUExJQ0lUX1VJIn0=",
+    "redaction": "CONTENT_ISOLATED"
   },
   "AccountViewInput": {
     "reason": "核对自有测试账户"
@@ -19,5 +19,14 @@
     "outcome": "FAILED",
     "reason": "已通过自有测试后台核验提交没有成功",
     "evidenceIds": []
+  },
+  "FunctionalEvidence": {
+    "schemaVersion": "1.0",
+    "kind": "FUNCTIONAL_EVIDENCE",
+    "stage": "RESULT",
+    "outcome": "SUCCEEDED",
+    "verification": "AUTO_EXPLICIT_UI",
+    "sourceDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "controls": []
   }
 }

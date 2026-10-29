@@ -7,6 +7,7 @@ import { readFile, writeFile, mkdir, lstat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { PrismaClient } from '@prisma/client';
 import { PNG } from 'pngjs';
+import { parseFunctionalEvidence, functionalEvidenceText } from '@apk/contracts';
 import { chromium } from '@playwright/test';
 import { createApp } from '../apps/control-api/dist/app.js';
 import { passwordHash } from '../apps/control-api/dist/auth.js';
@@ -30,6 +31,18 @@ const db = new PrismaClient(),
 const image = new PNG({ width: 120, height: 120 });
 image.data.fill(255);
 const white = PNG.sync.write(image);
+const functionalBytes = (outcome = 'UNVERIFIED') =>
+  Buffer.from(
+    functionalEvidenceText({
+      schemaVersion: '1.0',
+      kind: 'FUNCTIONAL_EVIDENCE',
+      stage: outcome === 'UNVERIFIED' ? 'DISCOVERY' : 'RESULT',
+      outcome,
+      verification: outcome === 'UNVERIFIED' ? 'NO_SUBMISSION' : 'CONFIGURED_LOCATOR',
+      sourceDigest: 'b'.repeat(64),
+      controls: [],
+    }),
+  );
 const pause = (ms) => new Promise((r) => setTimeout(r, ms));
 async function wait(fn, ms = 45000) {
   const end = Date.now() + ms;
@@ -409,7 +422,7 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
       {
         nodeId: node.id,
         releaseId: release.id,
-        agentVersion: '0.7.2',
+        agentVersion: '0.8.0',
         apiUrl: base,
         sdkRoot: '/fixture',
         toolsRoot: resolve('.'),
@@ -513,8 +526,14 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
         artifactName: 'agent-' + randomBytes(32).toString('hex') + '.tgz',
         sha256: randomBytes(32).toString('hex'),
         manifest: {
-          agentVersion: '0.7.2',
-          features: ['DOWNLOAD_V1', 'REGISTRATION_V1', 'DAILY_V1', 'AUTO_REGISTRATION_V1'],
+          agentVersion: '0.8.0',
+          features: [
+            'DOWNLOAD_V1',
+            'REGISTRATION_V1',
+            'DAILY_V1',
+            'AUTO_REGISTRATION_V1',
+            'CONTENT_ISOLATION_V1',
+          ],
           toolchain: { systemImage: body.execution.deviceProfiles[0].systemImage },
         },
       },
@@ -525,7 +544,7 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
         host: 'p3.example.test',
         deploymentStatus: 'INSTALLED',
         agentReleaseId: release.id,
-        agentVersion: '0.7.2',
+        agentVersion: '0.8.0',
         downloadProtocol: '1.0',
         health: report,
         lastSeenAt: new Date(),
@@ -557,8 +576,33 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
       assert.equal(r.data.error.code, 'NODE_UPGRADE_REQUIRED');
     });
     await start();
+    await t.test('registration refuses a signed release without content isolation', async () => {
+      const original = release.manifest;
+      await db.release.update({
+        where: { id: release.id },
+        data: {
+          manifest: {
+            ...original,
+            features: ['DOWNLOAD_V1', 'REGISTRATION_V1', 'DAILY_V1', 'AUTO_REGISTRATION_V1'],
+          },
+        },
+      });
+      try {
+        const v = await save(),
+          r = await req(
+            '/runs',
+            'POST',
+            { nodeId: node.id, configVersionId: v.id, releaseId: release.id },
+            idem(),
+          );
+        assert.equal(r.status, 409);
+        assert.equal(r.data.error.code, 'NODE_UPGRADE_REQUIRED');
+      } finally {
+        await db.release.update({ where: { id: release.id }, data: { manifest: original } });
+      }
+    });
     await t.test(
-      'first flow installs, launches, registers, masks screenshots and encrypts accounts',
+      'first flow really registers once and stores only functional evidence and encrypted accounts',
       async () => {
         const before = submitted,
           r = await run();
@@ -596,10 +640,14 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
           headers: { cookie },
         });
         assert.equal(content.status, 200);
+        assert.match(content.headers.get('content-type'), /^application\/json/);
         const bytes = Buffer.from(await content.arrayBuffer()),
-          png = PNG.sync.read(bytes);
-        assert.equal(png.data[(55 * 120 + 55) * 4], 0);
-        assert.equal(png.data[(15 * 120 + 15) * 4], 0);
+          evidence = parseFunctionalEvidence(bytes.toString());
+        assert.equal(evidence.stage, 'RESULT');
+        assert.equal(evidence.outcome, 'SUCCEEDED');
+        assert.equal(evidence.verification, 'CONFIGURED_LOCATOR');
+        assert.ok(!bytes.includes(Buffer.from(row.data.username)));
+        assert.ok(!bytes.includes(Buffer.from(row.data.password)));
         const delivery = await db.delivery.findUnique({ where: { runId: r.id } });
         const nodeCall = async (path, data, method = 'POST') => {
           const result = await fetch(base + '/api/v1/agent/' + path, {
@@ -640,18 +688,18 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
           fence: delivery.fence,
           taskId: task.id,
           artifactId: art.id,
-          kind: 'screenshot',
+          kind: 'functional-evidence',
           sha256: digest(bytes),
           dataBase64: bytes.toString('base64'),
-          redaction: 'CREDENTIAL_MASKED',
+          redaction: 'CONTENT_ISOLATED',
         };
         assert.equal((await nodeCall('artifacts', artifactMessage)).status, 200);
         assert.equal(
           (
             await nodeCall('artifacts', {
               ...artifactMessage,
-              dataBase64: white.toString('base64'),
-              sha256: digest(white),
+              dataBase64: functionalBytes().toString('base64'),
+              sha256: digest(functionalBytes()),
             })
           ).status,
           409,
@@ -685,7 +733,7 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
           (await nodeCall('artifacts', { ...artifactMessage, sha256: 'a'.repeat(64) })).status,
           422,
         );
-        const artifactPath = join(process.env.ARTIFACT_DIR, art.id + '.png');
+        const artifactPath = join(process.env.ARTIFACT_DIR, art.id + '.json');
         await writeFile(artifactPath, white);
         assert.equal(
           (await fetch(base + '/api/v1/artifacts/' + art.id + '/content', { headers: { cookie } }))
@@ -694,6 +742,41 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
         );
         await writeFile(artifactPath, bytes);
         assert.equal((await fetch(base + '/api/v1/artifacts/' + art.id + '/content')).status, 401);
+        for (const raw of [white, Buffer.from('{"body":"OWNED_CONTENT_MUST_NOT_EXPORT"}')]) {
+          assert.equal(
+            (
+              await nodeCall('artifacts', {
+                ...artifactMessage,
+                artifactId: randomUUID(),
+                dataBase64: raw.toString('base64'),
+                sha256: digest(raw),
+              })
+            ).status,
+            422,
+          );
+        }
+        const legacyId = randomUUID();
+        await db.artifact.create({
+          data: {
+            id: legacyId,
+            taskId: task.id,
+            deliveryId: delivery.id,
+            fence: delivery.fence,
+            kind: 'screenshot',
+            sha256: digest(white),
+            bytes: white.length,
+            storageKey: legacyId + '.png',
+          },
+        });
+        // Deliberately no legacy file: the read must be refused before touching storage.
+        const hidden = await req('/artifacts/' + legacyId + '/content');
+        assert.equal(hidden.status, 410);
+        assert.equal(hidden.data.error.code, 'CONTENT_ISOLATION_REQUIRED');
+        assert.ok(
+          !(await req('/tasks/' + task.id + '/artifacts')).data.items.some(
+            (a) => a.id === legacyId,
+          ),
+        );
         const eventText = JSON.stringify(
           await db.runEvent.findMany({
             where: { deliveryId: (await db.delivery.findUnique({ where: { runId: r.id } })).id },
@@ -1294,10 +1377,10 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
             fence: (await db.delivery.findUnique({ where: { runId: r.id } })).fence,
             taskId: task.id,
             artifactId: randomUUID(),
-            kind: 'screenshot',
-            sha256: digest(white),
-            dataBase64: white.toString('base64'),
-            redaction: 'CREDENTIAL_MASKED',
+            kind: 'functional-evidence',
+            sha256: digest(functionalBytes()),
+            dataBase64: functionalBytes().toString('base64'),
+            redaction: 'CONTENT_ISOLATED',
           }),
         });
         assert.equal(late.status, 200);

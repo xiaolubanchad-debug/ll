@@ -218,7 +218,7 @@ onUnmounted(() => {
           <a
             v-if="logId(task.latestCycle)"
             :href="href('runs', logId(task.latestCycle)!, { view: 'targets' })"
-            >查看失败详情与截图</a
+            >查看失败详情与功能记录</a
           ><el-button @click="navigate('tasks', task.id, { edit: 'true', step: '3' })"
             >补充注册规则</el-button
           >

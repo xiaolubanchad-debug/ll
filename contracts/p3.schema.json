@@ -47,7 +47,7 @@
           "format": "uuid"
         },
         "kind": {
-          "const": "screenshot"
+          "const": "functional-evidence"
         },
         "sha256": {
           "type": "string",
@@ -56,18 +56,20 @@
         "dataBase64": {
           "type": "string",
           "minLength": 8,
-          "maxLength": 13981016,
+          "maxLength": 87384,
           "pattern": "^[A-Za-z0-9+/]+={0,2}$"
         },
         "redaction": {
-          "const": "CREDENTIAL_MASKED"
+          "const": "CONTENT_ISOLATED"
         }
       }
     },
     "AccountViewInput": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["reason"],
+      "required": [
+        "reason"
+      ],
       "properties": {
         "reason": {
           "type": "string",
@@ -79,10 +81,17 @@
     "TaskReconcileInput": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["outcome", "reason", "evidenceIds"],
+      "required": [
+        "outcome",
+        "reason",
+        "evidenceIds"
+      ],
       "properties": {
         "outcome": {
-          "enum": ["SUCCEEDED", "FAILED"]
+          "enum": [
+            "SUCCEEDED",
+            "FAILED"
+          ]
         },
         "reason": {
           "type": "string",
@@ -99,6 +108,146 @@
           }
         }
       }
+    },
+    "FunctionalEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "stage",
+        "outcome",
+        "verification",
+        "sourceDigest",
+        "controls"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0"
+        },
+        "kind": {
+          "const": "FUNCTIONAL_EVIDENCE"
+        },
+        "stage": {
+          "enum": [
+            "RESULT",
+            "DISCOVERY"
+          ]
+        },
+        "outcome": {
+          "enum": [
+            "SUCCEEDED",
+            "FAILED",
+            "UNVERIFIED"
+          ]
+        },
+        "verification": {
+          "enum": [
+            "AUTO_EXPLICIT_UI",
+            "CONFIGURED_LOCATOR",
+            "NO_SUBMISSION"
+          ]
+        },
+        "sourceDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "controls": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "role",
+              "rect"
+            ],
+            "properties": {
+              "role": {
+                "enum": [
+                  "USERNAME",
+                  "PASSWORD",
+                  "PASSWORD_CONFIRM",
+                  "REGISTER",
+                  "LOGIN",
+                  "ACCOUNT",
+                  "CONSENT",
+                  "RESULT"
+                ]
+              },
+              "rect": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "x",
+                  "y",
+                  "width",
+                  "height"
+                ],
+                "properties": {
+                  "x": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 16384
+                  },
+                  "y": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 16384
+                  },
+                  "width": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 16384
+                  },
+                  "height": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 16384
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "stage": {
+                "const": "DISCOVERY"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "outcome": {
+                "const": "UNVERIFIED"
+              },
+              "verification": {
+                "const": "NO_SUBMISSION"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "outcome": {
+                "enum": [
+                  "SUCCEEDED",
+                  "FAILED"
+                ]
+              },
+              "verification": {
+                "enum": [
+                  "AUTO_EXPLICIT_UI",
+                  "CONFIGURED_LOCATOR"
+                ]
+              }
+            }
+          }
+        }
+      ]
     }
   }
 }

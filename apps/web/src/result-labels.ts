@@ -61,6 +61,7 @@ export const reasonLabels: Record<string, string> = {
   DOWNLOAD_SOURCE_INVALID: '需要本服务器、本配置当天的有效下载批次',
   REGISTRATION_UNKNOWN: '注册结果未知，需要核验',
   CLEANUP_INCOMPLETE: '模拟器尚未确认清理完成',
+  CONTENT_ISOLATION_REQUIRED: '原始画面已隔离，仅允许功能证据；请升级执行环境',
   SCHEDULE_DISABLED: '计划已关闭',
   SECRET_REVOKED: '引用的凭据已吊销',
   SCHEDULER_UNAVAILABLE: '计划检查暂未完成',

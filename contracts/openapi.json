@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "APK 部署中台 API",
-    "version": "1.9.2"
+    "version": "1.10.0"
   },
   "paths": {
     "/api/v1/auth/login": {
@@ -2451,7 +2451,14 @@
         ],
         "responses": {
           "200": {
-            "description": "成功"
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FunctionalEvidence"
+                }
+              }
+            }
           },
           "default": {
             "description": "统一错误",
@@ -6519,6 +6526,11 @@
                     "maximum": 60000
                   }
                 }
+              },
+              "contentIsolation": {
+                "const": true,
+                "default": true,
+                "description": "默认开启，仅保留功能证据，不上传或展示原始业务画面"
               }
             },
             "allOf": [
@@ -8772,14 +8784,15 @@
           },
           "features": {
             "type": "array",
-            "maxItems": 4,
+            "maxItems": 5,
             "uniqueItems": true,
             "items": {
               "enum": [
                 "DOWNLOAD_V1",
                 "REGISTRATION_V1",
                 "DAILY_V1",
-                "AUTO_REGISTRATION_V1"
+                "AUTO_REGISTRATION_V1",
+                "CONTENT_ISOLATION_V1"
               ]
             }
           }
@@ -9351,7 +9364,7 @@
             "format": "uuid"
           },
           "kind": {
-            "const": "screenshot"
+            "const": "functional-evidence"
           },
           "sha256": {
             "type": "string",
@@ -9360,11 +9373,11 @@
           "dataBase64": {
             "type": "string",
             "minLength": 8,
-            "maxLength": 13981016,
+            "maxLength": 87384,
             "pattern": "^[A-Za-z0-9+/]+={0,2}$"
           },
           "redaction": {
-            "const": "CREDENTIAL_MASKED"
+            "const": "CONTENT_ISOLATED"
           }
         }
       },
@@ -9412,6 +9425,146 @@
             }
           }
         }
+      },
+      "FunctionalEvidence": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schemaVersion",
+          "kind",
+          "stage",
+          "outcome",
+          "verification",
+          "sourceDigest",
+          "controls"
+        ],
+        "properties": {
+          "schemaVersion": {
+            "const": "1.0"
+          },
+          "kind": {
+            "const": "FUNCTIONAL_EVIDENCE"
+          },
+          "stage": {
+            "enum": [
+              "RESULT",
+              "DISCOVERY"
+            ]
+          },
+          "outcome": {
+            "enum": [
+              "SUCCEEDED",
+              "FAILED",
+              "UNVERIFIED"
+            ]
+          },
+          "verification": {
+            "enum": [
+              "AUTO_EXPLICIT_UI",
+              "CONFIGURED_LOCATOR",
+              "NO_SUBMISSION"
+            ]
+          },
+          "sourceDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "controls": {
+            "type": "array",
+            "maxItems": 64,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "role",
+                "rect"
+              ],
+              "properties": {
+                "role": {
+                  "enum": [
+                    "USERNAME",
+                    "PASSWORD",
+                    "PASSWORD_CONFIRM",
+                    "REGISTER",
+                    "LOGIN",
+                    "ACCOUNT",
+                    "CONSENT",
+                    "RESULT"
+                  ]
+                },
+                "rect": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "x",
+                    "y",
+                    "width",
+                    "height"
+                  ],
+                  "properties": {
+                    "x": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 16384
+                    },
+                    "y": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 16384
+                    },
+                    "width": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 16384
+                    },
+                    "height": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 16384
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "stage": {
+                  "const": "DISCOVERY"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "outcome": {
+                  "const": "UNVERIFIED"
+                },
+                "verification": {
+                  "const": "NO_SUBMISSION"
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "outcome": {
+                  "enum": [
+                    "SUCCEEDED",
+                    "FAILED"
+                  ]
+                },
+                "verification": {
+                  "enum": [
+                    "AUTO_EXPLICIT_UI",
+                    "CONFIGURED_LOCATOR"
+                  ]
+                }
+              }
+            }
+          }
+        ]
       },
       "ScheduleInput": {
         "type": "object",

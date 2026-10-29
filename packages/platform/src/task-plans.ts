@@ -9,7 +9,7 @@ import type {
   TaskControlInput,
   TestConfiguration,
 } from '@apk/contracts';
-import { schemaIssues } from '@apk/contracts';
+import { schemaIssues, contentIsolationSupported } from '@apk/contracts';
 import { checked } from './secrets.js';
 import { configBody, configSecrets } from './configurations.js';
 import { canonical, digest } from './security.js';
@@ -86,6 +86,20 @@ async function readiness(db: PrismaClient, p: PlanRow) {
   if (await db.managedTask.count({ where: { id: { not: p.id }, nodeId: p.nodeId, enabled: true } }))
     add('NODE_BUSY', '此服务器已有其他开启的任务', 'tasks');
   if (c.execution.mode === 'FULL') {
+    const release = node.agentReleaseId
+      ? await db.release.findUnique({ where: { id: node.agentReleaseId } })
+      : null;
+    if (
+      !contentIsolationSupported(
+        (release?.manifest as { features?: string[] } | null)?.features,
+        node.agentVersion,
+      )
+    )
+      add(
+        'NODE_UPGRADE_REQUIRED',
+        '注册测试需要默认内容隔离，请升级执行环境至 Agent 0.8.0',
+        'nodes',
+      );
     if (!h?.android || !h.kvm || node.registrationProtocol !== '1.0')
       add('NODE_NOT_READY', '安卓环境尚未就绪', 'nodes');
     const proxy = c.execution.proxySecretVersionId;
@@ -98,7 +112,7 @@ async function readiness(db: PrismaClient, p: PlanRow) {
       add('NEEDS_ADAPTATION', '请选择自动识别或补充注册规则', 'tasks');
     if (
       c.execution.autoRegistration?.enabled &&
-      !['0.6.0', '0.6.1', '0.7.0', '0.7.1', '0.7.2'].includes(node.agentVersion ?? '')
+      !['0.6.0', '0.6.1', '0.7.0', '0.7.1', '0.7.2', '0.8.0'].includes(node.agentVersion ?? '')
     )
       add('NODE_UPGRADE_REQUIRED', '自动识别需要升级执行环境', 'nodes');
   }

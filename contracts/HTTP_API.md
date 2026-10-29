@@ -1,5 +1,7 @@
 # HTTP 接口契约
 
+1.10 默认内容隔离与真实功能测试见 [增量契约](../docs/V110_CONTRACT.md)，对应 Agent 0.8.0。原始画面不作为新执行证据上传或展示。
+
 1.9.2 导航站跳过、注册入口修正与自动身份独立观察见 [增量契约](../docs/V192_CONTRACT.md)，对应 Agent 0.7.2。
 
 1.9.1 的安卓版本一致性和复杂页面读取修正见 [实测修正契约](../docs/V191_CONTRACT.md)，对应 Agent 0.7.1。
@@ -12,7 +14,7 @@
 
 1.7 中台结果、中文日志、数据库汇总、历史回填与页面操作遵循 [1.7 契约](../docs/V17_CONTRACT.md)，操作见 [使用说明](../docs/V17_SETUP.md)。兼容 Agent 0.6.0，不改变注册提交及未知结果规则。
 
-版本 1.9.2，前缀 /api/v1。已实现路由由 p0.http.json 至 v18.http.json 合并生成 openapi.json，CI 比较 Controller、清单和 OpenAPI。下表保留后续阶段设计，以机器清单判定实现范围。
+版本 1.10.0，前缀 /api/v1。已实现路由由 p0.http.json 至 v18.http.json 合并生成 openapi.json，CI 比较 Controller、清单和 OpenAPI。下表保留后续阶段设计，以机器清单判定实现范围。
 
 1.6 增加可选 execution.autoRegistration、DISCOVERING 阶段和任务 recognition 摘要，见 [自动识别契约](../docs/V16_CONTRACT.md)。不增加任意截图识别、代码执行或公开 Appium 接口。自动模式仍只允许一次提交，未知结果暂停；启用配置要求新的 AUTO_REGISTRATION_V1 签名发布。
 
@@ -77,8 +79,8 @@ POST 创建批次、部署、配置版本、停止和核验必须带 Idempotency
 | GET /runs/{id}/stream                  | Last-Event-ID                                               | SSE，仅摘要和脱敏日志                                           |
 | POST /tasks/{id}/reconciliations       | outcome,reason,evidenceIds                                  | 不改变原始 UNKNOWN 记录，追加人工核验决议                       |
 | POST /tasks/{id}/account-view          | reason                                                      | 显式授权查看测试账户，短期响应且审计，Cache-Control:no-store    |
-| GET /tasks/{taskId}/artifacts          | 无                                                          | 仅截图摘要，不返回存储路径                                      |
-| GET /artifacts/{id}/content            | 无                                                          | 鉴权下载，Content-Disposition，无磁盘路径透传                   |
+| GET /tasks/{taskId}/artifacts          | 无                                                          | 仅受限功能证据摘要，不返回历史图片或存储路径                                      |
+| GET /artifacts/{id}/content            | 无                                                          | 鉴权返回受限 JSON，历史图片返回 410；无磁盘路径透传                   |
 | GET /audit-events                      | cursor,limit                                                | 管理操作审计                                                    |
 | GET /health/live                       | 无，公开                                                    | 进程存活，不返回内部地址或配置                                  |
 | GET /health/ready                      | 无，内部                                                    | 数据库和关键依赖就绪，供部署系统使用                            |
@@ -86,7 +88,7 @@ POST 创建批次、部署、配置版本、停止和核验必须带 Idempotency
 
 登录及 me 返回 SessionView，包括 admin 摘要和 csrfToken。改密成功也返回 SessionView，并轮换当前 Cookie、撤销旧会话。密码修改和配置校验请求使用 JSON，Header 包含精确 Origin 与 X-CSRF-Token。会话最长 12 小时，非滑动续期。P0 管理员密码为 12–128 个字符，不采用 APK 测试账户的 8–12 位规则。
 
-NodeConnection 凭据上传上限 64 KiB；普通配置正文上限 256 KiB；单张截图上限 10 MiB；单份日志上限 20 MiB。注册流程不得包含实际账户密码，只能引用生成变量。所有嵌套未知字段默认拒绝。
+NodeConnection 凭据上传上限 64 KiB；普通配置正文上限 256 KiB；单份功能证据上限 64 KiB；单份日志上限 20 MiB。注册流程不得包含实际账户密码，只能引用生成变量。所有嵌套未知字段默认拒绝。
 
 ## 节点接口
 
@@ -101,7 +103,7 @@ NodeConnection 凭据上传上限 64 KiB；普通配置正文上限 256 KiB；�
 | POST /agent/deliveries/{id}/config | 当前 fence                                                                  | 固定配置与本任务 secrets；只有有效租约且未吊销身份可取                      |
 | POST /agent/events                 | kind=events                                                                 | ackedEventIds、appliedThroughSequence、recordedForReview；持久化后响应      |
 | PUT /agent/tasks/{taskId}/account  | kind=account                                                                | 按 accountRef 幂等保存生成账户，重复内容不同则冲突；写入后不回显密码        |
-| POST /agent/artifacts              | JSON/Base64 PNG、bootId、deliveryId、fence、taskId、kind、sha256、redaction | artifactId，先鉴权后解析大正文；PNG ≤10 MiB，类型及归属校验，不接收任意路径 |
+| POST /agent/artifacts              | JSON/Base64 功能证据、bootId、deliveryId、fence、taskId、kind、sha256、redaction | artifactId，先鉴权后解析大正文；受限规范 JSON ≤64 KiB，Schema、类型及归属校验，不接收任意路径 |
 | POST /agent/reconcile              | nodeId、bootId、未确认 delivery 和提交记录摘要                              | 继续核验、停止或隔离决策；不自动重跑注册                                    |
 | POST /agent/credentials/rotate     | 旧身份认证                                                                  | 新节点凭据和过渡时间，旧凭据按规则失效                                      |
 

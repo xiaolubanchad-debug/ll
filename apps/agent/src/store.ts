@@ -10,6 +10,7 @@ import {
   createHash,
 } from 'node:crypto';
 import type { AgentMessage, LearnedRegistrationTemplate } from '@apk/contracts';
+import { parseFunctionalEvidence } from '@apk/contracts';
 import { RegistrationError, validLearnedTemplate } from '@apk/automation';
 import type { Account, AndroidRecord } from '@apk/automation';
 import { pinyinUsername } from './accounts.js';
@@ -256,6 +257,8 @@ export class AgentStore {
       }));
   }
   evidence(d: Delivery, task: string, bytes: Buffer) {
+    if (bytes.length > 65536 || !parseFunctionalEvidence(bytes.toString('utf8')))
+      throw new RegistrationError('CONTENT_ISOLATION_REQUIRED');
     const id = randomUUID(),
       sha = createHash('sha256').update(bytes).digest('hex');
     this.db
