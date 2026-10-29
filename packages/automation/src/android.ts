@@ -371,7 +371,13 @@ export async function startAndroid(
     });
     await client.command('POST', client.path('/timeouts'), { implicit: 0 });
     await client.command('POST', client.path('/appium/settings'), {
-      settings: { waitForIdleTimeout: 500, waitForSelectorTimeout: 1000 },
+      settings: {
+        waitForIdleTimeout: 0,
+        waitForSelectorTimeout: 1000,
+        snapshotMaxDepth: 25,
+        ignoreUnimportantViews: true,
+        simpleBoundsCalculation: true,
+      },
     });
     const get = async (args: string[]) =>
       (await command(adb, ['-s', record.serial!, 'shell', ...args])).trim();

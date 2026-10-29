@@ -9,12 +9,13 @@ import { NetworkPolicy, runDownload } from '@apk/automation';
 import { fixtureApk } from './p2-fixtures.mjs';
 
 const routes = ['direct', 'manual-popup', 'manual-same', 'auto-popup', 'auto-same'];
-const mobileState = `function state(action) {
+const mobileState = `async function state(action) {
   return {
     action, width: innerWidth, screenWidth: screen.width, screenHeight: screen.height,
     pixelRatio: devicePixelRatio, touchPoints: navigator.maxTouchPoints,
     coarse: matchMedia('(pointer: coarse)').matches, ua: navigator.userAgent,
     platform: navigator.platform, hints: navigator.userAgentData ? {mobile:navigator.userAgentData.mobile,platform:navigator.userAgentData.platform}:null
+    , entropy:navigator.userAgentData ? await navigator.userAgentData.getHighEntropyValues(['platformVersion']):null
   };
 }`;
 const html = (
@@ -81,10 +82,10 @@ for (const customUa of [
                 `<script>${mobileState}
           for (const icon of document.querySelectorAll('.icon')) {
             icon.addEventListener('click', e => e.preventDefault());
-            icon.addEventListener('touchend', e => {
+            icon.addEventListener('touchend', async e => {
               e.preventDefault();
               const next = new URL(icon.href);
-              next.searchParams.set('source', JSON.stringify(state(e.type)));
+              next.searchParams.set('source', JSON.stringify(await state(e.type)));
               if (icon.dataset.popup === 'true') window.open(next.href, '_blank');
               else location.assign(next.href);
             });
@@ -97,17 +98,17 @@ for (const customUa of [
         const route = url.pathname.slice(1);
         if (routes.includes(route)) {
           const navigate = `const next = new URL('/${route}.apk', location.href);
-          next.searchParams.set('landing', JSON.stringify(state(action)));
+          next.searchParams.set('landing', JSON.stringify(await state(action)));
           location.assign(next.href);`;
           res.end(
             html(
               route.startsWith('manual')
                 ? `<div id="mobile-install">Mobile touch area</div><script>${mobileState}
-              document.querySelector('#mobile-install').addEventListener('touchend', e => {
+              document.querySelector('#mobile-install').addEventListener('touchend', async e => {
                 e.preventDefault(); const action = e.type; ${navigate}
               });</script>`
                 : `<p>Automatic download, no button</p><script>${mobileState}
-              setTimeout(() => { const action = 'automatic'; ${navigate} }, ${route === 'auto-popup' ? 0 : 250});
+              setTimeout(async () => { const action = 'automatic'; ${navigate} }, ${route === 'auto-popup' ? 0 : 250});
             </script>`,
             ),
           );
@@ -181,6 +182,10 @@ for (const customUa of [
         assert.equal(evidence.headerUa, evidence.ua);
         assert.match(evidence.platform, /^Linux/);
         assert.deepEqual(evidence.hints, { mobile: true, platform: 'Android' });
+        assert.equal(
+          evidence.entropy.platformVersion,
+          evidence.ua.match(/Android (\d+)/)[1] + '.0.0',
+        );
         assert.equal(evidence.mobileHint, '?1');
         assert.equal(evidence.platformHint, '"Android"');
         if (customUa) assert.equal(evidence.ua, customUa);

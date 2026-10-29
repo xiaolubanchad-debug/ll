@@ -185,7 +185,7 @@ test('page reads tolerate slow source and retry only transient read errors; muta
       return;
     }
     reads++;
-    if (mode === 'slow') await new Promise((r) => setTimeout(r, 5400));
+    if (mode === 'slow') await new Promise((r) => setTimeout(r, 16500));
     if (mode === 'timeout') await new Promise((r) => setTimeout(r, 200));
     if (mode === 'retry' && reads === 1) {
       res.writeHead(500).end(JSON.stringify({ value: { error: 'unknown error' } }));
@@ -213,7 +213,7 @@ test('page reads tolerate slow source and retry only transient read errors; muta
   const client = new AppiumClient(server.address().port);
   client.session = 'owned';
   assert.match(await client.source(), /注册/);
-  assert.equal(reads, 1, 'a valid source after five seconds is accepted');
+  assert.equal(reads, 1, 'a valid source after the former fifteen-second cutoff is accepted');
   mode = 'retry';
   reads = 0;
   assert.match(await client.source(), /注册/);

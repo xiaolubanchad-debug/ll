@@ -13,6 +13,7 @@ import {
   registrationOutcome,
   entryRole,
   recognizeRegistrationScreenshot,
+  discoverRegistration,
 } from '@apk/automation';
 import { openAgentStore } from '../apps/agent/dist/store.js';
 import { fixtureApk } from './p2-fixtures.mjs';
@@ -34,6 +35,53 @@ const makeConfig = () => {
 const png = new PNG({ width: 640, height: 960 });
 png.data.fill(255);
 const white = PNG.sync.write(png);
+test('a populated stable content page without a registration entry stops before account input', async () => {
+  const pkg = 'com.example.content';
+  const source = `<hierarchy>${Array.from({ length: 24 }, (_, i) => `<node package="${pkg}" class="android.widget.TextView" text="Content ${i}" enabled="true" clickable="true" bounds="[20,${i * 30}][500,${i * 30 + 25}]"/>`).join('')}</hierarchy>`;
+  let reads = 0,
+    actions = 0;
+  await assert.rejects(
+    discoverRegistration(
+      {
+        source: async () => {
+          reads++;
+          return source;
+        },
+        screenshot: async () => white,
+        ocr: async () =>
+          ['News', 'Videos', 'Recommendations'].map((text) => ({
+            text,
+            confidence: 95,
+            rect: { x: 20, y: 20, width: 100, height: 20 },
+          })),
+        tap: async () => {
+          actions++;
+        },
+        click: async () => {
+          actions++;
+        },
+        input: async () => {
+          actions++;
+        },
+      },
+      pkg,
+      { ...settings, screenshotFallback: true },
+      'owned-content',
+      new AbortController().signal,
+      () => {},
+      {
+        source: 'CONTROLS',
+        navigationSteps: 0,
+        cache: 'MISS',
+        learned: false,
+        needsAdaptation: false,
+      },
+    ),
+    (e) => e.code === 'AUTO_ENTRY_NOT_FOUND',
+  );
+  assert.equal(reads, 2, 'a negative result uses two stable snapshots without another costly tree');
+  assert.equal(actions, 0);
+});
 const escape = (s) => s.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;');
 function pageXml(pkg, state, values = {}, variant = {}) {
   const rows = [];

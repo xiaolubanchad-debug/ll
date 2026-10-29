@@ -225,7 +225,7 @@ export class AppiumClient {
           'GET',
           this.path(path),
           undefined,
-          15000,
+          35000,
           signal ?? this.signal ?? null,
         );
       } catch (error) {

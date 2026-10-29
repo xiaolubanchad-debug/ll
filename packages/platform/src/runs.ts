@@ -245,13 +245,13 @@ export async function createRun(
           (r) => r.mode !== undefined || r.autoWaitMs !== undefined,
         )) &&
       (!manifest?.features?.includes('DAILY_V1') ||
-        !['0.5.0', '0.5.1', '0.6.0', '0.6.1', '0.7.0'].includes(node.agentVersion ?? ''))
+        !['0.5.0', '0.5.1', '0.6.0', '0.6.1', '0.7.0', '0.7.1'].includes(node.agentVersion ?? ''))
     )
       fault('NODE_UPGRADE_REQUIRED', '请部署支持每日下载与循环注册的 Agent');
     if (
       configuration.execution.autoRegistration !== undefined &&
       (!manifest?.features?.includes('AUTO_REGISTRATION_V1') ||
-        !['0.6.0', '0.6.1', '0.7.0'].includes(node.agentVersion ?? ''))
+        !['0.6.0', '0.6.1', '0.7.0', '0.7.1'].includes(node.agentVersion ?? ''))
     )
       fault('NODE_UPGRADE_REQUIRED', '自动识别注册入口需要 Agent 0.6.0');
     const plan = await prepareDailyPlan(tx, input, config, now);

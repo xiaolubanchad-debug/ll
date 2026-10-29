@@ -94,7 +94,7 @@ export function appObstructions(
   const check = (signal: AbortSignal) => {
     if (signal.aborted) throw new RegistrationError('CANCELLED');
     beforeAction();
-    if (spent >= 30000) throw new RegistrationError('AUTO_OBSTRUCTION_TIMEOUT');
+    if (spent >= 60000) throw new RegistrationError('AUTO_OBSTRUCTION_TIMEOUT');
   };
   const pause = (ms: number, signal: AbortSignal) =>
     new Promise<void>((resolve, reject) => {
@@ -112,9 +112,9 @@ export function appObstructions(
       signal.addEventListener('abort', abort, { once: true });
       if (signal.aborted) abort();
     });
-  const clear = async (signal: AbortSignal): Promise<string> => {
+  const clear = async (signal: AbortSignal, initialSource?: string): Promise<string> => {
     check(signal);
-    let source = await session.source(signal),
+    let source = initialSource ?? (await session.source(signal)),
       waiting = 0;
     for (;;) {
       check(signal);

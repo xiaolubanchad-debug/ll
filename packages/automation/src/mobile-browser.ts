@@ -11,7 +11,12 @@ export async function androidBrowser(
   if (!androidBrowserUa(userAgent) || !userAgent)
     throw new DownloadError('ANDROID_BROWSER_REQUIRED');
   const version = userAgent.match(/Chrome\/([\d.]+)/)![1],
-    major = version.split('.')[0];
+    major = version.split('.')[0],
+    androidVersion = (userAgent.match(/Android\s+([\d.]+)/)?.[1] ?? '13')
+      .split('.')
+      .concat('0', '0')
+      .slice(0, 3)
+      .join('.');
   const configured = new WeakMap<Page, Promise<void>>(),
     confirmed = new WeakMap<Page, string>();
   await context.setExtraHTTPHeaders({
@@ -21,7 +26,7 @@ export async function androidBrowser(
   });
   // Popup scripts can execute before Playwright exposes their Page object.
   await context.addInitScript(
-    ({ major, version }) => {
+    ({ major, version, androidVersion }) => {
       Object.defineProperty(navigator, 'platform', {
         configurable: true,
         get: () => 'Linux armv8l',
@@ -55,7 +60,7 @@ export async function androidBrowser(
               bitness: '64',
               model: 'Pixel 7',
               platform: 'Android',
-              platformVersion: '13.0.0',
+              platformVersion: androidVersion,
               uaFullVersion: version,
               fullVersionList: brands.map((b) => ({ ...b, version })),
               wow64: false,
@@ -70,7 +75,7 @@ export async function androidBrowser(
         },
       });
     },
-    { major, version },
+    { major, version, androidVersion },
   );
   const prepare = (page: Page) => {
     let pending = configured.get(page);
@@ -90,7 +95,7 @@ export async function androidBrowser(
               { brand: 'Google Chrome', version },
             ],
             platform: 'Android',
-            platformVersion: '13.0.0',
+            platformVersion: androidVersion,
             architecture: 'arm',
             model: 'Pixel 7',
             mobile: true,
@@ -103,7 +108,7 @@ export async function androidBrowser(
     }
     return pending;
   };
-  // Routing waits for the new target's CDP override before its document can execute.
+  // The context init script covers the first popup document; CDP supplies subsequent requests.
   context.on('page', (page) => {
     void prepare(page).catch(() => {});
   });
@@ -111,9 +116,15 @@ export async function androidBrowser(
     await prepare(page);
     if (confirmed.get(page) === page.url()) return;
     if (!/^https?:/.test(page.url())) return;
-    const actual = await page.evaluate(() => {
+    const actual = await page.evaluate(async () => {
       const hints = (
-        navigator as Navigator & { userAgentData?: { mobile: boolean; platform: string } }
+        navigator as Navigator & {
+          userAgentData?: {
+            mobile: boolean;
+            platform: string;
+            getHighEntropyValues: (keys: string[]) => Promise<Record<string, unknown>>;
+          };
+        }
       ).userAgentData;
       return {
         ua: navigator.userAgent,
@@ -122,7 +133,14 @@ export async function androidBrowser(
         mobile: matchMedia('(pointer: coarse)').matches,
         width: screen.width,
         height: screen.height,
-        hints: hints ? { mobile: hints.mobile, platform: hints.platform } : null,
+        hints: hints
+          ? {
+              mobile: hints.mobile,
+              platform: hints.platform,
+              platformVersion: (await hints.getHighEntropyValues(['platformVersion']))
+                .platformVersion,
+            }
+          : null,
         secure: isSecureContext,
       };
     });
@@ -133,7 +151,10 @@ export async function androidBrowser(
       !actual.mobile ||
       actual.width !== 412 ||
       actual.height !== 915 ||
-      (actual.secure && (!actual.hints?.mobile || actual.hints.platform !== 'Android'))
+      (actual.secure &&
+        (!actual.hints?.mobile ||
+          actual.hints.platform !== 'Android' ||
+          actual.hints.platformVersion !== androidVersion))
     )
       throw new DownloadError('BROWSER_ENVIRONMENT_INVALID');
     confirmed.set(page, page.url());

@@ -1,5 +1,7 @@
 # HTTP 接口契约
 
+1.9.1 的安卓版本一致性和复杂页面读取修正见 [实测修正契约](../docs/V191_CONTRACT.md)，对应 Agent 0.7.1。
+
 1.9 安卓网页、APP 广告公告处理与页面读取遵循 [1.9 契约](../docs/V19_CONTRACT.md)，对应 Agent 0.7.0。
 
 1.8.1 显式下载复跑规则见 [补充契约](../docs/V181_CONTRACT.md)；普通开始仍每日复用，不自动重下。
@@ -8,7 +10,7 @@
 
 1.7 中台结果、中文日志、数据库汇总、历史回填与页面操作遵循 [1.7 契约](../docs/V17_CONTRACT.md)，操作见 [使用说明](../docs/V17_SETUP.md)。兼容 Agent 0.6.0，不改变注册提交及未知结果规则。
 
-版本 1.9.0，前缀 /api/v1。已实现路由由 p0.http.json 至 v18.http.json 合并生成 openapi.json，CI 比较 Controller、清单和 OpenAPI。下表保留后续阶段设计，以机器清单判定实现范围。
+版本 1.9.1，前缀 /api/v1。已实现路由由 p0.http.json 至 v18.http.json 合并生成 openapi.json，CI 比较 Controller、清单和 OpenAPI。下表保留后续阶段设计，以机器清单判定实现范围。
 
 1.6 增加可选 execution.autoRegistration、DISCOVERING 阶段和任务 recognition 摘要，见 [自动识别契约](../docs/V16_CONTRACT.md)。不增加任意截图识别、代码执行或公开 Appium 接口。自动模式仍只允许一次提交，未知结果暂停；启用配置要求新的 AUTO_REGISTRATION_V1 签名发布。
 

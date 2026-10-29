@@ -63,7 +63,7 @@ export async function discoverRegistration(
   beforeAction: () => void,
   recognition: RegistrationRecognition,
   learning?: RegistrationLearning,
-  ready?: (signal: AbortSignal) => Promise<string>,
+  ready?: (signal: AbortSignal, source?: string) => Promise<string>,
 ): Promise<RegistrationDiscovery> {
   const bounded = AbortSignal.any([signal, AbortSignal.timeout(settings.timeoutMs)]),
     deadline = Date.now() + settings.timeoutMs;
@@ -82,11 +82,11 @@ export async function discoverRegistration(
       ocrUsed = false;
     if (stored && !cached) recognition.cache = 'INVALIDATED';
     const pause = () => new Promise<void>((r) => setTimeout(r, 150));
-    let source = await (ready ? ready(bounded) : session.source(bounded)),
+    let source = await session.source(bounded),
       idle = 0;
     for (let observations = 0; observations < 50; observations++) {
       check();
-      if (ready) source = await ready(bounded);
+      if (ready) source = await ready(bounded, source);
       const page = readRegistrationPage(source, pkg);
       if (page.foreign) throw new RegistrationError('AUTO_FOREIGN_SCREEN');
       await pause();
@@ -143,6 +143,13 @@ export async function discoverRegistration(
             { role, rect: line.rect, hash: sha(canonical({ role, pixels, rect: line.rect })) },
           ];
         });
+        if (
+          !candidates.length &&
+          page.controls.length >= 20 &&
+          !page.controls.some((control) => control.editable) &&
+          lines.filter((line) => line.confidence >= 75 && line.text.trim()).length >= 3
+        )
+          throw new RegistrationError('AUTO_ENTRY_NOT_FOUND');
         const refreshed = await session.source(bounded);
         if (readRegistrationPage(refreshed, pkg).hash !== page.hash) {
           source = refreshed;
@@ -169,7 +176,7 @@ export async function discoverRegistration(
         step = { screenHash: page.hash, role: candidate.role, candidateHash: candidate.hash };
       const mark = sha(canonical(step));
       check();
-      const currentSource = await session.source(bounded);
+      const currentSource = picture ? await session.source(bounded) : settledSource;
       if (readRegistrationPage(currentSource, pkg).hash !== page.hash) {
         source = currentSource;
         continue;
@@ -213,7 +220,7 @@ export async function discoverRegistration(
       } while (Date.now() < waitUntil);
       if (readRegistrationPage(next, pkg).hash === page.hash)
         throw new RegistrationError('AUTO_NAVIGATION_STALLED');
-      source = ready ? await ready(bounded) : next;
+      source = next;
     }
     throw new RegistrationError('AUTO_SCREEN_CHANGED');
   } catch (error) {
