@@ -154,6 +154,16 @@ export async function fixtureSite() {
       res.end(
         `<a class="download" href="${path === '/same' ? '/third.apk' : '/second.apk'}">下载</a>`,
       );
+    else if (path === '/nav-source')
+      res.end('<a class="jgg-item" pid="directory" href="/nav-directory">Owned directory</a>');
+    else if (path === '/nav-directory')
+      res.end(
+        '<meta name="viewport" content="width=device-width,initial-scale=1"><style>a{display:inline-block;width:80px;padding:8px}</style>' +
+          Array.from(
+            { length: 8 },
+            (_, i) => `<a class="jgg-item" pid="nav${i}" href="/nav-forbidden">App ${i}</a>`,
+          ).join(''),
+      );
     else if (path === '/invalid')
       res.end('<a class="jgg-item" pid="4" href="/invalid.apk">坏文件</a>');
     else if (path === '/hang') res.end('<a class="jgg-item" pid="5" href="/hang.apk">慢下载</a>');

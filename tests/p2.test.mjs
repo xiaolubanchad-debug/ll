@@ -299,7 +299,11 @@ test('P2 acceptance with real PostgreSQL, SQLite, Chromium and owned fixture sit
               !x.cacheHit,
           ),
         );
-        assert.ok(site.agents.includes('Mozilla/5.0 (Linux; Android 13) Chrome/149.0.0.0 Mobile Safari/537.36'));
+        assert.ok(
+          site.agents.includes(
+            'Mozilla/5.0 (Linux; Android 13) Chrome/149.0.0.0 Mobile Safari/537.36',
+          ),
+        );
         assert.equal(site.counts.get('/direct.apk'), 1);
         assert.equal(site.counts.get('/second.apk'), 1);
         assert.equal(site.counts.get('/third.apk'), 1);
@@ -330,6 +334,27 @@ test('P2 acceptance with real PostgreSQL, SQLite, Chromium and owned fixture sit
         assert.equal((await endRun(id)).status, 'SUCCEEDED');
         tasks = (await req('/runs/' + id + '/tasks')).data.items;
         assert.ok(tasks.every((x) => !x.cacheHit && x.apk.cacheDay === '2026-10-28'));
+      },
+    );
+    await t.test(
+      'directory-only download persists a skip, retains zero APKs and releases the node',
+      async () => {
+        await save(await body('/nav-source'));
+        const id = await begin();
+        const run = await endRun(id);
+        assert.equal(run.status, 'FAILED');
+        assert.equal(run.errorCode, 'NO_APK_AVAILABLE');
+        const tasks = (await req('/runs/' + id + '/tasks')).data.items;
+        assert.equal(tasks.length, 1);
+        assert.equal(tasks[0].status, 'SKIPPED');
+        assert.equal(tasks[0].errorCode, 'NAVIGATION_SITE');
+        assert.equal(tasks[0].apk, null);
+        assert.equal(site.counts.get('/nav-forbidden') ?? 0, 0);
+        assert.equal(
+          (await db.nodeSlot.findUniqueOrThrow({ where: { nodeId: node.id } })).runId,
+          null,
+        );
+        await save(await body());
       },
     );
     await t.test(

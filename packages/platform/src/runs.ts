@@ -245,13 +245,15 @@ export async function createRun(
           (r) => r.mode !== undefined || r.autoWaitMs !== undefined,
         )) &&
       (!manifest?.features?.includes('DAILY_V1') ||
-        !['0.5.0', '0.5.1', '0.6.0', '0.6.1', '0.7.0', '0.7.1'].includes(node.agentVersion ?? ''))
+        !['0.5.0', '0.5.1', '0.6.0', '0.6.1', '0.7.0', '0.7.1', '0.7.2'].includes(
+          node.agentVersion ?? '',
+        ))
     )
       fault('NODE_UPGRADE_REQUIRED', '请部署支持每日下载与循环注册的 Agent');
     if (
       configuration.execution.autoRegistration !== undefined &&
       (!manifest?.features?.includes('AUTO_REGISTRATION_V1') ||
-        !['0.6.0', '0.6.1', '0.7.0', '0.7.1'].includes(node.agentVersion ?? ''))
+        !['0.6.0', '0.6.1', '0.7.0', '0.7.1', '0.7.2'].includes(node.agentVersion ?? ''))
     )
       fault('NODE_UPGRADE_REQUIRED', '自动识别注册入口需要 Agent 0.6.0');
     const plan = await prepareDailyPlan(tx, input, config, now);
@@ -761,6 +763,17 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
       fault('EVENT_CONFLICT', '下载成功必须有文件校验证据');
     if (!full && (p.proof === 'APP_UI' || status === 'UNKNOWN'))
       fault('FEATURE_UNAVAILABLE', 'P2 不接受注册结果', 422);
+    const navigationSkip =
+      status === 'SKIPPED' &&
+      p.errorCode === 'NAVIGATION_SITE' &&
+      task.status === 'DOWNLOADING' &&
+      !task.apk &&
+      !task.submissionId &&
+      !p.accountRef &&
+      p.proof === 'NONE' &&
+      (p.artifactIds as string[]).length === 0;
+    if (!full && status === 'SKIPPED' && !navigationSkip)
+      fault('EVENT_CONFLICT', '下载跳过必须是未下载的导航站');
     if (full) {
       const account = p.accountRef
         ? await tx.accountResult.findUnique({ where: { accountRef: String(p.accountRef) } })
@@ -797,7 +810,17 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
         fault('EVENT_CONFLICT', '注册成功缺少提交与界面证据');
       if (
         status === 'SKIPPED' &&
-        (task.status !== 'DOWNLOADED' || p.errorCode !== 'FLOW_NOT_CONFIGURED')
+        !navigationSkip &&
+        !(task.status === 'DOWNLOADED' && p.errorCode === 'FLOW_NOT_CONFIGURED') &&
+        !(
+          task.status === 'DISCOVERING' &&
+          ['APP_NAVIGATION_ONLY', 'APP_AUTO_IDENTITY'].includes(String(p.errorCode)) &&
+          task.observation &&
+          !task.accountRef &&
+          !p.accountRef &&
+          p.proof === 'NONE' &&
+          (p.recognition as { needsAdaptation?: boolean } | undefined)?.needsAdaptation === false
+        )
       )
         fault('EVENT_CONFLICT', '未适配任务才能跳过');
       const ids = p.artifactIds as string[];
@@ -814,7 +837,10 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
       data: {
         status,
         finishedAt: new Date(),
-        ...(full && !task.registrationStartedAt && status === 'SKIPPED'
+        ...(full &&
+        !task.registrationStartedAt &&
+        status === 'SKIPPED' &&
+        p.errorCode !== 'NAVIGATION_SITE'
           ? { registrationStartedAt: new Date() }
           : {}),
         proof: String(p.proof),
@@ -908,6 +934,18 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
             t.errorCode?.startsWith('AUTO_') &&
             (t.recognition as { needsAdaptation?: boolean } | null)?.needsAdaptation === true,
         );
+      const directories = tasks
+        .filter(
+          (t) =>
+            t.status === 'SKIPPED' &&
+            ['APP_NAVIGATION_ONLY', 'APP_AUTO_IDENTITY'].includes(t.errorCode ?? '') &&
+            !t.submissionId,
+        )
+        .map((t) => (t.apk as { apkSha256?: string } | null)?.apkSha256);
+      const noRegisterable =
+        p.errorCode === 'NO_REGISTERABLE_APK' &&
+        !!plan?.assets.length &&
+        plan.assets.every((a) => directories.includes(a.apk.apkSha256));
       if (
         !run.discovered ||
         active.length ||
@@ -916,6 +954,7 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
           !missing &&
           !changed &&
           !adaptation &&
+          !noRegisterable &&
           run.attemptsStarted < run.attemptLimit)
       )
         fault('EVENT_CONFLICT', '注册循环尚未达到终止条件');
@@ -924,13 +963,15 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
         ? undefined
         : empty
           ? 'NO_ADAPTED_APKS'
-          : adaptation
-            ? 'AUTO_ADAPTATION_REQUIRED'
-            : changed
-              ? 'FLOW_LAYOUT_CHANGED'
-              : missing
-                ? 'CACHE_MISSING'
-                : 'ATTEMPT_LIMIT';
+          : noRegisterable
+            ? 'NO_REGISTERABLE_APK'
+            : adaptation
+              ? 'AUTO_ADAPTATION_REQUIRED'
+              : changed
+                ? 'FLOW_LAYOUT_CHANGED'
+                : missing
+                  ? 'CACHE_MISSING'
+                  : 'ATTEMPT_LIMIT';
       if (p.status !== expected || p.errorCode !== code)
         fault('EVENT_CONFLICT', '配额结果或原因不一致');
       await tx.task.updateMany({
@@ -943,10 +984,15 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
     if (tasks.some((t) => !['SUCCEEDED', 'FAILED', 'SKIPPED', 'CANCELLED'].includes(t.status)))
       fault('EVENT_CONFLICT', '目标尚未全部结束');
     const count = tasks.filter((t) => t.status === 'SUCCEEDED').length;
+    const navigations = tasks.filter(
+      (t) => t.status === 'SKIPPED' && t.errorCode === 'NAVIGATION_SITE',
+    ).length;
+    if (p.errorCode === 'NO_APK_AVAILABLE' && (!tasks.length || navigations !== tasks.length))
+      fault('EVENT_CONFLICT', '仅导航站全部跳过时才能声明没有 APK');
     const status =
       !run.discovered || !tasks.length
         ? 'FAILED'
-        : count === tasks.length
+        : count > 0 && count + navigations === tasks.length
           ? 'SUCCEEDED'
           : count
             ? 'PARTIAL_FAILED'
@@ -958,7 +1004,12 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
       status,
       typeof p.errorCode === 'string'
         ? p.errorCode
-        : (run.errorCode ?? (tasks.length ? undefined : 'NO_TARGETS')),
+        : (run.errorCode ??
+            (!tasks.length
+              ? 'NO_TARGETS'
+              : navigations === tasks.length
+                ? 'NO_APK_AVAILABLE'
+                : undefined)),
     );
     return;
   }

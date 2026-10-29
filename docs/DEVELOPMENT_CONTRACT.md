@@ -1,5 +1,7 @@
 # 开发契约
 
+1.9.2 导航站跳过、注册入口修正与自动身份独立观察见 [增量契约](V192_CONTRACT.md)，对应 Agent 0.7.2。
+
 1.9.1 的安卓版本一致性和复杂页面读取修正见 [实测修正契约](V191_CONTRACT.md)，对应 Agent 0.7.1。
 
 1.9 安卓网页、APP 广告公告处理与页面读取遵循 [1.9 契约](V19_CONTRACT.md)，对应 Agent 0.7.0。
@@ -10,7 +12,7 @@
 
 1.7 中台结果、中文日志、数据库汇总、历史回填与页面操作遵循 [1.7 契约](V17_CONTRACT.md)，操作见 [使用说明](V17_SETUP.md)。兼容 Agent 0.6.0，不改变注册提交及未知结果规则。
 
-版本 1.9.1，日期 2026 年 10 月 29 日。MUST 表示发布必须满足，SHOULD 表示偏离时必须记录原因，MAY 表示可选。P2 行为由 [P2_CONTRACT.md](P2_CONTRACT.md) 细化；P3 以 [P3_CONTRACT.md](P3_CONTRACT.md) 为增量权威，分别记录自动化测试、真实 Android 与产品注册验证。网页手机屏幕和触控遵循 [移动端屏幕契约 1.4.1](MOBILE_SCREEN_CONTRACT.md)。P4 的契约不表示已完成能力。
+版本 1.9.2，日期 2026 年 10 月 29 日。MUST 表示发布必须满足，SHOULD 表示偏离时必须记录原因，MAY 表示可选。P2 行为由 [P2_CONTRACT.md](P2_CONTRACT.md) 细化；P3 以 [P3_CONTRACT.md](P3_CONTRACT.md) 为增量权威，分别记录自动化测试、真实 Android 与产品注册验证。网页手机屏幕和触控遵循 [移动端屏幕契约 1.4.1](MOBILE_SCREEN_CONTRACT.md)。P4 的契约不表示已完成能力。
 
 ## 契约权威与变更
 
@@ -100,7 +102,7 @@ runId 是批次，taskId 是单个图标任务，deliveryId 是一次节点分�
 
 允许退出至 FAILED、SKIPPED 或 CANCELLED。提交意图写入后无法确认成功或失败时转 UNKNOWN；不能因工作进程退出就记为注册失败。阶段单调前进，迟到事件不使状态倒退。
 
-汇总优先级：存在 UNKNOWN 或执行权不确定则 NEEDS_REVIEW；已确认停止则 CANCELLED 并保留完成项；无匹配项则 FAILED/NO_TARGETS；全部任务成功才 SUCCEEDED；有成功也有失败或跳过则 PARTIAL_FAILED；没有成功则 FAILED。SKIPPED 不计为注册成功。
+汇总优先级：存在 UNKNOWN 或执行权不确定则 NEEDS_REVIEW；已确认停止则 CANCELLED 并保留完成项；无匹配项则 FAILED/NO_TARGETS；全部任务成功才 SUCCEEDED；1.9.2 下载批次允许已确认的导航跳过，须至少有一个有效 APK 且无实际失败；其他情况有成功也有失败或跳过则 PARTIAL_FAILED；没有成功则 FAILED。SKIPPED 不计为注册成功。
 
 ## 停止、重启与提交
 

@@ -22,10 +22,12 @@ import java.nio.charset.StandardCharsets;
 public final class MainActivity extends Activity {
     private String username = "";
     private LinearLayout layout;
-    private EditText user, password;
+    private EditText user, password, confirmation;
+    private void label(String text) { TextView view = new TextView(this); view.setText(text); layout.addView(view); }
     private void page(String title) {
         layout = new LinearLayout(this); layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setPadding(32, 64, 32, 32); TextView heading = new TextView(this);
+        // API 35 enforces edge-to-edge; keep the fixture title below the status bar.
+        layout.setPadding(32, Math.round(64 * getResources().getDisplayMetrics().density), 32, 32); TextView heading = new TextView(this);
         heading.setText(title); layout.addView(heading); setContentView(layout);
     }
     private Button button(String label, int id) {
@@ -37,6 +39,14 @@ public final class MainActivity extends Activity {
     }
     @Override public void onCreate(Bundle state) {
         super.onCreate(state); page("Owned P3 fixture");
+        if (FIXTURE_ZETA) { page("个人中心"); label("游客"); label("用户ID：12345678"); return; }
+        if (FIXTURE_ETA) { page("热门推荐"); label("站长精选"); for (int i=0;i<8;i++) button("Owned App "+i, View.generateViewId()); return; }
+        if (FIXTURE_EPSILON) {
+            page("Home"); button("点击登录", R.id.login).setOnClickListener(v -> {
+                page("登录"); input("Username", R.id.login_username, false); input("Password", R.id.login_password, true);
+                button("登录", R.id.login_submit); button("注册新账号", R.id.open_register).setOnClickListener(w -> form());
+            }); return;
+        }
         if (FIXTURE_GAMMA) {
             page("Home"); button("My", R.id.my).setOnClickListener(v -> {
                 page("Account"); button("Login", R.id.login).setOnClickListener(w -> {
@@ -61,7 +71,9 @@ public final class MainActivity extends Activity {
         button("Open registration", R.id.open_register).setOnClickListener(v -> form());
     }
     private void form() {
-        page("Create test account"); user = input("Username", R.id.username, false);
+        page(FIXTURE_EPSILON ? "注册新账号" : "Create test account");
+        if (FIXTURE_EPSILON) label("用户名");
+        user = input(FIXTURE_EPSILON ? "" : "Username", FIXTURE_EPSILON ? View.NO_ID : R.id.username, false);
         if (FIXTURE_BETA) {
             button("Next", R.id.next).setOnClickListener(v -> {
                 username = user.getText().toString(); page("Password page"); passwordPage();
@@ -69,12 +81,15 @@ public final class MainActivity extends Activity {
         } else passwordPage();
     }
     private void passwordPage() {
-        password = input("Password", R.id.password, true);
+        if (FIXTURE_EPSILON) label("密码");
+        password = input(FIXTURE_EPSILON ? "" : "Password", FIXTURE_EPSILON ? View.NO_ID : R.id.password, true);
+        if (FIXTURE_EPSILON) { label("确认密码"); confirmation = input("", View.NO_ID, true); }
         Button submit = button("Register", R.id.submit);
         submit.setOnClickListener(v -> {
             submit.setEnabled(false);
             if (!FIXTURE_BETA) username = user.getText().toString();
             final String name = username, pass = password.getText().toString();
+            if (FIXTURE_EPSILON && !pass.equals(confirmation.getText().toString())) { page("Password mismatch"); return; }
             final String device = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
             new Thread(() -> {
                 String result = "UNKNOWN";
@@ -92,7 +107,7 @@ public final class MainActivity extends Activity {
                 runOnUiThread(() -> {
                     page("Result"); TextView text = new TextView(this);
                     text.setId("OK".equals(response) ? R.id.account_home : "REJECT".equals(response) ? R.id.rejected : R.id.pending);
-                    text.setText("OK".equals(response) ? (FIXTURE_GAMMA || FIXTURE_DELTA ? "Registration successful" : "Welcome " + name) : "REJECT".equals(response) ? "Rejected" : "Pending result"); layout.addView(text);
+                    text.setText("OK".equals(response) ? (FIXTURE_GAMMA || FIXTURE_DELTA || FIXTURE_EPSILON ? "Registration successful" : "Welcome " + name) : "REJECT".equals(response) ? "Rejected" : "Pending result"); layout.addView(text);
                 });
             }).start();
         });

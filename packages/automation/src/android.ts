@@ -27,6 +27,10 @@ export interface AndroidOptions {
   beforeAction: () => void;
   resources: (record: AndroidRecord | null) => Promise<void>;
 }
+// SettingsProvider uses Long.toHexString; leading zeroes are not guaranteed.
+export function validShellAndroidId(value: string): boolean {
+  return /^[a-f0-9]{1,16}$/i.test(value) && !/^0+$/.test(value);
+}
 export async function androidCommand(
   file: string,
   args: string[],
@@ -390,7 +394,7 @@ export async function startAndroid(
     const supportedAbis = (await get(['getprop', 'ro.product.cpu.abilist']))
       .split(',')
       .filter(Boolean);
-    if (!/^[a-f0-9]{16}$/i.test(androidId) || !Number.isInteger(api) || locale !== profile.locale)
+    if (!validShellAndroidId(androidId) || !Number.isInteger(api) || locale !== profile.locale)
       throw new RegistrationError('DEVICE_PROFILE_UNSUPPORTED');
     const rpc = client;
     return {

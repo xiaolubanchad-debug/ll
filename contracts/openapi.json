@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "APK 部署中台 API",
-    "version": "1.9.1"
+    "version": "1.9.2"
   },
   "paths": {
     "/api/v1/auth/login": {
@@ -5488,6 +5488,30 @@
                   "templateHash": {
                     "type": "string",
                     "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "automaticIdentity": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "kind",
+                      "identifierHash",
+                      "scope"
+                    ],
+                    "properties": {
+                      "kind": {
+                        "enum": [
+                          "GUEST",
+                          "APP_ASSIGNED"
+                        ]
+                      },
+                      "identifierHash": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      },
+                      "scope": {
+                        "const": "APP_UI_ONLY"
+                      }
+                    }
                   }
                 }
               },
@@ -5921,6 +5945,10 @@
                 "type": "null"
               }
             ]
+          },
+          "automaticIdentityCount": {
+            "type": "integer",
+            "minimum": 0
           }
         },
         "required": [
@@ -5932,7 +5960,8 @@
           "counts",
           "taskCount",
           "cleanup",
-          "activeTask"
+          "activeTask",
+          "automaticIdentityCount"
         ]
       },
       "TimelinePage": {
@@ -7753,6 +7782,30 @@
                   "templateHash": {
                     "type": "string",
                     "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "automaticIdentity": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "kind",
+                      "identifierHash",
+                      "scope"
+                    ],
+                    "properties": {
+                      "kind": {
+                        "enum": [
+                          "GUEST",
+                          "APP_ASSIGNED"
+                        ]
+                      },
+                      "identifierHash": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      },
+                      "scope": {
+                        "const": "APP_UI_ONLY"
+                      }
+                    }
                   }
                 }
               }
@@ -7854,6 +7907,30 @@
                   "templateHash": {
                     "type": "string",
                     "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "automaticIdentity": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "kind",
+                      "identifierHash",
+                      "scope"
+                    ],
+                    "properties": {
+                      "kind": {
+                        "enum": [
+                          "GUEST",
+                          "APP_ASSIGNED"
+                        ]
+                      },
+                      "identifierHash": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      },
+                      "scope": {
+                        "const": "APP_UI_ONLY"
+                      }
+                    }
                   }
                 }
               }
@@ -7903,6 +7980,72 @@
                     }
                   }
                 }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "errorCode": {
+                      "enum": [
+                        "NAVIGATION_SITE",
+                        "APP_NAVIGATION_ONLY"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "errorCode"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "status": {
+                      "const": "SKIPPED"
+                    },
+                    "proof": {
+                      "const": "NONE"
+                    }
+                  },
+                  "not": {
+                    "required": [
+                      "accountRef"
+                    ]
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "errorCode": {
+                      "const": "APP_AUTO_IDENTITY"
+                    }
+                  },
+                  "required": [
+                    "errorCode"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "status": {
+                      "const": "SKIPPED"
+                    },
+                    "proof": {
+                      "const": "NONE"
+                    },
+                    "recognition": {
+                      "required": [
+                        "automaticIdentity"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "recognition"
+                  ],
+                  "not": {
+                    "required": [
+                      "accountRef"
+                    ]
+                  }
+                }
               }
             ]
           },
@@ -7940,7 +8083,9 @@
                   "NO_ADAPTED_APKS",
                   "PROXY_CHECK_FAILED",
                   "FLOW_LAYOUT_CHANGED",
-                  "AUTO_ADAPTATION_REQUIRED"
+                  "AUTO_ADAPTATION_REQUIRED",
+                  "NO_APK_AVAILABLE",
+                  "NO_REGISTERABLE_APK"
                 ]
               }
             }
@@ -9550,6 +9695,30 @@
           "templateHash": {
             "type": "string",
             "pattern": "^[a-f0-9]{64}$"
+          },
+          "automaticIdentity": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "identifierHash",
+              "scope"
+            ],
+            "properties": {
+              "kind": {
+                "enum": [
+                  "GUEST",
+                  "APP_ASSIGNED"
+                ]
+              },
+              "identifierHash": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "scope": {
+                "const": "APP_UI_ONLY"
+              }
+            }
           }
         }
       },

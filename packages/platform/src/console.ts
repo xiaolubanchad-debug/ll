@@ -454,13 +454,19 @@ export async function runSummary(db: PrismaClient, id: string): Promise<RunSumma
     async (tx) => {
       const row = await tx.run.findUnique({ where: { id }, select: runSelect });
       if (!row) fault('NOT_FOUND', '执行批次不存在', 404);
-      const [counts, taskCount, activeTask] = await Promise.all([
+      const [counts, taskCount, activeTask, automaticIdentityCount] = await Promise.all([
         categoryCounts(tx, { runId: id }),
         tx.task.count({ where: { runId: id } }),
         tx.task.findFirst({
           where: { runId: id, status: { notIn: terminal } },
           orderBy: { position: 'asc' },
           select: { id: true, position: true, label: true, status: true, apk: true },
+        }),
+        tx.task.count({
+          where: {
+            runId: id,
+            recognition: { path: ['automaticIdentity', 'scope'], equals: 'APP_UI_ONLY' },
+          },
         }),
       ]);
       return output('RunSummaryView', {
@@ -470,6 +476,7 @@ export async function runSummary(db: PrismaClient, id: string): Promise<RunSumma
         releaseId: row.releaseId,
         finishedAt: row.finishedAt?.toISOString() ?? null,
         counts,
+        automaticIdentityCount,
         taskCount,
         cleanup:
           row.status === 'NEEDS_REVIEW' ? 'NEEDS_REVIEW' : row.finishedAt ? 'CONFIRMED' : 'PENDING',

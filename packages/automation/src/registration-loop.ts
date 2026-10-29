@@ -70,6 +70,8 @@ export async function runCachedRegistrations(
     missing = false;
   let layoutChanged = false;
   let needsAdaptation = false;
+  const directories = new Set<string>();
+  let noRegisterable = false;
   try {
     for (const [index, target] of targets.entries()) {
       beforeAction();
@@ -116,10 +118,23 @@ export async function runCachedRegistrations(
       layoutChanged = completion.errorCode === 'FLOW_STEP_FAILED';
       needsAdaptation = completion.recognition?.needsAdaptation === true;
       await emit({ type: 'TASK_FINISHED', taskId: target.taskId, payload });
+      if (
+        completion.status === 'SKIPPED' &&
+        ['APP_NAVIGATION_ONLY', 'APP_AUTO_IDENTITY'].includes(completion.errorCode ?? '')
+      )
+        directories.add(asset.apk.apkSha256);
+      noRegisterable = plan.assets.every((a) => directories.has(a.apk.apkSha256));
       if (completion.status === 'SUCCEEDED') successes++;
       cleanupIncomplete = !cleanupComplete;
       review = cleanupIncomplete || completion.status === 'UNKNOWN';
-      if (review || missing || layoutChanged || needsAdaptation || successes >= plan.successTarget)
+      if (
+        review ||
+        missing ||
+        layoutChanged ||
+        needsAdaptation ||
+        noRegisterable ||
+        successes >= plan.successTarget
+      )
         break;
     }
   } finally {
@@ -132,15 +147,17 @@ export async function runCachedRegistrations(
       : 'REGISTRATION_UNKNOWN'
     : !targets.length
       ? 'NO_ADAPTED_APKS'
-      : needsAdaptation
-        ? 'AUTO_ADAPTATION_REQUIRED'
-        : layoutChanged
-          ? 'FLOW_LAYOUT_CHANGED'
-          : missing
-            ? 'CACHE_MISSING'
-            : successes < plan.successTarget
-              ? 'ATTEMPT_LIMIT'
-              : undefined;
+      : noRegisterable
+        ? 'NO_REGISTERABLE_APK'
+        : needsAdaptation
+          ? 'AUTO_ADAPTATION_REQUIRED'
+          : layoutChanged
+            ? 'FLOW_LAYOUT_CHANGED'
+            : missing
+              ? 'CACHE_MISSING'
+              : successes < plan.successTarget
+                ? 'ATTEMPT_LIMIT'
+                : undefined;
   await emit({
     type: 'RUN_FINISHED',
     payload: {

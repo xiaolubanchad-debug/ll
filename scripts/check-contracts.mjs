@@ -687,6 +687,59 @@ test('P3 immutable UiSelector accepted', () => {
   };
   semanticConfig(value);
 });
+for (const errorCode of ['NAVIGATION_SITE', 'APP_NAVIGATION_ONLY', 'APP_AUTO_IDENTITY']) {
+  const payload = {
+    status: 'SKIPPED',
+    proof: 'NONE',
+    artifactIds: [],
+    errorCode,
+    ...(errorCode === 'APP_AUTO_IDENTITY'
+      ? {
+          recognition: {
+            source: 'CONTROLS',
+            navigationSteps: 1,
+            cache: 'MISS',
+            learned: false,
+            needsAdaptation: false,
+            automaticIdentity: {
+              kind: 'GUEST',
+              identifierHash: 'a'.repeat(64),
+              scope: 'APP_UI_ONLY',
+            },
+          },
+        }
+      : {}),
+  };
+  const event = {
+    ...browserEvent,
+    taskId: '44444444-4444-4444-8444-444444444444',
+    type: 'TASK_FINISHED',
+    payload,
+  };
+  test('1.9.2 bounded skip ' + errorCode, () =>
+    assert.deepEqual(agentIssues({ ...notes, events: [event] }), []),
+  );
+  test('1.9.2 skip cannot count as success ' + errorCode, () =>
+    assert.ok(
+      agentIssues({
+        ...notes,
+        events: [
+          { ...event, payload: { ...payload, status: 'SUCCEEDED', proof: 'FILE_VALIDATION' } },
+        ],
+      }).length,
+    ),
+  );
+  test('1.9.2 skip cannot carry account ' + errorCode, () =>
+    assert.ok(
+      agentIssues({
+        ...notes,
+        events: [
+          { ...event, payload: { ...payload, accountRef: '55555555-5555-4555-8555-555555555555' } },
+        ],
+      }).length,
+    ),
+  );
+}
 process.stdout.write(
   `${passed} contract checks passed${process.exitCode ? '; failures present' : ''}.\n`,
 );

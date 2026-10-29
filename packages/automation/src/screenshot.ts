@@ -2,7 +2,14 @@ import { PNG } from 'pngjs';
 import { XMLParser } from 'fast-xml-parser';
 import type { Rect, Account } from './registration-types.js';
 import { RegistrationError } from './registration-types.js';
-export function redactScreenshot(bytes: Buffer, source: string, account: Account, inputs: Rect[]) {
+import { automaticIdentity, readRegistrationPage } from './registration-ui.js';
+export function redactScreenshot(
+  bytes: Buffer,
+  source: string,
+  account: Account,
+  inputs: Rect[],
+  pkg?: string,
+) {
   if (
     bytes.length < 45 ||
     bytes.length > 10485760 ||
@@ -15,6 +22,7 @@ export function redactScreenshot(bytes: Buffer, source: string, account: Account
     throw new RegistrationError('EVIDENCE_UNSAFE');
   const image = PNG.sync.read(bytes, { checkCRC: true }),
     rects = [...inputs];
+  if (pkg) rects.push(...(automaticIdentity(readRegistrationPage(source, pkg))?.rects ?? []));
   const visit = (value: unknown) => {
     if (!value || typeof value !== 'object') return;
     const row = value as Record<string, unknown>;

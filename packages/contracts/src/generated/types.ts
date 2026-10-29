@@ -612,6 +612,11 @@ export interface RegistrationDetailView {
     learned: boolean;
     needsAdaptation: boolean;
     templateHash?: string;
+    automaticIdentity?: {
+      kind: 'GUEST' | 'APP_ASSIGNED';
+      identifierHash: string;
+      scope: 'APP_UI_ONLY';
+    };
   } | null;
   reviews: {
     outcome: 'SUCCEEDED' | 'FAILED';
@@ -696,6 +701,7 @@ export interface RunSummaryView {
     stage: string;
     packageName: string | null;
   } | null;
+  automaticIdentityCount: number;
 }
 
 export interface TimelinePage {
@@ -1290,6 +1296,11 @@ export interface RegistrationRecognition {
   learned: boolean;
   needsAdaptation: boolean;
   templateHash?: string;
+  automaticIdentity?: {
+    kind: 'GUEST' | 'APP_ASSIGNED';
+    identifierHash: string;
+    scope: 'APP_UI_ONLY';
+  };
 }
 
 export interface LearnedRegistrationTemplate {

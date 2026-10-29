@@ -13,6 +13,7 @@ import { NetworkPolicy, startEgress } from './network.js';
 import { sha, canonical, normalizeUrl, cacheDay, DownloadError } from './common.js';
 import type { RegistrationCompletion } from './registration.js';
 import { androidBrowser } from './mobile-browser.js';
+import { navigationSite } from './navigation-site.js';
 export interface AutomationEvent {
   type:
     | 'TARGETS_DISCOVERED'
@@ -207,6 +208,12 @@ async function capture(
           if (error instanceof DownloadError) throw error;
           else continue;
         }
+        if (
+          Date.now() - arrived.get(page)!.at >= Math.max(1500, rules[0]?.autoWaitMs ?? 1500) &&
+          (await navigationSite(page)) &&
+          !result
+        )
+          throw new DownloadError('NAVIGATION_SITE');
         if (rules[0]?.mode === 'AUTO') continue;
         for (const rule of rules) {
           if (rule.mode === 'AUTO') continue;
@@ -409,6 +416,7 @@ export async function runDownload(
         },
       });
     let succeeded = 0,
+      navigationSkipped = 0,
       review = false,
       cleanupIncomplete = false;
     for (const [index, target] of targets!.entries()) {
@@ -483,6 +491,7 @@ export async function runDownload(
                   : egress.wasBlocked()
                     ? 'NETWORK_BLOCKED'
                     : 'DOWNLOAD_FAILED';
+              if (errorCode === 'NAVIGATION_SITE') break;
               if (attempt < config.download.retries) await pause(250 * 2 ** attempt, signal);
             } finally {
               await download?.delete().catch(() => {});
@@ -520,12 +529,20 @@ export async function runDownload(
           review = cleanupIncomplete || completion.status === 'UNKNOWN';
           if (review) break;
           if (signal.aborted) throw new DownloadError('CANCELLED');
-        } else
+        } else {
+          const skipped = errorCode === 'NAVIGATION_SITE';
+          if (skipped) navigationSkipped++;
           await emit({
             type: 'TASK_FINISHED',
             taskId: target.taskId,
-            payload: { status: 'FAILED', proof: 'NONE', artifactIds: [], errorCode },
+            payload: {
+              status: skipped ? 'SKIPPED' : 'FAILED',
+              proof: 'NONE',
+              artifactIds: [],
+              errorCode,
+            },
           });
+        }
       } catch (error) {
         if (signal.aborted) throw error;
         throw error;
@@ -535,7 +552,10 @@ export async function runDownload(
     const cutoff = options.dailyDownload
       ? (options.fixedCacheDay ?? cacheDay(now()))
       : cacheDay(new Date(now().getTime() - 7 * 86400000));
-    if (!options.dailyDownload || (targets!.length > 0 && succeeded === targets!.length))
+    if (
+      !options.dailyDownload ||
+      (succeeded > 0 && succeeded + navigationSkipped === targets!.length)
+    )
       await cache.prune(cutoff);
     await cleanup();
     await emit({
@@ -545,7 +565,7 @@ export async function runDownload(
           ? 'NEEDS_REVIEW'
           : !targets!.length
             ? 'FAILED'
-            : succeeded === targets!.length
+            : succeeded > 0 && succeeded + navigationSkipped === targets!.length
               ? 'SUCCEEDED'
               : succeeded
                 ? 'PARTIAL_FAILED'
@@ -554,7 +574,9 @@ export async function runDownload(
           ? { errorCode: cleanupIncomplete ? 'CLEANUP_INCOMPLETE' : 'REGISTRATION_UNKNOWN' }
           : !targets!.length
             ? { errorCode: 'NO_TARGETS' }
-            : {}),
+            : navigationSkipped === targets!.length
+              ? { errorCode: 'NO_APK_AVAILABLE' }
+              : {}),
       },
     });
   } catch (error) {

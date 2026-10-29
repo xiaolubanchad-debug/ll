@@ -27,7 +27,12 @@
           "format": "uuid"
         },
         "purpose": {
-          "enum": ["DOWNLOAD", "REGISTER", "LEGACY", "PROXY_CHECK"]
+          "enum": [
+            "DOWNLOAD",
+            "REGISTER",
+            "LEGACY",
+            "PROXY_CHECK"
+          ]
         },
         "status": {
           "enum": [
@@ -173,7 +178,10 @@
           ]
         }
       },
-      "required": ["items", "nextCursor"]
+      "required": [
+        "items",
+        "nextCursor"
+      ]
     },
     "ResultsQuery": {
       "type": "object",
@@ -213,7 +221,10 @@
           ]
         },
         "review": {
-          "enum": ["OPEN", "RESOLVED"]
+          "enum": [
+            "OPEN",
+            "RESOLVED"
+          ]
         },
         "cursor": {
           "type": "string",
@@ -264,7 +275,10 @@
       },
       "required": [],
       "not": {
-        "required": ["afterSequence", "beforeSequence"]
+        "required": [
+          "afterSequence",
+          "beforeSequence"
+        ]
       }
     },
     "AssetQuery": {
@@ -419,11 +433,17 @@
                   "maxLength": 256
                 },
                 "versionName": {
-                  "type": ["string", "null"],
+                  "type": [
+                    "string",
+                    "null"
+                  ],
                   "maxLength": 256
                 },
                 "versionCode": {
-                  "type": ["integer", "null"],
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
                   "minimum": 0
                 },
                 "abis": {
@@ -461,7 +481,10 @@
         "reviewOutcome": {
           "anyOf": [
             {
-              "enum": ["SUCCEEDED", "FAILED"]
+              "enum": [
+                "SUCCEEDED",
+                "FAILED"
+              ]
             },
             {
               "type": "null"
@@ -623,11 +646,17 @@
                         "maxLength": 256
                       },
                       "versionName": {
-                        "type": ["string", "null"],
+                        "type": [
+                          "string",
+                          "null"
+                        ],
                         "maxLength": 256
                       },
                       "versionCode": {
-                        "type": ["integer", "null"],
+                        "type": [
+                          "integer",
+                          "null"
+                        ],
                         "minimum": 0
                       },
                       "abis": {
@@ -665,7 +694,10 @@
               "reviewOutcome": {
                 "anyOf": [
                   {
-                    "enum": ["SUCCEEDED", "FAILED"]
+                    "enum": [
+                      "SUCCEEDED",
+                      "FAILED"
+                    ]
                   },
                   {
                     "type": "null"
@@ -709,7 +741,10 @@
           ]
         }
       },
-      "required": ["items", "nextCursor"]
+      "required": [
+        "items",
+        "nextCursor"
+      ]
     },
     "RegistrationDetailView": {
       "type": "object",
@@ -839,11 +874,17 @@
                       "maxLength": 256
                     },
                     "versionName": {
-                      "type": ["string", "null"],
+                      "type": [
+                        "string",
+                        "null"
+                      ],
                       "maxLength": 256
                     },
                     "versionCode": {
-                      "type": ["integer", "null"],
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
                       "minimum": 0
                     },
                     "abis": {
@@ -881,7 +922,10 @@
             "reviewOutcome": {
               "anyOf": [
                 {
-                  "enum": ["SUCCEEDED", "FAILED"]
+                  "enum": [
+                    "SUCCEEDED",
+                    "FAILED"
+                  ]
                 },
                 {
                   "type": "null"
@@ -954,10 +998,20 @@
             {
               "type": "object",
               "additionalProperties": false,
-              "required": ["source", "navigationSteps", "cache", "learned", "needsAdaptation"],
+              "required": [
+                "source",
+                "navigationSteps",
+                "cache",
+                "learned",
+                "needsAdaptation"
+              ],
               "properties": {
                 "source": {
-                  "enum": ["CONTROLS", "OCR", "LEARNED"]
+                  "enum": [
+                    "CONTROLS",
+                    "OCR",
+                    "LEARNED"
+                  ]
                 },
                 "navigationSteps": {
                   "type": "integer",
@@ -965,7 +1019,11 @@
                   "maximum": 12
                 },
                 "cache": {
-                  "enum": ["MISS", "HIT", "INVALIDATED"]
+                  "enum": [
+                    "MISS",
+                    "HIT",
+                    "INVALIDATED"
+                  ]
                 },
                 "learned": {
                   "type": "boolean"
@@ -976,6 +1034,30 @@
                 "templateHash": {
                   "type": "string",
                   "pattern": "^[a-f0-9]{64}$"
+                },
+                "automaticIdentity": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "kind",
+                    "identifierHash",
+                    "scope"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "enum": [
+                        "GUEST",
+                        "APP_ASSIGNED"
+                      ]
+                    },
+                    "identifierHash": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    },
+                    "scope": {
+                      "const": "APP_UI_ONLY"
+                    }
+                  }
                 }
               }
             },
@@ -991,7 +1073,10 @@
             "additionalProperties": false,
             "properties": {
               "outcome": {
-                "enum": ["SUCCEEDED", "FAILED"]
+                "enum": [
+                  "SUCCEEDED",
+                  "FAILED"
+                ]
               },
               "reason": {
                 "type": "string"
@@ -1001,11 +1086,20 @@
                 "format": "date-time"
               }
             },
-            "required": ["outcome", "reason", "createdAt"]
+            "required": [
+              "outcome",
+              "reason",
+              "createdAt"
+            ]
           }
         }
       },
-      "required": ["record", "observation", "recognition", "reviews"]
+      "required": [
+        "record",
+        "observation",
+        "recognition",
+        "reviews"
+      ]
     },
     "OverviewView": {
       "type": "object",
@@ -1040,7 +1134,12 @@
               "minimum": 0
             }
           },
-          "required": ["total", "online", "busy", "quarantined"]
+          "required": [
+            "total",
+            "online",
+            "busy",
+            "quarantined"
+          ]
         },
         "downloads": {
           "type": "object",
@@ -1055,7 +1154,10 @@
               "minimum": 0
             }
           },
-          "required": ["validated", "failed"]
+          "required": [
+            "validated",
+            "failed"
+          ]
         },
         "registrations": {
           "type": "object",
@@ -1340,7 +1442,11 @@
           "minimum": 0
         },
         "cleanup": {
-          "enum": ["CONFIRMED", "PENDING", "NEEDS_REVIEW"]
+          "enum": [
+            "CONFIRMED",
+            "PENDING",
+            "NEEDS_REVIEW"
+          ]
         },
         "activeTask": {
           "anyOf": [
@@ -1373,12 +1479,22 @@
                   ]
                 }
               },
-              "required": ["id", "position", "label", "stage", "packageName"]
+              "required": [
+                "id",
+                "position",
+                "label",
+                "stage",
+                "packageName"
+              ]
             },
             {
               "type": "null"
             }
           ]
+        },
+        "automaticIdentityCount": {
+          "type": "integer",
+          "minimum": 0
         }
       },
       "required": [
@@ -1390,7 +1506,8 @@
         "counts",
         "taskCount",
         "cleanup",
-        "activeTask"
+        "activeTask",
+        "automaticIdentityCount"
       ]
     },
     "TimelinePage": {
@@ -1507,7 +1624,13 @@
           ]
         }
       },
-      "required": ["items", "hasEarlier", "hasLater", "firstSequence", "lastSequence"]
+      "required": [
+        "items",
+        "hasEarlier",
+        "hasLater",
+        "firstSequence",
+        "lastSequence"
+      ]
     },
     "AssetListView": {
       "type": "object",
@@ -1588,11 +1711,17 @@
                         "maxLength": 256
                       },
                       "versionName": {
-                        "type": ["string", "null"],
+                        "type": [
+                          "string",
+                          "null"
+                        ],
                         "maxLength": 256
                       },
                       "versionCode": {
-                        "type": ["integer", "null"],
+                        "type": [
+                          "integer",
+                          "null"
+                        ],
                         "minimum": 0
                       },
                       "abis": {
@@ -1651,7 +1780,10 @@
           ]
         }
       },
-      "required": ["items", "nextCursor"]
+      "required": [
+        "items",
+        "nextCursor"
+      ]
     },
     "ValidationListView": {
       "type": "object",
@@ -1703,7 +1835,12 @@
                       "minimum": 0
                     }
                   },
-                  "required": ["name", "status", "proof", "requests"]
+                  "required": [
+                    "name",
+                    "status",
+                    "proof",
+                    "requests"
+                  ]
                 }
               }
             },
@@ -1729,7 +1866,10 @@
           ]
         }
       },
-      "required": ["items", "nextCursor"]
+      "required": [
+        "items",
+        "nextCursor"
+      ]
     }
   }
 }

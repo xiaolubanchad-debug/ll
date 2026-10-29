@@ -942,6 +942,30 @@
             "templateHash": {
               "type": "string",
               "pattern": "^[a-f0-9]{64}$"
+            },
+            "automaticIdentity": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "identifierHash",
+                "scope"
+              ],
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "GUEST",
+                    "APP_ASSIGNED"
+                  ]
+                },
+                "identifierHash": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "scope": {
+                  "const": "APP_UI_ONLY"
+                }
+              }
             }
           }
         }
@@ -1043,6 +1067,30 @@
             "templateHash": {
               "type": "string",
               "pattern": "^[a-f0-9]{64}$"
+            },
+            "automaticIdentity": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "identifierHash",
+                "scope"
+              ],
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "GUEST",
+                    "APP_ASSIGNED"
+                  ]
+                },
+                "identifierHash": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "scope": {
+                  "const": "APP_UI_ONLY"
+                }
+              }
             }
           }
         }
@@ -1092,6 +1140,72 @@
               }
             }
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "errorCode": {
+                "enum": [
+                  "NAVIGATION_SITE",
+                  "APP_NAVIGATION_ONLY"
+                ]
+              }
+            },
+            "required": [
+              "errorCode"
+            ]
+          },
+          "then": {
+            "properties": {
+              "status": {
+                "const": "SKIPPED"
+              },
+              "proof": {
+                "const": "NONE"
+              }
+            },
+            "not": {
+              "required": [
+                "accountRef"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "errorCode": {
+                "const": "APP_AUTO_IDENTITY"
+              }
+            },
+            "required": [
+              "errorCode"
+            ]
+          },
+          "then": {
+            "properties": {
+              "status": {
+                "const": "SKIPPED"
+              },
+              "proof": {
+                "const": "NONE"
+              },
+              "recognition": {
+                "required": [
+                  "automaticIdentity"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "recognition"
+            ],
+            "not": {
+              "required": [
+                "accountRef"
+              ]
+            }
+          }
         }
       ]
     },
@@ -1129,7 +1243,9 @@
             "NO_ADAPTED_APKS",
             "PROXY_CHECK_FAILED",
             "FLOW_LAYOUT_CHANGED",
-            "AUTO_ADAPTATION_REQUIRED"
+            "AUTO_ADAPTATION_REQUIRED",
+            "NO_APK_AVAILABLE",
+            "NO_REGISTERABLE_APK"
           ]
         }
       }

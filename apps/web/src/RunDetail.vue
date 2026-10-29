@@ -205,6 +205,9 @@ onUnmounted(() => {
         ><small>所有 APK 合计；未执行配额不计尝试。</small>
       </div>
       <div class="status-strip">
+        <span v-if="summary.run.purpose === 'REGISTER'"
+          >自动身份观察 {{ summary.automaticIdentityCount }} 次（不计入成功）</span
+        >
         <span v-for="(count, key) in summary.counts" :key="key"
           >{{
             summary.run.purpose === 'DOWNLOAD' && key === 'SUCCESS'

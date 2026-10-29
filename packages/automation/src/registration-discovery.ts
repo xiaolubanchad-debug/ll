@@ -13,6 +13,8 @@ import {
   readRegistrationPage,
   registrationEntries,
   registrationForm,
+  appNavigationPage,
+  automaticIdentity,
 } from './registration-ui.js';
 import type { EntryCandidate, RegistrationForm } from './registration-ui.js';
 
@@ -98,6 +100,15 @@ export async function discoverRegistration(
       }
       let candidates = registrationEntries(page, pkg),
         picture: Buffer | undefined;
+      const identity = automaticIdentity(page);
+      if (identity && !recognition.automaticIdentity)
+        recognition.automaticIdentity = {
+          kind: identity.kind,
+          identifierHash: sha(canonical([pkg, key, identity.value])),
+          scope: 'APP_UI_ONLY',
+        };
+      if (identity) candidates = candidates.filter((c) => c.role !== 'ACCOUNT');
+      if (appNavigationPage(page)) throw new RegistrationError('APP_NAVIGATION_ONLY');
       const consent = candidates.filter((c) => c.role === 'CONSENT');
       const form = consent.length ? undefined : registrationForm(page, pkg);
       if (form) {
@@ -134,6 +145,7 @@ export async function discoverRegistration(
           if (
             !role ||
             line.confidence < 75 ||
+            (identity && role === 'ACCOUNT') ||
             (role === 'CONSENT' && !privacy) ||
             (role === 'LOGIN' && page.controls.some((e) => e.editable))
           )
@@ -143,6 +155,7 @@ export async function discoverRegistration(
             { role, rect: line.rect, hash: sha(canonical({ role, pixels, rect: line.rect })) },
           ];
         });
+        if (identity && !candidates.length) throw new RegistrationError('APP_AUTO_IDENTITY');
         if (
           !candidates.length &&
           page.controls.length >= 20 &&
@@ -159,6 +172,7 @@ export async function discoverRegistration(
       const priorities = { CONSENT: 0, REGISTER: 1, ACCOUNT: 2, LOGIN: 3 };
       candidates.sort((a, b) => priorities[a.role] - priorities[b.role]);
       if (!candidates.length) {
+        if (identity) throw new RegistrationError('APP_AUTO_IDENTITY');
         if (idle++ < 3) {
           await new Promise((r) => setTimeout(r, 400));
           source = await session.source(bounded);

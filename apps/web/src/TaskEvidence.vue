@@ -105,6 +105,11 @@ onUnmounted(() => {
       <p v-if="task.recognition.needsAdaptation">
         当前页面需要适配，可查看下方脱敏截图；剩余未执行次数未计入尝试。
       </p>
+      <p v-if="task.recognition.automaticIdentity">
+        自动身份：{{
+          task.recognition.automaticIdentity.kind === 'GUEST' ? '游客' : 'APP 分配的身份'
+        }}。 仅记录当前 APP 页面观察，不计入注册成功数。
+      </p>
     </template>
     <el-alert v-if="error" :title="error" type="error" :closable="false" />
     <template v-if="task.observation"

@@ -640,6 +640,58 @@ test('1.7 console acceptance: real database, long timelines and browser navigati
         assert.deepEqual(errors, []);
       },
     );
+    await t.test(
+      'automatic identities have a separate observed count and never increment successes',
+      async () => {
+        const observed = await db.run.create({
+          data: {
+            nodeId,
+            configVersionId: versionId,
+            purpose: 'REGISTER',
+            status: 'FAILED',
+            successTarget: 1,
+            attemptLimit: 1,
+            attemptsStarted: 1,
+            finishedAt: new Date(),
+            tasks: {
+              create: {
+                id: randomUUID(),
+                position: 0,
+                targetKey: 'e'.repeat(64),
+                label: 'Owned automatic identity',
+                sourceUrl: 'https://owned.example.test',
+                status: 'SKIPPED',
+                proof: 'NONE',
+                errorCode: 'APP_AUTO_IDENTITY',
+                recognition: {
+                  source: 'CONTROLS',
+                  navigationSteps: 1,
+                  cache: 'MISS',
+                  learned: false,
+                  needsAdaptation: false,
+                  automaticIdentity: {
+                    kind: 'GUEST',
+                    identifierHash: 'd'.repeat(64),
+                    scope: 'APP_UI_ONLY',
+                  },
+                },
+              },
+            },
+          },
+        });
+        try {
+          const summary = await get('/runs/' + observed.id + '/summary');
+          assert.equal(summary.status, 200);
+          assert.equal(summary.data.automaticIdentityCount, 1);
+          assert.equal(summary.data.run.successes, 0);
+          assert.equal(summary.data.counts.SUCCESS, 0);
+          assert.equal(summary.data.counts.SKIPPED, 1);
+        } finally {
+          await db.task.deleteMany({ where: { runId: observed.id } });
+          await db.run.delete({ where: { id: observed.id } });
+        }
+      },
+    );
   } finally {
     await browser?.close();
     await vite?.close();

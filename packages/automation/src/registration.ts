@@ -316,7 +316,7 @@ export async function registerApk(
             registrationOutcome(tree, apk.packageName, account, beforeSubmit) !== outcome
           )
             throw new RegistrationError('EVIDENCE_UNSAFE');
-          const bytes = redactScreenshot(screenshot, tree, account, inputs);
+          const bytes = redactScreenshot(screenshot, tree, account, inputs, apk.packageName);
           if (Date.now() >= deadline) throw new RegistrationError('REGISTRATION_UNKNOWN');
           const artifactId = await hooks.evidence(target.taskId, bytes, verificationSignal);
           result = {
@@ -340,17 +340,27 @@ export async function registerApk(
       };
     else {
       let code = error instanceof RegistrationError ? error.code : 'ANDROID_FAILED';
+      if (code === 'AUTO_ENTRY_NOT_FOUND' && recognition?.automaticIdentity && !account)
+        code = 'APP_AUTO_IDENTITY';
       if (automatic && (code === 'FLOW_STEP_FAILED' || (discovering && code === 'APPIUM_FAILED')))
         code = discovering ? 'AUTO_PAGE_UNREADABLE' : 'AUTO_FORM_CHANGED';
       if (code === 'CLEANUP_INCOMPLETE') clean = false;
       result = {
-        status: signal.aborted ? 'CANCELLED' : 'FAILED',
+        status: signal.aborted
+          ? 'CANCELLED'
+          : ['APP_NAVIGATION_ONLY', 'APP_AUTO_IDENTITY'].includes(code) && !account
+            ? 'SKIPPED'
+            : 'FAILED',
         proof: 'NONE',
         artifactIds: [],
         errorCode: code,
       };
-      if (recognition && !signal.aborted && code.startsWith('AUTO_')) {
-        recognition.needsAdaptation = true;
+      if (
+        recognition &&
+        !signal.aborted &&
+        (code.startsWith('AUTO_') || ['APP_NAVIGATION_ONLY', 'APP_AUTO_IDENTITY'].includes(code))
+      ) {
+        recognition.needsAdaptation = !['APP_NAVIGATION_ONLY', 'APP_AUTO_IDENTITY'].includes(code);
         try {
           action();
           const proofSignal = AbortSignal.timeout(5000),
@@ -370,6 +380,7 @@ export async function registerApk(
               password: '__NO_GENERATED_PASSWORD__',
             },
             [...inputs, ...fields],
+            apk.packageName,
           );
           result.artifactIds.push(await hooks.evidence(target.taskId, bytes, proofSignal));
         } catch {

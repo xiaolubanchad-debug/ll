@@ -249,20 +249,30 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
           const control = (id, text, kind, y, password = false) =>
             `<node package="${pkg}" class="android.widget.${kind}" resource-id="${pkg}:id/${id}" text="${text}" enabled="true" clickable="${kind === 'Button'}" password="${password}" bounds="[10,${y}][110,${y + 15}]"/>`;
           const content =
-            mode === 'auto-success' && !s.adClosed
-              ? control('ad-close', '关闭广告', 'Button', 10)
-              : s.submitted
-                ? control('result', 'Registration successful', 'TextView', 10)
-                : s.autoForm || mode === 'auto-unsupported'
-                  ? control(
-                      mode === 'auto-unsupported' ? 'phone' : 'username',
-                      mode === 'auto-unsupported' ? 'Phone number' : s.username || 'Username',
-                      'EditText',
-                      20,
-                    ) +
-                    control('password', s.password || 'Password', 'EditText', 40, true) +
-                    control('submit', 'Register', 'Button', 60)
-                  : control('open-register', 'Register', 'Button', 10);
+            mode === 'auto-guest'
+              ? control('profile', '个人中心', 'TextView', 10) +
+                control('guest', '游客', 'TextView', 30) +
+                control('uid', 'UID：12345678', 'TextView', 50)
+              : mode === 'auto-directory'
+                ? control('popular', '热门推荐', 'TextView', 0) +
+                  control('directory', '站长精选', 'TextView', 12) +
+                  Array.from({ length: 8 }, (_, i) =>
+                    control('app' + i, 'Owned app ' + i, 'Button', 24 + i * 10),
+                  ).join('')
+                : mode === 'auto-success' && !s.adClosed
+                  ? control('ad-close', '关闭广告', 'Button', 10)
+                  : s.submitted
+                    ? control('result', 'Registration successful', 'TextView', 10)
+                    : s.autoForm || mode === 'auto-unsupported'
+                      ? control(
+                          mode === 'auto-unsupported' ? 'phone' : 'username',
+                          mode === 'auto-unsupported' ? 'Phone number' : s.username || 'Username',
+                          'EditText',
+                          20,
+                        ) +
+                        control('password', s.password || 'Password', 'EditText', 40, true) +
+                        control('submit', 'Register', 'Button', 60)
+                      : control('open-register', 'Register', 'Button', 10);
           value = `<hierarchy><node package="${pkg}" class="android.widget.FrameLayout" text="" clickable="false" bounds="[0,0][120,120]">${content}</node></hierarchy>`;
         } else
           value =
@@ -399,7 +409,7 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
       {
         nodeId: node.id,
         releaseId: release.id,
-        agentVersion: '0.7.1',
+        agentVersion: '0.7.2',
         apiUrl: base,
         sdkRoot: '/fixture',
         toolsRoot: resolve('.'),
@@ -503,7 +513,7 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
         artifactName: 'agent-' + randomBytes(32).toString('hex') + '.tgz',
         sha256: randomBytes(32).toString('hex'),
         manifest: {
-          agentVersion: '0.7.1',
+          agentVersion: '0.7.2',
           features: ['DOWNLOAD_V1', 'REGISTRATION_V1', 'DAILY_V1', 'AUTO_REGISTRATION_V1'],
           toolchain: { systemImage: body.execution.deviceProfiles[0].systemImage },
         },
@@ -515,7 +525,7 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
         host: 'p3.example.test',
         deploymentStatus: 'INSTALLED',
         agentReleaseId: release.id,
-        agentVersion: '0.7.1',
+        agentVersion: '0.7.2',
         downloadProtocol: '1.0',
         health: report,
         lastSeenAt: new Date(),
@@ -873,6 +883,37 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
               ),
             );
             assert.equal(activeSessions, 0);
+            for (const scenario of ['auto-guest', 'auto-directory']) {
+              mode = scenario;
+              const beforeIdentitySubmit = submitted;
+              const skipped = await purpose({ ...input, successTarget: 2, attemptLimit: 5 });
+              assert.equal(skipped.status, 'FAILED');
+              assert.equal(skipped.errorCode, 'NO_REGISTERABLE_APK');
+              assert.equal(skipped.successes, 0);
+              assert.equal(skipped.attemptsStarted, 1);
+              const observedTask = await db.task.findFirstOrThrow({
+                where: { runId: skipped.id, attemptStarted: true },
+              });
+              assert.equal(observedTask.status, 'SKIPPED');
+              assert.equal(
+                observedTask.errorCode,
+                scenario === 'auto-guest' ? 'APP_AUTO_IDENTITY' : 'APP_NAVIGATION_ONLY',
+              );
+              assert.equal(observedTask.submissionId, null);
+              assert.equal(submitted, beforeIdentitySubmit);
+              assert.equal(
+                await db.accountResult.count({ where: { delivery: { runId: skipped.id } } }),
+                0,
+              );
+              const observedSummary = await req('/runs/' + skipped.id + '/summary');
+              assert.equal(observedSummary.status, 200);
+              assert.equal(
+                observedSummary.data.automaticIdentityCount,
+                scenario === 'auto-guest' ? 1 : 0,
+              );
+              assert.equal(observedSummary.data.counts.SUCCESS, 0);
+              assert.equal(activeSessions, 0);
+            }
             mode = 'auto-unsupported';
             const rejected = await purpose({ ...input, successTarget: 2, attemptLimit: 5 });
             assert.equal(rejected.status, 'FAILED');

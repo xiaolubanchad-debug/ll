@@ -177,7 +177,10 @@ export async function tickSchedules(db: PrismaClient, now = new Date()) {
       if (!['SUCCEEDED', 'PARTIAL_FAILED'].includes(downloaded.status)) {
         await db.dailyOccurrence.update({
           where: { id: row.id },
-          data: { status: 'PAUSED', errorCode: downloaded.errorCode ?? 'DOWNLOAD_FAILED' },
+          data: {
+            status: downloaded.errorCode === 'NO_APK_AVAILABLE' ? 'FINISHED' : 'PAUSED',
+            errorCode: downloaded.errorCode ?? 'DOWNLOAD_FAILED',
+          },
         });
         continue;
       }

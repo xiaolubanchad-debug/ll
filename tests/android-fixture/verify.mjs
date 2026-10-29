@@ -5,6 +5,7 @@ import { readFile, writeFile, mkdir, readdir, access } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { randomUUID, randomBytes, createHash } from 'node:crypto';
 import { URLSearchParams } from 'node:url';
+import { PNG } from 'pngjs';
 import {
   registerApk,
   inspectApk,
@@ -12,12 +13,14 @@ import {
   cacheDay,
   startAndroid,
   readRegistrationPage,
+  automaticIdentity,
 } from '@apk/automation';
 import { openAgentStore } from '../../apps/agent/src/store.js';
 process.umask(0o077);
 const root = resolve(process.argv[2]),
   config = JSON.parse(await readFile('/var/lib/apk-platform/agent-config.json', 'utf8'));
-const automatic = process.argv[3] === '--auto';
+const v192 = process.argv[3] === '--v192';
+const automatic = process.argv[3] === '--auto' || v192;
 assert.match(
   root,
   automatic
@@ -162,20 +165,26 @@ const policy = new NetworkPolicy(
 );
 const outcomes = [];
 try {
-  const cases = automatic
+  const cases = v192
     ? [
-        ['gamma', 'SUCCESS', 'SUCCEEDED'],
-        ['gamma', 'SUCCESS', 'SUCCEEDED'],
-        ['delta', 'SUCCESS', 'SUCCEEDED'],
-        ['gamma', 'TIMEOUT', 'UNKNOWN'],
+        ['epsilon', 'SUCCESS', 'SUCCEEDED'],
+        ['zeta', 'GUEST', 'SKIPPED'],
+        ['eta', 'DIRECTORY', 'SKIPPED'],
       ]
-    : [
-        ['alpha', 'SUCCESS', 'SUCCEEDED'],
-        ['beta', 'SUCCESS', 'SUCCEEDED'],
-        ['alpha', 'REJECT', 'FAILED'],
-        ['alpha', 'TIMEOUT', 'UNKNOWN'],
-        ['alpha', 'CHANGED', 'FAILED'],
-      ];
+    : automatic
+      ? [
+          ['gamma', 'SUCCESS', 'SUCCEEDED'],
+          ['gamma', 'SUCCESS', 'SUCCEEDED'],
+          ['delta', 'SUCCESS', 'SUCCEEDED'],
+          ['gamma', 'TIMEOUT', 'UNKNOWN'],
+        ]
+      : [
+          ['alpha', 'SUCCESS', 'SUCCEEDED'],
+          ['beta', 'SUCCESS', 'SUCCEEDED'],
+          ['alpha', 'REJECT', 'FAILED'],
+          ['alpha', 'TIMEOUT', 'UNKNOWN'],
+          ['alpha', 'CHANGED', 'FAILED'],
+        ];
   for (const [caseIndex, [variant, behavior, expected]] of cases.entries()) {
     if (abort.signal.aborted) throw Error('OWNED_VERIFICATION_STOPPED');
     if (automatic && caseIndex === 1) {
@@ -184,6 +193,8 @@ try {
     }
     currentCase = variant + '-' + behavior + (automatic ? '-' + caseIndex : '');
     mode = behavior;
+    let accountCalls = 0,
+      intentCalls = 0;
     const before = requests,
       taskId = randomUUID(),
       d = { deliveryId: randomUUID(), runId: randomUUID(), nodeId: config.nodeId, fence: 1 };
@@ -372,11 +383,15 @@ try {
           if (record) resources.push({ ...record });
         },
         account: async (id) => {
+          accountCalls++;
           currentAccount = store.account(d, id);
           store.accountAck(currentAccount.accountRef);
           return currentAccount;
         },
-        intent: async (id, ref) => store.intent(d, id, ref),
+        intent: async (id, ref) => {
+          intentCalls++;
+          return store.intent(d, id, ref);
+        },
         evidence: async (id, bytes) => {
           const artifactId = randomUUID();
           await writeFile(join(root, artifactId + '.png'), bytes, { flag: 'wx', mode: 0o600 });
@@ -401,13 +416,34 @@ try {
     if (automatic) {
       assert.ok(result.recognition);
       assert.equal(result.recognition.learned, expected === 'SUCCEEDED');
-      if (caseIndex === 1) assert.equal(result.recognition.cache, 'HIT');
+      if (caseIndex === 1 && !v192) assert.equal(result.recognition.cache, 'HIT');
       if (variant === 'delta') assert.equal(result.recognition.source, 'OCR');
     }
-    assert.equal(requests - before, behavior === 'CHANGED' ? 0 : 1);
+    assert.equal(requests - before, ['CHANGED', 'GUEST', 'DIRECTORY'].includes(behavior) ? 0 : 1);
+    if (expected === 'SKIPPED') {
+      assert.equal(accountCalls, 0);
+      assert.equal(intentCalls, 0);
+      assert.equal(result.proof, 'NONE');
+    }
+    if (behavior === 'GUEST') {
+      assert.equal(result.errorCode, 'APP_AUTO_IDENTITY');
+      assert.equal(result.recognition.automaticIdentity.kind, 'GUEST');
+      assert.equal(result.recognition.automaticIdentity.scope, 'APP_UI_ONLY');
+      assert.ok(result.artifactIds.length);
+      const tree = await readFile(join(root, 'last-before-input.xml'), 'utf8'),
+        identity = automaticIdentity(readRegistrationPage(tree, pkg));
+      assert.ok(identity);
+      const pic = PNG.sync.read(await readFile(join(root, result.artifactIds[0] + '.png'))),
+        r = identity.rects[0];
+      assert.equal(
+        pic.data[(Math.floor(r.y + r.height / 2) * pic.width + Math.floor(r.x + r.width / 2)) * 4],
+        0,
+      );
+    }
+    if (behavior === 'DIRECTORY') assert.equal(result.errorCode, 'APP_NAVIGATION_ONLY');
     if (expected === 'SUCCEEDED') assert.equal(result.proof, 'APP_UI');
     if (behavior === 'REJECT') assert.equal(result.errorCode, 'REGISTRATION_REJECTED');
-    if (behavior !== 'CHANGED') {
+    if (!['CHANGED', 'GUEST', 'DIRECTORY'].includes(behavior)) {
       assert.equal(reports.at(-1).validCredentials, true);
       assert.equal(reports.at(-1).userAgent, 'OwnedFixture/1.0');
     }

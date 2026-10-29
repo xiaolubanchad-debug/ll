@@ -98,7 +98,7 @@ async function readiness(db: PrismaClient, p: PlanRow) {
       add('NEEDS_ADAPTATION', '请选择自动识别或补充注册规则', 'tasks');
     if (
       c.execution.autoRegistration?.enabled &&
-      !['0.6.0', '0.6.1', '0.7.0', '0.7.1'].includes(node.agentVersion ?? '')
+      !['0.6.0', '0.6.1', '0.7.0', '0.7.1', '0.7.2'].includes(node.agentVersion ?? '')
     )
       add('NODE_UPGRADE_REQUIRED', '自动识别需要升级执行环境', 'nodes');
   }
@@ -601,15 +601,21 @@ async function advance(db: PrismaClient, p: ManagedTask, c: CycleRow, now: Date)
   }
   const downloaded = await db.run.findUniqueOrThrow({ where: { id: c.downloadRunId } });
   if (!RUN_END.includes(downloaded.status)) return;
+  if (c.runs.some((r) => RUN_END.includes(r.status) && r.errorCode === 'NO_REGISTERABLE_APK')) {
+    await updateCycle(db, c, 'DONE', 'NO_REGISTERABLE_APK');
+    return;
+  }
   if (!['SUCCEEDED', 'PARTIAL_FAILED'].includes(downloaded.status)) {
     await updateCycle(
       db,
       c,
-      downloaded.status === 'NEEDS_REVIEW'
-        ? 'NEEDS_REVIEW'
-        : downloaded.status === 'CANCELLED'
-          ? 'STOPPED'
-          : 'FAILED',
+      downloaded.errorCode === 'NO_APK_AVAILABLE'
+        ? 'DONE'
+        : downloaded.status === 'NEEDS_REVIEW'
+          ? 'NEEDS_REVIEW'
+          : downloaded.status === 'CANCELLED'
+            ? 'STOPPED'
+            : 'FAILED',
       downloaded.errorCode ??
         (downloaded.status === 'CANCELLED' ? 'DOWNLOAD_STOPPED' : 'DOWNLOAD_FAILED'),
     );
@@ -645,7 +651,11 @@ async function advance(db: PrismaClient, p: ManagedTask, c: CycleRow, now: Date)
     await updateCycle(
       db,
       c,
-      previous.status === 'NEEDS_REVIEW' ? 'NEEDS_REVIEW' : 'FAILED',
+      previous.errorCode === 'NO_REGISTERABLE_APK'
+        ? 'DONE'
+        : previous.status === 'NEEDS_REVIEW'
+          ? 'NEEDS_REVIEW'
+          : 'FAILED',
       previous.errorCode,
     );
     return;
