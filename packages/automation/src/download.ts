@@ -12,8 +12,16 @@ import { inspectApk } from './apk.js';
 import { NetworkPolicy, startEgress } from './network.js';
 import { sha, canonical, normalizeUrl, cacheDay, DownloadError } from './common.js';
 import type { RegistrationCompletion } from './registration.js';
+import { androidBrowser } from './mobile-browser.js';
 export interface AutomationEvent {
-  type: 'TARGETS_DISCOVERED' | 'TASK_STAGE' | 'TASK_FINISHED' | 'RUN_FINISHED' | 'PROXY_CHECKED';
+  type:
+    | 'TARGETS_DISCOVERED'
+    | 'TASK_STAGE'
+    | 'TASK_FINISHED'
+    | 'RUN_FINISHED'
+    | 'PROXY_CHECKED'
+    | 'BROWSER_ENVIRONMENT'
+    | 'APP_OBSTRUCTION';
   taskId?: string;
   payload: Record<string, unknown>;
 }
@@ -133,6 +141,7 @@ async function capture(
   target: Target,
   signal: AbortSignal,
   beforeAction: () => void,
+  mobile: Awaited<ReturnType<typeof androidBrowser>>,
 ): Promise<Download> {
   let result: Download | undefined;
   const pages = new Set<Page>([source]),
@@ -192,6 +201,12 @@ async function capture(
         const previous = arrived.get(page);
         if (!previous || previous.url !== page.url())
           arrived.set(page, { url: page.url(), at: Date.now() });
+        try {
+          await mobile.confirm(page, 'LANDING', target.taskId);
+        } catch (error) {
+          if (error instanceof DownloadError) throw error;
+          else continue;
+        }
         if (rules[0]?.mode === 'AUTO') continue;
         for (const rule of rules) {
           if (rule.mode === 'AUTO') continue;
@@ -327,6 +342,11 @@ export async function runDownload(
       ],
     });
     browser = context.browser()!;
+    const mobileBrowser = await androidBrowser(
+      context,
+      config.source.browserUserAgent || mobile.userAgent,
+      emit,
+    );
     await context.route('**/*', async (route) => {
       try {
         normalizeUrl(route.request().url());
@@ -348,6 +368,7 @@ export async function runDownload(
       }
     });
     const source = await context.newPage();
+    await mobileBrowser.prepare(source);
     let targets: Target[] | undefined;
     for (let attempt = 0; attempt < 2 && !targets; attempt++) {
       try {
@@ -357,6 +378,7 @@ export async function runDownload(
           timeout: config.download.timeoutMs,
         });
         targets = await discover(source, config);
+        await mobileBrowser.confirm(source, 'SOURCE');
       } catch (error) {
         if (signal.aborted) throw error;
         if (error instanceof DownloadError && error.code === 'TARGET_LIMIT') throw error;
@@ -418,7 +440,15 @@ export async function runDownload(
                   timeout: config.download.timeoutMs,
                 });
               limit = false;
-              download = await capture(context, source, config, target, signal, beforeAction);
+              download = await capture(
+                context,
+                source,
+                config,
+                target,
+                signal,
+                beforeAction,
+                mobileBrowser,
+              );
               const file = join(work, 'payload.apk');
               const timeout = setTimeout(() => void download?.cancel(), config.download.timeoutMs);
               try {

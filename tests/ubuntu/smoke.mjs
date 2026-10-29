@@ -27,7 +27,7 @@ try {
   config.source = {
     url: site.url + '/source',
     xpath: "//a[@class='jgg-item']",
-    browserUserAgent: 'Owned-Ubuntu-Fixture',
+    browserUserAgent: 'Mozilla/5.0 (Linux; Android 13) Chrome/149.0.0.0 Mobile Safari/537.36',
   };
   config.execution.mode = 'DOWNLOAD_ONLY';
   delete config.execution.proxySecretVersionId;

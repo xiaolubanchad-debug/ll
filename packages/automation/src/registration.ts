@@ -1,5 +1,6 @@
 import type { ApkMetadata, TestConfiguration, RegistrationRecognition } from '@apk/contracts';
 import { registrationFlowFor } from '@apk/contracts';
+import { appObstructions } from './app-obstructions.js';
 import { startAndroid } from './android.js';
 import type { AndroidOptions } from './android.js';
 import { inspectApk } from './apk.js';
@@ -78,6 +79,7 @@ export async function registerApk(
     learningKey = '',
     beforeSubmit = '',
     discovering = false;
+  let readiness: ReturnType<typeof appObstructions> | undefined;
   const inputs: Rect[] = [];
   const stage = async (name: string, extra: Record<string, unknown> = {}) =>
     emit({ type: 'TASK_STAGE', taskId: target.taskId, payload: { stage: name, ...extra } });
@@ -112,6 +114,16 @@ export async function registerApk(
     await stage('LAUNCHING');
     await session.launch(flow.packageName, flow.activity);
     action();
+    readiness = appObstructions(
+      session,
+      apk.packageName,
+      action,
+      async (payload) => {
+        await emit({ type: 'APP_OBSTRUCTION', taskId: target.taskId, payload: { ...payload } });
+      },
+      config.execution.autoRegistration?.screenshotFallback ?? false,
+    );
+    if (!automatic) await readiness.clear(signal);
     if (automatic) {
       recognition = {
         source: 'CONTROLS',
@@ -141,6 +153,7 @@ export async function registerApk(
         action,
         recognition!,
         hooks.learning,
+        readiness.clear,
       );
       discovering = false;
       const form = discovery.form;
@@ -179,6 +192,21 @@ export async function registerApk(
       }
       let id: string;
       try {
+        if (readiness) {
+          const tree = await readiness.clear(signal);
+          if (automatic) {
+            const binding = { ...discovery!.form };
+            delete binding.agreement;
+            if (
+              !registrationBindingsValid(
+                readRegistrationPage(tree, apk.packageName),
+                binding,
+                step.action !== 'submit',
+              )
+            )
+              throw new RegistrationError('AUTO_FORM_CHANGED');
+          }
+        }
         if (automatic && step.action === 'submit') {
           await session.hideKeyboard?.();
           action();

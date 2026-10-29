@@ -245,13 +245,13 @@ export async function createRun(
           (r) => r.mode !== undefined || r.autoWaitMs !== undefined,
         )) &&
       (!manifest?.features?.includes('DAILY_V1') ||
-        !['0.5.0', '0.5.1', '0.6.0', '0.6.1'].includes(node.agentVersion ?? ''))
+        !['0.5.0', '0.5.1', '0.6.0', '0.6.1', '0.7.0'].includes(node.agentVersion ?? ''))
     )
       fault('NODE_UPGRADE_REQUIRED', '请部署支持每日下载与循环注册的 Agent');
     if (
       configuration.execution.autoRegistration !== undefined &&
       (!manifest?.features?.includes('AUTO_REGISTRATION_V1') ||
-        !['0.6.0', '0.6.1'].includes(node.agentVersion ?? ''))
+        !['0.6.0', '0.6.1', '0.7.0'].includes(node.agentVersion ?? ''))
     )
       fault('NODE_UPGRADE_REQUIRED', '自动识别注册入口需要 Agent 0.6.0');
     const plan = await prepareDailyPlan(tx, input, config, now);
@@ -511,6 +511,25 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
     run.purpose === 'REGISTER' || (run.purpose === 'LEGACY' && config?.execution.mode === 'FULL');
   const plan = run.executionPlan as unknown as DailyExecutionPlan | null;
   const p = event.payload as Record<string, unknown>;
+  if (event.type === 'BROWSER_ENVIRONMENT' || event.type === 'APP_OBSTRUCTION') {
+    if (run.purpose === 'PROXY_CHECK') fault('EVENT_CONFLICT', '代理检查不接受页面事件');
+    if (event.type === 'APP_OBSTRUCTION' || event.taskId) {
+      const task = await tx.task.findUnique({ where: { id: event.taskId } });
+      if (
+        !task ||
+        task.runId !== runId ||
+        task.submittedAt ||
+        ['FAILED', 'CANCELLED', 'SUCCEEDED', 'UNKNOWN', 'SKIPPED'].includes(task.status)
+      )
+        fault('EVENT_CONFLICT', '页面事件与执行阶段不一致');
+      if (
+        event.type === 'APP_OBSTRUCTION' &&
+        (!full || !['LAUNCHING', 'DISCOVERING', 'REGISTERING'].includes(task.status))
+      )
+        fault('EVENT_CONFLICT', '当前阶段不能处理 APP 弹窗');
+    }
+    return;
+  }
   if (event.type === 'RUN_STARTED') {
     if (event.sequence !== 1 || p.configHash !== run.configHash || p.releaseId !== run.releaseId)
       fault('EVENT_CONFLICT', '开始事件不匹配');
@@ -964,6 +983,8 @@ export async function runEvents(db: PrismaClient, token: string, body: unknown) 
             'RUN_FINISHED',
             'STOP_ACK',
             'PROXY_CHECKED',
+            'BROWSER_ENVIRONMENT',
+            'APP_OBSTRUCTION',
           ].includes(event.type)
         )
           fault('FEATURE_UNAVAILABLE', 'P2 不接受此事件', 422);

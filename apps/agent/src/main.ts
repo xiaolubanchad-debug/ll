@@ -118,7 +118,7 @@ export async function startAgent(
   let report = await health(config.sdkRoot, config.toolsRoot, config.releaseId),
     checkedAt = Date.now(),
     refreshing = false;
-  const registration = ['0.4.0', '0.4.1', '0.5.0', '0.5.1', '0.6.0', '0.6.1'].includes(
+  const registration = ['0.4.0', '0.4.1', '0.5.0', '0.5.1', '0.6.0', '0.6.1', '0.7.0'].includes(
     config.agentVersion,
   );
   const engine = [
@@ -133,6 +133,7 @@ export async function startAgent(
     '0.5.1',
     '0.6.0',
     '0.6.1',
+    '0.7.0',
   ].includes(config.agentVersion)
     ? await TaskEngine.open(
         config.dataRoot ?? '/var/lib/apk-platform/execution',

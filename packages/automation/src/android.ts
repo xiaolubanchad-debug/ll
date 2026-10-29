@@ -370,6 +370,9 @@ export async function startAndroid(
       'appium:locale': profile.locale.split('-')[1],
     });
     await client.command('POST', client.path('/timeouts'), { implicit: 0 });
+    await client.command('POST', client.path('/appium/settings'), {
+      settings: { waitForIdleTimeout: 500, waitForSelectorTimeout: 1000 },
+    });
     const get = async (args: string[]) =>
       (await command(adb, ['-s', record.serial!, 'shell', ...args])).trim();
     const api = Number(await get(['getprop', 'ro.build.version.sdk'])),

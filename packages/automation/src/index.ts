@@ -10,6 +10,7 @@ export * from './android.js';
 export * from './proxy.js';
 export * from './screenshot.js';
 export * from './webdriver.js';
+export * from './app-obstructions.js';
 export * from './registration-ui.js';
 export * from './registration-discovery.js';
 export * from './ocr.js';

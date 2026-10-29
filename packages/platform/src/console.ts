@@ -498,6 +498,20 @@ const stageTitles: Record<string, string> = {
   VERIFYING: '核验已提交的注册结果',
 };
 function title(type: string, p: Record<string, unknown>) {
+  if (type === 'BROWSER_ENVIRONMENT')
+    return p.role === 'SOURCE' ? '网站安卓手机环境已确认' : '落地页安卓手机环境已确认';
+  if (type === 'APP_OBSTRUCTION')
+    return (
+      (
+        {
+          SKIP_AD: '已跳过开屏广告',
+          CLOSE_AD: '已关闭广告',
+          CLOSE_POPUP: '已关闭弹窗',
+          ACK_NOTICE: '已确认公告',
+          WAIT_SPLASH: '等待开屏广告倒计时',
+        } as Record<string, string>
+      )[String(p.action)] ?? '处理 APP 遮挡页面'
+    );
   if (type === 'TASK_STAGE') return stageTitles[String(p.stage)] ?? '执行阶段更新';
   if (type === 'TASK_FINISHED')
     return (

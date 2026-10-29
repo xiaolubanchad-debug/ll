@@ -82,6 +82,11 @@ export function configurationIssues(value: unknown): Issue[] {
   const issues = schemaIssues('TestConfiguration', value);
   if (issues.length) return issues;
   const config = value as TestConfiguration;
+  if (!androidBrowserUa(config.source.browserUserAgent ?? ''))
+    issues.push({
+      path: '/source/browserUserAgent',
+      message: '网页 UA 必须为安卓手机 Chrome，或留空使用默认值',
+    });
   if (config.execution.autoRegistration?.enabled && config.execution.mode !== 'FULL')
     issues.push({ path: '/execution/autoRegistration', message: '自动识别注册需要完整模式和代理' });
   let url: URL;
@@ -117,6 +122,15 @@ export function configurationIssues(value: unknown): Issue[] {
     }
   }
   return issues;
+}
+export function androidBrowserUa(value: string): boolean {
+  return (
+    value === '' ||
+    (!/[\r\n]|iPhone|iPad|Windows|Macintosh/i.test(value) &&
+      /Android/i.test(value) &&
+      /Mobile/i.test(value) &&
+      /Chrome\/\d+(?:\.\d+){0,3}/.test(value))
+  );
 }
 export function safeUiSelector(value: string) {
   return /^new UiSelector\(\)(?:(?:\.(?:text|textContains|resourceId|description|descriptionContains|className|packageName)\("[^"\\\r\n]{0,1000}"\))|(?:\.(?:index|instance)\([0-9]{1,4}\))|(?:\.(?:enabled|clickable|checked|selected|focusable|focused|scrollable)\((?:true|false)\)))+$/.test(
@@ -164,6 +178,14 @@ export function agentIssues(value: unknown): Issue[] {
     if (new Set(message.events.map((e) => e.eventId)).size !== message.events.length)
       issues.push({ path: '/events', message: '事件编号重复' });
     message.events.forEach((event, i) => {
+      if (event.type === 'BROWSER_ENVIRONMENT') {
+        const ua = (event.payload as { userAgent?: string }).userAgent;
+        if (!ua || !androidBrowserUa(ua))
+          issues.push({
+            path: `/events/${i}/payload/userAgent`,
+            message: '必须报告安卓手机网页环境',
+          });
+      }
       if (
         i > 0 &&
         (event.sequence <= message.events[i - 1].sequence ||

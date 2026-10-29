@@ -227,6 +227,7 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
       } else if (req.url.endsWith('/click')) {
         const id = parts[4];
         if (mode.startsWith('auto-') && id === 'open-register') s.autoForm = true;
+        if (mode === 'auto-success' && id === 'ad-close') s.adClosed = true;
         if (id === 'next') s.next = true;
         if (id === 'submit') {
           submitted++;
@@ -247,18 +248,21 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
           const pkg = s.packageName ?? 'com.example.p2';
           const control = (id, text, kind, y, password = false) =>
             `<node package="${pkg}" class="android.widget.${kind}" resource-id="${pkg}:id/${id}" text="${text}" enabled="true" clickable="${kind === 'Button'}" password="${password}" bounds="[10,${y}][110,${y + 15}]"/>`;
-          const content = s.submitted
-            ? control('result', 'Registration successful', 'TextView', 10)
-            : s.autoForm || mode === 'auto-unsupported'
-              ? control(
-                  mode === 'auto-unsupported' ? 'phone' : 'username',
-                  mode === 'auto-unsupported' ? 'Phone number' : s.username || 'Username',
-                  'EditText',
-                  20,
-                ) +
-                control('password', s.password || 'Password', 'EditText', 40, true) +
-                control('submit', 'Register', 'Button', 60)
-              : control('open-register', 'Register', 'Button', 10);
+          const content =
+            mode === 'auto-success' && !s.adClosed
+              ? control('ad-close', '关闭广告', 'Button', 10)
+              : s.submitted
+                ? control('result', 'Registration successful', 'TextView', 10)
+                : s.autoForm || mode === 'auto-unsupported'
+                  ? control(
+                      mode === 'auto-unsupported' ? 'phone' : 'username',
+                      mode === 'auto-unsupported' ? 'Phone number' : s.username || 'Username',
+                      'EditText',
+                      20,
+                    ) +
+                    control('password', s.password || 'Password', 'EditText', 40, true) +
+                    control('submit', 'Register', 'Button', 60)
+                  : control('open-register', 'Register', 'Button', 10);
           value = `<hierarchy><node package="${pkg}" class="android.widget.FrameLayout" text="" clickable="false" bounds="[0,0][120,120]">${content}</node></hierarchy>`;
         } else
           value =
@@ -395,7 +399,7 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
       {
         nodeId: node.id,
         releaseId: release.id,
-        agentVersion: '0.6.1',
+        agentVersion: '0.7.0',
         apiUrl: base,
         sdkRoot: '/fixture',
         toolsRoot: resolve('.'),
@@ -499,7 +503,7 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
         artifactName: 'agent-' + randomBytes(32).toString('hex') + '.tgz',
         sha256: randomBytes(32).toString('hex'),
         manifest: {
-          agentVersion: '0.6.1',
+          agentVersion: '0.7.0',
           features: ['DOWNLOAD_V1', 'REGISTRATION_V1', 'DAILY_V1', 'AUTO_REGISTRATION_V1'],
           toolchain: { systemImage: body.execution.deviceProfiles[0].systemImage },
         },
@@ -511,7 +515,7 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
         host: 'p3.example.test',
         deploymentStatus: 'INSTALLED',
         agentReleaseId: release.id,
-        agentVersion: '0.6.1',
+        agentVersion: '0.7.0',
         downloadProtocol: '1.0',
         health: report,
         lastSeenAt: new Date(),
@@ -849,6 +853,14 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
             );
             const stages = await db.runEvent.findMany({ where: { delivery: { runId: first.id } } });
             assert.ok(stages.some((e) => e.body.payload.stage === 'DISCOVERING'));
+            assert.ok(
+              stages.some(
+                (e) => e.body.type === 'APP_OBSTRUCTION' && e.body.payload.action === 'CLOSE_AD',
+              ),
+            );
+            const timeline = await req('/runs/' + first.id + '/timeline?limit=100');
+            assert.equal(timeline.status, 200);
+            assert.ok(timeline.data.items.some((e) => e.title === '已关闭广告'));
             abort.abort();
             await agentRun;
             await start();

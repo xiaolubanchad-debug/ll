@@ -23,7 +23,9 @@ export class AppiumClient {
   ): Promise<unknown> {
     if (!/^\/[A-Za-z0-9_./%-]*$/.test(path)) throw new RegistrationError('APPIUM_FAILED');
     const data = body === undefined ? undefined : Buffer.from(JSON.stringify(body));
+    const reading = method === 'GET' && /\/(source|screenshot)$/.test(path);
     return new Promise((ok, no) => {
+      let timedOut = false;
       const req = request(
         {
           host: '127.0.0.1',
@@ -47,23 +49,56 @@ export class AppiumClient {
           res.on('end', () => {
             try {
               const result = JSON.parse(Buffer.concat(chunks).toString()) as { value?: unknown };
-              if ((res.statusCode ?? 500) >= 400) throw Error();
+              if ((res.statusCode ?? 500) >= 400) {
+                const value = result.value as { error?: string } | undefined;
+                throw new RegistrationError(
+                  !reading
+                    ? 'APPIUM_FAILED'
+                    : value?.error === 'invalid session id'
+                      ? 'APPIUM_SESSION_LOST'
+                      : (res.statusCode ?? 500) >= 500
+                        ? 'APPIUM_READ_SERVER'
+                        : 'APPIUM_READ_REJECTED',
+                );
+              }
               ok(result.value);
-            } catch {
-              no(new RegistrationError('APPIUM_FAILED'));
+            } catch (error) {
+              no(
+                error instanceof RegistrationError
+                  ? error
+                  : new RegistrationError(reading ? 'APPIUM_READ_INVALID' : 'APPIUM_FAILED'),
+              );
             }
           });
-          res.on('error', () => no(new RegistrationError('APPIUM_FAILED')));
+          res.on('error', () =>
+            no(new RegistrationError(reading ? 'APPIUM_READ_CONNECTION' : 'APPIUM_FAILED')),
+          );
         },
       );
-      const timer = setTimeout(() => req.destroy(), Math.max(1, Math.min(timeout, 120000)));
+      const timer = setTimeout(
+        () => {
+          timedOut = true;
+          req.destroy();
+        },
+        Math.max(1, Math.min(timeout, 120000)),
+      );
       const abort = () => req.destroy();
       req.on('close', () => {
         clearTimeout(timer);
         signal?.removeEventListener('abort', abort);
       });
       req.on('error', () =>
-        no(new RegistrationError(signal?.aborted ? 'CANCELLED' : 'APPIUM_FAILED')),
+        no(
+          new RegistrationError(
+            signal?.aborted
+              ? 'CANCELLED'
+              : !reading
+                ? 'APPIUM_FAILED'
+                : timedOut
+                  ? 'APPIUM_READ_TIMEOUT'
+                  : 'APPIUM_READ_CONNECTION',
+          ),
+        ),
       );
       if (signal?.aborted) abort();
       else {
@@ -172,22 +207,39 @@ export class AppiumClient {
     return r;
   }
   async source(signal?: AbortSignal) {
-    const value = await this.command('GET', this.path('/source'), undefined, 5000, signal ?? null);
+    const value = await this.read('/source', signal);
     if (typeof value !== 'string' || Buffer.byteLength(value) > 2097152)
       throw new RegistrationError('EVIDENCE_UNSAFE');
     return value;
   }
   async screenshot(signal?: AbortSignal) {
-    const value = await this.command(
-      'GET',
-      this.path('/screenshot'),
-      undefined,
-      5000,
-      signal ?? null,
-    );
+    const value = await this.read('/screenshot', signal);
     if (typeof value !== 'string' || value.length > 13981016)
       throw new RegistrationError('EVIDENCE_UNSAFE');
     return Buffer.from(value, 'base64');
+  }
+  private async read(path: string, signal?: AbortSignal): Promise<unknown> {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await this.command(
+          'GET',
+          this.path(path),
+          undefined,
+          15000,
+          signal ?? this.signal ?? null,
+        );
+      } catch (error) {
+        if (
+          attempt !== 0 ||
+          signal?.aborted ||
+          !(error instanceof RegistrationError) ||
+          !['APPIUM_READ_TIMEOUT', 'APPIUM_READ_CONNECTION', 'APPIUM_READ_SERVER'].includes(
+            error.code,
+          )
+        )
+          throw error;
+      }
+    }
   }
   async close() {
     if (this.session)

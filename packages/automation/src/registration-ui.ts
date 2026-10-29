@@ -217,7 +217,11 @@ export interface RegistrationForm {
   submit: Locator;
   hash: string;
 }
-export function registrationBindingsValid(page: UiPage, form: RegistrationForm): boolean {
+export function registrationBindingsValid(
+  page: UiPage,
+  form: RegistrationForm,
+  allowDisabledSubmit = false,
+): boolean {
   if (page.foreign) return false;
   const match = (locator: Locator) =>
     page.controls.filter((control) => {
@@ -243,7 +247,7 @@ export function registrationBindingsValid(page: UiPage, form: RegistrationForm):
     page.controls.filter((e) => e.editable).length !== (form.confirm ? 3 : 2) ||
     submits.length !== 1 ||
     !submits[0].clickable ||
-    !submits[0].enabled ||
+    (!allowDisabledSubmit && !submits[0].enabled) ||
     !labels(submits[0]).some((v) => entryRole(v) === 'REGISTER')
   )
     return false;

@@ -63,6 +63,7 @@ export async function discoverRegistration(
   beforeAction: () => void,
   recognition: RegistrationRecognition,
   learning?: RegistrationLearning,
+  ready?: (signal: AbortSignal) => Promise<string>,
 ): Promise<RegistrationDiscovery> {
   const bounded = AbortSignal.any([signal, AbortSignal.timeout(settings.timeoutMs)]),
     deadline = Date.now() + settings.timeoutMs;
@@ -81,10 +82,11 @@ export async function discoverRegistration(
       ocrUsed = false;
     if (stored && !cached) recognition.cache = 'INVALIDATED';
     const pause = () => new Promise<void>((r) => setTimeout(r, 150));
-    let source = await session.source(bounded),
+    let source = await (ready ? ready(bounded) : session.source(bounded)),
       idle = 0;
     for (let observations = 0; observations < 50; observations++) {
       check();
+      if (ready) source = await ready(bounded);
       const page = readRegistrationPage(source, pkg);
       if (page.foreign) throw new RegistrationError('AUTO_FOREIGN_SCREEN');
       await pause();
@@ -211,7 +213,7 @@ export async function discoverRegistration(
       } while (Date.now() < waitUntil);
       if (readRegistrationPage(next, pkg).hash === page.hash)
         throw new RegistrationError('AUTO_NAVIGATION_STALLED');
-      source = next;
+      source = ready ? await ready(bounded) : next;
     }
     throw new RegistrationError('AUTO_SCREEN_CHANGED');
   } catch (error) {

@@ -13,7 +13,8 @@ const mobileState = `function state(action) {
   return {
     action, width: innerWidth, screenWidth: screen.width, screenHeight: screen.height,
     pixelRatio: devicePixelRatio, touchPoints: navigator.maxTouchPoints,
-    coarse: matchMedia('(pointer: coarse)').matches, ua: navigator.userAgent
+    coarse: matchMedia('(pointer: coarse)').matches, ua: navigator.userAgent,
+    platform: navigator.platform, hints: navigator.userAgentData ? {mobile:navigator.userAgentData.mobile,platform:navigator.userAgentData.platform}:null
   };
 }`;
 const html = (
@@ -23,7 +24,10 @@ const html = (
   @media (min-width: 600px), (pointer: fine) { .icon, #mobile-install { display:none; } }</style>
   ${body}`;
 
-for (const customUa of ['', 'Owned-Mobile-UA-Override']) {
+for (const customUa of [
+  '',
+  'Mozilla/5.0 (Linux; Android 13; Owned Mobile) AppleWebKit/537.36 Chrome/149.0.0.0 Mobile Safari/537.36',
+]) {
   test(
     `phone screens and touch across APK download paths (${customUa || 'default Android UA'})`,
     {
@@ -50,6 +54,8 @@ for (const customUa of ['', 'Owned-Mobile-UA-Override']) {
               path: url.pathname,
               key,
               headerUa: req.headers['user-agent'],
+              mobileHint: req.headers['sec-ch-ua-mobile'],
+              platformHint: req.headers['sec-ch-ua-platform'],
               ...JSON.parse(value),
             });
         }
@@ -173,6 +179,10 @@ for (const customUa of ['', 'Owned-Mobile-UA-Override']) {
         assert.ok(evidence.touchPoints > 0);
         assert.equal(evidence.coarse, true);
         assert.equal(evidence.headerUa, evidence.ua);
+        assert.match(evidence.platform, /^Linux/);
+        assert.deepEqual(evidence.hints, { mobile: true, platform: 'Android' });
+        assert.equal(evidence.mobileHint, '?1');
+        assert.equal(evidence.platformHint, '"Android"');
         if (customUa) assert.equal(evidence.ua, customUa);
         else assert.match(evidence.ua, /Android.*Mobile/);
         if (evidence.key === 'source' || evidence.path.includes('manual'))

@@ -967,7 +967,9 @@ export type AgentMessage =
           | 'RUN_FINISHED'
           | 'STOP_ACK'
           | 'LOG'
-          | 'PROXY_CHECKED';
+          | 'PROXY_CHECKED'
+          | 'BROWSER_ENVIRONMENT'
+          | 'APP_OBSTRUCTION';
         payload: {
           [k: string]: unknown;
         };

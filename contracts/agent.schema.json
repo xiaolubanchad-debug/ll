@@ -508,7 +508,9 @@
             "RUN_FINISHED",
             "STOP_ACK",
             "LOG",
-            "PROXY_CHECKED"
+            "PROXY_CHECKED",
+            "BROWSER_ENVIRONMENT",
+            "APP_OBSTRUCTION"
           ]
         },
         "payload": {
@@ -692,6 +694,47 @@
             "properties": {
               "payload": {
                 "$ref": "#/$defs/proxyChecked"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "BROWSER_ENVIRONMENT"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "payload": {
+                "$ref": "#/$defs/browserEnvironment"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "APP_OBSTRUCTION"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "taskId"
+            ],
+            "properties": {
+              "payload": {
+                "$ref": "#/$defs/appObstruction"
               }
             }
           }
@@ -1215,6 +1258,83 @@
           "const": "PROXY_CHECK_FAILED"
         }
       }
+    },
+    "browserEnvironment": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "role": {
+          "enum": [
+            "SOURCE",
+            "LANDING"
+          ]
+        },
+        "platform": {
+          "const": "Android"
+        },
+        "mobile": {
+          "const": true
+        },
+        "touch": {
+          "const": true
+        },
+        "width": {
+          "const": 412
+        },
+        "height": {
+          "const": 915
+        },
+        "userAgent": {
+          "type": "string",
+          "minLength": 20,
+          "maxLength": 1024,
+          "pattern": "^[^\\r\\n]+$"
+        },
+        "scope": {
+          "const": "EMULATED_BROWSER"
+        }
+      },
+      "required": [
+        "role",
+        "platform",
+        "mobile",
+        "touch",
+        "width",
+        "height",
+        "userAgent",
+        "scope"
+      ]
+    },
+    "appObstruction": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "enum": [
+            "SKIP_AD",
+            "CLOSE_AD",
+            "CLOSE_POPUP",
+            "ACK_NOTICE",
+            "WAIT_SPLASH"
+          ]
+        },
+        "method": {
+          "enum": [
+            "CONTROLS",
+            "OCR"
+          ]
+        },
+        "index": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 12
+        }
+      },
+      "required": [
+        "action",
+        "method",
+        "index"
+      ]
     }
   }
 }

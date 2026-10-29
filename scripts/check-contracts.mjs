@@ -21,6 +21,79 @@ const agentCheck = ajv.compile(read('contracts/agent.schema.json'));
 const config = read('contracts/fixtures/config.valid.json');
 const messages = read('contracts/fixtures/agent.valid.json');
 let passed = 0;
+for (const userAgent of [
+  'Mozilla/5.0 (iPhone) Mobile Safari/605.1',
+  'Mozilla/5.0 (Windows NT 10.0) Chrome/149.0',
+  'Android Mobile Chrome/149.0\nInjected: value',
+])
+  test('1.9 rejects non-Android browser ' + JSON.stringify(userAgent), () =>
+    assert.ok(
+      configurationIssues({ ...config, source: { ...config.source, browserUserAgent: userAgent } })
+        .length,
+    ),
+  );
+const browserEvent = {
+  eventId: '11111111-1111-4111-8111-111111111111',
+  runId: '22222222-2222-4222-8222-222222222222',
+  sequence: 1,
+  occurredAt: '2026-10-29T00:00:00Z',
+  type: 'BROWSER_ENVIRONMENT',
+  payload: {
+    role: 'LANDING',
+    platform: 'Android',
+    mobile: true,
+    touch: true,
+    width: 412,
+    height: 915,
+    userAgent: 'Mozilla/5.0 (Linux; Android 13) Chrome/149.0.0.0 Mobile Safari/537.36',
+    scope: 'EMULATED_BROWSER',
+  },
+};
+const notes = {
+  kind: 'events',
+  protocolVersion: '1.0',
+  nodeId: '22222222-2222-4222-8222-222222222222',
+  deliveryId: '33333333-3333-4333-8333-333333333333',
+  fence: 1,
+  events: [browserEvent],
+};
+test('1.9 Android browser evidence accepted', () => assert.deepEqual(agentIssues(notes), []));
+test('1.9 desktop client hint rejected', () =>
+  assert.ok(
+    agentIssues({
+      ...notes,
+      events: [{ ...browserEvent, payload: { ...browserEvent.payload, mobile: false } }],
+    }).length,
+  ));
+test('1.9 raw browser cookie rejected', () =>
+  assert.ok(
+    agentIssues({
+      ...notes,
+      events: [{ ...browserEvent, payload: { ...browserEvent.payload, cookie: 'forbidden' } }],
+    }).length,
+  ));
+const obstruction = {
+  ...browserEvent,
+  type: 'APP_OBSTRUCTION',
+  taskId: '44444444-4444-4444-8444-444444444444',
+  payload: { action: 'CLOSE_AD', method: 'CONTROLS', index: 1 },
+};
+test('1.9 bounded ad closure accepted', () =>
+  assert.deepEqual(agentIssues({ ...notes, events: [obstruction] }), []));
+test('1.9 unbounded ad closure rejected', () =>
+  assert.ok(
+    agentIssues({
+      ...notes,
+      events: [{ ...obstruction, payload: { ...obstruction.payload, index: 13 } }],
+    }).length,
+  ));
+test('1.9 purchase cannot be recorded as closure', () =>
+  assert.ok(
+    agentIssues({
+      ...notes,
+      events: [{ ...obstruction, payload: { ...obstruction.payload, action: 'BUY' } }],
+    }).length,
+  ));
 const v18 = read('contracts/fixtures/v18.valid.json');
 for (const [name, value] of [
   ['TaskPlanInput', v18.task],

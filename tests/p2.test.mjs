@@ -88,7 +88,7 @@ async function body(path = '/source') {
   c.source = {
     url: site.url + path,
     xpath: "//a[@class='jgg-item']",
-    browserUserAgent: 'P2-Fixture-UA',
+    browserUserAgent: 'Mozilla/5.0 (Linux; Android 13) Chrome/149.0.0.0 Mobile Safari/537.36',
   };
   c.execution.mode = 'DOWNLOAD_ONLY';
   delete c.execution.proxySecretVersionId;
@@ -299,7 +299,7 @@ test('P2 acceptance with real PostgreSQL, SQLite, Chromium and owned fixture sit
               !x.cacheHit,
           ),
         );
-        assert.ok(site.agents.includes('P2-Fixture-UA'));
+        assert.ok(site.agents.includes('Mozilla/5.0 (Linux; Android 13) Chrome/149.0.0.0 Mobile Safari/537.36'));
         assert.equal(site.counts.get('/direct.apk'), 1);
         assert.equal(site.counts.get('/second.apk'), 1);
         assert.equal(site.counts.get('/third.apk'), 1);
