@@ -505,6 +505,18 @@ const stageTitles: Record<string, string> = {
   VERIFYING: '核验已提交的注册结果',
 };
 function title(type: string, p: Record<string, unknown>) {
+  if (type === 'LOG') {
+    const message = String(p.message);
+    return [
+      '下载入口：已操作配置控件',
+      '下载入口：已操作明确下载文字',
+      '下载入口：正在访问源码中的唯一 APK 地址',
+      '下载传输：已收到浏览器文件，等待保存与 APK 校验',
+      '下载等待结束：未收到浏览器下载文件',
+    ].includes(message)
+      ? message
+      : '下载执行记录';
+  }
   if (type === 'BROWSER_ENVIRONMENT')
     return p.role === 'SOURCE' ? '网站安卓手机环境已确认' : '落地页安卓手机环境已确认';
   if (type === 'APP_OBSTRUCTION')

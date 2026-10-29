@@ -3,6 +3,7 @@ export * from './network.js';
 export * from './apk.js';
 export * from './cache.js';
 export * from './download.js';
+export { extractApkLinks } from './apk-links.js';
 export * from './processes.js';
 export * from './registration-types.js';
 export * from './registration.js';

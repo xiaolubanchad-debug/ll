@@ -5,7 +5,15 @@ import { createWriteStream } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import type { Browser, BrowserContext, Page, Download, BrowserType } from 'playwright';
+import type {
+  Browser,
+  BrowserContext,
+  Page,
+  Download,
+  BrowserType,
+  Frame,
+  Locator,
+} from 'playwright';
 import type { TestConfiguration, ApkMetadata } from '@apk/contracts';
 import { ApkCache, removeOwned } from './cache.js';
 import { inspectApk } from './apk.js';
@@ -14,6 +22,7 @@ import { sha, canonical, normalizeUrl, cacheDay, DownloadError } from './common.
 import type { RegistrationCompletion } from './registration.js';
 import { androidBrowser } from './mobile-browser.js';
 import { navigationSite } from './navigation-site.js';
+import { frameApkLinks } from './apk-links.js';
 export interface AutomationEvent {
   type:
     | 'TARGETS_DISCOVERED'
@@ -22,7 +31,8 @@ export interface AutomationEvent {
     | 'RUN_FINISHED'
     | 'PROXY_CHECKED'
     | 'BROWSER_ENVIRONMENT'
-    | 'APP_OBSTRUCTION';
+    | 'APP_OBSTRUCTION'
+    | 'LOG';
   taskId?: string;
   payload: Record<string, unknown>;
 }
@@ -143,6 +153,7 @@ async function capture(
   signal: AbortSignal,
   beforeAction: () => void,
   mobile: Awaited<ReturnType<typeof androidBrowser>>,
+  emit: (event: AutomationEvent) => Promise<void>,
 ): Promise<Download> {
   let result: Download | undefined;
   const pages = new Set<Page>([source]),
@@ -150,7 +161,20 @@ async function capture(
   let landingClicks = 0;
   const arrived = new Map<Page, { url: string; at: number }>();
   const sourceUrl = source.url();
-  const attempted = new WeakMap<Page, Set<string>>();
+  const attempted = new WeakMap<Frame, Set<string>>();
+  const acted = new Set<Page>();
+  const requested = new Set<string>();
+  const linkSnapshots = new WeakMap<Frame, { url: string; at: number; links: string[] }>();
+  const log = (message: string) =>
+    emit({ type: 'LOG', taskId: target.taskId, payload: { level: 'INFO', message } });
+  const requestListener = (request: import('playwright').Request) => {
+    try {
+      const url = normalizeUrl(request.url());
+      if (/\.apk$/i.test(decodeURIComponent(new URL(url).pathname))) requested.add(url);
+    } catch {
+      /* Unsupported requests are handled by the network policy. */
+    }
+  };
   const listener = (download: Download) => {
     if (!result) result = download;
     else void download.cancel();
@@ -166,6 +190,7 @@ async function capture(
   const fresh = (page: Page) => attach(page);
   source.on('download', listener);
   context.on('page', fresh);
+  context.on('request', requestListener);
   const end = Date.now() + config.download.timeoutMs;
   try {
     beforeAction();
@@ -176,7 +201,8 @@ async function capture(
     await pause(150, signal);
     while (!result && Date.now() < end) {
       for (const page of pages) {
-        if (result || page.isClosed()) break;
+        if (result) break;
+        if (page.isClosed()) continue;
         // The source may already have redirected before the icon was clicked.
         // Only a navigation makes it a landing page; popups are handled separately.
         if (page === source && page.url() === sourceUrl) continue;
@@ -193,15 +219,18 @@ async function capture(
         } catch {
           continue;
         }
-        const rules = [
+        const rulesFor = (host: string) => [
           ...config.download.landingRules.filter(
-            (r) => r.host.toLowerCase() === u.hostname.toLowerCase(),
+            (r) => r.host.toLowerCase() === host.toLowerCase(),
           ),
           ...config.download.landingRules.filter((r) => r.host === '*'),
         ];
+        const rules = rulesFor(u.hostname);
         const previous = arrived.get(page);
-        if (!previous || previous.url !== page.url())
+        if (!previous || previous.url !== page.url()) {
           arrived.set(page, { url: page.url(), at: Date.now() });
+          acted.delete(page);
+        }
         try {
           await mobile.confirm(page, 'LANDING', target.taskId);
         } catch (error) {
@@ -215,54 +244,134 @@ async function capture(
         )
           throw new DownloadError('NAVIGATION_SITE');
         if (rules[0]?.mode === 'AUTO') continue;
-        for (const rule of rules) {
-          if (rule.mode === 'AUTO') continue;
-          const elapsed = Date.now() - arrived.get(page)!.at;
-          if (rule.mode !== 'CLICK' && elapsed < (rule.autoWaitMs ?? 1500)) continue;
-          const candidates = page.locator(rule.by + '=' + rule.selector);
-          const n = await candidates.count().catch(() => 0);
-          let clicked = false;
-          for (let i = 0; i < Math.min(n, 100); i++) {
-            const candidate = candidates.nth(i);
-            if (!(await candidate.isVisible().catch(() => false))) continue;
-            const signature = canonical([
-              page.url(),
-              rule.by,
-              rule.selector,
-              i,
-              await candidate.getAttribute('href'),
-            ]);
-            const seen = attempted.get(page) ?? new Set<string>();
-            if (seen.has(signature)) continue;
+        const elapsed = Date.now() - arrived.get(page)!.at;
+        let clicked = false;
+        const sourceLinks = new Map<string, string>();
+        for (const frame of page.frames().slice(0, 16)) {
+          let frameRules: typeof rules;
+          try {
+            frameRules = rulesFor(new URL(normalizeUrl(frame.url())).hostname);
+          } catch {
+            continue;
+          }
+          if (!frameRules.length || frameRules[0]?.mode === 'AUTO') continue;
+          const tap = async (candidate: Locator, signature: string, message: string) => {
+            if (!(await candidate.isVisible().catch(() => false))) return false;
+            const seen = attempted.get(frame) ?? new Set<string>();
+            if (seen.has(signature)) return false;
             seen.add(signature);
-            attempted.set(page, seen);
-            // Do not re-click the source icon while waiting for a popup or navigation.
-            if (
-              page === source &&
-              normalizeUrl(page.url()) === normalizeUrl(config.source.url) &&
-              (await candidate.evaluate(
-                (e, pid) => !!pid && e.getAttribute('pid') === pid,
-                target.pid,
-              ))
-            )
-              continue;
-            clicks.set(page, count + 1);
-            landingClicks++;
+            attempted.set(frame, seen);
             beforeAction();
-            await candidate.tap({ timeout: 2000, noWaitAfter: true }).catch(() => {});
-            clicked = true;
+            clicks.set(page, (clicks.get(page) ?? 0) + 1);
+            landingClicks++;
+            acted.add(page);
+            await log(message);
+            beforeAction();
+            if (Date.now() >= end) throw new DownloadError('DOWNLOAD_FAILED');
+            await candidate
+              .tap({ timeout: Math.min(2000, Math.max(1, end - Date.now())), noWaitAfter: true })
+              .catch(() => {});
             await pause(150, signal);
-            break;
+            return true;
+          };
+          for (const rule of frameRules) {
+            if (rule.mode === 'AUTO') continue;
+            if (rule.mode !== 'CLICK' && elapsed < (rule.autoWaitMs ?? 1500)) continue;
+            const candidates = frame.locator(rule.by + '=' + rule.selector);
+            const n = await candidates.count().catch(() => 0);
+            for (let i = 0; i < Math.min(n, 100); i++) {
+              const candidate = candidates.nth(i);
+              // A redirected source is not another chance to tap its original icon.
+              if (
+                page === source &&
+                frame === page.mainFrame() &&
+                normalizeUrl(page.url()) === normalizeUrl(config.source.url) &&
+                (await candidate.evaluate(
+                  (e, pid) => !!pid && e.getAttribute('pid') === pid,
+                  target.pid,
+                ))
+              )
+                continue;
+              const signature = canonical([
+                frame.url(),
+                rule.by,
+                rule.selector,
+                i,
+                await candidate.getAttribute('href'),
+              ]);
+              clicked = await tap(candidate, signature, '下载入口：已操作配置控件');
+              if (clicked || result) break;
+            }
+            if (clicked || result) break;
           }
           if (clicked || result) break;
+          // Do not send another request from the same page after a control has been used.
+          if (acted.has(page) || elapsed < Math.max(1500, frameRules[0]?.autoWaitMs ?? 1500))
+            continue;
+          const controls = frame.getByText(
+            /^(?:高速下载|立即下载|安卓下载|安卓版下载|下载\s*APP|普通下载|安全下载|下载安卓版|download\s*apk|install\s*app)$/i,
+          );
+          const visible: Locator[] = [];
+          for (let i = 0, n = Math.min(100, await controls.count().catch(() => 0)); i < n; i++) {
+            const candidate = controls.nth(i);
+            if (await candidate.isVisible().catch(() => false)) visible.push(candidate);
+          }
+          if (visible.length === 1) {
+            clicked = await tap(
+              visible[0]!,
+              canonical([frame.url(), 'DOWNLOAD_TEXT']),
+              '下载入口：已操作明确下载文字',
+            );
+            if (clicked || result) break;
+          }
+          if (visible.length > 1) continue;
+          let snapshot = linkSnapshots.get(frame);
+          if (!snapshot || snapshot.url !== frame.url() || Date.now() - snapshot.at >= 1000) {
+            snapshot = {
+              url: frame.url(),
+              at: Date.now(),
+              links: await frameApkLinks(frame).catch(() => []),
+            };
+            linkSnapshots.set(frame, snapshot);
+          }
+          for (const link of snapshot.links) sourceLinks.set(link, frame.url());
+        }
+        if (!clicked && !result && !acted.has(page) && sourceLinks.size === 1) {
+          const [link, referer] = [...sourceLinks.entries()][0]!;
+          if (!requested.has(link)) {
+            beforeAction();
+            requested.add(link);
+            landingClicks++;
+            acted.add(page);
+            await log('下载入口：正在访问源码中的唯一 APK 地址');
+            beforeAction();
+            if (Date.now() >= end) throw new DownloadError('DOWNLOAD_FAILED');
+            if (result) continue;
+            const downloadPage = await context.newPage();
+            await mobile.prepare(downloadPage);
+            beforeAction();
+            if (!result)
+              await downloadPage
+                .goto(link, {
+                  referer,
+                  waitUntil: 'domcontentloaded',
+                  timeout: Math.min(10000, Math.max(1, end - Date.now())),
+                })
+                .catch(() => {});
+          }
         }
       }
       if (!result) await pause(100, signal);
     }
-    if (!result) throw new DownloadError('DOWNLOAD_FAILED');
+    if (!result) {
+      await log('下载等待结束：未收到浏览器下载文件');
+      throw new DownloadError('DOWNLOAD_FAILED');
+    }
+    await log('下载传输：已收到浏览器文件，等待保存与 APK 校验');
     return result;
   } finally {
     context.off('page', fresh);
+    context.off('request', requestListener);
     for (const page of pages) page.off('download', listener);
   }
 }
@@ -456,6 +565,7 @@ export async function runDownload(
                 signal,
                 beforeAction,
                 mobileBrowser,
+                emit,
               );
               const file = join(work, 'payload.apk');
               const timeout = setTimeout(() => void download?.cancel(), config.download.timeoutMs);

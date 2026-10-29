@@ -87,7 +87,10 @@ export function contentIsolationSupported(
   features: readonly string[] | undefined,
   version: string | null | undefined,
 ): boolean {
-  return version === '0.8.0' && features?.includes('CONTENT_ISOLATION_V1') === true;
+  return (
+    ['0.8.0', '0.8.1'].includes(version ?? '') &&
+    features?.includes('CONTENT_ISOLATION_V1') === true
+  );
 }
 export function executionOSSupported(distribution: string, version: string): boolean {
   return schemaIssues('ExecutionOS', { distribution, version }).length === 0;

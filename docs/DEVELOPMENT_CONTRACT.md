@@ -1,5 +1,7 @@
 # 开发契约
 
+1.10.1 的控件、子框架和源码 APK 地址发现遵循 [下载增量契约](V1101_DOWNLOAD_CONTRACT.md)，对应 Agent 0.8.1；不改变注册提交和内容隔离规则。
+
 1.10 默认内容隔离与真实功能测试见 [增量契约](V110_CONTRACT.md)，对应 Agent 0.8.0。原始画面不作为新执行证据上传或展示。
 
 1.9.2 导航站跳过、注册入口修正与自动身份独立观察见 [增量契约](V192_CONTRACT.md)，对应 Agent 0.7.2。
@@ -14,7 +16,7 @@
 
 1.7 中台结果、中文日志、数据库汇总、历史回填与页面操作遵循 [1.7 契约](V17_CONTRACT.md)，操作见 [使用说明](V17_SETUP.md)。兼容 Agent 0.6.0，不改变注册提交及未知结果规则。
 
-版本 1.10.0，日期 2026 年 10 月 29 日。MUST 表示发布必须满足，SHOULD 表示偏离时必须记录原因，MAY 表示可选。P2 行为由 [P2_CONTRACT.md](P2_CONTRACT.md) 细化；P3 以 [P3_CONTRACT.md](P3_CONTRACT.md) 为增量权威，分别记录自动化测试、真实 Android 与产品注册验证。网页手机屏幕和触控遵循 [移动端屏幕契约 1.4.1](MOBILE_SCREEN_CONTRACT.md)。P4 的契约不表示已完成能力。
+版本 1.10.1，日期 2026 年 10 月 29 日。MUST 表示发布必须满足，SHOULD 表示偏离时必须记录原因，MAY 表示可选。P2 行为由 [P2_CONTRACT.md](P2_CONTRACT.md) 细化；P3 以 [P3_CONTRACT.md](P3_CONTRACT.md) 为增量权威，分别记录自动化测试、真实 Android 与产品注册验证。网页手机屏幕和触控遵循 [移动端屏幕契约 1.4.1](MOBILE_SCREEN_CONTRACT.md)。P4 的契约不表示已完成能力。
 
 ## 契约权威与变更
 

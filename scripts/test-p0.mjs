@@ -164,6 +164,7 @@ try {
   await run(['--test', '--test-concurrency=1', 'tests/p1.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/p2.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/mobile-download.test.mjs'], env);
+  await run(['--test', '--test-concurrency=1', 'tests/download-discovery.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/v15-download.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/v15-entry.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/proxy-probe.test.mjs'], env);

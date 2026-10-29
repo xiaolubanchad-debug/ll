@@ -42,6 +42,8 @@ test('content isolation is on for old configurations and cannot be disabled', ()
   assert.equal(contentIsolationSupported(['REGISTRATION_V1'], '0.8.0'), false);
   assert.equal(contentIsolationSupported(['CONTENT_ISOLATION_V1'], '0.7.2'), false);
   assert.equal(contentIsolationSupported(['CONTENT_ISOLATION_V1'], '0.8.0'), true);
+  assert.equal(contentIsolationSupported(['CONTENT_ISOLATION_V1'], '0.8.1'), true);
+  assert.equal(contentIsolationSupported(['REGISTRATION_V1'], '0.8.1'), false);
 });
 test('functional records contain only known roles and geometry, never business text or pixels', () => {
   const source = `<hierarchy><node package="${pkg}" class="android.widget.FrameLayout" bounds="[0,0][1080,1920]">${row('OWNED_BUSINESS_CONTENT_MUST_NOT_EXPORT', 20)}${row('个人中心', 70)}${row('UID：12345678', 120)}<node package="${pkg}" class="android.widget.Button" text="注册新账号" enabled="true" clickable="true" bounds="[10,200][300,260]"/></node></hierarchy>`;

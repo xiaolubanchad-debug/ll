@@ -27,12 +27,12 @@ export async function navigationSite(page: Page): Promise<boolean> {
     )
       return false;
     const tiles = [...document.querySelectorAll('a.jgg-item[pid]')].filter(visible);
-    const primary = [...document.querySelectorAll('a,button')]
+    const primary = [...document.querySelectorAll('a,button,div,span,[role=button]')]
       .filter(visible)
       .some(
         (e) =>
           !e.closest('.jgg-item') &&
-          /^(安卓下载|立即下载|下载APP|点击下载|安全下载|下载安卓版|downloadapk|installapp)$/i.test(
+          /^(高速下载|普通下载|安卓下载|安卓版下载|立即下载|下载APP|点击下载|安全下载|下载安卓版|downloadapk|installapp)$/i.test(
             (e.textContent ?? '').replace(/\s/g, ''),
           ),
       );

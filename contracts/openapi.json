@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "APK 部署中台 API",
-    "version": "1.10.0"
+    "version": "1.10.1"
   },
   "paths": {
     "/api/v1/auth/login": {
@@ -7528,7 +7528,10 @@
                     "payload": {
                       "$ref": "#/components/schemas/AgentMessage/$defs/log"
                     }
-                  }
+                  },
+                  "required": [
+                    "taskId"
+                  ]
                 }
               },
               {
@@ -8123,15 +8126,16 @@
             ],
             "properties": {
               "level": {
-                "enum": [
-                  "INFO",
-                  "WARN",
-                  "ERROR"
-                ]
+                "const": "INFO"
               },
               "message": {
-                "type": "string",
-                "maxLength": 4000
+                "enum": [
+                  "下载入口：已操作配置控件",
+                  "下载入口：已操作明确下载文字",
+                  "下载入口：正在访问源码中的唯一 APK 地址",
+                  "下载传输：已收到浏览器文件，等待保存与 APK 校验",
+                  "下载等待结束：未收到浏览器下载文件"
+                ]
               }
             }
           },

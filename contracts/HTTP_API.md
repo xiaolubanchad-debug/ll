@@ -1,5 +1,7 @@
 # HTTP 接口契约
 
+1.10.1 补充有界下载入口发现，见 [下载增量契约](../docs/V1101_DOWNLOAD_CONTRACT.md)，对应 Agent 0.8.1。请求、响应和配置 Schema 保持兼容。
+
 1.10 默认内容隔离与真实功能测试见 [增量契约](../docs/V110_CONTRACT.md)，对应 Agent 0.8.0。原始画面不作为新执行证据上传或展示。
 
 1.9.2 导航站跳过、注册入口修正与自动身份独立观察见 [增量契约](../docs/V192_CONTRACT.md)，对应 Agent 0.7.2。
@@ -14,7 +16,7 @@
 
 1.7 中台结果、中文日志、数据库汇总、历史回填与页面操作遵循 [1.7 契约](../docs/V17_CONTRACT.md)，操作见 [使用说明](../docs/V17_SETUP.md)。兼容 Agent 0.6.0，不改变注册提交及未知结果规则。
 
-版本 1.10.0，前缀 /api/v1。已实现路由由 p0.http.json 至 v18.http.json 合并生成 openapi.json，CI 比较 Controller、清单和 OpenAPI。下表保留后续阶段设计，以机器清单判定实现范围。
+版本 1.10.1，前缀 /api/v1。已实现路由由 p0.http.json 至 v18.http.json 合并生成 openapi.json，CI 比较 Controller、清单和 OpenAPI。下表保留后续阶段设计，以机器清单判定实现范围。
 
 1.6 增加可选 execution.autoRegistration、DISCOVERING 阶段和任务 recognition 摘要，见 [自动识别契约](../docs/V16_CONTRACT.md)。不增加任意截图识别、代码执行或公开 Appium 接口。自动模式仍只允许一次提交，未知结果暂停；启用配置要求新的 AUTO_REGISTRATION_V1 签名发布。
 

@@ -307,6 +307,15 @@ test('P2 acceptance with real PostgreSQL, SQLite, Chromium and owned fixture sit
         assert.equal(site.counts.get('/direct.apk'), 1);
         assert.equal(site.counts.get('/second.apk'), 1);
         assert.equal(site.counts.get('/third.apk'), 1);
+        const timeline = (await req('/runs/' + id + '/timeline')).data;
+        assert.equal(
+          timeline.items.filter(
+            (item) =>
+              item.type === 'LOG' &&
+              item.title === '下载传输：已收到浏览器文件，等待保存与 APK 校验',
+          ).length,
+          3,
+        );
       },
     );
     await t.test(
