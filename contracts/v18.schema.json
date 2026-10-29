@@ -61,7 +61,8 @@
             "NEW_ROUND",
             "DISABLE_DAILY",
             "ARCHIVE",
-            "RESTORE"
+            "RESTORE",
+            "RETRY_DOWNLOAD"
           ]
         }
       },
@@ -144,6 +145,17 @@
         "apkCount": {
           "type": "integer",
           "minimum": 0
+        },
+        "downloadRetryOf": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -160,7 +172,8 @@
         "activeRunId",
         "registerRunIds",
         "deferredDownloadRules",
-        "apkCount"
+        "apkCount",
+        "downloadRetryOf"
       ]
     },
     "TaskPlanView": {

@@ -18,7 +18,7 @@ import { lockLibrary } from './library-lock.js';
 import { lockNode, idle } from './nodes.js';
 import { fault, PlatformError } from './errors.js';
 import { beijingDay, validateBudget } from './daily-plan.js';
-import { createRun, stopRun, requestRunStop, RUN_END } from './runs.js';
+import { createRun, stopRun, requestRunStop, downloadRetryParent, RUN_END } from './runs.js';
 type Tx = Prisma.TransactionClient;
 const closed = ['DONE', 'FAILED', 'STOPPED'];
 const cycleInclude = { runs: { orderBy: { createdAt: 'asc' as const } } };
@@ -59,6 +59,7 @@ async function cycleView(db: PrismaClient, c: CycleRow): Promise<TaskCycleView> 
     activeRunId: c.runs.find((r) => !RUN_END.includes(r.status))?.id ?? null,
     registerRunIds: c.runs.filter((r) => r.purpose === 'REGISTER').map((r) => r.id),
     deferredDownloadRules: c.deferredDownloadRules,
+    downloadRetryOf: c.downloadRetryOf,
     apkCount,
   };
 }
@@ -95,7 +96,10 @@ async function readiness(db: PrismaClient, p: PlanRow) {
       add('PROXY_REQUIRED', '请选择有效代理', 'proxies');
     if (!c.execution.autoRegistration?.enabled && !c.registrationFlows.some((f) => f.enabled))
       add('NEEDS_ADAPTATION', '请选择自动识别或补充注册规则', 'tasks');
-    if (c.execution.autoRegistration?.enabled && node.agentVersion !== '0.6.0')
+    if (
+      c.execution.autoRegistration?.enabled &&
+      !['0.6.0', '0.6.1'].includes(node.agentVersion ?? '')
+    )
       add('NODE_UPGRADE_REQUIRED', '自动识别需要升级执行环境', 'nodes');
   }
   return result;
@@ -254,6 +258,7 @@ async function effectiveVersion(tx: Tx, p: ManagedTask, nodeId: string, now: Dat
       configVersion: { configId: p.configId },
     },
     include: { configVersion: true },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
   });
   if (downloaded?.configVersion) {
     const original = downloaded.configVersion.body as unknown as TestConfiguration,
@@ -279,9 +284,15 @@ async function createCycle(
   node: { id: string; agentReleaseId: string | null },
   now: Date,
   round: number,
+  retryOf?: string,
 ) {
   if (!node.agentReleaseId) fault('NODE_NOT_READY', '服务器尚未部署');
-  const { version, deferred } = await effectiveVersion(tx, p, node.id, now);
+  const { version, deferred } = retryOf
+    ? {
+        version: await tx.configVersion.findUniqueOrThrow({ where: { id: p.currentVersionId } }),
+        deferred: false,
+      }
+    : await effectiveVersion(tx, p, node.id, now);
   const full = (version.body as unknown as TestConfiguration).execution.mode === 'FULL';
   return tx.managedCycle.create({
     data: {
@@ -294,6 +305,7 @@ async function createCycle(
       successTarget: full ? p.successTarget : 0,
       attemptLimit: full ? p.attemptLimit : 0,
       deferredDownloadRules: deferred,
+      ...(retryOf ? { downloadRetryOf: retryOf } : {}),
     },
   });
 }
@@ -384,7 +396,11 @@ export async function controlTaskPlan(
           })
         )
           fault('NODE_BUSY', '此服务器已有开启的任务');
-        if (input.action === 'NEW_ROUND' && latest && !closed.includes(latest.status))
+        if (
+          ['NEW_ROUND', 'RETRY_DOWNLOAD'].includes(input.action) &&
+          latest &&
+          !closed.includes(latest.status)
+        )
           fault('TASK_ACTIVE', '请先结束当前轮次');
         if (latest?.status === 'STOPPING') fault('STOP_PENDING', '正在等待停止与清理确认');
         if (
@@ -427,7 +443,24 @@ export async function controlTaskPlan(
                 },
               });
             }
-          } else await createCycle(tx, p, node, now, (latest?.round ?? 0) + 1);
+          } else {
+            let retryOf: string | undefined;
+            if (input.action === 'RETRY_DOWNLOAD') {
+              const source = await tx.run.findFirst({
+                where: {
+                  nodeId: p.nodeId,
+                  purpose: 'DOWNLOAD',
+                  cacheDay: beijingDay(now),
+                  configVersion: { configId: p.configId },
+                },
+                orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+              });
+              if (!source) fault('DOWNLOAD_RETRY_INVALID', '当天没有可关联复跑的下载批次', 422);
+              await downloadRetryParent(tx, source.id, p.nodeId, p.configId, beijingDay(now));
+              retryOf = source.id;
+            }
+            await createCycle(tx, p, node, now, (latest?.round ?? 0) + 1, retryOf);
+          }
         }
         const completed =
           latest &&
@@ -551,7 +584,11 @@ async function advance(db: PrismaClient, p: ManagedTask, c: CycleRow, now: Date)
   if (!c.downloadRunId) {
     await createRun(
       db,
-      { ...common, purpose: 'DOWNLOAD' },
+      {
+        ...common,
+        purpose: 'DOWNLOAD',
+        ...(c.downloadRetryOf ? { supersedesRunId: c.downloadRetryOf } : {}),
+      },
       p.createdBy,
       'task-center',
       'task:' + c.id + ':download',
@@ -568,8 +605,13 @@ async function advance(db: PrismaClient, p: ManagedTask, c: CycleRow, now: Date)
     await updateCycle(
       db,
       c,
-      downloaded.status === 'NEEDS_REVIEW' ? 'NEEDS_REVIEW' : 'FAILED',
-      downloaded.errorCode ?? 'DOWNLOAD_FAILED',
+      downloaded.status === 'NEEDS_REVIEW'
+        ? 'NEEDS_REVIEW'
+        : downloaded.status === 'CANCELLED'
+          ? 'STOPPED'
+          : 'FAILED',
+      downloaded.errorCode ??
+        (downloaded.status === 'CANCELLED' ? 'DOWNLOAD_STOPPED' : 'DOWNLOAD_FAILED'),
     );
     return;
   }
@@ -671,7 +713,7 @@ export async function tickTaskPlans(db: PrismaClient, now = new Date()) {
           orderBy: { round: 'desc' },
           take: 1,
         });
-        if (cycles[0] && ['DONE', 'FAILED'].includes(cycles[0].status) && !p.automatic)
+        if (cycles[0] && ['DONE', 'FAILED', 'STOPPED'].includes(cycles[0].status) && !p.automatic)
           await db.managedTask.updateMany({
             where: { id: p.id, enabled: true, version: p.version },
             data: { enabled: false, version: { increment: 1 } },

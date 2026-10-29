@@ -7,7 +7,8 @@ const props = defineProps<{ task: TaskPlanView }>(),
 const busy = ref(false),
   error = ref(''),
   notice = ref(''),
-  confirmNew = ref(false);
+  confirmNew = ref(false),
+  confirmRetry = ref(false);
 const active = computed(
   () =>
     props.task.latestCycle &&
@@ -32,10 +33,11 @@ async function control(action: TaskControlInput['action']) {
       { 'If-Match': String(props.task.version) },
     );
     confirmNew.value = false;
+    confirmRetry.value = false;
     notice.value =
       action === 'STOP'
         ? '停止意图已保存：后续自动执行已关闭，正在等待节点停止与清理确认。'
-        : action === 'START' || action === 'NEW_ROUND'
+        : ['START', 'NEW_ROUND', 'RETRY_DOWNLOAD'].includes(action)
           ? '任务已开启，后台将检查代理、准备当天 APK 并执行。'
           : '任务设置已更新。';
     emit('changed');
@@ -91,6 +93,15 @@ async function control(action: TaskControlInput['action']) {
         ><el-button :disabled="busy || task.enabled || !!active" @click="control('ARCHIVE')"
           >归档任务</el-button
         >
+        <el-button
+          v-if="task.latestCycle?.downloadRunId"
+          :disabled="busy || !!active || task.readiness.length > 0"
+          @click="
+            confirmRetry = true;
+            confirmNew = false;
+          "
+          >重新下载并测试</el-button
+        >
       </div>
     </details>
     <div v-if="confirmNew" class="confirmation-box" role="alert">
@@ -101,6 +112,16 @@ async function control(action: TaskControlInput['action']) {
       <el-button :disabled="busy" type="primary" @click="control('NEW_ROUND')"
         >确认新增一轮</el-button
       ><el-button :disabled="busy" @click="confirmNew = false">取消</el-button>
+    </div>
+    <div v-if="confirmRetry" class="confirmation-box" role="alert">
+      <p>
+        对当天未完整成功或已停止的下载重新执行一轮。会再次访问网站，已校验的 APK 可复用缓存；
+        随后按当前设置注册 {{ task.successTarget }} 个成功账户，最多尝试
+        {{ task.attemptLimit }} 次。 原下载及停止记录仍保留。完整成功或尚未清理的批次不能复跑。
+      </p>
+      <el-button :disabled="busy" type="primary" @click="control('RETRY_DOWNLOAD')"
+        >确认重新下载并测试</el-button
+      ><el-button :disabled="busy" @click="confirmRetry = false">取消</el-button>
     </div>
     <el-alert v-if="error" :title="error" type="error" :closable="false" />
     <p v-if="notice" role="status" class="result-explanation">{{ notice }}</p>

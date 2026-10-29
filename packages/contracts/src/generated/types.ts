@@ -98,7 +98,7 @@ export interface APKTestConfigurationVersion10 {
 }
 
 export interface TaskControlInput {
-  action: 'START' | 'STOP' | 'NEW_ROUND' | 'DISABLE_DAILY' | 'ARCHIVE' | 'RESTORE';
+  action: 'START' | 'STOP' | 'NEW_ROUND' | 'DISABLE_DAILY' | 'ARCHIVE' | 'RESTORE' | 'RETRY_DOWNLOAD';
 }
 
 export interface TaskCycleView {
@@ -116,6 +116,7 @@ export interface TaskCycleView {
   registerRunIds: string[];
   deferredDownloadRules: boolean;
   apkCount: number;
+  downloadRetryOf: string | null;
 }
 
 export interface TaskPlanView {
@@ -147,6 +148,7 @@ export interface TaskPlanView {
     registerRunIds: string[];
     deferredDownloadRules: boolean;
     apkCount: number;
+    downloadRetryOf: string | null;
   } | null;
   readiness: {
     code: string;
@@ -186,6 +188,7 @@ export interface TaskPlanDetail {
       registerRunIds: string[];
       deferredDownloadRules: boolean;
       apkCount: number;
+      downloadRetryOf: string | null;
     } | null;
     readiness: {
       code: string;
@@ -210,6 +213,7 @@ export interface TaskPlanDetail {
     registerRunIds: string[];
     deferredDownloadRules: boolean;
     apkCount: number;
+    downloadRetryOf: string | null;
   }[];
 }
 export interface APKTestConfigurationVersion10 {
@@ -330,6 +334,7 @@ export interface TaskPlanList {
       registerRunIds: string[];
       deferredDownloadRules: boolean;
       apkCount: number;
+      downloadRetryOf: string | null;
     } | null;
     readiness: {
       code: string;

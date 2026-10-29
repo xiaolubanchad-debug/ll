@@ -74,6 +74,51 @@ export async function expireRuns(db: PrismaClient) {
       await expireNodeRun(tx, run.nodeId);
     });
 }
+export async function downloadRetryParent(
+  tx: Tx,
+  id: string,
+  nodeId: string,
+  configId: string,
+  day: string,
+) {
+  const parent = await tx.run.findUnique({
+    where: { id },
+    include: { configVersion: true, delivery: true },
+  });
+  if (
+    !parent ||
+    parent.nodeId !== nodeId ||
+    parent.purpose !== 'DOWNLOAD' ||
+    parent.cacheDay !== day ||
+    parent.configVersion?.configId !== configId ||
+    !['FAILED', 'CANCELLED', 'PARTIAL_FAILED'].includes(parent.status)
+  )
+    fault(
+      'DOWNLOAD_RETRY_INVALID',
+      '只能手动复跑本服务器、本方案当天已停止或未完整成功的下载',
+      422,
+    );
+  const latest = await tx.run.findFirst({
+    where: { nodeId, purpose: 'DOWNLOAD', cacheDay: day, configVersion: { configId } },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+  });
+  if (latest?.id !== id) fault('DOWNLOAD_RETRY_INVALID', '已有更新的下载批次，请刷新', 422);
+  if (parent.status === 'CANCELLED' && parent.delivery) {
+    const ack = await tx.runEvent.findFirst({
+      where: {
+        deliveryId: parent.delivery.id,
+        recordedForReview: false,
+        sequence: { lte: parent.delivery.appliedThroughSequence },
+        AND: [
+          { body: { path: ['type'], equals: 'STOP_ACK' } },
+          { body: { path: ['payload', 'cleanupComplete'], equals: true } },
+        ],
+      },
+    });
+    if (!ack) fault('DOWNLOAD_RETRY_NOT_READY', '必须先收到原下载的清理回执');
+  }
+  return parent;
+}
 export async function createRun(
   db: PrismaClient,
   body: unknown,
@@ -130,10 +175,27 @@ export async function createRun(
       fault('VERSION_ARCHIVED', '配置已归档，请恢复后使用');
     const dailyKey =
       input.purpose === 'DOWNLOAD'
-        ? digest(canonical([node.id, config.configId, beijingDay(now)]))
+        ? digest(
+            canonical([
+              node.id,
+              config.configId,
+              beijingDay(now),
+              ...(input.supersedesRunId ? [input.supersedesRunId] : []),
+            ]),
+          )
         : null;
     if (dailyKey) {
-      const existing = await tx.run.findUnique({ where: { dailyKey } });
+      const existing = input.supersedesRunId
+        ? await tx.run.findUnique({ where: { dailyKey } })
+        : await tx.run.findFirst({
+            where: {
+              nodeId: node.id,
+              purpose: 'DOWNLOAD',
+              cacheDay: beijingDay(now),
+              configVersion: { configId: config.configId },
+            },
+            orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          });
       if (existing) {
         if (cycleId)
           await tx.managedCycle.update({
@@ -143,6 +205,14 @@ export async function createRun(
         return { operationId: existing.id, resourceId: existing.id, status: existing.status };
       }
     }
+    if (input.purpose === 'DOWNLOAD' && input.supersedesRunId)
+      await downloadRetryParent(
+        tx,
+        input.supersedesRunId,
+        node.id,
+        config.configId,
+        beijingDay(now),
+      );
     await idle(tx, node.id);
     if (!node.lastSeenAt || node.lastSeenAt.getTime() < Date.now() - 45000)
       fault('NODE_OFFLINE', '节点尚未在线');
@@ -175,12 +245,13 @@ export async function createRun(
           (r) => r.mode !== undefined || r.autoWaitMs !== undefined,
         )) &&
       (!manifest?.features?.includes('DAILY_V1') ||
-        !['0.5.0', '0.5.1', '0.6.0'].includes(node.agentVersion ?? ''))
+        !['0.5.0', '0.5.1', '0.6.0', '0.6.1'].includes(node.agentVersion ?? ''))
     )
       fault('NODE_UPGRADE_REQUIRED', '请部署支持每日下载与循环注册的 Agent');
     if (
       configuration.execution.autoRegistration !== undefined &&
-      (!manifest?.features?.includes('AUTO_REGISTRATION_V1') || node.agentVersion !== '0.6.0')
+      (!manifest?.features?.includes('AUTO_REGISTRATION_V1') ||
+        !['0.6.0', '0.6.1'].includes(node.agentVersion ?? ''))
     )
       fault('NODE_UPGRADE_REQUIRED', '自动识别注册入口需要 Agent 0.6.0');
     const plan = await prepareDailyPlan(tx, input, config, now);

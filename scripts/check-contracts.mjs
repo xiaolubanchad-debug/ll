@@ -25,6 +25,7 @@ const v18 = read('contracts/fixtures/v18.valid.json');
 for (const [name, value] of [
   ['TaskPlanInput', v18.task],
   ['TaskControlInput', v18.control],
+  ['TaskControlInput', { action: 'RETRY_DOWNLOAD' }],
   ['MaintenanceInput', v18.maintenance],
 ])
   test('1.8 valid ' + name, () => assert.deepEqual(schemaIssues(name, value), []));

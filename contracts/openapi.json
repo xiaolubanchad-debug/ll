@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "APK 部署中台 API",
-    "version": "1.8.0"
+    "version": "1.8.1"
   },
   "paths": {
     "/api/v1/auth/login": {
@@ -3968,7 +3968,8 @@
               "NEW_ROUND",
               "DISABLE_DAILY",
               "ARCHIVE",
-              "RESTORE"
+              "RESTORE",
+              "RETRY_DOWNLOAD"
             ]
           }
         },
@@ -4051,6 +4052,17 @@
           "apkCount": {
             "type": "integer",
             "minimum": 0
+          },
+          "downloadRetryOf": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -4067,7 +4079,8 @@
           "activeRunId",
           "registerRunIds",
           "deferredDownloadRules",
-          "apkCount"
+          "apkCount",
+          "downloadRetryOf"
         ]
       },
       "TaskPlanView": {

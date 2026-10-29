@@ -139,6 +139,8 @@ async function capture(
     clicks = new Map<Page, number>();
   let landingClicks = 0;
   const arrived = new Map<Page, { url: string; at: number }>();
+  const sourceUrl = source.url();
+  const attempted = new WeakMap<Page, Set<string>>();
   const listener = (download: Download) => {
     if (!result) result = download;
     else void download.cancel();
@@ -165,6 +167,9 @@ async function capture(
     while (!result && Date.now() < end) {
       for (const page of pages) {
         if (result || page.isClosed()) break;
+        // The source may already have redirected before the icon was clicked.
+        // Only a navigation makes it a landing page; popups are handled separately.
+        if (page === source && page.url() === sourceUrl) continue;
         const count = clicks.get(page) ?? 0;
         if (
           count >= config.download.maxLandingClicks ||
@@ -198,6 +203,17 @@ async function capture(
           for (let i = 0; i < Math.min(n, 100); i++) {
             const candidate = candidates.nth(i);
             if (!(await candidate.isVisible().catch(() => false))) continue;
+            const signature = canonical([
+              page.url(),
+              rule.by,
+              rule.selector,
+              i,
+              await candidate.getAttribute('href'),
+            ]);
+            const seen = attempted.get(page) ?? new Set<string>();
+            if (seen.has(signature)) continue;
+            seen.add(signature);
+            attempted.set(page, seen);
             // Do not re-click the source icon while waiting for a popup or navigation.
             if (
               page === source &&

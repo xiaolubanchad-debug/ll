@@ -441,6 +441,7 @@ model ManagedCycle {
   downloadRunId         String?       @db.Uuid
   proxyRunId            String?       @db.Uuid
   deferredDownloadRules Boolean       @default(false)
+  downloadRetryOf       String?       @db.Uuid
   errorCode             String?       @db.VarChar(100)
   createdAt             DateTime      @default(now()) @db.Timestamptz(3)
   runs                  Run[]

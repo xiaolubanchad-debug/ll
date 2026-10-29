@@ -142,3 +142,75 @@ test('1.5 AUTO landing ignores a visible backup button and waits for delayed aut
   assert.equal(counts.get('/automatic.apk'), 1);
   assert.equal(counts.get('/backup.apk') ?? 0, 0);
 });
+
+test('0.6.1 redirected source never consumes popup click budget; same-page landing still downloads', async (t) => {
+  const apk = fixtureApk(),
+    counts = new Map(),
+    sockets = new Set();
+  const server = createServer((req, res) => {
+    const path = new URL(req.url, 'http://localhost').pathname;
+    counts.set(path, (counts.get(path) ?? 0) + 1);
+    if (path === '/source') {
+      res.writeHead(302, { location: '/redirected' }).end();
+      return;
+    }
+    if (path.endsWith('.apk')) {
+      res
+        .writeHead(200, {
+          'content-type': 'application/vnd.android.package-archive',
+          'content-disposition': 'attachment; filename="owned.apk"',
+        })
+        .end(apk);
+      return;
+    }
+    res.setHeader('content-type', 'text/html; charset=utf-8');
+    const pages = {
+      '/redirected':
+        '<a class="icon" pid="popup" href="/popup" target="_blank">popup</a><a class="icon" pid="same" href="/same">same</a><a class="download" href="/wrong.apk">下载 APP</a>',
+      '/popup':
+          '<a class="download" href="#" onclick="fetch(\'/tap\');setTimeout(()=>location.assign(\'/popup.apk\'),2200);return false">下载 APP</a>',
+      '/same': '<a class="download" href="/same.apk">下载 APP</a>',
+    };
+    res.end(
+      '<meta name="viewport" content="width=device-width,initial-scale=1">' + (pages[path] ?? ''),
+    );
+  });
+  server.on('connection', (s) => {
+    sockets.add(s);
+    s.once('close', () => sockets.delete(s));
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  t.after(async () => {
+    for (const s of sockets) s.destroy();
+    await new Promise((r) => server.close(r));
+  });
+  const origin = 'http://127.0.0.1:' + server.address().port;
+  const config = JSON.parse(await readFile('contracts/fixtures/config.valid.json', 'utf8'));
+  config.source = { url: origin + '/source', xpath: '//a[@class="icon"]', browserUserAgent: '' };
+  config.execution.mode = 'DOWNLOAD_ONLY';
+  delete config.execution.proxySecretVersionId;
+  config.registrationFlows = [];
+  config.download.timeoutMs = 10000;
+  config.download.maxLandingClicks = 3;
+  config.download.landingRules = [{ host: '127.0.0.1', by: 'css', selector: '.download' }];
+  const events = [];
+  await runDownload(
+    config,
+    randomUUID(),
+    await temporary(t),
+    resolve('.'),
+    AbortSignal.timeout(30000),
+    async (e) => events.push(e),
+    {
+      chromium,
+      policy: new NetworkPolicy(new Set([origin])),
+      dailyDownload: true,
+      fixedCacheDay: '2026-10-29',
+    },
+  );
+  assert.equal(events.at(-1).payload.status, 'SUCCEEDED');
+  assert.equal(counts.get('/wrong.apk') ?? 0, 0);
+  assert.equal(counts.get('/popup.apk'), 1);
+  assert.equal(counts.get('/same.apk'), 1);
+  assert.equal(counts.get('/tap'), 1, 'a delayed download button is only tapped once');
+});
