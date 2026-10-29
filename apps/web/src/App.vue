@@ -13,6 +13,8 @@ import RegistrationRecords from './RegistrationRecords.vue';
 import ApkAssets from './ApkAssets.vue';
 import ProxyManager from './ProxyManager.vue';
 import ValidationRecords from './ValidationRecords.vue';
+import TaskCenter from './TaskCenter.vue';
+import MaintenanceManager from './MaintenanceManager.vue';
 import { route, navigate } from './navigation';
 import type { Section } from './navigation';
 
@@ -45,6 +47,7 @@ sample.registrationFlows = [];
 const draftText = ref(JSON.stringify(sample, null, 2));
 const labels: Record<Section, string> = {
   overview: '工作台',
+  tasks: '任务中心',
   config: '任务方案',
   runs: '执行任务',
   results: '注册记录',
@@ -53,6 +56,16 @@ const labels: Record<Section, string> = {
   nodes: '服务器',
   security: '系统设置',
 };
+const mainSections = [
+  'overview',
+  'tasks',
+  'results',
+  'assets',
+  'proxies',
+  'nodes',
+  'security',
+] as const;
+const advancedSections = ['config', 'runs'] as const;
 function message(e: unknown) {
   return e instanceof Error ? e.message : '操作失败，请稍后重试';
 }
@@ -304,7 +317,7 @@ onMounted(async () => {
       <span class="nav-caption">管理空间</span>
       <nav aria-label="主导航">
         <button
-          v-for="(label, key) in labels"
+          v-for="key in mainSections"
           :key="key"
           :class="{ active: section === key }"
           @click="
@@ -313,12 +326,25 @@ onMounted(async () => {
             notice = '';
           "
         >
-          {{ label }}<span>↗</span>
+          {{ labels[key] }}<span>↗</span>
         </button>
       </nav>
+      <details class="advanced-navigation" :open="advancedSections.some((key) => key === section)">
+        <summary>高级操作</summary>
+        <nav aria-label="高级导航">
+          <button
+            v-for="key in advancedSections"
+            :key="key"
+            :class="{ active: section === key }"
+            @click="section = key"
+          >
+            {{ labels[key] }}<span>↗</span>
+          </button>
+        </nav>
+      </details>
       <div class="sidebar-bottom">
         <span class="status-dot"></span> 执行记录统一管理
-        <p>1.7 · 执行结果与日志</p>
+        <p>1.8 · 任务与执行管理</p>
       </div>
     </aside>
     <div class="main-area">
@@ -339,17 +365,20 @@ onMounted(async () => {
               {{
                 section === 'overview'
                   ? '查看注册结果、下载进度及需要处理的问题。'
-                  : section === 'config'
-                    ? '设置网站、下载规则与注册方式，保存后在新执行中生效。'
-                    : '所有记录来自当前中台数据库。'
+                  : section === 'tasks'
+                    ? '配置一次，直接开始、停止与查看结果。'
+                    : section === 'config'
+                      ? '设置网站、下载规则与注册方式，保存后在新执行中生效。'
+                      : '所有记录来自当前中台数据库。'
               }}
             </p>
           </div>
-          <span class="phase-tag">1.7 管理控制台</span>
+          <span class="phase-tag">1.8 管理控制台</span>
         </div>
         <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon />
         <el-alert v-if="notice" :title="notice" type="success" :closable="false" show-icon />
         <OverviewPanel v-if="section === 'overview'" />
+        <TaskCenter v-else-if="section === 'tasks'" />
         <RegistrationRecords v-else-if="section === 'results'" />
         <ApkAssets v-else-if="section === 'assets'" />
         <ProxyManager v-else-if="section === 'proxies'" />
@@ -415,6 +444,7 @@ onMounted(async () => {
         </section>
         <template v-else-if="section === 'security'"
           ><ValidationRecords />
+          <MaintenanceManager />
           <section class="surface security-form">
             <h2>修改管理员密码</h2>
             <p class="muted">新密码至少12位。修改后将撤销其他登录会话。</p>

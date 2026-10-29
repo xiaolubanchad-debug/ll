@@ -36,7 +36,17 @@ const v17 = await json('contracts/v17.schema.json'),
   v17Http = await json('contracts/v17.http.json');
 manifest.routes.push(...v17Http.routes);
 manifest.version = v17Http.version;
+const v18 = await json('contracts/v18.schema.json'),
+  v18Http = await json('contracts/v18.http.json');
+manifest.routes.push(...v18Http.routes);
+manifest.version = v18Http.version;
 const schemas = {
+  ...Object.fromEntries(
+    Object.entries(v18.$defs).map(([name, value]) => [
+      name,
+      { ...value, $id: v18.$id + '/' + name },
+    ]),
+  ),
   ...Object.fromEntries(
     Object.entries(v17.$defs).map(([name, value]) => [
       name,
@@ -109,10 +119,31 @@ function structuralShape(schema) {
   walk(copy);
   return copy;
 }
+function inlineTypes(value, owner) {
+  if (!value || typeof value !== 'object') return value;
+  if (Array.isArray(value)) return value.map((v) => inlineTypes(v, owner));
+  if (value.$ref) {
+    const [uri, pointer] = value.$ref.split('#');
+    const target = uri ? Object.values(schemas).find((s) => s.$id === uri) : owner;
+    if (!target) throw new Error('Unknown local contract reference');
+    const part = pointer
+      ? pointer
+          .slice(1)
+          .split('/')
+          .reduce((v, k) => v[k.replaceAll('~1', '/').replaceAll('~0', '~')], target)
+      : target;
+    return inlineTypes(part, target);
+  }
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([k]) => !['$id', '$schema', '$defs'].includes(k))
+      .map(([k, v]) => [k, inlineTypes(v, owner)]),
+  );
+}
 const types = (
   await Promise.all(
     Object.entries(schemas).map(([name, schema]) =>
-      compile({ ...structuralShape(schema), title: name }, name, {
+      compile({ ...structuralShape(inlineTypes(schema, schema)), title: name }, name, {
         bannerComment: '',
         declareExternallyReferenced: true,
         ignoreMinAndMaxItems: true,
@@ -127,6 +158,10 @@ function normalize(schema, name) {
     if (!value || typeof value !== 'object') return;
     if (value.$ref?.startsWith('#/'))
       value.$ref = `#/components/schemas/${name}/${value.$ref.slice(2)}`;
+    else if (value.$ref) {
+      const entry = Object.entries(schemas).find(([, s]) => s.$id === value.$ref);
+      if (entry) value.$ref = '#/components/schemas/' + entry[0];
+    }
     for (const child of Object.values(value)) walk(child);
   }
   walk(copy);
@@ -270,7 +305,7 @@ for (const route of manifest.routes) {
         in: 'query',
         name,
         schema,
-        required: false,
+        required: querySchema.required?.includes(name) ?? false,
       })),
     );
   }

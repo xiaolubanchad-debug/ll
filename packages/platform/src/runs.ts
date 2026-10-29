@@ -16,6 +16,7 @@ import { fault } from './errors.js';
 import { isIP } from 'node:net';
 import { beijingDay, prepareDailyPlan, dailyTargetKey } from './daily-plan.js';
 import type { DailyExecutionPlan } from '@apk/contracts';
+import { lockLibrary } from './library-lock.js';
 type Tx = P.TransactionClient;
 export const ACTIVE_RUNS = ['ASSIGNED', 'RUNNING', 'STOP_REQUESTED'] as const;
 export const RUN_END = ['SUCCEEDED', 'PARTIAL_FAILED', 'FAILED', 'CANCELLED', 'NEEDS_REVIEW'];
@@ -81,10 +82,41 @@ export async function createRun(
   key: string,
   now = new Date(),
   scheduleId?: string,
+  cycleId?: string,
+  cycleGeneration?: number,
 ) {
   const input = checked<RunInput>('RunInput', body);
   return idempotent(db, actor, 'POST:/runs', key, input, async (tx) => {
+    await lockLibrary(tx);
     const node = await lockNode(tx, input.nodeId);
+    if (!cycleId && (await tx.managedTask.count({ where: { nodeId: node.id, enabled: true } })))
+      fault('NODE_BUSY', '此服务器由任务中心管理，请先停止对应任务');
+    if (cycleId) {
+      const cycle = await tx.managedCycle.findUnique({
+        where: { id: cycleId },
+        include: { task: true },
+      });
+      if (
+        !cycle ||
+        cycle.stopRequested ||
+        !cycle.task.enabled ||
+        cycle.task.archivedAt ||
+        cycle.day !== beijingDay(now)
+      )
+        fault('TASK_STOPPED', '任务已停止或日期已变化');
+      if (cycleGeneration !== undefined && cycle.generation !== cycleGeneration)
+        fault('TASK_CHANGED', '任务轮次已变化');
+      if (
+        cycle.nodeId !== input.nodeId ||
+        cycle.configVersionId !== input.configVersionId ||
+        cycle.releaseId !== input.releaseId
+      )
+        fault('VALIDATION_FAILED', '任务快照不一致', 422);
+      const active = await tx.run.findFirst({
+        where: { taskCycleId: cycleId, status: { notIn: RUN_END as Run['status'][] } },
+      });
+      if (active) return { operationId: active.id, resourceId: active.id, status: active.status };
+    }
     if (scheduleId) {
       const schedule = await tx.dailySchedule.findUnique({ where: { id: scheduleId } });
       if (!schedule?.enabled || schedule.nodeId !== node.id)
@@ -93,14 +125,23 @@ export async function createRun(
     await expireNodeRun(tx, node.id);
     const config = await tx.configVersion.findUnique({ where: { id: input.configVersionId } });
     if (!config) fault('NOT_FOUND', '配置版本不存在', 404);
+    const container = await tx.configuration.findUniqueOrThrow({ where: { id: config.configId } });
+    if (config.archivedAt || container.archivedAt)
+      fault('VERSION_ARCHIVED', '配置已归档，请恢复后使用');
     const dailyKey =
       input.purpose === 'DOWNLOAD'
         ? digest(canonical([node.id, config.configId, beijingDay(now)]))
         : null;
     if (dailyKey) {
       const existing = await tx.run.findUnique({ where: { dailyKey } });
-      if (existing)
+      if (existing) {
+        if (cycleId)
+          await tx.managedCycle.update({
+            where: { id: cycleId },
+            data: { downloadRunId: existing.id, status: 'DOWNLOADING' },
+          });
         return { operationId: existing.id, resourceId: existing.id, status: existing.status };
+      }
     }
     await idle(tx, node.id);
     if (!node.lastSeenAt || node.lastSeenAt.getTime() < Date.now() - 45000)
@@ -168,6 +209,7 @@ export async function createRun(
     const run = await tx.run.create({
       data: {
         ...input,
+        ...(cycleId ? { taskCycleId: cycleId } : {}),
         configHash: config.configHash,
         createdBy: actor,
         ...(plan
@@ -176,6 +218,16 @@ export async function createRun(
         ...(dailyKey ? { dailyKey } : {}),
       },
     });
+    if (cycleId)
+      await tx.managedCycle.update({
+        where: { id: cycleId },
+        data:
+          input.purpose === 'DOWNLOAD'
+            ? { downloadRunId: run.id, status: 'DOWNLOADING' }
+            : input.purpose === 'PROXY_CHECK'
+              ? { proxyRunId: run.id, status: 'CHECKING_PROXY' }
+              : { status: 'REGISTERING' },
+      });
     await tx.nodeSlot.update({
       where: { nodeId: node.id },
       data: { runId: run.id, fence: { increment: 1 } },
@@ -341,6 +393,26 @@ export async function closeRun(
     data: { runId: null },
   });
 }
+export async function requestRunStop(tx: Tx, id: string) {
+  const previous = await tx.run.findUnique({ where: { id } });
+  if (!previous) fault('NOT_FOUND', '批次不存在', 404);
+  await lockNode(tx, previous.nodeId);
+  await expireNodeRun(tx, previous.nodeId);
+  const run = await tx.run.findUniqueOrThrow({ where: { id } });
+  if (run.status === 'QUEUED') await closeRun(tx, run, 'CANCELLED');
+  else if (!RUN_END.includes(run.status))
+    await tx.run.update({ where: { id }, data: { status: 'STOP_REQUESTED', stopRequested: true } });
+  return {
+    operationId: id,
+    resourceId: id,
+    status:
+      run.status === 'QUEUED'
+        ? 'CANCELLED'
+        : RUN_END.includes(run.status)
+          ? run.status
+          : 'STOP_REQUESTED',
+  };
+}
 export async function stopRun(
   db: PrismaClient,
   id: string,
@@ -350,30 +422,11 @@ export async function stopRun(
   key: string,
 ) {
   return idempotent(db, actor, 'POST:/runs/' + id + '/stop', key, reason, async (tx) => {
-    const previous = await tx.run.findUnique({ where: { id } });
-    if (!previous) fault('NOT_FOUND', '批次不存在', 404);
-    await lockNode(tx, previous.nodeId);
-    await expireNodeRun(tx, previous.nodeId);
-    const run = await tx.run.findUniqueOrThrow({ where: { id } });
-    if (run.status === 'QUEUED') await closeRun(tx, run, 'CANCELLED');
-    else if (!RUN_END.includes(run.status))
-      await tx.run.update({
-        where: { id },
-        data: { status: 'STOP_REQUESTED', stopRequested: true },
-      });
+    const result = await requestRunStop(tx, id);
     await tx.auditEvent.create({
       data: { adminId: actor, action: 'RUN_STOP_REQUESTED', requestId },
     });
-    return {
-      operationId: id,
-      resourceId: id,
-      status:
-        run.status === 'QUEUED'
-          ? 'CANCELLED'
-          : RUN_END.includes(run.status)
-            ? run.status
-            : 'STOP_REQUESTED',
-    };
+    return result;
   });
 }
 type Event = Extract<AgentMessage, { kind: 'events' }>['events'][number];

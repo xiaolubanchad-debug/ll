@@ -926,3 +926,120 @@ label > select {
     font-size: 11px;
   }
 }
+/* Unified task workflows. */
+.wizard-fields {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.wizard-fields input:not([type='checkbox']),
+.wizard-fields select,
+.wizard-fields textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #d9e2ed;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font: inherit;
+  color: #18324f;
+  background: white;
+}
+.wizard-fields .filter-grid label {
+  display: grid;
+  gap: 8px;
+}
+.wizard-progress {
+  display: flex;
+  gap: 12px;
+  list-style: none;
+  padding: 0;
+  margin: 22px 0;
+  flex-wrap: wrap;
+}
+.wizard-progress li {
+  padding: 9px 16px;
+  border-radius: 8px;
+  background: #f0f4f7;
+  color: #77899a;
+}
+.wizard-progress li.active {
+  background: #e2eee7;
+  color: #265e4f;
+  font-weight: 600;
+}
+.managed-task-card {
+  border-left: 4px solid #3e7866;
+}
+.managed-task-card h2 a {
+  color: inherit;
+  text-decoration: none;
+}
+.stop-task-button {
+  color: #a03d36;
+  border-color: #e2bbb8;
+}
+.task-actions {
+  margin-top: 18px;
+}
+.task-more {
+  margin: 12px 0;
+}
+.task-more summary,
+.history-manager summary,
+.task-wizard summary {
+  cursor: pointer;
+  color: #56706f;
+  padding: 10px 0;
+}
+.confirmation-box {
+  padding: 16px;
+  background: #fff7eb;
+  border: 1px solid #ead6b6;
+  border-radius: 10px;
+  margin: 16px 0;
+  overflow-wrap: anywhere;
+}
+.table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.console-table {
+  border-collapse: collapse;
+  width: 100%;
+  text-align: left;
+}
+.console-table th,
+.console-table td {
+  padding: 13px 10px;
+  border-bottom: 1px solid #e6edf4;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+.history-manager .filter-grid select {
+  padding: 10px;
+  border: 1px solid #dce5ed;
+  border-radius: 8px;
+  width: 100%;
+}
+.history-manager .filter-grid label {
+  display: grid;
+  gap: 8px;
+}
+@media (max-width: 640px) {
+  .console-table {
+    min-width: 540px;
+  }
+  .task-wizard {
+    padding: 18px;
+  }
+  .wizard-progress {
+    gap: 5px;
+  }
+  .wizard-progress li {
+    padding: 8px;
+    font-size: 12px;
+  }
+}

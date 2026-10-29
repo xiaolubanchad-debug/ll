@@ -6,6 +6,7 @@ import { lockNode, idle } from './nodes.js';
 import { readSecret } from './secrets.js';
 import { fault } from './errors.js';
 import { TERMINAL } from './types.js';
+import { lockLibrary } from './library-lock.js';
 export function keyRequired(key: string | undefined) {
   if (!key || !/^[A-Za-z0-9._:-]{8,128}$/.test(key))
     fault('VALIDATION_FAILED', '缺少有效的请求幂等编号', 422);
@@ -62,7 +63,10 @@ export async function enqueue(
     key,
     { nodeId, kind, releaseId },
     async (tx) => {
+      await lockLibrary(tx);
       const node = await lockNode(tx, nodeId);
+      if (await tx.managedTask.count({ where: { nodeId, enabled: true } }))
+        fault('NODE_BUSY', '请先停止任务中心中绑定此服务器的任务');
       await idle(tx, nodeId, kind !== 'DEPLOY');
       if (kind !== 'PROBE') {
         if (!node.expectedFingerprint || !node.hostKey)
@@ -73,6 +77,8 @@ export async function enqueue(
       if (kind === 'DEPLOY') {
         if (!releaseId || !(await tx.release.findUnique({ where: { id: releaseId } })))
           fault('RELEASE_INVALID', '发布版本不存在', 422);
+        if ((await tx.release.findUniqueOrThrow({ where: { id: releaseId } })).archivedAt)
+          fault('VERSION_ARCHIVED', '发布已归档，请恢复后部署');
         await tx.node.update({ where: { id: nodeId }, data: { deploymentStatus: 'INSTALLING' } });
       }
       const job = await tx.deployment.create({

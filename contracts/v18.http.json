@@ -1,0 +1,66 @@
+{
+  "version": "1.8.0",
+  "routes": [
+    {
+      "method": "get",
+      "path": "/task-plans",
+      "operationId": "taskPlanList",
+      "response": "TaskPlanList",
+      "status": 200,
+      "query": "TaskPlanQuery"
+    },
+    {
+      "method": "post",
+      "path": "/task-plans",
+      "operationId": "createTaskPlan",
+      "response": "TaskPlanView",
+      "status": 201,
+      "request": "TaskPlanInput",
+      "idempotent": true
+    },
+    {
+      "method": "get",
+      "path": "/task-plans/{id}",
+      "operationId": "taskPlanDetail",
+      "response": "TaskPlanDetail",
+      "status": 200
+    },
+    {
+      "method": "put",
+      "path": "/task-plans/{id}",
+      "operationId": "updateTaskPlan",
+      "response": "TaskPlanView",
+      "status": 200,
+      "request": "TaskPlanInput",
+      "idempotent": true,
+      "ifMatch": true
+    },
+    {
+      "method": "post",
+      "path": "/task-plans/{id}/control",
+      "operationId": "controlTaskPlan",
+      "response": "TaskPlanView",
+      "status": 200,
+      "request": "TaskControlInput",
+      "idempotent": true,
+      "ifMatch": true
+    },
+    {
+      "method": "get",
+      "path": "/maintenance/items",
+      "operationId": "maintenanceList",
+      "response": "MaintenanceList",
+      "status": 200,
+      "query": "MaintenanceQuery"
+    },
+    {
+      "method": "post",
+      "path": "/maintenance/actions",
+      "operationId": "maintenanceAction",
+      "response": "MaintenanceResult",
+      "status": 200,
+      "request": "MaintenanceInput",
+      "idempotent": true
+    }
+  ]
+}

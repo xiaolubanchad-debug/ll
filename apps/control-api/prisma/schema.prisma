@@ -52,6 +52,7 @@ model LoginBucket {
 }
 
 model Node {
+  managedTasks            ManagedTask[]
   id                      String           @id @default(uuid()) @db.Uuid
   name                    String           @db.VarChar(100)
   host                    String           @db.VarChar(253)
@@ -96,6 +97,8 @@ model SecretVersion {
 }
 
 model Release {
+  archivedAt   DateTime?    @db.Timestamptz(3)
+  revision     Int          @default(1)
   id           String       @id @db.Uuid
   manifest     Json
   artifactName String       @unique @db.VarChar(160)
@@ -184,6 +187,8 @@ model IdempotencyRecord {
 }
 
 model Run {
+  taskCycleId          String?        @db.Uuid
+  taskCycle            ManagedCycle?  @relation(fields: [taskCycleId], references: [id], onDelete: Restrict)
   id                   String         @id @default(uuid()) @db.Uuid
   nodeId               String         @db.Uuid
   node                 Node           @relation(fields: [nodeId], references: [id], onDelete: Restrict)
@@ -219,26 +224,34 @@ model Run {
   delivery             Delivery?
 
   @@index([createdAt, id])
+  @@index([taskCycleId, createdAt])
 }
 
 model Configuration {
-  id        String          @id @default(uuid()) @db.Uuid
-  name      String          @db.VarChar(100)
-  version   Int             @default(1)
-  createdAt DateTime        @default(now()) @db.Timestamptz(3)
-  versions  ConfigVersion[]
+  archivedAt  DateTime?       @db.Timestamptz(3)
+  revision    Int             @default(1)
+  managedTask ManagedTask?
+  id          String          @id @default(uuid()) @db.Uuid
+  name        String          @db.VarChar(100)
+  version     Int             @default(1)
+  createdAt   DateTime        @default(now()) @db.Timestamptz(3)
+  versions    ConfigVersion[]
 }
 
 model ConfigVersion {
-  id         String        @id @default(uuid()) @db.Uuid
-  configId   String        @db.Uuid
-  config     Configuration @relation(fields: [configId], references: [id], onDelete: Restrict)
-  version    Int
-  body       Json
-  configHash String        @db.Char(64)
-  createdAt  DateTime      @default(now()) @db.Timestamptz(3)
-  createdBy  String        @db.Uuid
-  runs       Run[]
+  archivedAt     DateTime?      @db.Timestamptz(3)
+  revision       Int            @default(1)
+  managedCurrent ManagedTask[]
+  managedCycles  ManagedCycle[]
+  id             String         @id @default(uuid()) @db.Uuid
+  configId       String         @db.Uuid
+  config         Configuration  @relation(fields: [configId], references: [id], onDelete: Restrict)
+  version        Int
+  body           Json
+  configHash     String         @db.Char(64)
+  createdAt      DateTime       @default(now()) @db.Timestamptz(3)
+  createdBy      String         @db.Uuid
+  runs           Run[]
 
   @@unique([configId, version])
 }
@@ -260,32 +273,32 @@ model Delivery {
 }
 
 model Task {
-  id             String         @id @db.Uuid
-  startedAt      DateTime?       @db.Timestamptz(3)
-  registrationStartedAt DateTime? @db.Timestamptz(3)
-  finishedAt     DateTime?       @db.Timestamptz(3)
-  lastStage      String         @default("QUEUED") @db.VarChar(32)
-  runId          String         @db.Uuid
-  run            Run            @relation(fields: [runId], references: [id], onDelete: Restrict)
-  targetKey      String         @db.Char(64)
-  entryId        String?        @db.VarChar(100)
-  label          String         @db.VarChar(200)
-  sourceUrl      String         @db.VarChar(4096)
-  position       Int
-  status         String         @default("QUEUED") @db.VarChar(32)
-  apk            Json?
-  cacheHit       Boolean        @default(false)
-  proof          String         @default("NONE") @db.VarChar(32)
-  errorCode      String?        @db.VarChar(100)
-  observation    Json?
-  recognition    Json?
-  accountRef     String?        @db.Uuid
-  submissionId   String?        @unique @db.Uuid
-  submittedAt    DateTime?      @db.Timestamptz(3)
-  attemptStarted Boolean        @default(false)
-  account        AccountResult?
-  artifacts      Artifact[]
-  reviews        TaskReview[]
+  id                    String         @id @db.Uuid
+  startedAt             DateTime?      @db.Timestamptz(3)
+  registrationStartedAt DateTime?      @db.Timestamptz(3)
+  finishedAt            DateTime?      @db.Timestamptz(3)
+  lastStage             String         @default("QUEUED") @db.VarChar(32)
+  runId                 String         @db.Uuid
+  run                   Run            @relation(fields: [runId], references: [id], onDelete: Restrict)
+  targetKey             String         @db.Char(64)
+  entryId               String?        @db.VarChar(100)
+  label                 String         @db.VarChar(200)
+  sourceUrl             String         @db.VarChar(4096)
+  position              Int
+  status                String         @default("QUEUED") @db.VarChar(32)
+  apk                   Json?
+  cacheHit              Boolean        @default(false)
+  proof                 String         @default("NONE") @db.VarChar(32)
+  errorCode             String?        @db.VarChar(100)
+  observation           Json?
+  recognition           Json?
+  accountRef            String?        @db.Uuid
+  submissionId          String?        @unique @db.Uuid
+  submittedAt           DateTime?      @db.Timestamptz(3)
+  attemptStarted        Boolean        @default(false)
+  account               AccountResult?
+  artifacts             Artifact[]
+  reviews               TaskReview[]
 
   @@unique([runId, targetKey])
   @@unique([runId, position])
@@ -385,4 +398,53 @@ enum RunStatus {
   FAILED
   CANCELLED
   NEEDS_REVIEW
+}
+
+model ManagedTask {
+  id               String         @id @default(uuid()) @db.Uuid
+  name             String         @db.VarChar(100)
+  nodeId           String         @db.Uuid
+  node             Node           @relation(fields: [nodeId], references: [id], onDelete: Restrict)
+  configId         String         @unique @db.Uuid
+  config           Configuration  @relation(fields: [configId], references: [id], onDelete: Restrict)
+  currentVersionId String         @db.Uuid
+  currentVersion   ConfigVersion  @relation(fields: [currentVersionId], references: [id], onDelete: Restrict)
+  version          Int            @default(1)
+  automatic        Boolean        @default(false)
+  enabled          Boolean        @default(false)
+  time             String         @default("00:05") @db.VarChar(5)
+  successTarget    Int
+  attemptLimit     Int
+  createdBy        String         @db.Uuid
+  archivedAt       DateTime?      @db.Timestamptz(3)
+  createdAt        DateTime       @default(now()) @db.Timestamptz(3)
+  cycles           ManagedCycle[]
+
+  @@index([nodeId, enabled])
+}
+
+model ManagedCycle {
+  id                    String        @id @default(uuid()) @db.Uuid
+  taskId                String        @db.Uuid
+  task                  ManagedTask   @relation(fields: [taskId], references: [id], onDelete: Restrict)
+  nodeId                String        @db.Uuid
+  configVersionId       String        @db.Uuid
+  configVersion         ConfigVersion @relation(fields: [configVersionId], references: [id], onDelete: Restrict)
+  releaseId             String        @db.Uuid
+  day                   String        @db.VarChar(10)
+  round                 Int           @default(1)
+  generation            Int           @default(1)
+  status                String        @default("QUEUED") @db.VarChar(32)
+  stopRequested         Boolean       @default(false)
+  successTarget         Int
+  attemptLimit          Int
+  downloadRunId         String?       @db.Uuid
+  proxyRunId            String?       @db.Uuid
+  deferredDownloadRules Boolean       @default(false)
+  errorCode             String?       @db.VarChar(100)
+  createdAt             DateTime      @default(now()) @db.Timestamptz(3)
+  runs                  Run[]
+
+  @@unique([taskId, day, round])
+  @@index([status, createdAt])
 }

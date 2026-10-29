@@ -188,6 +188,14 @@ export async function archiveNode(
   await db.$transaction(async (tx) => {
     const n = await lockNode(tx, id);
     await idle(tx, id);
+    if (
+      (await tx.managedTask.count({ where: { nodeId: id, enabled: true } })) ||
+      (await tx.managedCycle.count({
+        where: { nodeId: id, status: { notIn: ['DONE', 'FAILED', 'STOPPED'] } },
+      })) ||
+      (await tx.dailySchedule.count({ where: { nodeId: id, enabled: true } }))
+    )
+      fault('TASK_ACTIVE', '请先关闭计划、停止任务并确认清理');
     if (n.version !== version) fault('STALE_VERSION', '服务器资料已更新');
     if (n.lastSeenAt && n.lastSeenAt.getTime() > Date.now() - 45000)
       fault('NODE_BUSY', '请先在服务器停止 Agent 服务，再归档');

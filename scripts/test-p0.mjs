@@ -170,6 +170,7 @@ try {
   await run(['--test', '--test-concurrency=1', 'tests/registration-discovery.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/p3.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/v17.test.mjs'], env);
+  await run(['--test', '--test-concurrency=1', 'tests/v18.test.mjs'], env);
   const { initializeAdmin } = await import('../apps/control-api/dist/admin.js');
   const { passwordHash } = await import('../apps/control-api/dist/auth.js');
   const admin = await db.admin.findFirst();

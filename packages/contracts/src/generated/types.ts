@@ -1,4 +1,408 @@
 // Generated. Run npm run generate:contracts.
+export interface TaskPlanInput {
+  name: string;
+  nodeId: string;
+  configId?: string;
+  configuration: APKTestConfigurationVersion10;
+  automatic: boolean;
+  time: string;
+  successTarget: number;
+  attemptLimit: number;
+}
+export interface APKTestConfigurationVersion10 {
+  schemaVersion: '1.0';
+  name: string;
+  source: {
+    url: string;
+    xpath: string;
+    browserUserAgent: string;
+  };
+  download: {
+    cacheTimezone: 'Asia/Shanghai';
+    maxTargets: number;
+    maxLandingClicks: number;
+    timeoutMs: number;
+    retries: number;
+    /**
+     * @minItems 1
+     * @maxItems 50
+     */
+    landingRules: {
+      host: string;
+      by: 'css' | 'xpath';
+      selector: string;
+      mode?: 'AUTO' | 'CLICK' | 'AUTO_THEN_CLICK';
+      autoWaitMs?: number;
+    }[];
+    maxApkBytes?: number;
+  };
+  execution: {
+    mode: 'DOWNLOAD_ONLY' | 'FULL';
+    proxySecretVersionId?: string;
+    /**
+     * @minItems 1
+     * @maxItems 10
+     */
+    deviceProfiles: {
+      id: string;
+      name: string;
+      avdDevice: string;
+      systemImage: string;
+      locale: string;
+    }[];
+    autoRegistration?: {
+      enabled: boolean;
+      screenshotFallback: boolean;
+      maxNavigationSteps: number;
+      timeoutMs: number;
+      successTimeoutMs: number;
+    };
+  };
+  /**
+   * @maxItems 100
+   */
+  registrationFlows: {
+    packageName: string;
+    activity: string;
+    enabled: boolean;
+    /**
+     * @minItems 1
+     * @maxItems 60
+     */
+    steps: {
+      action: 'click' | 'input' | 'wait' | 'back' | 'submit';
+      locator?: {
+        by: 'id' | 'accessibilityId' | 'xpath' | 'androidUiAutomator';
+        value: string;
+      };
+      text?: '{username}' | '{password}';
+      timeoutMs: number;
+      optional: boolean;
+    }[];
+    success: {
+      locator: {
+        by: 'id' | 'accessibilityId' | 'xpath' | 'androidUiAutomator';
+        value: string;
+      };
+      timeoutMs: number;
+    };
+    failure?: {
+      locator: {
+        by: 'id' | 'accessibilityId' | 'xpath' | 'androidUiAutomator';
+        value: string;
+      };
+      timeoutMs: number;
+    };
+    entryId?: string;
+  }[];
+}
+
+export interface TaskControlInput {
+  action: 'START' | 'STOP' | 'NEW_ROUND' | 'DISABLE_DAILY' | 'ARCHIVE' | 'RESTORE';
+}
+
+export interface TaskCycleView {
+  id: string;
+  day: string;
+  round: number;
+  status: string;
+  errorCode: string | null;
+  successes: number;
+  attemptsStarted: number;
+  successTarget: number;
+  attemptLimit: number;
+  downloadRunId: string | null;
+  activeRunId: string | null;
+  registerRunIds: string[];
+  deferredDownloadRules: boolean;
+  apkCount: number;
+}
+
+export interface TaskPlanView {
+  id: string;
+  name: string;
+  nodeId: string;
+  nodeName: string;
+  version: number;
+  configId: string;
+  currentVersionId: string;
+  automatic: boolean;
+  enabled: boolean;
+  time: string;
+  successTarget: number;
+  attemptLimit: number;
+  archivedAt: string | null;
+  latestCycle: {
+    id: string;
+    day: string;
+    round: number;
+    status: string;
+    errorCode: string | null;
+    successes: number;
+    attemptsStarted: number;
+    successTarget: number;
+    attemptLimit: number;
+    downloadRunId: string | null;
+    activeRunId: string | null;
+    registerRunIds: string[];
+    deferredDownloadRules: boolean;
+    apkCount: number;
+  } | null;
+  readiness: {
+    code: string;
+    message: string;
+    section: string;
+  }[];
+  nextRunAt: string | null;
+}
+
+export interface TaskPlanDetail {
+  task: {
+    id: string;
+    name: string;
+    nodeId: string;
+    nodeName: string;
+    version: number;
+    configId: string;
+    currentVersionId: string;
+    automatic: boolean;
+    enabled: boolean;
+    time: string;
+    successTarget: number;
+    attemptLimit: number;
+    archivedAt: string | null;
+    latestCycle: {
+      id: string;
+      day: string;
+      round: number;
+      status: string;
+      errorCode: string | null;
+      successes: number;
+      attemptsStarted: number;
+      successTarget: number;
+      attemptLimit: number;
+      downloadRunId: string | null;
+      activeRunId: string | null;
+      registerRunIds: string[];
+      deferredDownloadRules: boolean;
+      apkCount: number;
+    } | null;
+    readiness: {
+      code: string;
+      message: string;
+      section: string;
+    }[];
+    nextRunAt: string | null;
+  };
+  configuration: APKTestConfigurationVersion10;
+  cycles: {
+    id: string;
+    day: string;
+    round: number;
+    status: string;
+    errorCode: string | null;
+    successes: number;
+    attemptsStarted: number;
+    successTarget: number;
+    attemptLimit: number;
+    downloadRunId: string | null;
+    activeRunId: string | null;
+    registerRunIds: string[];
+    deferredDownloadRules: boolean;
+    apkCount: number;
+  }[];
+}
+export interface APKTestConfigurationVersion10 {
+  schemaVersion: '1.0';
+  name: string;
+  source: {
+    url: string;
+    xpath: string;
+    browserUserAgent: string;
+  };
+  download: {
+    cacheTimezone: 'Asia/Shanghai';
+    maxTargets: number;
+    maxLandingClicks: number;
+    timeoutMs: number;
+    retries: number;
+    /**
+     * @minItems 1
+     * @maxItems 50
+     */
+    landingRules: {
+      host: string;
+      by: 'css' | 'xpath';
+      selector: string;
+      mode?: 'AUTO' | 'CLICK' | 'AUTO_THEN_CLICK';
+      autoWaitMs?: number;
+    }[];
+    maxApkBytes?: number;
+  };
+  execution: {
+    mode: 'DOWNLOAD_ONLY' | 'FULL';
+    proxySecretVersionId?: string;
+    /**
+     * @minItems 1
+     * @maxItems 10
+     */
+    deviceProfiles: {
+      id: string;
+      name: string;
+      avdDevice: string;
+      systemImage: string;
+      locale: string;
+    }[];
+    autoRegistration?: {
+      enabled: boolean;
+      screenshotFallback: boolean;
+      maxNavigationSteps: number;
+      timeoutMs: number;
+      successTimeoutMs: number;
+    };
+  };
+  /**
+   * @maxItems 100
+   */
+  registrationFlows: {
+    packageName: string;
+    activity: string;
+    enabled: boolean;
+    /**
+     * @minItems 1
+     * @maxItems 60
+     */
+    steps: {
+      action: 'click' | 'input' | 'wait' | 'back' | 'submit';
+      locator?: {
+        by: 'id' | 'accessibilityId' | 'xpath' | 'androidUiAutomator';
+        value: string;
+      };
+      text?: '{username}' | '{password}';
+      timeoutMs: number;
+      optional: boolean;
+    }[];
+    success: {
+      locator: {
+        by: 'id' | 'accessibilityId' | 'xpath' | 'androidUiAutomator';
+        value: string;
+      };
+      timeoutMs: number;
+    };
+    failure?: {
+      locator: {
+        by: 'id' | 'accessibilityId' | 'xpath' | 'androidUiAutomator';
+        value: string;
+      };
+      timeoutMs: number;
+    };
+    entryId?: string;
+  }[];
+}
+
+export interface TaskPlanList {
+  items: {
+    id: string;
+    name: string;
+    nodeId: string;
+    nodeName: string;
+    version: number;
+    configId: string;
+    currentVersionId: string;
+    automatic: boolean;
+    enabled: boolean;
+    time: string;
+    successTarget: number;
+    attemptLimit: number;
+    archivedAt: string | null;
+    latestCycle: {
+      id: string;
+      day: string;
+      round: number;
+      status: string;
+      errorCode: string | null;
+      successes: number;
+      attemptsStarted: number;
+      successTarget: number;
+      attemptLimit: number;
+      downloadRunId: string | null;
+      activeRunId: string | null;
+      registerRunIds: string[];
+      deferredDownloadRules: boolean;
+      apkCount: number;
+    } | null;
+    readiness: {
+      code: string;
+      message: string;
+      section: string;
+    }[];
+    nextRunAt: string | null;
+  }[];
+  nextCursor: string | null;
+}
+
+export interface TaskPlanQuery {
+  cursor?: string;
+  limit?: string;
+  archived?: 'ACTIVE' | 'ARCHIVED' | 'ALL';
+}
+
+export interface MaintenanceQuery {
+  kind: 'CONFIGURATION' | 'CONFIG_VERSION' | 'RELEASE';
+  configId?: string;
+  archived?: 'ACTIVE' | 'ARCHIVED' | 'ALL';
+  cursor?: string;
+  limit?: string;
+}
+
+export interface MaintenanceItem {
+  id: string;
+  kind: string;
+  title: string;
+  revision: number;
+  archivedAt: string | null;
+  references: {
+    label: string;
+    count: number;
+  }[];
+  canDelete: boolean;
+  canArchive: boolean;
+}
+
+export interface MaintenanceList {
+  items: {
+    id: string;
+    kind: string;
+    title: string;
+    revision: number;
+    archivedAt: string | null;
+    references: {
+      label: string;
+      count: number;
+    }[];
+    canDelete: boolean;
+    canArchive: boolean;
+  }[];
+  nextCursor: string | null;
+}
+
+export interface MaintenanceInput {
+  action: 'ARCHIVE' | 'RESTORE' | 'DELETE';
+  /**
+   * @minItems 1
+   * @maxItems 100
+   */
+  items: {
+    id: string;
+    kind: 'CONFIGURATION' | 'CONFIG_VERSION' | 'RELEASE';
+    revision: number;
+  }[];
+}
+
+export interface MaintenanceResult {
+  affected: number;
+}
+
 export type ResultCategory =
   | 'SUCCESS'
   | 'REJECTED'
@@ -389,7 +793,13 @@ export interface TestConfiguration {
      * @minItems 1
      * @maxItems 10
      */
-    deviceProfiles: DeviceProfile[];
+    deviceProfiles: {
+      id: string;
+      name: string;
+      avdDevice: string;
+      systemImage: string;
+      locale: string;
+    }[];
     autoRegistration?: {
       enabled: boolean;
       screenshotFallback: boolean;
@@ -401,185 +811,174 @@ export interface TestConfiguration {
   /**
    * @maxItems 100
    */
-  registrationFlows: Flow[];
-}
-export interface DeviceProfile {
-  id: string;
-  name: string;
-  avdDevice: string;
-  systemImage: string;
-  locale: string;
-}
-export interface Flow {
-  packageName: string;
-  activity: string;
-  enabled: boolean;
-  /**
-   * @minItems 1
-   * @maxItems 60
-   */
-  steps: Step[];
-  success: {
-    locator: Locator;
-    timeoutMs: number;
-  };
-  failure?: {
-    locator: Locator;
-    timeoutMs: number;
-  };
-  entryId?: string;
-}
-export interface Step {
-  action: 'click' | 'input' | 'wait' | 'back' | 'submit';
-  locator?: Locator;
-  text?: '{username}' | '{password}';
-  timeoutMs: number;
-  optional: boolean;
-}
-export interface Locator {
-  by: 'id' | 'accessibilityId' | 'xpath' | 'androidUiAutomator';
-  value: string;
-}
-
-export type AgentMessage = Enroll | Heartbeat | Claim | Delivery | Accept | Events | Account;
-export type Uuid = string;
-export type Version = string;
-export type Time = string;
-export type Hash = string;
-
-export interface Enroll {
-  kind: 'enroll';
-  protocolVersion: '1.0';
-  nodeId: Uuid;
-  bootId: Uuid;
-  agentVersion: Version;
-  releaseId: Uuid;
-}
-export interface Heartbeat {
-  kind: 'heartbeat';
-  protocolVersion: '1.0';
-  nodeId: Uuid;
-  bootId: Uuid;
-  agentVersion: Version;
-  releaseId: Uuid;
-  sentAt: Time;
-  capabilities: {
-    download: boolean;
-    android: boolean;
-    kvm: boolean;
-    freeDiskBytes: number;
-    downloadProtocol?: '1.0';
-    registrationProtocol?: '1.0';
-  };
-  currentDelivery: null | CurrentDelivery;
-  report?: {
-    ubuntu: string;
-    arch: string;
-    memoryKiB: number;
-    freeDiskBytes: number;
-    kvm: boolean;
-    sudo: boolean;
-    markerPresent: boolean;
-    android: boolean;
-    download: boolean;
-    versions: {
-      node?: string;
-      adb?: string;
-      emulator?: string;
-      appium?: string;
-      playwright?: string;
-      systemImage?: string;
-    };
+  registrationFlows: {
+    packageName: string;
+    activity: string;
+    enabled: boolean;
     /**
-     * @maxItems 20
+     * @minItems 1
+     * @maxItems 60
      */
-    errors: (
-      | 'NO_KVM'
-      | 'DISK_LOW'
-      | 'UNSUPPORTED_OS'
-      | 'UNSUPPORTED_ARCH'
-      | 'SUDO_REQUIRED'
-      | 'ANDROID_NOT_READY'
-      | 'INSTALL_IN_PROGRESS'
-    )[];
-  };
+    steps: {
+      action: 'click' | 'input' | 'wait' | 'back' | 'submit';
+      locator?: {
+        by: 'id' | 'accessibilityId' | 'xpath' | 'androidUiAutomator';
+        value: string;
+      };
+      text?: '{username}' | '{password}';
+      timeoutMs: number;
+      optional: boolean;
+    }[];
+    success: {
+      locator: {
+        by: 'id' | 'accessibilityId' | 'xpath' | 'androidUiAutomator';
+        value: string;
+      };
+      timeoutMs: number;
+    };
+    failure?: {
+      locator: {
+        by: 'id' | 'accessibilityId' | 'xpath' | 'androidUiAutomator';
+        value: string;
+      };
+      timeoutMs: number;
+    };
+    entryId?: string;
+  }[];
 }
-export interface CurrentDelivery {
-  deliveryId: Uuid;
-  runId: Uuid;
-  fence: number;
-}
-export interface Claim {
-  kind: 'claim';
-  protocolVersion: '1.0';
-  nodeId: Uuid;
-  bootId: Uuid;
-}
-export interface Delivery {
-  kind: 'delivery';
-  protocolVersion: '1.0';
-  nodeId: Uuid;
-  deliveryId: Uuid;
-  runId: Uuid;
-  fence: number;
-  configVersionId: Uuid;
-  configHash: Hash;
-  releaseId: Uuid;
-  issuedAt: Time;
-  ackDeadline: Time;
-  leaseExpiresAt: Time;
-}
-export interface Accept {
-  kind: 'accept';
-  protocolVersion: '1.0';
-  nodeId: Uuid;
-  bootId: Uuid;
-  deliveryId: Uuid;
-  fence: number;
-}
-export interface Events {
-  kind: 'events';
-  protocolVersion: '1.0';
-  nodeId: Uuid;
-  deliveryId: Uuid;
-  fence: number;
-  /**
-   * @minItems 1
-   * @maxItems 100
-   */
-  events: Event[];
-}
-export interface Event {
-  eventId: Uuid;
-  runId: Uuid;
-  taskId?: Uuid;
-  sequence: number;
-  occurredAt: Time;
-  type:
-    | 'RUN_STARTED'
-    | 'TARGETS_DISCOVERED'
-    | 'TASK_STAGE'
-    | 'SUBMISSION_INTENT'
-    | 'TASK_FINISHED'
-    | 'RUN_FINISHED'
-    | 'STOP_ACK'
-    | 'LOG'
-    | 'PROXY_CHECKED';
-  payload: {
-    [k: string]: unknown;
-  };
-}
-export interface Account {
-  kind: 'account';
-  protocolVersion: '1.0';
-  nodeId: Uuid;
-  deliveryId: Uuid;
-  fence: number;
-  taskId: Uuid;
-  accountRef: Uuid;
-  username: string;
-  password: string;
-}
+
+export type AgentMessage =
+  | {
+      kind: 'enroll';
+      protocolVersion: '1.0';
+      nodeId: string;
+      bootId: string;
+      agentVersion: string;
+      releaseId: string;
+    }
+  | {
+      kind: 'heartbeat';
+      protocolVersion: '1.0';
+      nodeId: string;
+      bootId: string;
+      agentVersion: string;
+      releaseId: string;
+      sentAt: string;
+      capabilities: {
+        download: boolean;
+        android: boolean;
+        kvm: boolean;
+        freeDiskBytes: number;
+        downloadProtocol?: '1.0';
+        registrationProtocol?: '1.0';
+      };
+      currentDelivery: null | {
+        deliveryId: string;
+        runId: string;
+        fence: number;
+      };
+      report?: {
+        ubuntu: string;
+        arch: string;
+        memoryKiB: number;
+        freeDiskBytes: number;
+        kvm: boolean;
+        sudo: boolean;
+        markerPresent: boolean;
+        android: boolean;
+        download: boolean;
+        versions: {
+          node?: string;
+          adb?: string;
+          emulator?: string;
+          appium?: string;
+          playwright?: string;
+          systemImage?: string;
+        };
+        /**
+         * @maxItems 20
+         */
+        errors: (
+          | 'NO_KVM'
+          | 'DISK_LOW'
+          | 'UNSUPPORTED_OS'
+          | 'UNSUPPORTED_ARCH'
+          | 'SUDO_REQUIRED'
+          | 'ANDROID_NOT_READY'
+          | 'INSTALL_IN_PROGRESS'
+        )[];
+      };
+    }
+  | {
+      kind: 'claim';
+      protocolVersion: '1.0';
+      nodeId: string;
+      bootId: string;
+    }
+  | {
+      kind: 'delivery';
+      protocolVersion: '1.0';
+      nodeId: string;
+      deliveryId: string;
+      runId: string;
+      fence: number;
+      configVersionId: string;
+      configHash: string;
+      releaseId: string;
+      issuedAt: string;
+      ackDeadline: string;
+      leaseExpiresAt: string;
+    }
+  | {
+      kind: 'accept';
+      protocolVersion: '1.0';
+      nodeId: string;
+      bootId: string;
+      deliveryId: string;
+      fence: number;
+    }
+  | {
+      kind: 'events';
+      protocolVersion: '1.0';
+      nodeId: string;
+      deliveryId: string;
+      fence: number;
+      /**
+       * @minItems 1
+       * @maxItems 100
+       */
+      events: {
+        eventId: string;
+        runId: string;
+        taskId?: string;
+        sequence: number;
+        occurredAt: string;
+        type:
+          | 'RUN_STARTED'
+          | 'TARGETS_DISCOVERED'
+          | 'TASK_STAGE'
+          | 'SUBMISSION_INTENT'
+          | 'TASK_FINISHED'
+          | 'RUN_FINISHED'
+          | 'STOP_ACK'
+          | 'LOG'
+          | 'PROXY_CHECKED';
+        payload: {
+          [k: string]: unknown;
+        };
+      }[];
+    }
+  | {
+      kind: 'account';
+      protocolVersion: '1.0';
+      nodeId: string;
+      deliveryId: string;
+      fence: number;
+      taskId: string;
+      accountRef: string;
+      username: string;
+      password: string;
+    };
 
 export interface LoginInput {
   username: string;

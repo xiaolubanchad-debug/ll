@@ -176,3 +176,18 @@ export function agentIssues(value: unknown): Issue[] {
 }
 export const loginIssues = (value: unknown) => schemaIssues('LoginInput', value);
 export const passwordChangeIssues = (value: unknown) => schemaIssues('PasswordChangeInput', value);
+
+export type {
+  TaskPlanInput,
+  TaskControlInput,
+  TaskCycleView,
+  TaskPlanView,
+  TaskPlanDetail,
+  TaskPlanList,
+  TaskPlanQuery,
+  MaintenanceQuery,
+  MaintenanceItem,
+  MaintenanceList,
+  MaintenanceInput,
+  MaintenanceResult,
+} from './generated/types.js';

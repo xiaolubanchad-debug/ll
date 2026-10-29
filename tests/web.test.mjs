@@ -18,7 +18,8 @@ test('browser login, config checks, refresh, password change and logout', async 
     await expect(page.getByText('用户名或密码不正确')).toBeVisible();
     await page.getByLabel('密码', { exact: true }).fill(process.env.P0_TEST_PASSWORD);
     await page.getByRole('button', { name: '登录中台' }).click();
-    await expect(page.getByRole('heading', { name: '工作台', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '任务中心', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: '工作台', exact: false }).first().click();
     await expect(
       page.getByRole('heading', { name: '当前执行与待处理', exact: true }),
     ).toBeVisible();
@@ -67,6 +68,7 @@ test('browser login, config checks, refresh, password change and logout', async 
     await page.getByText('归档服务器', { exact: true }).click();
     await page.getByRole('button', { name: '确认归档服务器', exact: true }).click();
     await expect(page.getByText('尚未接入服务器')).toBeVisible();
+    await page.getByText('高级操作', { exact: true }).click();
     await page.getByRole('button', { name: '任务方案', exact: false }).first().click();
     await expect(page.getByLabel('完整配置 JSON', { exact: true })).not.toBeVisible();
     let validateRequests = 0;
@@ -86,11 +88,11 @@ test('browser login, config checks, refresh, password change and logout', async 
     await expect(page.getByText('配置已建立，可保存当前草稿为第一个版本')).toBeVisible();
     await page.getByRole('button', { name: '保存草稿为新版本', exact: true }).click();
     await expect(page.getByText('已保存不可变版本，运行中的任务不会改变')).toBeVisible();
-    await expect(page.getByRole('button', { name: '载入版本', exact: true })).toHaveCount(1);
+    await expect(page.getByRole('button', { name: '用此版本编辑', exact: true })).toHaveCount(1);
     await page.getByLabel('网站 URL').fill('https://second.example.test/');
     await page.getByRole('button', { name: '保存草稿为新版本', exact: true }).click();
-    await expect(page.getByRole('button', { name: '载入版本', exact: true })).toHaveCount(2);
-    await page.getByRole('button', { name: '载入版本', exact: true }).last().click();
+    await expect(page.getByRole('button', { name: '用此版本编辑', exact: true })).toHaveCount(2);
+    await page.getByRole('button', { name: '用此版本编辑', exact: true }).last().click();
     await expect(page.getByLabel('网站 URL')).toHaveValue('https://downloads.example.test/');
     await page.screenshot({
       path: path.join(process.env.P0_SCREENSHOT_DIR, 'p2-configs.png'),
@@ -173,7 +175,9 @@ test('browser login, config checks, refresh, password change and logout', async 
       )),
     );
     await page.getByRole('button', { name: '保存草稿为新版本', exact: true }).click();
-    await expect(page.getByRole('button', { name: '载入版本', exact: true })).toHaveCount(3);
+    await expect(page.getByRole('button', { name: '用此版本编辑', exact: true })).toHaveCount(3);
+    if (!(await page.getByRole('button', { name: '执行任务', exact: false }).first().isVisible()))
+      await page.getByText('高级操作', { exact: true }).click();
     await page.getByRole('button', { name: '执行任务', exact: false }).first().click();
     await expect(page.getByRole('heading', { name: '开始测试任务', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: '开始下载', exact: true })).toBeDisabled();

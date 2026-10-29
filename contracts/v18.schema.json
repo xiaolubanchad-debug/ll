@@ -1,0 +1,540 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.apk-platform.example/v1/v18.schema.json",
+  "$defs": {
+    "TaskPlanInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "nodeId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "configId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "configuration": {
+          "$ref": "https://contracts.apk-platform.example/v1/config.schema.json"
+        },
+        "automatic": {
+          "type": "boolean"
+        },
+        "time": {
+          "type": "string",
+          "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+        },
+        "successTarget": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "attemptLimit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        }
+      },
+      "required": [
+        "name",
+        "nodeId",
+        "configuration",
+        "automatic",
+        "time",
+        "successTarget",
+        "attemptLimit"
+      ]
+    },
+    "TaskControlInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "enum": [
+            "START",
+            "STOP",
+            "NEW_ROUND",
+            "DISABLE_DAILY",
+            "ARCHIVE",
+            "RESTORE"
+          ]
+        }
+      },
+      "required": [
+        "action"
+      ]
+    },
+    "TaskCycleView": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "day": {
+          "type": "string"
+        },
+        "round": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "status": {
+          "type": "string"
+        },
+        "errorCode": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "successes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "attemptsStarted": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "successTarget": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "attemptLimit": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "downloadRunId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "activeRunId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "registerRunIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "deferredDownloadRules": {
+          "type": "boolean"
+        },
+        "apkCount": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "id",
+        "day",
+        "round",
+        "status",
+        "errorCode",
+        "successes",
+        "attemptsStarted",
+        "successTarget",
+        "attemptLimit",
+        "downloadRunId",
+        "activeRunId",
+        "registerRunIds",
+        "deferredDownloadRules",
+        "apkCount"
+      ]
+    },
+    "TaskPlanView": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "name": {
+          "type": "string"
+        },
+        "nodeId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "nodeName": {
+          "type": "string"
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "configId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "currentVersionId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "automatic": {
+          "type": "boolean"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "time": {
+          "type": "string"
+        },
+        "successTarget": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "attemptLimit": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "archivedAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "latestCycle": {
+          "anyOf": [
+            {
+              "$ref": "https://contracts.apk-platform.example/v1/v18.schema.json/TaskCycleView"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "readiness": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "section": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message",
+              "section"
+            ]
+          }
+        },
+        "nextRunAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "nodeId",
+        "nodeName",
+        "version",
+        "configId",
+        "currentVersionId",
+        "automatic",
+        "enabled",
+        "time",
+        "successTarget",
+        "attemptLimit",
+        "archivedAt",
+        "latestCycle",
+        "readiness",
+        "nextRunAt"
+      ]
+    },
+    "TaskPlanDetail": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "task": {
+          "$ref": "https://contracts.apk-platform.example/v1/v18.schema.json/TaskPlanView"
+        },
+        "configuration": {
+          "$ref": "https://contracts.apk-platform.example/v1/config.schema.json"
+        },
+        "cycles": {
+          "type": "array",
+          "items": {
+            "$ref": "https://contracts.apk-platform.example/v1/v18.schema.json/TaskCycleView"
+          }
+        }
+      },
+      "required": [
+        "task",
+        "configuration",
+        "cycles"
+      ]
+    },
+    "TaskPlanList": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "https://contracts.apk-platform.example/v1/v18.schema.json/TaskPlanView"
+          }
+        },
+        "nextCursor": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "items",
+        "nextCursor"
+      ]
+    },
+    "TaskPlanQuery": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cursor": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "limit": {
+          "type": "string",
+          "pattern": "^(?:[1-9]|[1-9][0-9]|100)$"
+        },
+        "archived": {
+          "enum": [
+            "ACTIVE",
+            "ARCHIVED",
+            "ALL"
+          ]
+        }
+      },
+      "required": []
+    },
+    "MaintenanceQuery": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "CONFIGURATION",
+            "CONFIG_VERSION",
+            "RELEASE"
+          ]
+        },
+        "configId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "archived": {
+          "enum": [
+            "ACTIVE",
+            "ARCHIVED",
+            "ALL"
+          ]
+        },
+        "cursor": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "limit": {
+          "type": "string",
+          "pattern": "^(?:[1-9]|[1-9][0-9]|100)$"
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "MaintenanceItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "archivedAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "references": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "label",
+              "count"
+            ]
+          }
+        },
+        "canDelete": {
+          "type": "boolean"
+        },
+        "canArchive": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "title",
+        "revision",
+        "archivedAt",
+        "references",
+        "canDelete",
+        "canArchive"
+      ]
+    },
+    "MaintenanceList": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "https://contracts.apk-platform.example/v1/v18.schema.json/MaintenanceItem"
+          }
+        },
+        "nextCursor": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "items",
+        "nextCursor"
+      ]
+    },
+    "MaintenanceInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "enum": [
+            "ARCHIVE",
+            "RESTORE",
+            "DELETE"
+          ]
+        },
+        "items": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "kind": {
+                "enum": [
+                  "CONFIGURATION",
+                  "CONFIG_VERSION",
+                  "RELEASE"
+                ]
+              },
+              "revision": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "required": [
+              "id",
+              "kind",
+              "revision"
+            ]
+          }
+        }
+      },
+      "required": [
+        "action",
+        "items"
+      ]
+    },
+    "MaintenanceResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "affected": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "affected"
+      ]
+    }
+  }
+}

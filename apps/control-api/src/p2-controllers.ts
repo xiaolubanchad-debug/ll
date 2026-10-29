@@ -41,6 +41,7 @@ export class P2Controller {
     return page(
       await this.db.configuration.findMany({
         ...args,
+        where: { archivedAt: null },
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         include: {
           versions: {
@@ -77,7 +78,7 @@ export class P2Controller {
     return page(
       await this.db.configVersion.findMany({
         ...args,
-        where: { configId: uuid(id) },
+        where: { configId: uuid(id), archivedAt: null },
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         select: { id: true, configId: true, version: true, configHash: true, createdAt: true },
       }),

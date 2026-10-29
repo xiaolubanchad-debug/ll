@@ -6,6 +6,7 @@ import { checked, readSecret } from './secrets.js';
 import { canonical, digest } from './security.js';
 import { idempotent } from './jobs.js';
 import { fault } from './errors.js';
+import { lockLibrary } from './library-lock.js';
 export function configBody(body: unknown): TestConfiguration {
   if (configurationIssues(body).length) fault('VALIDATION_FAILED', '测试配置不符合要求', 422);
   return body as TestConfiguration;
@@ -45,9 +46,11 @@ export async function saveConfiguration(
     key,
     { input, version },
     async (tx) => {
+      await lockLibrary(tx);
       await tx.$queryRaw`SELECT "id" FROM "Configuration" WHERE "id"=${id}::uuid FOR UPDATE`;
       const config = await tx.configuration.findUnique({ where: { id } });
       if (!config) fault('NOT_FOUND', '配置不存在', 404);
+      if (config.archivedAt) fault('VERSION_ARCHIVED', '方案已归档');
       if (config.version !== version) fault('STALE_VERSION', '配置已有新版本，请刷新');
       await configSecrets(tx, input);
       const saved = await tx.configVersion.create({

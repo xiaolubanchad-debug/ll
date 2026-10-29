@@ -4,6 +4,7 @@ import { configurationIssues, schemaIssues } from '@apk/contracts';
 import { api, mutation } from './api';
 import RegistrationFlowEditor from './RegistrationFlowEditor.vue';
 import AutomaticRegistrationEditor from './AutomaticRegistrationEditor.vue';
+import MaintenanceManager from './MaintenanceManager.vue';
 const props = defineProps<{ draftText: string }>();
 const emit = defineEmits<{ load: [value: string] }>();
 interface Config {
@@ -296,17 +297,10 @@ watch(
     ><el-button v-if="cursor" text @click="action(() => refresh(true))">加载更多配置</el-button>
     <template v-if="selected"
       ><h3>当前配置：{{ selected.name }}</h3>
-      <el-table :data="versions" empty-text="尚未保存版本"
-        ><el-table-column prop="version" label="版本" /><el-table-column label="摘要"
-          ><template #default="s"
-            ><span class="fingerprint">{{ s.row.configHash.slice(0, 16) }}</span></template
-          ></el-table-column
-        ><el-table-column label="操作"
-          ><template #default="s"
-            ><el-button text @click="load(s.row)">载入版本</el-button></template
-          ></el-table-column
-        ></el-table
-      ></template
-    >
+      <MaintenanceManager
+        :key="selected.id + ':' + selected.version"
+        :config-id="selected.id"
+        @choose-version="(id) => load({ id, version: 0, configHash: '', createdAt: '' })"
+    /></template>
   </div>
 </template>

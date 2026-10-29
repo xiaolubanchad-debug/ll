@@ -21,6 +21,22 @@ const agentCheck = ajv.compile(read('contracts/agent.schema.json'));
 const config = read('contracts/fixtures/config.valid.json');
 const messages = read('contracts/fixtures/agent.valid.json');
 let passed = 0;
+const v18 = read('contracts/fixtures/v18.valid.json');
+for (const [name, value] of [
+  ['TaskPlanInput', v18.task],
+  ['TaskControlInput', v18.control],
+  ['MaintenanceInput', v18.maintenance],
+])
+  test('1.8 valid ' + name, () => assert.deepEqual(schemaIssues(name, value), []));
+for (const [name, value] of [
+  ['TaskControlInput', { action: 'FORCE_RETRY' }],
+  ['TaskPlanInput', { ...v18.task, sshPassword: 'forbidden' }],
+  ['MaintenanceInput', { ...v18.maintenance, items: [] }],
+  ['MaintenanceInput', { action: 'DELETE', items: [{ ...v18.maintenance.items[0], revision: 0 }] }],
+  ['TaskPlanQuery', { limit: '101' }],
+  ['MaintenanceQuery', { kind: 'ANY_TABLE' }],
+])
+  test('1.8 rejects ' + name, () => assert.ok(schemaIssues(name, value).length));
 for (const [name, value] of Object.entries(read('contracts/fixtures/v17.valid.json')))
   test('1.7 valid ' + name, () => assert.deepEqual(schemaIssues(name, value), []));
 for (const [name, value] of [

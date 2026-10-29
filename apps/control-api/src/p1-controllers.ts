@@ -233,6 +233,7 @@ export class DeploymentController {
     return page(
       await this.db.release.findMany({
         ...args,
+        where: { archivedAt: null },
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         select: { id: true, manifest: true, createdAt: true },
       }),

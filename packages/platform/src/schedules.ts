@@ -6,6 +6,7 @@ import { lockNode } from './nodes.js';
 import { fault, PlatformError } from './errors.js';
 import { beijingDay, validateBudget } from './daily-plan.js';
 import { createRun, stopRun, RUN_END } from './runs.js';
+import { lockLibrary } from './library-lock.js';
 
 export async function saveSchedule(
   db: PrismaClient,
@@ -25,6 +26,7 @@ export async function saveSchedule(
     key,
     { input, id, version },
     async (tx) => {
+      await lockLibrary(tx);
       const node = await lockNode(tx, input.nodeId);
       const previous = await tx.dailySchedule.findUnique({
         where: id ? { id } : { nodeId: input.nodeId },
@@ -37,6 +39,15 @@ export async function saveSchedule(
       const config = await tx.configVersion.findUnique({ where: { id: input.configVersionId } });
       const release = await tx.release.findUnique({ where: { id: input.releaseId } });
       if (!config || !release) fault('NOT_FOUND', '配置或发布不存在', 404);
+      const container = await tx.configuration.findUniqueOrThrow({
+        where: { id: config.configId },
+      });
+      if (config.archivedAt || container.archivedAt) fault('VERSION_ARCHIVED', '方案或配置已归档');
+      if (
+        input.enabled &&
+        (await tx.managedTask.count({ where: { nodeId: input.nodeId, enabled: true } }))
+      )
+        fault('NODE_BUSY', '此服务器已有运行中的统一任务');
       if (!(release.manifest as { features?: string[] }).features?.includes('DAILY_V1'))
         fault('NODE_UPGRADE_REQUIRED', '计划需要支持 1.5 的固定发布');
       if (node.archivedAt) fault('NOT_FOUND', '服务器已归档', 404);

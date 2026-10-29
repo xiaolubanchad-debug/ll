@@ -56,3 +56,14 @@ export const reasonLabels: Record<string, string> = {
   FLOW_NOT_CONFIGURED: '尚未配置此 APK 的注册流程',
   REGISTRATION_REJECTED: 'APP 明确拒绝注册',
 };
+// Task-center orchestration reasons use the same plain-language labels as runs.
+Object.assign(reasonLabels, {
+  REVIEW_REQUIRED: '上次结果或清理情况需要核验，请查看执行详情',
+  LEGACY_PLAN_ENABLED: '旧每日计划仍开启，请先关闭后使用任务中心',
+  TASK_SCHEDULER_UNAVAILABLE: '后台暂未完成任务检查，将继续检查状态',
+  NEEDS_ADAPTATION: '请补充注册规则或开启自动识别',
+  VERSION_ARCHIVED: '所选配置已经归档，请先恢复',
+  TASK_CHANGED: '任务已更新，正在读取最新状态',
+  TASK_STOPPED: '任务已经停止',
+  NEW_ROUND_REQUIRED: '更换服务器后，请明确新增一轮',
+});

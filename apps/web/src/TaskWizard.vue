@@ -1,0 +1,351 @@
+<script setup lang="ts">
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import type { TaskPlanDetail, TaskPlanInput, TestConfiguration, NodeView } from '@apk/contracts';
+import { configurationIssues } from '@apk/contracts';
+import example from '../../../contracts/fixtures/config.valid.json';
+import { api, mutation } from './api';
+import RegistrationFlowEditor from './RegistrationFlowEditor.vue';
+import AutomaticRegistrationEditor from './AutomaticRegistrationEditor.vue';
+const props = defineProps<{ initial?: TaskPlanDetail; initialStep?: number }>(),
+  emit = defineEmits<{ saved: [id: string]; cancel: [] }>();
+const step = ref(props.initialStep ?? 1),
+  busy = ref(false),
+  error = ref(''),
+  name = ref(props.initial?.task.name ?? ''),
+  nodeId = ref(props.initial?.task.nodeId ?? ''),
+  proxyId = ref(props.initial?.configuration.execution.proxySecretVersionId ?? ''),
+  automatic = ref(props.initial?.task.automatic ?? false),
+  time = ref(props.initial?.task.time ?? '00:05'),
+  target = ref(props.initial?.task.successTarget ?? 10),
+  limit = ref(props.initial?.task.attemptLimit ?? 30),
+  importId = ref(props.initial?.task.configId ?? '');
+const source = ref(props.initial?.configuration.source.url ?? ''),
+  xpath = ref(props.initial?.configuration.source.xpath ?? example.source.xpath),
+  mode = ref<'FULL' | 'DOWNLOAD_ONLY'>(props.initial?.configuration.execution.mode ?? 'FULL'),
+  autoEntry = ref(
+    props.initial?.configuration.execution.autoRegistration?.enabled ??
+      !props.initial?.configuration.registrationFlows.some((f) => f.enabled),
+  );
+const base = ref<TestConfiguration>(
+  props.initial?.configuration ??
+    ({ ...structuredClone(example), registrationFlows: [] } as TestConfiguration),
+);
+const nodes = ref<NodeView[]>([]),
+  proxies = ref<{ id: string; name: string | null; type: string; revokedAt: string | null }[]>([]),
+  configs = ref<{ id: string; name: string }[]>([]);
+const proxyName = ref(''),
+  host = ref(''),
+  port = ref(10000),
+  user = ref(''),
+  password = ref('');
+watch(target, (value, previous) => {
+  if (limit.value === previous * 3) limit.value = Math.min(1000, value * 3);
+});
+const draft = computed(() => {
+  const v = JSON.parse(JSON.stringify(base.value)) as TestConfiguration;
+  v.name = name.value || 'APK 测试任务';
+  v.source = { ...v.source, url: source.value, xpath: xpath.value };
+  v.execution.mode = mode.value;
+  if (mode.value === 'FULL') {
+    v.execution.proxySecretVersionId = proxyId.value;
+    if (autoEntry.value)
+      v.execution.autoRegistration = {
+        screenshotFallback: true,
+        maxNavigationSteps: 8,
+        timeoutMs: 60000,
+        successTimeoutMs: 60000,
+        ...v.execution.autoRegistration,
+        enabled: true,
+      };
+    else delete v.execution.autoRegistration;
+  } else {
+    delete v.execution.proxySecretVersionId;
+    delete v.execution.autoRegistration;
+  }
+  return JSON.stringify(v, null, 2);
+});
+const raw = ref('');
+async function all<T>(path: string): Promise<T[]> {
+  let cursor: string | null = null;
+  const result: T[] = [];
+  do {
+    const p: { items: T[]; nextCursor: string | null } = await api(
+      path + '?limit=100' + (cursor ? '&cursor=' + cursor : ''),
+    );
+    result.push(...p.items);
+    cursor = p.nextCursor;
+  } while (cursor);
+  return result;
+}
+async function choices() {
+  [nodes.value, proxies.value, configs.value] = await Promise.all([
+    all<NodeView>('/nodes'),
+    all<{ id: string; name: string | null; type: string; revokedAt: string | null }>('/secrets'),
+    all<{ id: string; name: string }>('/configs'),
+  ]);
+  proxies.value = proxies.value.filter((p) => p.type === 'HTTP_PROXY' && !p.revokedAt);
+  const online = nodes.value.filter(
+    (n) => n.connection === 'ONLINE' && n.deploymentStatus === 'INSTALLED',
+  );
+  if (!nodeId.value && online.length === 1) nodeId.value = online[0].id;
+  if (!proxyId.value && proxies.value.length === 1) proxyId.value = proxies.value[0].id;
+}
+function apply(value: string) {
+  try {
+    const c = JSON.parse(value) as TestConfiguration;
+    if (configurationIssues(c).length) throw Error('高级配置有误，请检查后应用');
+    base.value = c;
+    source.value = c.source.url;
+    xpath.value = c.source.xpath;
+    proxyId.value = c.execution.proxySecretVersionId ?? '';
+    mode.value = c.execution.mode;
+    autoEntry.value = c.execution.autoRegistration?.enabled === true;
+    error.value = '';
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : '配置无效';
+  }
+}
+async function work(fn: () => Promise<void>) {
+  busy.value = true;
+  error.value = '';
+  try {
+    await fn();
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : '操作失败';
+  } finally {
+    busy.value = false;
+  }
+}
+async function importConfig() {
+  if (!importId.value) return;
+  await work(async () => {
+    const p = await api<{ items: { id: string }[] }>(
+      '/configs/' + importId.value + '/versions?limit=1',
+    );
+    if (!p.items[0]) throw Error('此方案还没有保存配置');
+    const v = await api<{ body: TestConfiguration }>(
+      '/configs/' + importId.value + '/versions/' + p.items[0].id,
+    );
+    apply(JSON.stringify(v.body));
+    if (
+      v.body.execution.autoRegistration === undefined &&
+      !v.body.registrationFlows.some((f) => f.enabled)
+    )
+      autoEntry.value = true;
+    name.value = configs.value.find((c) => c.id === importId.value)?.name ?? v.body.name;
+  });
+}
+async function saveProxy() {
+  await work(async () => {
+    const saved = await api<{ id: string }>('/secrets/versions', 'POST', {
+      type: 'HTTP_PROXY',
+      ...(proxyName.value ? { name: proxyName.value } : {}),
+      secretValue: {
+        host: host.value,
+        port: port.value,
+        username: user.value,
+        password: password.value,
+      },
+    });
+    user.value = '';
+    password.value = '';
+    await choices();
+    proxyId.value = saved.id;
+  });
+}
+function next() {
+  error.value = '';
+  if (
+    step.value === 1 &&
+    (!name.value.trim() || !/^https?:\/\//.test(source.value) || !xpath.value.trim())
+  ) {
+    error.value = '请填写任务名称、有效网站地址和 XPath';
+    return;
+  }
+  if (step.value === 2 && (!nodeId.value || (mode.value === 'FULL' && !proxyId.value))) {
+    error.value = '请选择服务器及注册代理';
+    return;
+  }
+  step.value++;
+}
+async function save() {
+  await work(async () => {
+    const c = JSON.parse(draft.value) as TestConfiguration;
+    const issues = configurationIssues(c);
+    if (issues.length)
+      throw Error('配置需要修正：' + issues.map((i) => i.path + ' ' + i.message).join('；'));
+    if (
+      !Number.isInteger(target.value) ||
+      !Number.isInteger(limit.value) ||
+      limit.value < target.value
+    )
+      throw Error('尝试上限需不小于成功目标');
+    const input: TaskPlanInput = {
+      name: name.value.trim(),
+      nodeId: nodeId.value,
+      ...(importId.value ? { configId: importId.value } : {}),
+      configuration: c,
+      automatic: automatic.value,
+      time: time.value,
+      successTarget: target.value,
+      attemptLimit: limit.value,
+    };
+    const task = await mutation<{ id: string }>(
+      props.initial ? '/task-plans/' + props.initial.task.id : '/task-plans',
+      input,
+      props.initial ? { 'If-Match': String(props.initial.task.version) } : {},
+      props.initial ? 'PUT' : 'POST',
+    );
+    emit('saved', task.id);
+  });
+}
+onMounted(() => void work(choices));
+onUnmounted(() => {
+  user.value = '';
+  password.value = '';
+});
+</script>
+<template>
+  <section class="surface task-wizard">
+    <div class="section-heading">
+      <div>
+        <span class="phase-tag">第 {{ step }} / 3 步</span>
+        <h2>{{ initial ? '编辑任务' : '新建任务' }}</h2>
+      </div>
+      <el-button :disabled="busy" @click="emit('cancel')">取消</el-button>
+    </div>
+    <ol class="wizard-progress">
+      <li :class="{ active: step === 1 }">1 网站来源</li>
+      <li :class="{ active: step === 2 }">2 执行环境</li>
+      <li :class="{ active: step === 3 }">3 执行目标</li>
+    </ol>
+    <el-alert v-if="error" :title="error" type="error" :closable="false" />
+    <fieldset :disabled="busy" class="wizard-fields">
+      <template v-if="step === 1">
+        <details v-if="!initial">
+          <summary>从已有方案接入（可选）</summary>
+          <label for="task-import">已有方案</label
+          ><select id="task-import" v-model="importId" @change="importConfig">
+            <option value="">新建独立任务</option>
+            <option v-for="c in configs" :key="c.id" :value="c.id">{{ c.name }}</option>
+          </select>
+          <p class="muted">接入保留原历史，不会启动旧计划。</p>
+        </details>
+        <label for="task-name">任务名称</label
+        ><input
+          id="task-name"
+          v-model="name"
+          maxlength="100"
+          placeholder="例如：每日 APP 注册测试"
+        />
+        <label for="task-url">网站 URL</label
+        ><input id="task-url" v-model="source" placeholder="https://example.com/" />
+        <label for="task-xpath">图标 XPath</label
+        ><textarea id="task-xpath" v-model="xpath" rows="3" />
+        <p class="muted">
+          执行时依次处理匹配的全部图标，支持直接下载、落地页下载及自动下载。保存不会访问网站。
+        </p>
+      </template>
+      <template v-else-if="step === 2">
+        <label for="task-node">执行服务器</label
+        ><select id="task-node" v-model="nodeId">
+          <option value="">请选择服务器</option>
+          <option v-for="n in nodes" :key="n.id" :value="n.id">
+            {{ n.name }} · {{ n.connection === 'ONLINE' ? '在线' : '离线' }}
+          </option>
+        </select>
+        <label for="task-mode">执行内容</label
+        ><select id="task-mode" v-model="mode">
+          <option value="FULL">下载 APK 并注册</option>
+          <option value="DOWNLOAD_ONLY">只下载 APK</option>
+        </select>
+        <template v-if="mode === 'FULL'"
+          ><label for="task-proxy">注册代理</label
+          ><select id="task-proxy" v-model="proxyId">
+            <option value="">请选择已保存代理</option>
+            <option v-for="p in proxies" :key="p.id" :value="p.id">
+              {{ p.name ?? '历史代理 ' + p.id.slice(0, 8) }}
+            </option>
+          </select>
+          <details>
+            <summary>新增代理</summary>
+            <label for="task-proxy-name">代理名称</label
+            ><input id="task-proxy-name" v-model="proxyName" />
+            <div class="filter-grid">
+              <label>地址<input v-model="host" placeholder="res.proxy-seller.com" /></label
+              ><label>端口<input v-model.number="port" type="number" min="1" max="65535" /></label
+              ><label>认证用户名<input v-model="user" autocomplete="off" /></label
+              ><label
+                >认证密码<input v-model="password" type="password" autocomplete="new-password"
+              /></label>
+            </div>
+            <el-button @click="saveProxy">保存代理并选中</el-button>
+          </details>
+          <label class="inline-check"
+            ><input v-model="autoEntry" type="checkbox" />自动寻找各 APP 的注册入口</label
+          >
+          <p class="muted">
+            无法可靠识别的 APP 会提示待适配，可查看截图并补充规则。注册前自动检查代理。
+          </p></template
+        >
+      </template>
+      <template v-else>
+        <div v-if="mode === 'FULL'" class="filter-grid">
+          <label for="task-target"
+            >所有 APK 合计成功账户数<input
+              id="task-target"
+              v-model.number="target"
+              type="number"
+              min="1"
+              max="1000" /></label
+          ><label for="task-limit"
+            >总尝试上限<input
+              id="task-limit"
+              v-model.number="limit"
+              type="number"
+              :min="target"
+              max="1000"
+          /></label>
+        </div>
+        <p v-if="mode === 'DOWNLOAD_ONLY'" class="muted">本任务只下载 APK，不创建注册账户。</p>
+        <label class="inline-check"
+          ><input v-model="automatic" type="checkbox" />开始后每天自动执行</label
+        ><label v-if="automatic" for="task-time"
+          >每天执行时间（北京时间）<input id="task-time" v-model="time" type="time"
+        /></label>
+        <div class="selection-summary">
+          {{ name }} · {{ nodes.find((n) => n.id === nodeId)?.name }} ·
+          {{ mode === 'FULL' ? '下载并注册' : '只下载' }}
+          <p>
+            <span v-if="mode === 'FULL'">成功目标 {{ target }}，最多尝试 {{ limit }} 次。</span
+            >{{
+              automatic
+                ? '开始后立即执行，并在每天 ' + time + ' 自动执行。'
+                : '仅在点击开始后执行本轮。'
+            }}
+          </p>
+          <small>用户名、密码自动生成；网页和 APP 使用手机屏幕。保存后请在任务卡片点击开始。</small>
+        </div>
+        <details class="advanced-settings" :open="initialStep === 3">
+          <summary @click="raw = draft">高级设置与手工注册规则</summary>
+          <AutomaticRegistrationEditor :draft-text="draft" @load="apply" /><RegistrationFlowEditor
+            :draft-text="draft"
+            @load="apply"
+          /><label for="task-json">完整配置 JSON</label
+          ><textarea id="task-json" v-model="raw" class="json-editor" /><el-button
+            @click="apply(raw)"
+            >应用高级配置</el-button
+          >
+        </details>
+        <p v-if="initial" class="muted">
+          保存不影响正在执行的批次；停止并确认清理后，剩余尝试可采用新注册配置。原轮次额度保持，下载规则修改次日生效。
+        </p>
+      </template>
+    </fieldset>
+    <div class="form-actions">
+      <el-button v-if="step > 1" :disabled="busy" @click="step--">上一步</el-button
+      ><el-button v-if="step < 3" type="primary" :disabled="busy" @click="next">下一步</el-button
+      ><el-button v-else type="primary" :loading="busy" @click="save">保存任务</el-button>
+    </div>
+  </section>
+</template>

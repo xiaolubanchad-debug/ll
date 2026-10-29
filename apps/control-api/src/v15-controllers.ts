@@ -12,7 +12,14 @@ import {
   Injectable,
 } from '@nestjs/common';
 import type { OnModuleInit, OnModuleDestroy } from '@nestjs/common';
-import { saveSchedule, tickSchedules, expireRuns, keyRequired, ifMatch } from '@apk/platform';
+import {
+  saveSchedule,
+  tickSchedules,
+  tickTaskPlans,
+  expireRuns,
+  keyRequired,
+  ifMatch,
+} from '@apk/platform';
 import { Database } from './database.js';
 import type { AuthedRequest } from './auth.js';
 import { uuid } from './p1-controllers.js';
@@ -81,6 +88,7 @@ export class DailyScheduler implements OnModuleInit, OnModuleDestroy {
       if (!this.running)
         this.running = expireRuns(this.db)
           .then(() => tickSchedules(this.db))
+          .then(() => tickTaskPlans(this.db))
           .catch(() => {
             console.error('每日计划检查暂未完成');
           })

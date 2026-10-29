@@ -1,5 +1,7 @@
 # APK 自动化测试部署中台
 
+1.8 提供任务中心、三步配置、统一开始停止和历史版本管理，操作见 [1.8 说明](docs/V18_SETUP.md)，规则见 [1.8 契约](docs/V18_CONTRACT.md)。兼容现有 Agent 0.6.0。
+
 超级管理员在中台添加 EC2 服务器，通过 SSH 部署执行程序，统一配置网站、XPath、HTTP 代理和注册步骤。EC2 主动领取任务，执行 APK 下载、安卓安装和注册测试，再回传结果。
 
 采用 Node.js + TypeScript 统一实现中台和执行端。中台可部署在现有 Hostinger Ubuntu 服务器；Android 模拟器运行在通过 KVM 检查的 EC2 节点。
@@ -18,32 +20,32 @@
 
 ## 文档入口
 
-| 文档                                              | 内容                                         |
-| ------------------------------------------------- | -------------------------------------------- |
-| [实施方案](docs/PLAN.md)                          | 产品范围、技术栈、模块职责和部署结构         |
-| [开发契约](docs/DEVELOPMENT_CONTRACT.md)          | 状态机、任务协议、幂等、停止和恢复规则       |
-| [接口契约](contracts/HTTP_API.md)                 | 管理端和节点 API、权限、错误和事件格式       |
-| [配置 Schema](contracts/config.schema.json)       | 不包含明文凭据的配置版本结构                 |
-| [节点协议 Schema](contracts/agent.schema.json)    | 节点注册、心跳、领取、接收和结果事件         |
-| [部署与凭据规则](docs/DEPLOYMENT_AND_SECURITY.md) | SSH、密钥、发布、网络和运维规则              |
-| [开发阶段和验收](docs/ROADMAP.md)                 | 实施顺序、验收场景和交付证据                 |
-| [架构决策](docs/DECISIONS.md)                     | 已确定选择及其变更条件                       |
-| [P0 启动与验证](docs/P0_SETUP.md)                 | 本地启动、管理员初始化、测试和边界           |
-| [P1 部署与验证](docs/P1_SETUP.md)                 | Linux Worker、发布构件、服务器接入及故障恢复 |
-| [P1 增量契约](docs/P1_CONTRACT.md)                | 部署占用、身份注册、主机核验和重试规则       |
-| [P2 配置与下载](docs/P2_SETUP.md)                 | 升级、配置版本、下载任务、缓存与故障恢复     |
-| [P2 增量契约](docs/P2_CONTRACT.md)                | 领取、租约、事件、每日缓存和网络约束         |
-| [P3 安装注册](docs/P3_SETUP.md)                   | 代理、注册流程、结果证据与验证边界           |
-| [P3 增量契约](docs/P3_CONTRACT.md)                | 唯一提交、未知结果、账户与截图保护           |
-| [手机屏幕契约](docs/MOBILE_SCREEN_CONTRACT.md)   | 网页与落地页使用手机布局、竖屏和触屏操作     |
-| [下载与注册需求](docs/DAILY_DOWNLOAD_AND_REGISTRATION_REQUIREMENTS.md) | 用户确认的每日 00:05、成功目标与尝试上限 |
-| [1.5 执行契约](docs/V15_CONTRACT.md) | 每日下载、缓存资产、配额、跨日与关闭规则 |
-| [1.5 使用与验证](docs/V15_SETUP.md) | 新版部署、代理检查、循环注册及每日计划 |
-| [1.6 入口识别契约](docs/V16_CONTRACT.md) | 自动导航、原生表单、结果证明与路径学习 |
-| [1.6 使用与验证](docs/V16_SETUP.md) | 开启自动识别、发布升级及适配边界 |
-| [1.7 结果与日志](docs/V17_SETUP.md) | 统计、注册记录、执行时间线及新版操作流程 |
-| [1.7 增量契约](docs/V17_CONTRACT.md) | 查询边界、历史回填、日志与隐私规则 |
-| [契约样例](contracts/README.md)                   | 正反例与检查方式                             |
+| 文档                                                                   | 内容                                         |
+| ---------------------------------------------------------------------- | -------------------------------------------- |
+| [实施方案](docs/PLAN.md)                                               | 产品范围、技术栈、模块职责和部署结构         |
+| [开发契约](docs/DEVELOPMENT_CONTRACT.md)                               | 状态机、任务协议、幂等、停止和恢复规则       |
+| [接口契约](contracts/HTTP_API.md)                                      | 管理端和节点 API、权限、错误和事件格式       |
+| [配置 Schema](contracts/config.schema.json)                            | 不包含明文凭据的配置版本结构                 |
+| [节点协议 Schema](contracts/agent.schema.json)                         | 节点注册、心跳、领取、接收和结果事件         |
+| [部署与凭据规则](docs/DEPLOYMENT_AND_SECURITY.md)                      | SSH、密钥、发布、网络和运维规则              |
+| [开发阶段和验收](docs/ROADMAP.md)                                      | 实施顺序、验收场景和交付证据                 |
+| [架构决策](docs/DECISIONS.md)                                          | 已确定选择及其变更条件                       |
+| [P0 启动与验证](docs/P0_SETUP.md)                                      | 本地启动、管理员初始化、测试和边界           |
+| [P1 部署与验证](docs/P1_SETUP.md)                                      | Linux Worker、发布构件、服务器接入及故障恢复 |
+| [P1 增量契约](docs/P1_CONTRACT.md)                                     | 部署占用、身份注册、主机核验和重试规则       |
+| [P2 配置与下载](docs/P2_SETUP.md)                                      | 升级、配置版本、下载任务、缓存与故障恢复     |
+| [P2 增量契约](docs/P2_CONTRACT.md)                                     | 领取、租约、事件、每日缓存和网络约束         |
+| [P3 安装注册](docs/P3_SETUP.md)                                        | 代理、注册流程、结果证据与验证边界           |
+| [P3 增量契约](docs/P3_CONTRACT.md)                                     | 唯一提交、未知结果、账户与截图保护           |
+| [手机屏幕契约](docs/MOBILE_SCREEN_CONTRACT.md)                         | 网页与落地页使用手机布局、竖屏和触屏操作     |
+| [下载与注册需求](docs/DAILY_DOWNLOAD_AND_REGISTRATION_REQUIREMENTS.md) | 用户确认的每日 00:05、成功目标与尝试上限     |
+| [1.5 执行契约](docs/V15_CONTRACT.md)                                   | 每日下载、缓存资产、配额、跨日与关闭规则     |
+| [1.5 使用与验证](docs/V15_SETUP.md)                                    | 新版部署、代理检查、循环注册及每日计划       |
+| [1.6 入口识别契约](docs/V16_CONTRACT.md)                               | 自动导航、原生表单、结果证明与路径学习       |
+| [1.6 使用与验证](docs/V16_SETUP.md)                                    | 开启自动识别、发布升级及适配边界             |
+| [1.7 结果与日志](docs/V17_SETUP.md)                                    | 统计、注册记录、执行时间线及新版操作流程     |
+| [1.7 增量契约](docs/V17_CONTRACT.md)                                   | 查询边界、历史回填、日志与隐私规则           |
+| [契约样例](contracts/README.md)                                        | 正反例与检查方式                             |
 
 执行节点兼容 Ubuntu 24.04 / 26.04 LTS x86_64。Agent 0.4.1 在完整安装注册基础上，将网页、落地页及下载统一为手机竖屏和触屏模式；旧版本必须升级签名发布后才能使用这项默认行为。0.3.x 继续支持旧下载模式；版本沿革见 [兼容契约](docs/UBUNTU_COMPATIBILITY.md)，安装修复见 [驱动权限契约](docs/APPIUM_INSTALL_FIX.md) 和 [SDK 布局契约](docs/ANDROID_SDK_LAYOUT.md)。
 

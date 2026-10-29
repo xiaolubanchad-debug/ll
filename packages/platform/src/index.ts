@@ -11,4 +11,6 @@ export * from './releases.js';
 export * from './agent-auth.js';
 export * from './registration.js';
 export * from './console.js';
+export * from './task-plans.js';
+export * from './maintenance.js';
 export { saveSchedule, tickSchedules } from './schedules.js';

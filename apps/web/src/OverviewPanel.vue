@@ -80,12 +80,12 @@ onUnmounted(() => clearInterval(timer));
               {{ data.servers.busy }} 台 · 隔离待核验 {{ data.servers.quarantined }} 台
             </p>
           </div>
-          <el-button @click="navigate('runs')">创建执行</el-button>
+          <el-button @click="navigate('tasks')">进入任务中心</el-button>
         </div>
         <div v-if="!data.activeRuns.length" class="empty-state">
           <h3>当前没有执行中的批次</h3>
-          <p>保存任务方案后，先下载当天 APK，再开始注册或开启每日计划。</p>
-          <el-button @click="navigate('config')">配置任务方案</el-button>
+          <p>在任务中心配置一次，点击开始后自动关联下载和注册。</p>
+          <el-button @click="navigate('tasks', '', { new: 'true' })">新建测试任务</el-button>
         </div>
         <div v-for="run in data.activeRuns" :key="run.id" class="execution-row">
           <div>

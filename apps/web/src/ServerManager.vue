@@ -3,6 +3,7 @@ import { ref, onMounted, onUnmounted, reactive } from 'vue';
 import { schemaIssues } from '@apk/contracts';
 import type { NodeView, NodeInput, ReleaseInput } from '@apk/contracts';
 import { api } from './api';
+import MaintenanceManager from './MaintenanceManager.vue';
 const emit = defineEmits<{ changed: [] }>();
 interface Operation {
   id: string;
@@ -98,6 +99,13 @@ async function refresh(append = false) {
   nodes.value = append ? [...nodes.value, ...page.items] : page.items;
   more.value = page.nextCursor;
   releases.value = (await api<{ items: ReleaseRow[] }>('/releases')).items;
+  releases.value.sort(
+    (a, b) =>
+      (b.manifest.features?.length ?? 0) - (a.manifest.features?.length ?? 0) ||
+      b.manifest.agentVersion.localeCompare(a.manifest.agentVersion, 'en', { numeric: true }),
+  );
+  if (!releases.value.some((r) => r.id === releaseId.value))
+    releaseId.value = releases.value[0]?.id ?? '';
   if (selected.value) {
     selected.value = await api<NodeView>('/nodes/' + selected.value.id);
     operations.value = (
@@ -572,6 +580,10 @@ onUnmounted(() => {
         </div>
       </section>
     </template>
+    <details class="surface">
+      <summary>历史程序版本：归档、恢复与删除</summary>
+      <MaintenanceManager />
+    </details>
     <section class="surface">
       <details>
         <summary>登记签名发布版本</summary>
