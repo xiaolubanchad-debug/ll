@@ -786,7 +786,7 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
         assert.ok(!eventText.includes(row.data.password));
         if (process.platform !== 'win32')
           assert.equal(
-            (await lstat(join(process.env.ARTIFACT_DIR, art.id + '.png'))).mode & 0o777,
+            (await lstat(join(process.env.ARTIFACT_DIR, art.id + '.json'))).mode & 0o777,
             0o600,
           );
       },
