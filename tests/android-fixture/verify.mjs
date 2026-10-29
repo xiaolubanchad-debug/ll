@@ -13,13 +13,18 @@ import {
   cacheDay,
   startAndroid,
   readRegistrationPage,
+  obstructionRegions,
+  closeIcon,
+  screenshotPixels,
 } from '@apk/automation';
 import { openAgentStore } from '../../apps/agent/src/store.js';
 process.umask(0o077);
+process.env.HOME = '/var/lib/apk-platform/home';
 const root = resolve(process.argv[2]),
   config = JSON.parse(await readFile('/var/lib/apk-platform/agent-config.json', 'utf8'));
+const v111 = process.argv[3] === '--v111';
 const v192 = ['--v192', '--v110'].includes(process.argv[3]);
-const automatic = process.argv[3] === '--auto' || v192;
+const automatic = process.argv[3] === '--auto' || v192 || v111;
 assert.match(
   root,
   automatic
@@ -164,26 +169,28 @@ const policy = new NetworkPolicy(
 );
 const outcomes = [];
 try {
-  const cases = v192
-    ? [
-        ['epsilon', 'SUCCESS', 'SUCCEEDED'],
-        ['zeta', 'GUEST', 'SKIPPED'],
-        ['eta', 'DIRECTORY', 'SKIPPED'],
-      ]
-    : automatic
+  const cases = v111
+    ? [['theta', 'SUCCESS', 'SUCCEEDED']]
+    : v192
       ? [
-          ['gamma', 'SUCCESS', 'SUCCEEDED'],
-          ['gamma', 'SUCCESS', 'SUCCEEDED'],
-          ['delta', 'SUCCESS', 'SUCCEEDED'],
-          ['gamma', 'TIMEOUT', 'UNKNOWN'],
+          ['epsilon', 'SUCCESS', 'SUCCEEDED'],
+          ['zeta', 'GUEST', 'SKIPPED'],
+          ['eta', 'DIRECTORY', 'SKIPPED'],
         ]
-      : [
-          ['alpha', 'SUCCESS', 'SUCCEEDED'],
-          ['beta', 'SUCCESS', 'SUCCEEDED'],
-          ['alpha', 'REJECT', 'FAILED'],
-          ['alpha', 'TIMEOUT', 'UNKNOWN'],
-          ['alpha', 'CHANGED', 'FAILED'],
-        ];
+      : automatic
+        ? [
+            ['gamma', 'SUCCESS', 'SUCCEEDED'],
+            ['gamma', 'SUCCESS', 'SUCCEEDED'],
+            ['delta', 'SUCCESS', 'SUCCEEDED'],
+            ['gamma', 'TIMEOUT', 'UNKNOWN'],
+          ]
+        : [
+            ['alpha', 'SUCCESS', 'SUCCEEDED'],
+            ['beta', 'SUCCESS', 'SUCCEEDED'],
+            ['alpha', 'REJECT', 'FAILED'],
+            ['alpha', 'TIMEOUT', 'UNKNOWN'],
+            ['alpha', 'CHANGED', 'FAILED'],
+          ];
   for (const [caseIndex, [variant, behavior, expected]] of cases.entries()) {
     if (abort.signal.aborted) throw Error('OWNED_VERIFICATION_STOPPED');
     if (automatic && caseIndex === 1) {
@@ -194,6 +201,7 @@ try {
     mode = behavior;
     let accountCalls = 0,
       intentCalls = 0;
+    const startupNotes = [];
     const before = requests,
       taskId = randomUUID(),
       d = { deliveryId: randomUUID(), runId: randomUUID(), nodeId: config.nodeId, fence: 1 };
@@ -263,6 +271,7 @@ try {
         maxNavigationSteps: 8,
         timeoutMs: 90000,
         successTimeoutMs: behavior === 'TIMEOUT' ? 3000 : 60000,
+        ...(v111 ? { startup: { confirmationTimeoutMs: 5000 } } : {}),
       };
       testConfig.registrationFlows = [];
     }
@@ -276,6 +285,7 @@ try {
       abort.signal,
       async (event) => {
         store.append(d, event);
+        if (event.type === 'APP_OBSTRUCTION') startupNotes.push(event.payload);
         console.log(JSON.stringify({ case: currentCase, stage: event.payload.stage }));
       },
       {
@@ -297,8 +307,61 @@ try {
               },
               androidFactory: async (...args) => {
                 const session = await startAndroid(...args);
+                let inspectedIcon = false;
+                const inspectedNative = new Set();
                 return {
                   ...session,
+                  rect: async (id) => {
+                    const rect = await session.rect(id);
+                    if (v111)
+                      console.log(JSON.stringify({ case: currentCase, ownedActionRect: rect }));
+                    return rect;
+                  },
+                  source: async (signal) => {
+                    const source = await session.source(signal);
+                    if (v111 && !inspectedIcon) {
+                      const page = readRegistrationPage(source, pkg);
+                      for (const kind of ['skip_ad', 'notice_ack']) {
+                        const native = page.controls.find((c) =>
+                          c.resourceId.endsWith(':id/' + kind),
+                        );
+                        if (native && !inspectedNative.has(kind)) {
+                          inspectedNative.add(kind);
+                          console.log(
+                            JSON.stringify({
+                              case: currentCase,
+                              ownedSourceRect: { kind, rect: native.rect },
+                            }),
+                          );
+                        }
+                      }
+                      const target = page.controls.find((c) =>
+                        c.resourceId.endsWith(':id/graphic_target'),
+                      );
+                      if (target) {
+                        inspectedIcon = true;
+                        console.log(
+                          JSON.stringify({
+                            case: currentCase,
+                            ownedIconProbe: {
+                              className: target.className,
+                              rect: target.rect,
+                              clickable: target.clickable,
+                              ownClickable: target.ownClickable,
+                              enabled: target.enabled,
+                              labelled: !!(target.text || target.description),
+                              scopes: obstructionRegions(page),
+                              validGlyph: closeIcon(
+                                screenshotPixels(await session.screenshot(signal)),
+                                target.rect,
+                              ),
+                            },
+                          }),
+                        );
+                      }
+                    }
+                    return source;
+                  },
                   submit: async (...values) => {
                     const started = Date.now();
                     try {
@@ -394,8 +457,17 @@ try {
       { mode: 0o600 },
     );
     console.log(JSON.stringify(resultRecord));
+    if (v111) console.log(JSON.stringify({ case: currentCase, startupNotes }));
     assert.equal(result.cleanupComplete, true);
     assert.equal(result.status, expected);
+    if (v111) {
+      assert.deepEqual(
+        startupNotes.filter((n) => n.phase === 'ACTION_SENT').map((n) => n.action),
+        ['SKIP_AD', 'ACK_NOTICE', 'CLOSE_POPUP'],
+      );
+      assert.equal(startupNotes.filter((n) => n.phase === 'CLEARED').length, 3);
+      assert.ok(startupNotes.some((n) => n.method === 'ICON' && n.phase === 'CLEARED'));
+    }
     if (automatic) {
       assert.ok(result.recognition);
       assert.equal(result.recognition.learned, expected === 'SUCCEEDED');

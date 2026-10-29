@@ -11,6 +11,7 @@ import {
   schemaIssues,
   registrationFlowFor,
   contentIsolationSupported,
+  appReadinessSupported,
 } from '@apk/contracts';
 import { readFunctionalArtifact } from './functional-artifacts.js';
 import { checked, readSecret } from './secrets.js';
@@ -237,6 +238,11 @@ export async function createRun(
       fault('NODE_UPGRADE_REQUIRED', '请部署支持下载任务的 Agent 版本');
     const configuration = config.body as unknown as TestConfiguration;
     if (
+      configuration.execution.autoRegistration?.startup &&
+      !appReadinessSupported(manifest?.features, node.agentVersion)
+    )
+      fault('NODE_UPGRADE_REQUIRED', '启动准备设置需要 Agent 0.9.0');
+    if (
       (input.purpose ||
         configuration.registrationFlows.some(
           (f) =>
@@ -251,15 +257,24 @@ export async function createRun(
           (r) => r.mode !== undefined || r.autoWaitMs !== undefined,
         )) &&
       (!manifest?.features?.includes('DAILY_V1') ||
-        !['0.5.0', '0.5.1', '0.6.0', '0.6.1', '0.7.0', '0.7.1', '0.7.2', '0.8.0', '0.8.1'].includes(
-          node.agentVersion ?? '',
-        ))
+        ![
+          '0.5.0',
+          '0.5.1',
+          '0.6.0',
+          '0.6.1',
+          '0.7.0',
+          '0.7.1',
+          '0.7.2',
+          '0.8.0',
+          '0.8.1',
+          '0.9.0',
+        ].includes(node.agentVersion ?? ''))
     )
       fault('NODE_UPGRADE_REQUIRED', '请部署支持每日下载与循环注册的 Agent');
     if (
       configuration.execution.autoRegistration !== undefined &&
       (!manifest?.features?.includes('AUTO_REGISTRATION_V1') ||
-        !['0.6.0', '0.6.1', '0.7.0', '0.7.1', '0.7.2', '0.8.0', '0.8.1'].includes(
+        !['0.6.0', '0.6.1', '0.7.0', '0.7.1', '0.7.2', '0.8.0', '0.8.1', '0.9.0'].includes(
           node.agentVersion ?? '',
         ))
     )
@@ -416,6 +431,17 @@ async function assertIsolatedRun(tx: Tx, run: Run) {
     )
   )
     fault('NODE_UPGRADE_REQUIRED', '注册任务需要默认内容隔离的 Agent 0.8.0');
+  const config = run.configVersionId
+    ? await tx.configVersion.findUnique({ where: { id: run.configVersionId } })
+    : null;
+  if (
+    (config?.body as unknown as TestConfiguration)?.execution.autoRegistration?.startup &&
+    !appReadinessSupported(
+      (release?.manifest as { features?: string[] } | null)?.features,
+      node.agentVersion,
+    )
+  )
+    fault('NODE_UPGRADE_REQUIRED', '启动准备设置需要 Agent 0.9.0');
 }
 function authorized(d: Delivery & { run: Run }) {
   if (
@@ -569,6 +595,40 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
         (!full || !['LAUNCHING', 'DISCOVERING', 'REGISTERING'].includes(task.status))
       )
         fault('EVENT_CONFLICT', '当前阶段不能处理 APP 弹窗');
+      if (event.type === 'APP_OBSTRUCTION' && p.phase) {
+        const prior = await tx.runEvent.findMany({
+          where: {
+            delivery: { runId },
+            sequence: { lt: event.sequence },
+            recordedForReview: false,
+            body: { path: ['taskId'], equals: event.taskId },
+          },
+          orderBy: { sequence: 'desc' },
+          take: 200,
+        });
+        const matching = prior
+          .map((row) => row.body as { type?: string; payload?: Record<string, unknown> })
+          .filter(
+            (e) =>
+              e.type === 'APP_OBSTRUCTION' &&
+              e.payload?.index === p.index &&
+              e.payload?.action === p.action &&
+              e.payload?.method === p.method,
+          )
+          .map((e) => e.payload!.phase);
+        const sent = matching.includes('ACTION_SENT'),
+          detected = matching.includes('DETECTED');
+        const terminal = matching.some((phase) => phase === 'CLEARED' || phase === 'UNCHANGED');
+        if (
+          terminal ||
+          (p.phase === 'ACTION_SENT' && (!detected || sent)) ||
+          (['CLEARED', 'UNCHANGED'].includes(String(p.phase)) && (!sent || terminal)) ||
+          (p.phase === 'WAITING' && p.action !== 'WAIT_SPLASH' && !sent) ||
+          (p.phase === 'UNVERIFIED' && !detected && !sent) ||
+          (p.phase === 'DETECTED' && sent)
+        )
+          fault('EVENT_CONFLICT', '弹窗处理阶段缺少对应操作或重复确认');
+      }
     }
     return;
   }

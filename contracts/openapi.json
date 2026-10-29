@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "APK 部署中台 API",
-    "version": "1.10.1"
+    "version": "1.11.0"
   },
   "paths": {
     "/api/v1/auth/login": {
@@ -6524,6 +6524,40 @@
                     "type": "integer",
                     "minimum": 1000,
                     "maximum": 60000
+                  },
+                  "startup": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "confirmationTimeoutMs": {
+                        "type": "integer",
+                        "minimum": 1000,
+                        "maximum": 5000,
+                        "default": 3000
+                      },
+                      "splashTimeoutMs": {
+                        "type": "integer",
+                        "minimum": 1000,
+                        "maximum": 45000,
+                        "default": 15000
+                      },
+                      "totalTimeoutMs": {
+                        "type": "integer",
+                        "minimum": 10000,
+                        "maximum": 90000,
+                        "default": 60000
+                      },
+                      "maxActions": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 12,
+                        "default": 12
+                      },
+                      "iconRecognition": {
+                        "type": "boolean",
+                        "default": true
+                      }
+                    }
                   }
                 }
               },
@@ -8293,19 +8327,71 @@
               "method": {
                 "enum": [
                   "CONTROLS",
-                  "OCR"
+                  "OCR",
+                  "ICON"
                 ]
               },
               "index": {
                 "type": "integer",
                 "minimum": 1,
                 "maximum": 12
+              },
+              "phase": {
+                "enum": [
+                  "DETECTED",
+                  "WAITING",
+                  "ACTION_SENT",
+                  "CLEARED",
+                  "UNCHANGED",
+                  "UNVERIFIED"
+                ]
               }
             },
             "required": [
               "action",
               "method",
               "index"
+            ],
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "method": {
+                      "const": "ICON"
+                    }
+                  },
+                  "required": [
+                    "method"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "phase"
+                  ]
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "action": {
+                      "const": "WAIT_SPLASH"
+                    }
+                  },
+                  "required": [
+                    "action"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "phase": {
+                      "enum": [
+                        "DETECTED",
+                        "WAITING"
+                      ]
+                    }
+                  }
+                }
+              }
             ]
           }
         }
@@ -8788,7 +8874,7 @@
           },
           "features": {
             "type": "array",
-            "maxItems": 5,
+            "maxItems": 6,
             "uniqueItems": true,
             "items": {
               "enum": [
@@ -8796,7 +8882,8 @@
                 "REGISTRATION_V1",
                 "DAILY_V1",
                 "AUTO_REGISTRATION_V1",
-                "CONTENT_ISOLATION_V1"
+                "CONTENT_ISOLATION_V1",
+                "APP_READINESS_V1"
               ]
             }
           }
@@ -9810,6 +9897,40 @@
             "type": "integer",
             "minimum": 1000,
             "maximum": 60000
+          },
+          "startup": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "confirmationTimeoutMs": {
+                "type": "integer",
+                "minimum": 1000,
+                "maximum": 5000,
+                "default": 3000
+              },
+              "splashTimeoutMs": {
+                "type": "integer",
+                "minimum": 1000,
+                "maximum": 45000,
+                "default": 15000
+              },
+              "totalTimeoutMs": {
+                "type": "integer",
+                "minimum": 10000,
+                "maximum": 90000,
+                "default": 60000
+              },
+              "maxActions": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 12,
+                "default": 12
+              },
+              "iconRecognition": {
+                "type": "boolean",
+                "default": true
+              }
+            }
           }
         }
       },
@@ -9930,6 +10051,40 @@
           "templateHash": {
             "type": "string",
             "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      },
+      "StartupPolicy": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "confirmationTimeoutMs": {
+            "type": "integer",
+            "minimum": 1000,
+            "maximum": 5000,
+            "default": 3000
+          },
+          "splashTimeoutMs": {
+            "type": "integer",
+            "minimum": 1000,
+            "maximum": 45000,
+            "default": 15000
+          },
+          "totalTimeoutMs": {
+            "type": "integer",
+            "minimum": 10000,
+            "maximum": 90000,
+            "default": 60000
+          },
+          "maxActions": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 12,
+            "default": 12
+          },
+          "iconRecognition": {
+            "type": "boolean",
+            "default": true
           }
         }
       },

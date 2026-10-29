@@ -15,6 +15,12 @@ import android.graphics.Bitmap;
 import android.graphics.drawable.BitmapDrawable;
 import android.view.View;
 import android.view.MotionEvent;
+import android.app.Dialog;
+import android.widget.FrameLayout;
+import android.widget.ImageButton;
+import android.os.Handler;
+import android.os.Looper;
+import android.view.Gravity;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
@@ -48,6 +54,7 @@ public final class MainActivity extends Activity {
     }
     @Override public void onCreate(Bundle state) {
         super.onCreate(state); page("Owned P3 fixture");
+        if (FIXTURE_THETA) { startupSplash(); return; }
         if (FIXTURE_ZETA) { page("个人中心"); label("游客"); label("用户ID：12345678"); return; }
         if (FIXTURE_ETA) { page("热门推荐"); label("站长精选"); for (int i=0;i<8;i++) button("Owned App "+i, View.generateViewId()); return; }
         if (FIXTURE_EPSILON) {
@@ -78,6 +85,41 @@ public final class MainActivity extends Activity {
             }); return;
         }
         button("Open registration", R.id.open_register).setOnClickListener(v -> form());
+    }
+    private void startupSplash() {
+        page("开屏广告");
+        Button skip = button("跳过 1 秒", R.id.skip_ad); skip.setEnabled(false);
+        new Handler(Looper.getMainLooper()).postDelayed(() -> { skip.setText("跳过广告"); skip.setEnabled(true); }, 1000);
+        skip.setOnClickListener(v -> {
+            skip.setEnabled(false);
+            new Handler(Looper.getMainLooper()).postDelayed(() -> startupNotice(), 1800);
+        });
+    }
+    private void startupNotice() {
+        page("系统公告");
+        Button ack = button("我知道了", R.id.notice_ack);
+        ack.setOnClickListener(v -> { ack.setEnabled(false); new Handler(Looper.getMainLooper()).postDelayed(() -> startupIcon(), 1800); });
+    }
+    private void startupIcon() {
+        page("准备中");
+        Dialog dialog = new Dialog(this);
+        FrameLayout panel = new FrameLayout(this); panel.setId(R.id.ad_panel); panel.setBackgroundColor(Color.WHITE);
+        panel.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
+        TextView title = new TextView(this); title.setText("广告提示"); panel.addView(title, new FrameLayout.LayoutParams(400,200));
+        ImageButton close = new ImageButton(this) {
+            final Paint ink = new Paint(Paint.ANTI_ALIAS_FLAG);
+            @Override protected void onDraw(Canvas canvas) {
+                canvas.drawColor(Color.WHITE); ink.setColor(Color.BLACK); ink.setStrokeWidth(3 * getResources().getDisplayMetrics().density);
+                canvas.drawLine(getWidth()*0.24f,getHeight()*0.24f,getWidth()*0.76f,getHeight()*0.76f,ink);
+                canvas.drawLine(getWidth()*0.76f,getHeight()*0.24f,getWidth()*0.24f,getHeight()*0.76f,ink);
+            }
+        };
+        close.setId(R.id.graphic_target); close.setBackgroundColor(Color.WHITE);
+        int size = Math.round(48 * getResources().getDisplayMetrics().density);
+        FrameLayout.LayoutParams position = new FrameLayout.LayoutParams(size,size,Gravity.TOP|Gravity.RIGHT); panel.addView(close,position);
+        dialog.setContentView(panel); dialog.getWindow().setLayout(Math.round(280 * getResources().getDisplayMetrics().density),Math.round(320 * getResources().getDisplayMetrics().density));
+        dialog.setCancelable(false); dialog.show(); dialog.getWindow().setLayout(Math.round(280 * getResources().getDisplayMetrics().density),Math.round(320 * getResources().getDisplayMetrics().density));
+        close.setOnClickListener(v -> { close.setEnabled(false); new Handler(Looper.getMainLooper()).postDelayed(() -> { dialog.dismiss(); page("Home"); button("注册新账号", R.id.open_register).setOnClickListener(w -> form()); }, 1800); });
     }
     private void form() {
         page(FIXTURE_EPSILON ? "注册新账号" : "Create test account");
@@ -116,7 +158,7 @@ public final class MainActivity extends Activity {
                 runOnUiThread(() -> {
                     page("Result"); TextView text = new TextView(this);
                     text.setId("OK".equals(response) ? R.id.account_home : "REJECT".equals(response) ? R.id.rejected : R.id.pending);
-                    text.setText("OK".equals(response) ? (FIXTURE_GAMMA || FIXTURE_DELTA || FIXTURE_EPSILON ? "Registration successful" : "Welcome " + name) : "REJECT".equals(response) ? "Rejected" : "Pending result"); layout.addView(text);
+                    text.setText("OK".equals(response) ? (FIXTURE_GAMMA || FIXTURE_DELTA || FIXTURE_EPSILON || FIXTURE_THETA ? "Registration successful" : "Welcome " + name) : "REJECT".equals(response) ? "Rejected" : "Pending result"); layout.addView(text);
                 });
             }).start();
         });

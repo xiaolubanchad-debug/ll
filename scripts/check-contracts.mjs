@@ -95,6 +95,50 @@ test('1.9 purchase cannot be recorded as closure', () =>
     }).length,
   ));
 const v18 = read('contracts/fixtures/v18.valid.json');
+for (const phase of ['DETECTED', 'WAITING', 'ACTION_SENT', 'CLEARED', 'UNCHANGED', 'UNVERIFIED'])
+  test('1.11 bounded obstruction phase ' + phase, () =>
+    assert.deepEqual(
+      agentIssues({
+        ...notes,
+        events: [{ ...obstruction, payload: { ...obstruction.payload, phase } }],
+      }),
+      [],
+    ),
+  );
+test('1.11 icon action requires phase', () =>
+  assert.ok(
+    agentIssues({
+      ...notes,
+      events: [{ ...obstruction, payload: { ...obstruction.payload, method: 'ICON' } }],
+    }).length,
+  ));
+test('1.11 countdown cannot claim cleared', () =>
+  assert.ok(
+    agentIssues({
+      ...notes,
+      events: [
+        {
+          ...obstruction,
+          payload: { ...obstruction.payload, action: 'WAIT_SPLASH', phase: 'CLEARED' },
+        },
+      ],
+    }).length,
+  ));
+for (const value of [
+  {},
+  { confirmationTimeoutMs: 3000, splashTimeoutMs: 15000, iconRecognition: true },
+])
+  test('1.11 startup policy accepts bounded defaults', () =>
+    assert.deepEqual(schemaIssues('StartupPolicy', value), []));
+for (const value of [
+  { confirmationTimeoutMs: 150 },
+  { maxActions: 13 },
+  { splashTimeoutMs: 999999 },
+  { screenshot: 'private' },
+  { iconRecognition: 'yes' },
+])
+  test('1.11 startup policy rejects unbounded or raw settings', () =>
+    assert.ok(schemaIssues('StartupPolicy', value).length));
 for (const [name, value] of [
   ['TaskPlanInput', v18.task],
   ['TaskControlInput', v18.control],

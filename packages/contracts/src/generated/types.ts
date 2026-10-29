@@ -56,6 +56,13 @@ export interface APKTestConfigurationVersion10 {
       maxNavigationSteps: number;
       timeoutMs: number;
       successTimeoutMs: number;
+      startup?: {
+        confirmationTimeoutMs?: number;
+        splashTimeoutMs?: number;
+        totalTimeoutMs?: number;
+        maxActions?: number;
+        iconRecognition?: boolean;
+      };
     };
     /**
      * 默认开启，仅保留功能证据，不上传或展示原始业务画面
@@ -267,6 +274,13 @@ export interface APKTestConfigurationVersion10 {
       maxNavigationSteps: number;
       timeoutMs: number;
       successTimeoutMs: number;
+      startup?: {
+        confirmationTimeoutMs?: number;
+        splashTimeoutMs?: number;
+        totalTimeoutMs?: number;
+        maxActions?: number;
+        iconRecognition?: boolean;
+      };
     };
     /**
      * 默认开启，仅保留功能证据，不上传或展示原始业务画面
@@ -825,6 +839,13 @@ export interface TestConfiguration {
       maxNavigationSteps: number;
       timeoutMs: number;
       successTimeoutMs: number;
+      startup?: {
+        confirmationTimeoutMs?: number;
+        splashTimeoutMs?: number;
+        totalTimeoutMs?: number;
+        maxActions?: number;
+        iconRecognition?: boolean;
+      };
     };
     /**
      * 默认开启，仅保留功能证据，不上传或展示原始业务画面
@@ -1087,9 +1108,16 @@ export interface ReleaseInput {
     npmLockSha256: string;
   };
   /**
-   * @maxItems 5
+   * @maxItems 6
    */
-  features?: ('DOWNLOAD_V1' | 'REGISTRATION_V1' | 'DAILY_V1' | 'AUTO_REGISTRATION_V1' | 'CONTENT_ISOLATION_V1')[];
+  features?: (
+    | 'DOWNLOAD_V1'
+    | 'REGISTRATION_V1'
+    | 'DAILY_V1'
+    | 'AUTO_REGISTRATION_V1'
+    | 'CONTENT_ISOLATION_V1'
+    | 'APP_READINESS_V1'
+  )[];
 }
 
 export interface HealthReport {
@@ -1320,6 +1348,13 @@ export interface AutoRegistration {
   maxNavigationSteps: number;
   timeoutMs: number;
   successTimeoutMs: number;
+  startup?: {
+    confirmationTimeoutMs?: number;
+    splashTimeoutMs?: number;
+    totalTimeoutMs?: number;
+    maxActions?: number;
+    iconRecognition?: boolean;
+  };
 }
 
 export interface RegistrationRecognition {
@@ -1348,6 +1383,14 @@ export interface LearnedRegistrationTemplate {
   }[];
   formHash: string;
   templateHash: string;
+}
+
+export interface StartupPolicy {
+  confirmationTimeoutMs?: number;
+  splashTimeoutMs?: number;
+  totalTimeoutMs?: number;
+  maxActions?: number;
+  iconRecognition?: boolean;
 }
 
 export interface SessionView {

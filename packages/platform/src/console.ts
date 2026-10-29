@@ -519,18 +519,32 @@ function title(type: string, p: Record<string, unknown>) {
   }
   if (type === 'BROWSER_ENVIRONMENT')
     return p.role === 'SOURCE' ? '网站安卓手机环境已确认' : '落地页安卓手机环境已确认';
-  if (type === 'APP_OBSTRUCTION')
+  if (type === 'APP_OBSTRUCTION') {
+    const action =
+      (
+        {
+          SKIP_AD: '跳过开屏广告',
+          CLOSE_AD: '关闭广告',
+          CLOSE_POPUP: '关闭弹窗',
+          ACK_NOTICE: '确认公告',
+          WAIT_SPLASH: '等待开屏广告倒计时',
+        } as Record<string, string>
+      )[String(p.action)] ?? '处理 APP 遮挡';
+    if (!p.phase)
+      return p.action === 'WAIT_SPLASH' ? action : '已执行' + action + '，关闭结果未核对';
     return (
       (
         {
-          SKIP_AD: '已跳过开屏广告',
-          CLOSE_AD: '已关闭广告',
-          CLOSE_POPUP: '已关闭弹窗',
-          ACK_NOTICE: '已确认公告',
-          WAIT_SPLASH: '等待开屏广告倒计时',
+          DETECTED: '发现遮挡：' + action,
+          WAITING: p.action === 'WAIT_SPLASH' ? '等待开屏广告倒计时' : '等待关闭操作生效',
+          ACTION_SENT: '已执行' + action + '，正在核对',
+          CLEARED: '已确认遮挡消失：' + action,
+          UNCHANGED: '关闭操作未生效，已停止重复点击',
+          UNVERIFIED: '关闭目标变化或结果无法核验',
         } as Record<string, string>
-      )[String(p.action)] ?? '处理 APP 遮挡页面'
+      )[String(p.phase)] ?? '处理 APP 遮挡'
     );
+  }
   if (type === 'TASK_STAGE') return stageTitles[String(p.stage)] ?? '执行阶段更新';
   if (type === 'TASK_FINISHED')
     return (

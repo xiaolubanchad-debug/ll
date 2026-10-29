@@ -13,6 +13,7 @@ export * from './screenshot.js';
 export * from './functional-evidence.js';
 export * from './webdriver.js';
 export * from './app-obstructions.js';
+export { closeIcon, screenshotPixels } from './close-icon.js';
 export * from './registration-ui.js';
 export * from './registration-discovery.js';
 export * from './ocr.js';

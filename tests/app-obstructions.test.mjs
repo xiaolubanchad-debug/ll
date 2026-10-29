@@ -37,7 +37,11 @@ test('disabled skip and separate countdown wait until the ad becomes skippable',
     false,
   ).clear(new AbortController().signal);
   assert.deepEqual(
-    notes.map((n) => n.action),
+    notes
+      .filter(
+        (n) => n.phase === 'ACTION_SENT' || (n.action === 'WAIT_SPLASH' && n.phase === 'WAITING'),
+      )
+      .map((n) => n.action),
     ['WAIT_SPLASH', 'SKIP_AD'],
   );
   assert.equal(obstructionRole('Skip in 3s', false), 'WAIT_SPLASH');
@@ -73,7 +77,11 @@ test('APP startup countdown, ad and notice close before form; later popup is han
   );
   assert.match(await handler.clear(new AbortController().signal), /注册/);
   assert.deepEqual(
-    notes.map((n) => n.action),
+    notes
+      .filter(
+        (n) => n.phase === 'ACTION_SENT' || (n.action === 'WAIT_SPLASH' && n.phase === 'WAITING'),
+      )
+      .map((n) => n.action),
     ['WAIT_SPLASH', 'SKIP_AD', 'ACK_NOTICE'],
   );
   state = 'popup';

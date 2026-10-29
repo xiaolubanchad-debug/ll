@@ -1441,19 +1441,71 @@
         "method": {
           "enum": [
             "CONTROLS",
-            "OCR"
+            "OCR",
+            "ICON"
           ]
         },
         "index": {
           "type": "integer",
           "minimum": 1,
           "maximum": 12
+        },
+        "phase": {
+          "enum": [
+            "DETECTED",
+            "WAITING",
+            "ACTION_SENT",
+            "CLEARED",
+            "UNCHANGED",
+            "UNVERIFIED"
+          ]
         }
       },
       "required": [
         "action",
         "method",
         "index"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "method": {
+                "const": "ICON"
+              }
+            },
+            "required": [
+              "method"
+            ]
+          },
+          "then": {
+            "required": [
+              "phase"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "WAIT_SPLASH"
+              }
+            },
+            "required": [
+              "action"
+            ]
+          },
+          "then": {
+            "properties": {
+              "phase": {
+                "enum": [
+                  "DETECTED",
+                  "WAITING"
+                ]
+              }
+            }
+          }
+        }
       ]
     }
   }

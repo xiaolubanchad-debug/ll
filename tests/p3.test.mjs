@@ -253,7 +253,11 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
         }
       } else if (req.url.endsWith('/value')) {
         s[parts[4]] = b.text;
-      } else if (req.url.endsWith('/rect')) value = { x: 10, y: 10, width: 20, height: 10 };
+      } else if (req.url.endsWith('/rect'))
+        value =
+          mode.startsWith('auto-') && parts[4] === 'ad-close'
+            ? { x: 10, y: 10, width: 100, height: 15 }
+            : { x: 10, y: 10, width: 20, height: 10 };
       else if (req.url.endsWith('/screenshot')) value = white.toString('base64');
       else if (req.url.endsWith('/appium/device/is_keyboard_shown')) value = false;
       else if (req.url.endsWith('/source')) {
@@ -953,7 +957,7 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
             );
             const timeline = await req('/runs/' + first.id + '/timeline?limit=100');
             assert.equal(timeline.status, 200);
-            assert.ok(timeline.data.items.some((e) => e.title === '已关闭广告'));
+            assert.ok(timeline.data.items.some((e) => e.title === '已确认遮挡消失：关闭广告'));
             abort.abort();
             await agentRun;
             await start();

@@ -9,7 +9,7 @@ import type {
   TaskControlInput,
   TestConfiguration,
 } from '@apk/contracts';
-import { schemaIssues, contentIsolationSupported } from '@apk/contracts';
+import { schemaIssues, contentIsolationSupported, appReadinessSupported } from '@apk/contracts';
 import { checked } from './secrets.js';
 import { configBody, configSecrets } from './configurations.js';
 import { canonical, digest } from './security.js';
@@ -102,6 +102,14 @@ async function readiness(db: PrismaClient, p: PlanRow) {
       );
     if (!h?.android || !h.kvm || node.registrationProtocol !== '1.0')
       add('NODE_NOT_READY', '安卓环境尚未就绪', 'nodes');
+    if (
+      c.execution.autoRegistration?.startup &&
+      !appReadinessSupported(
+        (release?.manifest as { features?: string[] } | null)?.features,
+        node.agentVersion,
+      )
+    )
+      add('NODE_UPGRADE_REQUIRED', '启动准备设置需要 Agent 0.9.0', 'nodes');
     const proxy = c.execution.proxySecretVersionId;
     if (
       !proxy ||
@@ -112,7 +120,7 @@ async function readiness(db: PrismaClient, p: PlanRow) {
       add('NEEDS_ADAPTATION', '请选择自动识别或补充注册规则', 'tasks');
     if (
       c.execution.autoRegistration?.enabled &&
-      !['0.6.0', '0.6.1', '0.7.0', '0.7.1', '0.7.2', '0.8.0', '0.8.1'].includes(
+      !['0.6.0', '0.6.1', '0.7.0', '0.7.1', '0.7.2', '0.8.0', '0.8.1', '0.9.0'].includes(
         node.agentVersion ?? '',
       )
     )

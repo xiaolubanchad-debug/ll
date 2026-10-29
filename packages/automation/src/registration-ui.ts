@@ -14,6 +14,8 @@ export interface UiControl {
   enabled: boolean;
   password: boolean;
   clickable: boolean;
+  ownClickable?: boolean;
+  clickParent?: { className: string; resourceId: string; rect: Rect };
   checkable: boolean;
   checked?: boolean;
   rect: Rect;
@@ -24,6 +26,7 @@ export interface UiPage {
   locatorControls?: UiControl[];
   hash: string;
   foreign: boolean;
+  window?: Rect;
 }
 export const compactLabel = (value: string) =>
   value
@@ -87,13 +90,20 @@ export function readRegistrationPage(source: string, pkg: string): UiPage {
   const controls: UiControl[] = [];
   let window: Rect | undefined;
   let foreign = false;
-  const visit = (value: unknown, parentPackage = '', ancestorClickable = false, level = 0) => {
+  const visit = (
+    value: unknown,
+    parentPackage = '',
+    ancestorClickable = false,
+    level = 0,
+    clickParent?: UiControl['clickParent'],
+  ) => {
     if (!value || typeof value !== 'object' || level > 55) return;
     if (Array.isArray(value)) {
-      for (const v of value) visit(v, parentPackage, ancestorClickable, level);
+      for (const v of value) visit(v, parentPackage, ancestorClickable, level, clickParent);
       return;
     }
     const row = value as Record<string, unknown>;
+    let ownTarget: UiControl['clickParent'];
     const owner = String(row.package ?? parentPackage),
       clickable = row.clickable === 'true';
     const bounds = String(row.bounds ?? '').match(/^\[(\d+),(\d+)\]\[(\d+),(\d+)\]$/);
@@ -132,6 +142,8 @@ export function readRegistrationPage(source: string, pkg: string): UiPage {
             enabled: row.enabled !== 'false',
             password: row.password === 'true',
             clickable: clickable || ancestorClickable,
+            ownClickable: clickable,
+            ...(ancestorClickable && clickParent ? { clickParent } : {}),
             checkable: row.checkable === 'true' || String(row.class ?? '').includes('CheckBox'),
             ...(row.checked === 'true' || row.checked === 'false'
               ? { checked: row.checked === 'true' }
@@ -139,6 +151,12 @@ export function readRegistrationPage(source: string, pkg: string): UiPage {
             rect: { x, y, width: x2 - x, height: y2 - y },
             packageName: owner,
           });
+          if (clickable)
+            ownTarget = {
+              className: String(row.class ?? ''),
+              resourceId: String(row['resource-id'] ?? ''),
+              rect: { x, y, width: x2 - x, height: y2 - y },
+            };
         }
       }
     }
@@ -146,7 +164,13 @@ export function readRegistrationPage(source: string, pkg: string): UiPage {
     const container = /(?:WebView|ScrollView|RecyclerView|ListView)$/.test(String(row.class));
     for (const child of Object.values(row))
       if (typeof child === 'object')
-        visit(child, owner, !container && (ancestorClickable || clickable), level + 1);
+        visit(
+          child,
+          owner,
+          !container && (ancestorClickable || clickable),
+          level + 1,
+          container ? undefined : (ownTarget ?? clickParent),
+        );
   };
   visit(
     new XMLParser({
@@ -170,6 +194,7 @@ export function readRegistrationPage(source: string, pkg: string): UiPage {
     controls: shown,
     locatorControls: controls,
     foreign,
+    ...(window ? { window } : {}),
     hash: sha(
       canonical(
         shown.map((e) => ({
@@ -232,6 +257,25 @@ export function controlLocator(control: UiControl, page: UiPage): Locator {
           literal(value) +
           ']',
       };
+  }
+  if (
+    control.ownClickable &&
+    all.filter(
+      (e) => e.className === control.className && canonical(e.rect) === canonical(control.rect),
+    ).length === 1
+  ) {
+    const r = control.rect;
+    return {
+      by: 'xpath',
+      value:
+        '//*[@package=' +
+        literal(control.packageName) +
+        ' and @class=' +
+        literal(control.className) +
+        ' and @bounds=' +
+        literal(`[${r.x},${r.y}][${r.x + r.width},${r.y + r.height}]`) +
+        ']',
+    };
   }
   throw new RegistrationError('AUTO_CONTROL_AMBIGUOUS');
 }

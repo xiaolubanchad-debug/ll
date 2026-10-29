@@ -121,6 +121,7 @@ export async function registerApk(
         await emit({ type: 'APP_OBSTRUCTION', taskId: target.taskId, payload: { ...payload } });
       },
       config.execution.autoRegistration?.screenshotFallback ?? false,
+      config.execution.autoRegistration?.startup,
     );
     if (!automatic) await readiness.clear(signal);
     if (automatic) {

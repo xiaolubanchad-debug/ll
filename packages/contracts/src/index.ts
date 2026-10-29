@@ -32,6 +32,7 @@ import type { FunctionalEvidence } from './generated/types.js';
 export type { ScheduleInput, DailyExecutionPlan, ProxyObservation } from './generated/types.js';
 export type {
   AutoRegistration,
+  StartupPolicy,
   RegistrationRecognition,
   LearnedRegistrationTemplate,
 } from './generated/types.js';
@@ -88,9 +89,15 @@ export function contentIsolationSupported(
   version: string | null | undefined,
 ): boolean {
   return (
-    ['0.8.0', '0.8.1'].includes(version ?? '') &&
+    ['0.8.0', '0.8.1', '0.9.0'].includes(version ?? '') &&
     features?.includes('CONTENT_ISOLATION_V1') === true
   );
+}
+export function appReadinessSupported(
+  features: readonly string[] | undefined,
+  version: string | null | undefined,
+): boolean {
+  return version === '0.9.0' && features?.includes('APP_READINESS_V1') === true;
 }
 export function executionOSSupported(distribution: string, version: string): boolean {
   return schemaIssues('ExecutionOS', { distribution, version }).length === 0;

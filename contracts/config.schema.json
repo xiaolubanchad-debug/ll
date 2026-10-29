@@ -192,6 +192,40 @@
               "type": "integer",
               "minimum": 1000,
               "maximum": 60000
+            },
+            "startup": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "confirmationTimeoutMs": {
+                  "type": "integer",
+                  "minimum": 1000,
+                  "maximum": 5000,
+                  "default": 3000
+                },
+                "splashTimeoutMs": {
+                  "type": "integer",
+                  "minimum": 1000,
+                  "maximum": 45000,
+                  "default": 15000
+                },
+                "totalTimeoutMs": {
+                  "type": "integer",
+                  "minimum": 10000,
+                  "maximum": 90000,
+                  "default": 60000
+                },
+                "maxActions": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 12,
+                  "default": 12
+                },
+                "iconRecognition": {
+                  "type": "boolean",
+                  "default": true
+                }
+              }
             }
           }
         },
