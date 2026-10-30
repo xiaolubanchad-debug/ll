@@ -526,6 +526,28 @@ export async function startAndroid(
         );
         if (!/^Success\s*$/m.test(value)) throw new RegistrationError('APK_INSTALL_FAILED');
       },
+      async testClientStatus() {
+        options.beforeAction();
+        const value = await command(
+          adb,
+          [
+            '-s',
+            record.serial!,
+            'shell',
+            'run-as',
+            'com.apkplatform.testclient',
+            'cat',
+            'files/report-status',
+          ],
+          2000,
+          'TEST_CLIENT_STATUS_READ',
+        ).catch(() => 'UNCONFIRMED');
+        return /^(?:PREPARING|CONFIG_ERROR|NETWORK_(?:ERROR|TLS|TIMEOUT|CONNECT)|HTTP_[1-5][0-9]{2})$/.test(
+          value.trim(),
+        )
+          ? value.trim()
+          : 'UNCONFIRMED';
+      },
       async provisionTestClient(bootstrap) {
         options.beforeAction();
         await command(

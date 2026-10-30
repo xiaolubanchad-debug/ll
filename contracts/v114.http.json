@@ -1,5 +1,5 @@
 {
-  "version": "1.14.0",
+  "version": "1.14.1",
   "routes": [
     {
       "method": "get",
@@ -22,14 +22,16 @@
       "path": "/test-client",
       "operationId": "testClientPage",
       "public": true,
-      "status": 200
+      "status": 200,
+      "query": "TestClientQuery"
     },
     {
       "method": "get",
       "path": "/test-client/apk",
       "operationId": "testClientApk",
       "public": true,
-      "status": 200
+      "status": 200,
+      "query": "TestClientQuery"
     },
     {
       "method": "get",

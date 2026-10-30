@@ -63,6 +63,7 @@ export interface AndroidSession {
   supportedAbis: string[];
   install(file: string): Promise<void>;
   provisionTestClient?(bootstrap: import('@apk/contracts').TestBootstrap): Promise<void>;
+  testClientStatus?(): Promise<string>;
   launch(packageName: string, activity: string): Promise<void>;
   foreground?(packageName: string): Promise<boolean>;
   find(locator: Locator, timeout: number, signal?: AbortSignal): Promise<string>;

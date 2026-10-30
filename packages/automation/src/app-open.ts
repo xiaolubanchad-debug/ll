@@ -126,6 +126,22 @@ export async function openApk(
         }
       }
     });
+    if (config.execution.appOpen.ownedTestClient) {
+      action();
+      const status =
+        (await session.testClientStatus?.().catch(() => 'UNCONFIRMED')) ?? 'UNCONFIRMED';
+      const message =
+        status === 'HTTP_200'
+          ? '自有测试 APK：账户已上报'
+          : status === 'CONFIG_ERROR'
+            ? '自有测试 APK：配置读取失败'
+            : /^HTTP_/.test(status)
+              ? '自有测试 APK：请求未获接受'
+              : status.startsWith('NETWORK_')
+                ? '自有测试 APK：网络响应尚未确认'
+                : '自有测试 APK：上报结果尚未确认';
+      await emit({ type: 'LOG', taskId: target.taskId, payload: { level: 'INFO', message } });
+    }
   } catch (error) {
     result = {
       status: signal.aborted ? 'CANCELLED' : 'FAILED',

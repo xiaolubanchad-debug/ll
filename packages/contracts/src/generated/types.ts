@@ -9,7 +9,7 @@ export interface TestEnrollInput {
   locale: string;
   declaredUserAgent: string;
   defaultWebViewUa: string;
-  appVersion: '1.0.0';
+  appVersion: '1.0.0' | '1.0.1';
   appliedWebViewUa: string;
 }
 
@@ -84,6 +84,10 @@ export interface TestClientInfo {
   version: string | null;
   downloadUrl: string;
   sourcePageUrl: string;
+}
+
+export interface TestClientQuery {
+  sha256?: string;
 }
 
 export interface TaskPlanInput {

@@ -137,6 +137,7 @@ export async function startAgent(
     '0.11.0',
     '0.11.1',
     '0.12.0',
+    '0.12.1',
   ].includes(config.agentVersion);
   const engine = [
     '0.3.0',
@@ -162,6 +163,7 @@ export async function startAgent(
     '0.11.0',
     '0.11.1',
     '0.12.0',
+    '0.12.1',
   ].includes(config.agentVersion)
     ? await TaskEngine.open(
         config.dataRoot ?? '/var/lib/apk-platform/execution',

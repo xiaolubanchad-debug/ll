@@ -99,9 +99,18 @@ export function contentIsolationSupported(
   version: string | null | undefined,
 ): boolean {
   return (
-    ['0.8.0', '0.8.1', '0.9.0', '0.9.1', '0.9.2', '0.10.0', '0.11.0', '0.11.1', '0.12.0'].includes(
-      version ?? '',
-    ) && features?.includes('CONTENT_ISOLATION_V1') === true
+    [
+      '0.8.0',
+      '0.8.1',
+      '0.9.0',
+      '0.9.1',
+      '0.9.2',
+      '0.10.0',
+      '0.11.0',
+      '0.11.1',
+      '0.12.0',
+      '0.12.1',
+    ].includes(version ?? '') && features?.includes('CONTENT_ISOLATION_V1') === true
   );
 }
 export function appReadinessSupported(
@@ -109,8 +118,9 @@ export function appReadinessSupported(
   version: string | null | undefined,
 ): boolean {
   return (
-    ['0.9.0', '0.9.1', '0.9.2', '0.10.0', '0.11.0', '0.11.1', '0.12.0'].includes(version ?? '') &&
-    features?.includes('APP_READINESS_V1') === true
+    ['0.9.0', '0.9.1', '0.9.2', '0.10.0', '0.11.0', '0.11.1', '0.12.0', '0.12.1'].includes(
+      version ?? '',
+    ) && features?.includes('APP_READINESS_V1') === true
   );
 }
 export function appOpenSupported(
@@ -118,7 +128,7 @@ export function appOpenSupported(
   version: string | null | undefined,
 ): boolean {
   return (
-    ['0.10.0', '0.11.0', '0.11.1', '0.12.0'].includes(version ?? '') &&
+    ['0.10.0', '0.11.0', '0.11.1', '0.12.0', '0.12.1'].includes(version ?? '') &&
     features?.includes('APP_OPEN_V1') === true
   );
 }
@@ -127,7 +137,7 @@ export function parallelAppOpenSupported(
   version: string | null | undefined,
 ): boolean {
   return (
-    ['0.11.0', '0.11.1', '0.12.0'].includes(version ?? '') &&
+    ['0.11.0', '0.11.1', '0.12.0', '0.12.1'].includes(version ?? '') &&
     features?.includes('APP_OPEN_PARALLEL_V1') === true
   );
 }
@@ -337,11 +347,17 @@ export function identitySupported(
   features: readonly string[] | undefined,
   version: string | null | undefined,
 ) {
-  return version === '0.12.0' && features?.includes('DEVICE_VARIANTS_V1') === true;
+  return (
+    ['0.12.0', '0.12.1'].includes(version ?? '') &&
+    features?.includes('DEVICE_VARIANTS_V1') === true
+  );
 }
 export function ownedTestSupported(
   features: readonly string[] | undefined,
   version: string | null | undefined,
 ) {
-  return version === '0.12.0' && features?.includes('OWNED_TEST_CLIENT_V1') === true;
+  return (
+    ['0.12.0', '0.12.1'].includes(version ?? '') &&
+    features?.includes('OWNED_TEST_CLIENT_V1') === true
+  );
 }

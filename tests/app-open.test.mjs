@@ -45,8 +45,15 @@ test('open-only completion follows measured foreground dwell and cleanup, withou
   );
   const file = join(dir, 'owned.apk');
   await writeFile(file, fixtureApk());
-  const apk = await inspectApk(file, 268435456, '2026-10-30', new AbortController().signal);
+  const clientFile = join(dir, 'client.apk');
+  await writeFile(clientFile, fixtureApk('com.apkplatform.testclient'));
   async function run(variant = {}) {
+    const file = variant.owned ? clientFile : join(dir, 'owned.apk');
+    const apk = await inspectApk(file, 268435456, '2026-10-30', new AbortController().signal);
+    if (variant.owned) config.execution.appOpen.ownedTestClient = true;
+    else delete config.execution.appOpen.ownedTestClient;
+    const logs = [],
+      order = [];
     let now = 0,
       samples = 0,
       closed = false;
@@ -60,6 +67,10 @@ test('open-only completion follows measured foreground dwell and cleanup, withou
       0,
       abort.signal,
       async (e) => {
+        if (e.type === 'LOG') {
+          logs.push(e.payload.message);
+          return;
+        }
         assert.equal(e.type, 'TASK_STAGE');
         stages.push(e.payload.stage);
         assert.equal(closed, false);
@@ -78,13 +89,29 @@ test('open-only completion follows measured foreground dwell and cleanup, withou
             if (variant.stop && now >= 3000) abort.abort();
           },
         },
+        testBootstrap: async () => {
+          order.push('bootstrap');
+          return { token: 'x'.repeat(43) };
+        },
         androidFactory: async (_profile, _signal, options) => {
           assert.equal(options.controlMode, 'LAUNCH_ONLY');
           const session = {
             supportedAbis: apk.abis,
             observation: { profileId: 'owned-fixture' },
-            install: async (path) => assert.equal(path, file),
+            install: async (path) => {
+              order.push('install');
+              assert.equal(path, file);
+            },
+            ...(variant.owned
+              ? {
+                  provisionTestClient: async () => {
+                    order.push('provision');
+                  },
+                  testClientStatus: async () => variant.report,
+                }
+              : {}),
             launch: async (pkg, activity) => {
+              order.push('launch');
               assert.equal(pkg, apk.packageName);
               assert.equal(activity, '@launcher');
             },
@@ -116,7 +143,7 @@ test('open-only completion follows measured foreground dwell and cleanup, withou
         ? ['PREPARING', 'INSTALLING', 'LAUNCHING']
         : ['PREPARING', 'INSTALLING', 'LAUNCHING', 'HOLDING'],
     );
-    return { result, now, samples };
+    return { result, now, samples, logs, order };
   }
   const { result, now, samples } = await run();
   assert.equal(now, 10000);
@@ -142,6 +169,18 @@ test('open-only completion follows measured foreground dwell and cleanup, withou
     assert.equal(failed.errorCode, code);
     assert.equal(failed.openObservation, undefined);
     assert.equal(failed.cleanupComplete, !variant.dirty);
+  }
+  for (const [report, message] of [
+    ['HTTP_200', '自有测试 APK：账户已上报'],
+    ['NETWORK_TIMEOUT', '自有测试 APK：网络响应尚未确认'],
+    ['HTTP_422', '自有测试 APK：请求未获接受'],
+    ['secret-token-raw', '自有测试 APK：上报结果尚未确认'],
+  ]) {
+    const owned = await run({ owned: true, report });
+    assert.equal(owned.now, 10000);
+    assert.equal(owned.result.proof, 'APP_OPEN');
+    assert.deepEqual(owned.order, ['install', 'bootstrap', 'provision', 'launch']);
+    assert.deepEqual(owned.logs, [message]);
   }
   const { cleanupComplete, ...payload } = result;
   assert.equal(cleanupComplete, true);

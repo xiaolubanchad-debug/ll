@@ -188,6 +188,7 @@ async function readiness(db: PrismaClient, p: PlanRow) {
         '0.11.0',
         '0.11.1',
         '0.12.0',
+        '0.12.1',
       ].includes(node.agentVersion ?? '')
     )
       add('NODE_UPGRADE_REQUIRED', '自动识别需要升级执行环境', 'nodes');

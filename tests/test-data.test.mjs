@@ -10,8 +10,12 @@ import {
   testDataPage,
   viewTestCredentials,
   digest,
+  runEvents,
+  runTimeline,
+  openAdmissionDeadline,
 } from '@apk/platform';
 import { readFile } from 'node:fs/promises';
+import { beijingDay } from '../packages/platform/dist/daily-plan.js';
 
 test('owned APP accounts bind one installation, retain first request IP and remain separate from APP_OPEN proofs', async () => {
   const db = new PrismaClient(),
@@ -54,7 +58,15 @@ test('owned APP accounts bind one installation, retain first request IP and rema
         id: releaseId,
         artifactName: 'agent-' + digest(releaseId) + '.tgz',
         sha256: digest(releaseId),
-        manifest: { agentVersion: '0.12.0', features: ['OWNED_TEST_CLIENT_V1'] },
+        manifest: {
+          agentVersion: '0.12.0',
+          features: [
+            'OWNED_TEST_CLIENT_V1',
+            'CONTENT_ISOLATION_V1',
+            'APP_OPEN_V1',
+            'APP_OPEN_PARALLEL_V1',
+          ],
+        },
       },
     });
     await db.node.create({
@@ -89,6 +101,19 @@ test('owned APP accounts bind one installation, retain first request IP and rema
         configVersionId: versionId,
         status: 'RUNNING',
         purpose: 'REGISTER',
+        cacheDay: beijingDay(new Date()),
+        executionPlan: {
+          purpose: 'REGISTER',
+          cacheDay: beijingDay(new Date()),
+          successTarget: 2,
+          attemptLimit: 2,
+          assets: [],
+          openPolicy: {
+            concurrency: 2,
+            dailyLimit: 800,
+            admissionDeadline: openAdmissionDeadline(beijingDay(new Date())),
+          },
+        },
         discovered: true,
         successTarget: 2,
         attemptLimit: 2,
@@ -130,6 +155,28 @@ test('owned APP accounts bind one installation, retain first request IP and rema
     const boot = await issueTestBootstrap(db, token, taskId, input),
       again = await issueTestBootstrap(db, token, taskId, input);
     assert.deepEqual(again, boot);
+    const log = (message) =>
+      runEvents(db, token, {
+        kind: 'events',
+        protocolVersion: '1.0',
+        nodeId,
+        deliveryId,
+        fence: 1,
+        events: [
+          {
+            eventId: randomUUID(),
+            runId,
+            taskId,
+            sequence: 1,
+            occurredAt: new Date().toISOString(),
+            type: 'LOG',
+            payload: { level: 'INFO', message },
+          },
+        ],
+      });
+    await assert.rejects(log('自有测试 APK：账户已上报'), (e) => e.code === 'EVENT_CONFLICT');
+    await db.task.update({ where: { id: taskId }, data: { status: 'HOLDING' } });
+    await assert.rejects(log('自有测试 APK：账户已上报'), (e) => e.code === 'EVENT_CONFLICT');
     const body = {
       installationId: randomUUID(),
       requestKey: randomUUID(),
@@ -139,9 +186,9 @@ test('owned APP accounts bind one installation, retain first request IP and rema
       apiLevel: 35,
       locale: 'en-US',
       declaredUserAgent: boot.userAgent,
-      appliedWebViewUa: boot.userAgent,
-      defaultWebViewUa: 'Owned WebView fixture/1.0',
-      appVersion: '1.0.0',
+      appliedWebViewUa: 'NOT_COLLECTED',
+      defaultWebViewUa: 'NOT_COLLECTED',
+      appVersion: '1.0.1',
     };
     await assert.rejects(
       enrollTestClient(
@@ -169,6 +216,13 @@ test('owned APP accounts bind one installation, retain first request IP and rema
       },
       body: JSON.stringify(body),
     });
+    const source = await fetch(base + '/test-client?sha256=' + sha);
+    assert.equal(source.status, 200);
+    assert.ok((await source.text()).includes('/test-client/apk?sha256=' + sha));
+    const versioned = await fetch(base + '/test-client/apk?sha256=' + sha);
+    assert.equal(versioned.status, 200);
+    assert.deepEqual(Buffer.from(await versioned.arrayBuffer()), bytes);
+    assert.equal((await fetch(base + '/test-client/apk?sha256=../../secret')).status, 422);
     assert.equal(native.status, 200);
     const created = await native.json();
     assert.equal(created.sourceIp, '127.0.0.1');
@@ -178,6 +232,33 @@ test('owned APP accounts bind one installation, retain first request IP and rema
     ]);
     assert.deepEqual(one, two);
     assert.deepEqual(one, created);
+    await db.task.update({ where: { id: taskId }, data: { status: 'HOLDING' } });
+    await log('自有测试 APK：账户已上报');
+    assert.equal(
+      (await runTimeline(db, runId, { limit: '100' })).items[0].title,
+      '自有测试 APK：账户已上报',
+    );
+    await assert.rejects(
+      runEvents(db, token, {
+        kind: 'events',
+        protocolVersion: '1.0',
+        nodeId,
+        deliveryId,
+        fence: 1,
+        events: [
+          {
+            eventId: randomUUID(),
+            runId,
+            taskId,
+            sequence: 2,
+            occurredAt: new Date().toISOString(),
+            type: 'LOG',
+            payload: { level: 'INFO', message: '下载入口：已操作配置控件' },
+          },
+        ],
+      }),
+      (e) => e.code === 'EVENT_CONFLICT',
+    );
     assert.match(one.username, /^[a-z]{6,10}$/);
     assert.match(one.password, /^(?=.*[A-Za-z])(?=.*[0-9])[A-Za-z0-9]{8,12}$/);
     assert.equal(await db.testRecord.count({ where: { enrollment: { nodeId } } }), 1);
@@ -263,6 +344,7 @@ test('owned APP accounts bind one installation, retain first request IP and rema
     await app?.close();
     await db.testRecord.deleteMany({ where: { enrollment: { nodeId } } });
     await db.testEnrollment.deleteMany({ where: { nodeId } });
+    await db.runEvent.deleteMany({ where: { deliveryId } });
     await db.task.deleteMany({ where: { runId } });
     await db.delivery.deleteMany({ where: { id: deliveryId } });
     await db.run.deleteMany({ where: { id: runId } });

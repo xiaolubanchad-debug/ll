@@ -7,6 +7,7 @@ import {
   testClientArtifact,
   issueTestBootstrap,
   enrollTestClient,
+  checked,
 } from '@apk/platform';
 import { NodeRoute, Public, TestAppRoute } from './auth.js';
 import type { AuthedRequest } from './auth.js';
@@ -29,15 +30,20 @@ export class V114Controller {
   @Get('test-client/info') info() {
     return testClientInfo();
   }
-  @Public() @Get('test-client') page(@Res() res: Response) {
+  @Public() @Get('test-client') async page(@Query() query: unknown, @Res() res: Response) {
+    const input = checked<{ sha256?: string }>('TestClientQuery', query);
+    const artifact = await testClientArtifact(input.sha256);
     res
       .type('html')
       .send(
-        '<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>自有测试 APK</title><body><h1>中台自有测试 APK</h1><p>用于中台模拟器任务的设备观测和测试账户上报。</p><a id="test-apk" href="/api/v1/test-client/apk">下载测试 APK</a></body></html>',
+        '<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>自有测试 APK</title><body><h1>中台自有测试 APK</h1><p>用于中台模拟器任务的设备观测和测试账户上报。</p><a id="test-apk" href="/api/v1/test-client/apk?sha256=' +
+          artifact.sha256 +
+          '">下载测试 APK</a></body></html>',
       );
   }
-  @Public() @Get('test-client/apk') async apk(@Res() res: Response) {
-    const artifact = await testClientArtifact();
+  @Public() @Get('test-client/apk') async apk(@Query() query: unknown, @Res() res: Response) {
+    const input = checked<{ sha256?: string }>('TestClientQuery', query);
+    const artifact = await testClientArtifact(input.sha256);
     res.setHeader('Content-Type', 'application/vnd.android.package-archive');
     res.setHeader('Content-Disposition', 'attachment; filename="apk-platform-test.apk"');
     res.setHeader('X-Content-Type-Options', 'nosniff');

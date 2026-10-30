@@ -76,6 +76,8 @@ export async function testClientInfo(): Promise<TestClientInfo> {
     return checked('TestClientInfo', {
       ...base,
       ready: true,
+      downloadUrl: base.downloadUrl + '?sha256=' + a.sha256,
+      sourcePageUrl: base.sourcePageUrl + '?sha256=' + a.sha256,
       sha256: a.sha256,
       version: a.version,
     });
@@ -231,10 +233,7 @@ export async function enrollTestClient(
         apiLevel: input.apiLevel,
         userAgent,
         defaultWebViewUa: input.defaultWebViewUa,
-        uaMatched:
-          userAgent === input.declaredUserAgent &&
-          userAgent === e.expectedUa &&
-          input.appliedWebViewUa === e.expectedUa,
+        uaMatched: userAgent === input.declaredUserAgent && userAgent === e.expectedUa,
         modelMatched: input.model === e.model,
         encrypted: encrypt(account, 'test-data:' + id) as unknown as Prisma.InputJsonValue,
       },

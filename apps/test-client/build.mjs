@@ -59,7 +59,7 @@ await writeFile(
 );
 await writeFile(
   join(work, 'AndroidManifest.xml'),
-  '<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.apkplatform.testclient" android:versionCode="1" android:versionName="1.0.0"><uses-sdk android:minSdkVersion="26" android:targetSdkVersion="35"/><uses-permission android:name="android.permission.INTERNET"/><application android:label="@string/app_name" android:theme="@android:style/Theme.Material.Light.NoActionBar" android:allowBackup="false" android:debuggable="true" android:usesCleartextTraffic="false"><activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity></application></manifest>',
+  '<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.apkplatform.testclient" android:versionCode="2" android:versionName="1.0.1"><uses-sdk android:minSdkVersion="26" android:targetSdkVersion="35"/><uses-permission android:name="android.permission.INTERNET"/><application android:label="@string/app_name" android:theme="@android:style/Theme.Material.Light.NoActionBar" android:allowBackup="false" android:debuggable="true" android:usesCleartextTraffic="false"><activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity></application></manifest>',
 );
 await copyFile(join(source, 'MainActivity.java'), join(work, 'MainActivity.java'));
 run(join(tools, 'aapt2'), [
@@ -133,7 +133,7 @@ const sha256 = createHash('sha256')
 await copyFile(file, join(out, sha256 + '.apk'));
 await writeFile(
   join(out, 'current.json'),
-  JSON.stringify({ sha256, version: '1.0.0', packageName: 'com.apkplatform.testclient' }) + '\n',
+  JSON.stringify({ sha256, version: '1.0.1', packageName: 'com.apkplatform.testclient' }) + '\n',
   { mode: 0o644 },
 );
 console.log(JSON.stringify({ built: true, sha256, packageName: 'com.apkplatform.testclient' }));

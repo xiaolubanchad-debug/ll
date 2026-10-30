@@ -278,6 +278,7 @@ export async function createRun(
           '0.11.0',
           '0.11.1',
           '0.12.0',
+          '0.12.1',
         ].includes(node.agentVersion ?? ''))
     )
       fault('NODE_UPGRADE_REQUIRED', '请部署支持每日下载与循环注册的 Agent');
@@ -299,6 +300,7 @@ export async function createRun(
           '0.11.0',
           '0.11.1',
           '0.12.0',
+          '0.12.1',
         ].includes(node.agentVersion ?? ''))
     )
       fault('NODE_UPGRADE_REQUIRED', '自动识别注册入口需要 Agent 0.6.0');
@@ -622,8 +624,28 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
   const p = event.payload as Record<string, unknown>;
   if (event.type === 'LOG') {
     const task = await tx.task.findUnique({ where: { id: event.taskId } });
-    if (!task || task.runId !== runId || task.status !== 'DOWNLOADING' || task.submittedAt)
-      fault('EVENT_CONFLICT', '下载日志与执行阶段不一致');
+    const native = String(p.message).startsWith('自有测试 APK：');
+    if (
+      !task ||
+      task.runId !== runId ||
+      task.submittedAt ||
+      (native
+        ? !(
+            openOnly &&
+            config.execution.appOpen?.ownedTestClient &&
+            task.status === 'HOLDING' &&
+            (task.apk as { packageName?: string } | null)?.packageName ===
+              'com.apkplatform.testclient'
+          )
+        : task.status !== 'DOWNLOADING')
+    )
+      fault('EVENT_CONFLICT', '日志与执行阶段不一致');
+    if (
+      native &&
+      p.message === '自有测试 APK：账户已上报' &&
+      !(await tx.testRecord.count({ where: { enrollment: { taskId: task.id } } }))
+    )
+      fault('EVENT_CONFLICT', '尚无本轮账户上报记录');
     return;
   }
   if (event.type === 'BROWSER_ENVIRONMENT' || event.type === 'APP_OBSTRUCTION') {

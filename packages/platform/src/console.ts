@@ -550,6 +550,11 @@ function title(type: string, p: Record<string, unknown>) {
       '下载入口：正在访问源码中的唯一 APK 地址',
       '下载传输：已收到浏览器文件，等待保存与 APK 校验',
       '下载等待结束：未收到浏览器下载文件',
+      '自有测试 APK：账户已上报',
+      '自有测试 APK：上报结果尚未确认',
+      '自有测试 APK：配置读取失败',
+      '自有测试 APK：请求未获接受',
+      '自有测试 APK：网络响应尚未确认',
     ].includes(message)
       ? message
       : '下载执行记录';

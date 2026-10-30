@@ -963,6 +963,11 @@ test('1.11.2 credential observation is an unsubmitted adaptation result', () =>
     }),
     [],
   ));
+test('1.14.1 accepts only pinned public artifact queries', () => {
+  assert.deepEqual(schemaIssues('TestClientQuery', { sha256: 'a'.repeat(64) }), []);
+  for (const x of [{ sha256: '../../secret' }, { path: '/root' }, { sha256: ['a'.repeat(64)] }])
+    assert.ok(schemaIssues('TestClientQuery', x).length);
+});
 const enrollFixture = read('contracts/fixtures/test-enroll.valid.json');
 test('1.14 own client request', () =>
   assert.deepEqual(schemaIssues('TestEnrollInput', enrollFixture), []));

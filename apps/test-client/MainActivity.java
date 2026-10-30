@@ -5,8 +5,6 @@ import android.os.Bundle;
 import android.os.Build;
 import android.provider.Settings;
 import android.content.SharedPreferences;
-import android.webkit.WebView;
-import android.webkit.WebSettings;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import org.json.JSONObject;
@@ -26,11 +24,12 @@ public final class MainActivity extends Activity {
     TextView title=new TextView(this); title.setText("中台自有测试 APK"); title.setTextSize(24); root.addView(title);
     state=new TextView(this); state.setText("正在读取本轮测试配置"); state.setTextSize(18); root.addView(state);
     details=new TextView(this); root.addView(details); setContentView(root);
+    report("PREPARING");
     prefs=getSharedPreferences("owned_test",MODE_PRIVATE);
-    if(prefs.contains("accountId")) { state.setText("测试账户已上报"); details.setText("用户名："+prefs.getString("username","")+"\n同一安装复用原账户"); return; }
+    if(prefs.contains("accountId")) { report("HTTP_200"); state.setText("测试账户已上报"); details.setText("用户名："+prefs.getString("username","")+"\n同一安装复用原账户"); return; }
     try {
       File config=new File(getFilesDir(),"bootstrap.json");
-      if(!config.isFile()) { state.setText("请通过中台任务启动此测试 APK"); return; }
+      if(!config.isFile()) { report("CONFIG_ERROR"); state.setText("请通过中台任务启动此测试 APK"); return; }
       JSONObject boot=new JSONObject(read(new FileInputStream(config),16384));
       URL url=new URL(boot.getString("apiUrl"));
       if(!"https".equals(url.getProtocol()) && !("http".equals(url.getProtocol()) && "127.0.0.1".equals(url.getHost())))
@@ -40,21 +39,19 @@ public final class MainActivity extends Activity {
       String payload=prefs.getString("pendingBody",null);
       if(payload==null) {
         String deviceId=Settings.Secure.getString(getContentResolver(),Settings.Secure.ANDROID_ID);
-        WebView probe=new WebView(this); probe.getSettings().setUserAgentString(ua);
-        String appliedUa=probe.getSettings().getUserAgentString(); probe.destroy();
         JSONObject body=new JSONObject();
         body.put("installationId",UUID.randomUUID().toString()); body.put("requestKey",UUID.randomUUID().toString());
         body.put("androidId",deviceId); body.put("model",Build.MODEL); body.put("manufacturer",Build.MANUFACTURER);
         body.put("apiLevel",Build.VERSION.SDK_INT); body.put("locale",Locale.getDefault().toLanguageTag());
-        body.put("declaredUserAgent",ua); body.put("appliedWebViewUa",appliedUa);
-        body.put("defaultWebViewUa",WebSettings.getDefaultUserAgent(this)); body.put("appVersion","1.0.0");
+        body.put("declaredUserAgent",ua); body.put("appliedWebViewUa","NOT_COLLECTED");
+        body.put("defaultWebViewUa","NOT_COLLECTED"); body.put("appVersion","1.0.1");
         payload=body.toString();
         if(!prefs.edit().putString("pendingBody",payload).commit()) throw new IOException("JOURNAL_FAILED");
       }
       final String stableBody=payload;
       details.setText("型号："+Build.MODEL+"\n系统 API："+Build.VERSION.SDK_INT+"\n正在通过本轮网络上报");
       new Thread(() -> enroll(url,token,ua,stableBody),"owned-test-enroll").start();
-    } catch(Exception e) { state.setText("测试配置不可用；未创建新账户"); }
+    } catch(Exception e) { report("CONFIG_ERROR"); state.setText("测试配置不可用；未创建新账户"); }
   }
   private void show(String text) { if(!closed)runOnUiThread(()->{if(!closed)state.setText(text);}); }
   private void enroll(URL url,String token,String ua,String body) {
@@ -68,6 +65,7 @@ public final class MainActivity extends Activity {
         byte[] bytes=body.getBytes(StandardCharsets.UTF_8); connection.setFixedLengthStreamingMode(bytes.length);
         try(OutputStream out=connection.getOutputStream()) { out.write(bytes); }
         int status=connection.getResponseCode();
+        report("HTTP_"+status);
         if(status==200) {
           JSONObject response=new JSONObject(read(connection.getInputStream(),16384));
           prefs.edit().putString("accountId",response.getString("id")).putString("username",response.getString("username")).commit();
@@ -75,11 +73,16 @@ public final class MainActivity extends Activity {
           return;
         }
         if(status>=400&&status<500) { show("本轮上报未获接受（"+status+"），未更换请求编号"); return; }
-      } catch(Exception e) { /* The same persisted body is used for every retry; no secrets enter logs. */ }
+      } catch(Exception e) { report(e instanceof javax.net.ssl.SSLException ? "NETWORK_TLS" : e instanceof java.net.SocketTimeoutException ? "NETWORK_TIMEOUT" : e instanceof java.net.ConnectException ? "NETWORK_CONNECT" : "NETWORK_ERROR"); /* Retry the same persisted body; no exception text enters logs. */ }
       finally { if(connection!=null)connection.disconnect(); }
       try { Thread.sleep(500L*(attempt+1)); } catch(InterruptedException e) { Thread.currentThread().interrupt(); return; }
     }
     show("上报结果尚未确认；中台记录为准，不重复生成账户");
+  }
+  private void report(String code) {
+    if(!code.matches("(?:PREPARING|CONFIG_ERROR|NETWORK_(?:ERROR|TLS|TIMEOUT|CONNECT)|HTTP_[1-5][0-9]{2})"))return;
+    try(FileOutputStream out=new FileOutputStream(new File(getFilesDir(),"report-status"))) { out.write(code.getBytes(StandardCharsets.US_ASCII)); } catch(IOException ignored) {}
+    android.util.Log.i("ApkPlatformTest",code);
   }
   private static String read(InputStream in,int max) throws IOException {
     try(InputStream source=in;ByteArrayOutputStream out=new ByteArrayOutputStream()) {
