@@ -98,56 +98,26 @@ export function contentIsolationSupported(
   features: readonly string[] | undefined,
   version: string | null | undefined,
 ): boolean {
-  return (
-    [
-      '0.8.0',
-      '0.8.1',
-      '0.9.0',
-      '0.9.1',
-      '0.9.2',
-      '0.10.0',
-      '0.11.0',
-      '0.11.1',
-      '0.12.0',
-      '0.12.1',
-      '0.12.2',
-    ].includes(version ?? '') && features?.includes('CONTENT_ISOLATION_V1') === true
-  );
+  return knownAgentAtLeast(version, '0.8.0') && features?.includes('CONTENT_ISOLATION_V1') === true;
 }
 export function appReadinessSupported(
   features: readonly string[] | undefined,
   version: string | null | undefined,
 ): boolean {
-  return (
-    [
-      '0.9.0',
-      '0.9.1',
-      '0.9.2',
-      '0.10.0',
-      '0.11.0',
-      '0.11.1',
-      '0.12.0',
-      '0.12.1',
-      '0.12.2',
-    ].includes(version ?? '') && features?.includes('APP_READINESS_V1') === true
-  );
+  return knownAgentAtLeast(version, '0.9.0') && features?.includes('APP_READINESS_V1') === true;
 }
 export function appOpenSupported(
   features: readonly string[] | undefined,
   version: string | null | undefined,
 ): boolean {
-  return (
-    ['0.10.0', '0.11.0', '0.11.1', '0.12.0', '0.12.1', '0.12.2'].includes(version ?? '') &&
-    features?.includes('APP_OPEN_V1') === true
-  );
+  return knownAgentAtLeast(version, '0.10.0') && features?.includes('APP_OPEN_V1') === true;
 }
 export function parallelAppOpenSupported(
   features: readonly string[] | undefined,
   version: string | null | undefined,
 ): boolean {
   return (
-    ['0.11.0', '0.11.1', '0.12.0', '0.12.1', '0.12.2'].includes(version ?? '') &&
-    features?.includes('APP_OPEN_PARALLEL_V1') === true
+    knownAgentAtLeast(version, '0.11.0') && features?.includes('APP_OPEN_PARALLEL_V1') === true
   );
 }
 export function executionOSSupported(distribution: string, version: string): boolean {
@@ -355,23 +325,26 @@ export const IDENTITY_MODELS = ['qa-model-01', 'qa-model-02', 'qa-model-03'] as 
 export function identitySupported(
   features: readonly string[] | undefined,
   version: string | null | undefined,
-) {
-  return (
-    ['0.12.0', '0.12.1', '0.12.2'].includes(version ?? '') &&
-    features?.includes('DEVICE_VARIANTS_V1') === true
-  );
+): boolean {
+  return knownAgentAtLeast(version, '0.12.0') && features?.includes('DEVICE_VARIANTS_V1') === true;
 }
 export function ownedTestSupported(
   features: readonly string[] | undefined,
   version: string | null | undefined,
-) {
+): boolean {
   return (
-    ['0.12.0', '0.12.1', '0.12.2'].includes(version ?? '') &&
-    features?.includes('OWNED_TEST_CLIENT_V1') === true
+    knownAgentAtLeast(version, '0.12.0') && features?.includes('OWNED_TEST_CLIENT_V1') === true
   );
 }
 
-const dailyAgentVersions: readonly string[] = [
+const knownAgentVersions: readonly string[] = [
+  '0.3.0',
+  '0.3.1',
+  '0.3.2',
+  '0.3.3',
+  '0.3.4',
+  '0.4.0',
+  '0.4.1',
   '0.5.0',
   '0.5.1',
   '0.6.0',
@@ -390,21 +363,39 @@ const dailyAgentVersions: readonly string[] = [
   '0.12.0',
   '0.12.1',
   '0.12.2',
+  '0.12.3',
 ];
+function knownAgentAtLeast(version: string | null | undefined, minimum: string): boolean {
+  const index = knownAgentVersions.indexOf(version ?? '');
+  return index >= knownAgentVersions.indexOf(minimum);
+}
+export function agentProtocolsForVersion(version: string | null | undefined) {
+  return {
+    download: knownAgentAtLeast(version, '0.3.0'),
+    registration: knownAgentAtLeast(version, '0.4.0'),
+  };
+}
+
+export function requiredAgentProtocolsReady(
+  features: readonly string[] | undefined,
+  report: { downloadProtocol?: string | null; registrationProtocol?: string | null },
+): boolean {
+  return (
+    (!features?.includes('DOWNLOAD_V1') || report.downloadProtocol === '1.0') &&
+    (!features?.includes('REGISTRATION_V1') || report.registrationProtocol === '1.0')
+  );
+}
+
 export function dailySupported(
   features: readonly string[] | undefined,
   version: string | null | undefined,
 ): boolean {
-  return dailyAgentVersions.includes(version ?? '') && features?.includes('DAILY_V1') === true;
+  return knownAgentAtLeast(version, '0.5.0') && features?.includes('DAILY_V1') === true;
 }
+
 export function autoRegistrationSupported(
   features: readonly string[] | undefined,
   version: string | null | undefined,
 ): boolean {
-  return (
-    dailyAgentVersions.includes(version ?? '') &&
-    version !== '0.5.0' &&
-    version !== '0.5.1' &&
-    features?.includes('AUTO_REGISTRATION_V1') === true
-  );
+  return knownAgentAtLeast(version, '0.6.0') && features?.includes('AUTO_REGISTRATION_V1') === true;
 }

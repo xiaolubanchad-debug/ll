@@ -7,6 +7,7 @@ import {
   parallelAppOpenSupported,
   ownedTestSupported,
   identitySupported,
+  requiredAgentProtocolsReady,
 } from '@apk/contracts';
 
 test('signed 0.12 releases retain all managed-task gates, while missing features and unknown versions fail closed', () => {
@@ -19,14 +20,26 @@ test('signed 0.12 releases retain all managed-task gates, while missing features
     [identitySupported, 'DEVICE_VARIANTS_V1'],
   ];
   for (const [supported, feature] of gates) {
-    for (const version of ['0.12.0', '0.12.1', '0.12.2']) {
+    for (const version of ['0.12.0', '0.12.1', '0.12.2', '0.12.3']) {
       assert.equal(supported([feature], version), true, feature + ':' + version);
       assert.equal(supported([], version), false);
     }
-    for (const version of [null, undefined, '', '0.12.3', '1.0.0', '0.12.2-unverified'])
+    for (const version of [null, undefined, '', '0.12.4', '1.0.0', '0.12.2-unverified'])
       assert.equal(supported([feature], version), false);
   }
   assert.equal(dailySupported(['DAILY_V1'], '0.5.0'), true);
   assert.equal(autoRegistrationSupported(['AUTO_REGISTRATION_V1'], '0.5.0'), false);
   assert.equal(autoRegistrationSupported(['AUTO_REGISTRATION_V1'], '0.6.0'), true);
+  assert.equal(requiredAgentProtocolsReady([], {}), true);
+  assert.equal(requiredAgentProtocolsReady(undefined, {}), true);
+  const execution = ['DOWNLOAD_V1', 'REGISTRATION_V1'];
+  assert.equal(requiredAgentProtocolsReady(execution, {}), false);
+  assert.equal(requiredAgentProtocolsReady(execution, { downloadProtocol: '1.0' }), false);
+  assert.equal(
+    requiredAgentProtocolsReady(execution, {
+      downloadProtocol: '1.0',
+      registrationProtocol: '1.0',
+    }),
+    true,
+  );
 });

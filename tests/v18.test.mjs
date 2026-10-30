@@ -89,7 +89,7 @@ test('1.8 managed tasks: real PostgreSQL, persistent orchestration and browser c
         sha256: digest(randomUUID()),
         artifactName: 'agent-' + digest(randomUUID()) + '.tgz',
         manifest: {
-          agentVersion: '0.12.2',
+          agentVersion: '0.12.3',
           features: [
             'DOWNLOAD_V1',
             'REGISTRATION_V1',
@@ -106,7 +106,7 @@ test('1.8 managed tasks: real PostgreSQL, persistent orchestration and browser c
         name: '1.8 自有测试服务器',
         host: '192.0.2.181',
         lastSeenAt: new Date(),
-        agentVersion: '0.12.2',
+        agentVersion: '0.12.3',
         agentReleaseId: release.id,
         deploymentStatus: 'INSTALLED',
         downloadProtocol: '1.0',

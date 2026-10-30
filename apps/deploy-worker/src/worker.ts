@@ -18,7 +18,7 @@ import {
   SAFE_CODES,
 } from '@apk/platform';
 import type { HealthReport } from '@apk/platform';
-import { executionOSSupported } from '@apk/contracts';
+import { executionOSSupported, requiredAgentProtocolsReady } from '@apk/contracts';
 import type { Runner, InstallContext } from './runner.js';
 const scriptPath = fileURLToPath(
   new URL('../../../deploy/ansible/files/inspect.sh', import.meta.url),
@@ -173,13 +173,18 @@ export class Worker {
         auth.releaseId === job.releaseId &&
         node.lastSeenAt &&
         node.lastSeenAt.getTime() > Date.now() - 45000 &&
-        health?.android
+        health?.android &&
+        requiredAgentProtocolsReady(manifest.features, node)
       ) {
         const until = Date.now() + 45000;
         let fresh = false;
         while (Date.now() < until && !abort.signal.aborted) {
           const live = await this.db.node.findUniqueOrThrow({ where: { id: node.id } });
-          if (live.lastSeenAt && live.lastSeenAt > job.createdAt) {
+          if (
+            live.lastSeenAt &&
+            live.lastSeenAt > job.createdAt &&
+            requiredAgentProtocolsReady(manifest.features, live)
+          ) {
             fresh = true;
             break;
           }
@@ -239,7 +244,8 @@ export class Worker {
           current.agentReleaseId === manifest.id &&
           current.agentVersion === manifest.agentVersion &&
           currentHealth?.android &&
-          !currentHealth.markerPresent
+          !currentHealth.markerPresent &&
+          requiredAgentProtocolsReady(manifest.features, current)
         ) {
           verified = true;
           break;

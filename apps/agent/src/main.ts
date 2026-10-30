@@ -1,3 +1,4 @@
+import { agentProtocolsForVersion } from '@apk/contracts';
 import { readFile, mkdir, writeFile, rename, chmod } from 'node:fs/promises';
 import { randomBytes, randomUUID, createCipheriv, createDecipheriv } from 'node:crypto';
 import { join, resolve } from 'node:path';
@@ -118,53 +119,9 @@ export async function startAgent(
   let report = await health(config.sdkRoot, config.toolsRoot, config.releaseId),
     checkedAt = Date.now(),
     refreshing = false;
-  const registration = [
-    '0.4.0',
-    '0.4.1',
-    '0.5.0',
-    '0.5.1',
-    '0.6.0',
-    '0.6.1',
-    '0.7.0',
-    '0.7.1',
-    '0.7.2',
-    '0.8.0',
-    '0.8.1',
-    '0.9.0',
-    '0.9.1',
-    '0.9.2',
-    '0.10.0',
-    '0.11.0',
-    '0.11.1',
-    '0.12.0',
-    '0.12.1',
-  ].includes(config.agentVersion);
-  const engine = [
-    '0.3.0',
-    '0.3.1',
-    '0.3.2',
-    '0.3.3',
-    '0.3.4',
-    '0.4.0',
-    '0.4.1',
-    '0.5.0',
-    '0.5.1',
-    '0.6.0',
-    '0.6.1',
-    '0.7.0',
-    '0.7.1',
-    '0.7.2',
-    '0.8.0',
-    '0.8.1',
-    '0.9.0',
-    '0.9.1',
-    '0.9.2',
-    '0.10.0',
-    '0.11.0',
-    '0.11.1',
-    '0.12.0',
-    '0.12.1',
-  ].includes(config.agentVersion)
+  const protocols = agentProtocolsForVersion(config.agentVersion);
+  const registration = protocols.registration;
+  const engine = protocols.download
     ? await TaskEngine.open(
         config.dataRoot ?? '/var/lib/apk-platform/execution',
         config.nodeId,
