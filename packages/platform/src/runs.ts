@@ -9,6 +9,8 @@ import type {
 } from '@apk/contracts';
 import {
   agentIssues,
+  dailySupported,
+  autoRegistrationSupported,
   schemaIssues,
   registrationFlowFor,
   contentIsolationSupported,
@@ -260,48 +262,12 @@ export async function createRun(
         configuration.download.landingRules.some(
           (r) => r.mode !== undefined || r.autoWaitMs !== undefined,
         )) &&
-      (!manifest?.features?.includes('DAILY_V1') ||
-        ![
-          '0.5.0',
-          '0.5.1',
-          '0.6.0',
-          '0.6.1',
-          '0.7.0',
-          '0.7.1',
-          '0.7.2',
-          '0.8.0',
-          '0.8.1',
-          '0.9.0',
-          '0.9.1',
-          '0.9.2',
-          '0.10.0',
-          '0.11.0',
-          '0.11.1',
-          '0.12.0',
-          '0.12.1',
-        ].includes(node.agentVersion ?? ''))
+      !dailySupported(manifest?.features, node.agentVersion)
     )
       fault('NODE_UPGRADE_REQUIRED', '请部署支持每日下载与循环注册的 Agent');
     if (
       configuration.execution.autoRegistration !== undefined &&
-      (!manifest?.features?.includes('AUTO_REGISTRATION_V1') ||
-        ![
-          '0.6.0',
-          '0.6.1',
-          '0.7.0',
-          '0.7.1',
-          '0.7.2',
-          '0.8.0',
-          '0.8.1',
-          '0.9.0',
-          '0.9.1',
-          '0.9.2',
-          '0.10.0',
-          '0.11.0',
-          '0.11.1',
-          '0.12.0',
-          '0.12.1',
-        ].includes(node.agentVersion ?? ''))
+      !autoRegistrationSupported(manifest?.features, node.agentVersion)
     )
       fault('NODE_UPGRADE_REQUIRED', '自动识别注册入口需要 Agent 0.6.0');
     if (configuration.execution.appOpen && !appOpenSupported(manifest?.features, node.agentVersion))

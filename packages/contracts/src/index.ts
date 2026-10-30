@@ -370,3 +370,41 @@ export function ownedTestSupported(
     features?.includes('OWNED_TEST_CLIENT_V1') === true
   );
 }
+
+const dailyAgentVersions: readonly string[] = [
+  '0.5.0',
+  '0.5.1',
+  '0.6.0',
+  '0.6.1',
+  '0.7.0',
+  '0.7.1',
+  '0.7.2',
+  '0.8.0',
+  '0.8.1',
+  '0.9.0',
+  '0.9.1',
+  '0.9.2',
+  '0.10.0',
+  '0.11.0',
+  '0.11.1',
+  '0.12.0',
+  '0.12.1',
+  '0.12.2',
+];
+export function dailySupported(
+  features: readonly string[] | undefined,
+  version: string | null | undefined,
+): boolean {
+  return dailyAgentVersions.includes(version ?? '') && features?.includes('DAILY_V1') === true;
+}
+export function autoRegistrationSupported(
+  features: readonly string[] | undefined,
+  version: string | null | undefined,
+): boolean {
+  return (
+    dailyAgentVersions.includes(version ?? '') &&
+    version !== '0.5.0' &&
+    version !== '0.5.1' &&
+    features?.includes('AUTO_REGISTRATION_V1') === true
+  );
+}
