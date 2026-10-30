@@ -14,6 +14,11 @@ export const dailyLabels: Record<string, string> = {
   WAITING: '等待条件就绪',
 };
 export const reasonLabels: Record<string, string> = {
+  APP_NOT_FOREGROUND: 'APP 未保持在前台，本轮未完成',
+  APP_FOREGROUND_FAILED: '无法读取 APP 前台状态，本轮未完成',
+  APP_OPEN_FAILED: 'APP 启动停留执行失败',
+  APP_OPEN_TIMEOUT: 'APP 前台检查超时，本轮未完成',
+  APP_OPEN_CONFIG_INVALID: '启动停留配置无效，请重新保存任务',
   BATCH_ENDED: '批次已结束，此轮未执行',
   AUTO_ADAPTATION_REQUIRED: '注册页面需要适配，剩余次数未执行',
   AUTO_ENTRY_NOT_FOUND: '未找到明确的注册入口',
