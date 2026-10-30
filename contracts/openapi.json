@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "APK 部署中台 API",
-    "version": "1.13.1"
+    "version": "1.14.0"
   },
   "paths": {
     "/api/v1/auth/login": {
@@ -3913,10 +3913,334 @@
           }
         ]
       }
+    },
+    "/api/v1/test-data": {
+      "get": {
+        "operationId": "testDataList",
+        "x-phase": "P0",
+        "security": [
+          {
+            "AdminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestDataPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "统一错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "string",
+              "pattern": "^([1-9]|[1-9][0-9]|100)$"
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "nodeId",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "runId",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false
+          }
+        ]
+      }
+    },
+    "/api/v1/test-data/{id}/credentials": {
+      "post": {
+        "operationId": "testDataCredentials",
+        "x-phase": "P0",
+        "security": [
+          {
+            "AdminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestDataCredentials"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "统一错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountViewInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/test-client": {
+      "get": {
+        "operationId": "testClientPage",
+        "x-phase": "P0",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "default": {
+            "description": "统一错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": []
+      }
+    },
+    "/api/v1/test-client/apk": {
+      "get": {
+        "operationId": "testClientApk",
+        "x-phase": "P0",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "成功"
+          },
+          "default": {
+            "description": "统一错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": []
+      }
+    },
+    "/api/v1/test-client/info": {
+      "get": {
+        "operationId": "testClientInfo",
+        "x-phase": "P0",
+        "security": [
+          {
+            "AdminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestClientInfo"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "统一错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": []
+      }
+    },
+    "/api/v1/agent/tasks/{taskId}/test-bootstrap": {
+      "put": {
+        "operationId": "testClientBootstrap",
+        "x-phase": "P0",
+        "security": [
+          {
+            "NodeBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestBootstrap"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "统一错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestBootstrapInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "taskId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/test-data/enroll": {
+      "post": {
+        "operationId": "testClientEnroll",
+        "x-phase": "P0",
+        "security": [
+          {
+            "TestEnrollment": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestEnrollResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "统一错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestEnrollInput"
+              }
+            }
+          }
+        },
+        "parameters": []
+      }
     }
   },
   "components": {
     "securitySchemes": {
+      "TestEnrollment": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "限本次自有 APK 安装的短期令牌"
+      },
       "AdminSession": {
         "type": "apiKey",
         "in": "cookie",
@@ -3928,6 +4252,410 @@
       }
     },
     "schemas": {
+      "TestEnrollInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "installationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "requestKey": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "androidId": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{1,16}$"
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "manufacturer": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "apiLevel": {
+            "type": "integer",
+            "minimum": 26,
+            "maximum": 100
+          },
+          "locale": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32
+          },
+          "declaredUserAgent": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "pattern": "^[ -~]+$"
+          },
+          "defaultWebViewUa": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "pattern": "^[ -~]+$"
+          },
+          "appVersion": {
+            "const": "1.0.0"
+          },
+          "appliedWebViewUa": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "pattern": "^[ -~]+$"
+          }
+        },
+        "required": [
+          "installationId",
+          "requestKey",
+          "androidId",
+          "model",
+          "manufacturer",
+          "apiLevel",
+          "locale",
+          "declaredUserAgent",
+          "defaultWebViewUa",
+          "appVersion",
+          "appliedWebViewUa"
+        ]
+      },
+      "TestEnrollResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "username": {
+            "type": "string",
+            "pattern": "^[a-z]{6,10}$"
+          },
+          "password": {
+            "type": "string",
+            "pattern": "^(?=.*[A-Za-z])(?=.*[0-9])[A-Za-z0-9]{8,12}$"
+          },
+          "sourceIp": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "username",
+          "password",
+          "sourceIp",
+          "createdAt"
+        ]
+      },
+      "TestBootstrapInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "protocolVersion": {
+            "const": "1.0"
+          },
+          "nodeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "deliveryId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fence": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "protocolVersion",
+          "nodeId",
+          "deliveryId",
+          "fence"
+        ]
+      },
+      "TestBootstrap": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "apiUrl": {
+            "type": "string",
+            "format": "uri",
+            "maxLength": 2048
+          },
+          "token": {
+            "type": "string",
+            "pattern": "^[-_A-Za-z0-9]{43}$"
+          },
+          "profileId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "expectedModel": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "userAgent": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "pattern": "^[ -~]+$"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "apiUrl",
+          "token",
+          "profileId",
+          "expectedModel",
+          "userAgent",
+          "expiresAt"
+        ]
+      },
+      "TestDataQuery": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "limit": {
+            "type": "string",
+            "pattern": "^([1-9]|[1-9][0-9]|100)$"
+          },
+          "cursor": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nodeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "runId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": []
+      },
+      "TestDataPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "nodeId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "nodeName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                "runId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "taskId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "position": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "username": {
+                  "type": "string",
+                  "pattern": "^[a-z]{6,10}$"
+                },
+                "sourceIp": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "androidIdHash": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "model": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                "manufacturer": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                "apiLevel": {
+                  "type": "integer",
+                  "minimum": 26,
+                  "maximum": 100
+                },
+                "userAgent": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512
+                },
+                "defaultWebViewUa": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1024
+                },
+                "profileId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "uaMatched": {
+                  "type": "boolean"
+                },
+                "modelMatched": {
+                  "type": "boolean"
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "id",
+                "nodeId",
+                "nodeName",
+                "runId",
+                "taskId",
+                "position",
+                "username",
+                "sourceIp",
+                "androidIdHash",
+                "model",
+                "manufacturer",
+                "apiLevel",
+                "userAgent",
+                "defaultWebViewUa",
+                "profileId",
+                "uaMatched",
+                "modelMatched",
+                "createdAt"
+              ]
+            }
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ]
+      },
+      "TestDataCredentials": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "username": {
+            "type": "string",
+            "pattern": "^[a-z]{6,10}$"
+          },
+          "password": {
+            "type": "string",
+            "pattern": "^(?=.*[A-Za-z])(?=.*[0-9])[A-Za-z0-9]{8,12}$"
+          },
+          "androidId": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{1,16}$"
+          }
+        },
+        "required": [
+          "username",
+          "password",
+          "androidId"
+        ]
+      },
+      "TestClientInfo": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "ready": {
+            "type": "boolean"
+          },
+          "packageName": {
+            "const": "com.apkplatform.testclient"
+          },
+          "sha256": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 32
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "downloadUrl": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          },
+          "sourcePageUrl": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          }
+        },
+        "required": [
+          "ready",
+          "packageName",
+          "sha256",
+          "version",
+          "downloadUrl",
+          "sourcePageUrl"
+        ]
+      },
       "TaskPlanInput": {
         "type": "object",
         "additionalProperties": false,
@@ -5579,14 +6307,18 @@
                   "proxyObservedAt": {
                     "type": "string",
                     "format": "date-time"
+                  },
+                  "proxyIpScope": {
+                    "enum": [
+                      "PROBE_ONLY",
+                      "NOT_CHECKED"
+                    ]
                   }
                 },
                 "required": [
                   "model",
                   "locale",
-                  "shellAndroidIdHash",
-                  "proxyObservedIp",
-                  "proxyObservedAt"
+                  "shellAndroidIdHash"
                 ]
               },
               {
@@ -6924,6 +7656,12 @@
                       2
                     ],
                     "default": 1
+                  },
+                  "randomDeviceProfile": {
+                    "const": true
+                  },
+                  "ownedTestClient": {
+                    "const": true
                   }
                 }
               }
@@ -7535,6 +8273,10 @@
                       "systemImage": {
                         "type": "string",
                         "maxLength": 100
+                      },
+                      "identityModels": {
+                        "type": "string",
+                        "pattern": "^[0-3]$"
                       }
                     }
                   },
@@ -8747,8 +9489,6 @@
               "locale",
               "shellAndroidIdHash",
               "androidIdScope",
-              "proxyObservedIp",
-              "proxyObservedAt",
               "proxyIpScope",
               "appUserAgent",
               "identitySource"
@@ -8789,15 +9529,62 @@
                 "$ref": "#/components/schemas/AgentMessage/$defs/time"
               },
               "proxyIpScope": {
-                "const": "PROBE_ONLY"
+                "enum": [
+                  "PROBE_ONLY",
+                  "NOT_CHECKED"
+                ]
               },
               "appUserAgent": {
                 "const": "UNVERIFIED"
               },
               "identitySource": {
                 "const": "EMULATOR_NOT_REAL_DEVICE"
+              },
+              "variantId": {
+                "type": "string",
+                "pattern": "^qa-model-(0[1-9]|10)$"
+              },
+              "systemImageSha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
               }
-            }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "proxyIpScope": {
+                      "const": "PROBE_ONLY"
+                    }
+                  },
+                  "required": [
+                    "proxyIpScope"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "proxyObservedIp",
+                    "proxyObservedAt"
+                  ]
+                },
+                "else": {
+                  "not": {
+                    "anyOf": [
+                      {
+                        "required": [
+                          "proxyObservedIp"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "proxyObservedAt"
+                        ]
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
           },
           "proxyChecked": {
             "type": "object",
@@ -9512,7 +10299,7 @@
           },
           "features": {
             "type": "array",
-            "maxItems": 8,
+            "maxItems": 16,
             "uniqueItems": true,
             "items": {
               "enum": [
@@ -9523,7 +10310,9 @@
                 "CONTENT_ISOLATION_V1",
                 "APP_READINESS_V1",
                 "APP_OPEN_V1",
-                "APP_OPEN_PARALLEL_V1"
+                "APP_OPEN_PARALLEL_V1",
+                "DEVICE_VARIANTS_V1",
+                "OWNED_TEST_CLIENT_V1"
               ]
             }
           }
@@ -9604,6 +10393,10 @@
               "systemImage": {
                 "type": "string",
                 "maxLength": 100
+              },
+              "identityModels": {
+                "type": "string",
+                "pattern": "^[0-3]$"
               }
             }
           },
@@ -10526,6 +11319,16 @@
               "admissionDeadline": {
                 "type": "string",
                 "format": "date-time"
+              },
+              "variantIds": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 10,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "pattern": "^qa-model-(0[1-9]|10)$"
+                }
               }
             }
           }

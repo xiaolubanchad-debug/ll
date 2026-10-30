@@ -37,6 +37,7 @@ export interface AutomationEvent {
   payload: Record<string, unknown>;
 }
 export interface Target {
+  variantId?: string;
   taskId: string;
   targetKey: string;
   entryId?: string;

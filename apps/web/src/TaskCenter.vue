@@ -139,6 +139,7 @@ onUnmounted(() => {
       :closable="false"
     />
     <TaskWizard
+      :owned-test="route.query.get('ownedTest') === 'true'"
       v-if="editor && (!route.id || detail)"
       :key="(route.id || 'new') + (route.query.get('version') ?? '')"
       :initial="detail ?? undefined"

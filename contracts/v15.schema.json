@@ -57,15 +57,10 @@
     "ProxyObservation": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "status"
-      ],
+      "required": ["status"],
       "properties": {
         "status": {
-          "enum": [
-            "SUCCEEDED",
-            "FAILED"
-          ]
+          "enum": ["SUCCEEDED", "FAILED"]
         },
         "ip": {
           "type": "string",
@@ -86,20 +81,10 @@
     "DailyExecutionPlan": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "purpose",
-        "cacheDay",
-        "successTarget",
-        "attemptLimit",
-        "assets"
-      ],
+      "required": ["purpose", "cacheDay", "successTarget", "attemptLimit", "assets"],
       "properties": {
         "purpose": {
-          "enum": [
-            "DOWNLOAD",
-            "REGISTER",
-            "PROXY_CHECK"
-          ]
+          "enum": ["DOWNLOAD", "REGISTER", "PROXY_CHECK"]
         },
         "cacheDay": {
           "type": "string",
@@ -125,12 +110,7 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": [
-              "targetKey",
-              "label",
-              "sourceUrl",
-              "apk"
-            ],
+            "required": ["targetKey", "label", "sourceUrl", "apk"],
             "properties": {
               "targetKey": {
                 "type": "string",
@@ -165,17 +145,11 @@
                     "maxLength": 256
                   },
                   "versionName": {
-                    "type": [
-                      "string",
-                      "null"
-                    ],
+                    "type": ["string", "null"],
                     "maxLength": 256
                   },
                   "versionCode": {
-                    "type": [
-                      "integer",
-                      "null"
-                    ],
+                    "type": ["integer", "null"],
                     "minimum": 0
                   },
                   "abis": {
@@ -212,18 +186,11 @@
         "openPolicy": {
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "concurrency",
-            "dailyLimit",
-            "admissionDeadline"
-          ],
+          "required": ["concurrency", "dailyLimit", "admissionDeadline"],
           "properties": {
             "concurrency": {
               "type": "integer",
-              "enum": [
-                1,
-                2
-              ]
+              "enum": [1, 2]
             },
             "dailyLimit": {
               "const": 800
@@ -231,6 +198,16 @@
             "admissionDeadline": {
               "type": "string",
               "format": "date-time"
+            },
+            "variantIds": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 10,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "pattern": "^qa-model-(0[1-9]|10)$"
+              }
             }
           }
         }
@@ -238,9 +215,7 @@
       "allOf": [
         {
           "if": {
-            "required": [
-              "openPolicy"
-            ]
+            "required": ["openPolicy"]
           },
           "then": {
             "properties": {

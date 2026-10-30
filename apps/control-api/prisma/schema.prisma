@@ -273,6 +273,7 @@ model Delivery {
 }
 
 model Task {
+  testEnrollment        TestEnrollment?
   id                    String         @id @db.Uuid
   startedAt             DateTime?      @db.Timestamptz(3)
   registrationStartedAt DateTime?      @db.Timestamptz(3)
@@ -303,6 +304,47 @@ model Task {
   @@unique([runId, targetKey])
   @@unique([runId, position])
   @@index([registrationStartedAt, id])
+}
+
+model TestEnrollment {
+  id          String      @id @default(uuid()) @db.Uuid
+  taskId      String      @unique @db.Uuid
+  task        Task        @relation(fields: [taskId], references: [id], onDelete: Restrict)
+  nodeId      String      @db.Uuid
+  deliveryId  String      @db.Uuid
+  fence       Int
+  tokenHash   String      @unique @db.Char(64)
+  expectedUa  String      @db.VarChar(512)
+  model       String      @db.VarChar(100)
+  profileId   String      @db.VarChar(64)
+  expiresAt   DateTime    @db.Timestamptz(3)
+  createdAt   DateTime    @default(now()) @db.Timestamptz(3)
+  record      TestRecord?
+
+  @@index([nodeId, createdAt])
+}
+
+model TestRecord {
+  id               String         @id @default(uuid()) @db.Uuid
+  enrollmentId     String         @unique @db.Uuid
+  enrollment       TestEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Restrict)
+  installationId   String         @db.Uuid
+  requestKey       String         @db.Uuid
+  requestHash      String         @db.Char(64)
+  username         String         @unique @db.VarChar(10)
+  sourceIp         String         @db.VarChar(64)
+  androidIdHash    String         @db.Char(64)
+  model            String         @db.VarChar(100)
+  manufacturer     String         @db.VarChar(100)
+  apiLevel         Int
+  userAgent        String         @db.VarChar(512)
+  defaultWebViewUa  String         @db.VarChar(1024)
+  uaMatched        Boolean
+  modelMatched     Boolean
+  encrypted        Json
+  createdAt        DateTime       @default(now()) @db.Timestamptz(3)
+
+  @@index([createdAt, id])
 }
 
 model AccountResult {

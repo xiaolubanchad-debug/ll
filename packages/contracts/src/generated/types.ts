@@ -1,4 +1,91 @@
 // Generated. Run npm run generate:contracts.
+export interface TestEnrollInput {
+  installationId: string;
+  requestKey: string;
+  androidId: string;
+  model: string;
+  manufacturer: string;
+  apiLevel: number;
+  locale: string;
+  declaredUserAgent: string;
+  defaultWebViewUa: string;
+  appVersion: '1.0.0';
+  appliedWebViewUa: string;
+}
+
+export interface TestEnrollResult {
+  id: string;
+  username: string;
+  password: string;
+  sourceIp: string;
+  createdAt: string;
+}
+
+export interface TestBootstrapInput {
+  protocolVersion: '1.0';
+  nodeId: string;
+  deliveryId: string;
+  fence: number;
+}
+
+export interface TestBootstrap {
+  apiUrl: string;
+  token: string;
+  profileId: string;
+  expectedModel: string;
+  userAgent: string;
+  expiresAt: string;
+}
+
+export interface TestDataQuery {
+  limit?: string;
+  cursor?: string;
+  nodeId?: string;
+  runId?: string;
+}
+
+export interface TestDataPage {
+  /**
+   * @maxItems 100
+   */
+  items: {
+    id: string;
+    nodeId: string;
+    nodeName: string;
+    runId: string;
+    taskId: string;
+    position: number;
+    username: string;
+    sourceIp: string;
+    androidIdHash: string;
+    model: string;
+    manufacturer: string;
+    apiLevel: number;
+    userAgent: string;
+    defaultWebViewUa: string;
+    profileId: string;
+    uaMatched: boolean;
+    modelMatched: boolean;
+    createdAt: string;
+  }[];
+  nextCursor: string | null;
+}
+
+export interface TestDataCredentials {
+  username: string;
+  password: string;
+  androidId: string;
+}
+
+export interface TestClientInfo {
+  ready: boolean;
+  packageName: 'com.apkplatform.testclient';
+  sha256: string | null;
+  version: string | null;
+  downloadUrl: string;
+  sourcePageUrl: string;
+}
+
 export interface TaskPlanInput {
   name: string;
   nodeId: string;
@@ -71,6 +158,8 @@ export interface APKTestConfigurationVersion10 {
     appOpen?: {
       dwellMs: 10000;
       concurrency?: 1 | 2;
+      randomDeviceProfile?: true;
+      ownedTestClient?: true;
     };
   };
   /**
@@ -317,6 +406,8 @@ export interface APKTestConfigurationVersion10 {
     appOpen?: {
       dwellMs: 10000;
       concurrency?: 1 | 2;
+      randomDeviceProfile?: true;
+      ownedTestClient?: true;
     };
   };
   /**
@@ -671,8 +762,9 @@ export interface RegistrationDetailView {
     model: string;
     locale: string;
     shellAndroidIdHash: string;
-    proxyObservedIp: string;
-    proxyObservedAt: string;
+    proxyObservedIp?: string;
+    proxyObservedAt?: string;
+    proxyIpScope?: 'PROBE_ONLY' | 'NOT_CHECKED';
   } | null;
   recognition: {
     source: 'CONTROLS' | 'OCR' | 'LEARNED';
@@ -962,6 +1054,8 @@ export interface TestConfiguration {
     appOpen?: {
       dwellMs: 10000;
       concurrency?: 1 | 2;
+      randomDeviceProfile?: true;
+      ownedTestClient?: true;
     };
   };
   /**
@@ -1050,6 +1144,7 @@ export type AgentMessage =
           appium?: string;
           playwright?: string;
           systemImage?: string;
+          identityModels?: string;
         };
         /**
          * @maxItems 20
@@ -1220,7 +1315,7 @@ export interface ReleaseInput {
     npmLockSha256: string;
   };
   /**
-   * @maxItems 8
+   * @maxItems 16
    */
   features?: (
     | 'DOWNLOAD_V1'
@@ -1231,6 +1326,8 @@ export interface ReleaseInput {
     | 'APP_READINESS_V1'
     | 'APP_OPEN_V1'
     | 'APP_OPEN_PARALLEL_V1'
+    | 'DEVICE_VARIANTS_V1'
+    | 'OWNED_TEST_CLIENT_V1'
   )[];
 }
 
@@ -1251,6 +1348,7 @@ export interface HealthReport {
     appium?: string;
     playwright?: string;
     systemImage?: string;
+    identityModels?: string;
   };
   /**
    * @maxItems 20
@@ -1458,6 +1556,11 @@ export interface DailyExecutionPlan {
     concurrency: 1 | 2;
     dailyLimit: 800;
     admissionDeadline: string;
+    /**
+     * @minItems 1
+     * @maxItems 10
+     */
+    variantIds?: string[];
   };
 }
 

@@ -502,7 +502,7 @@ try {
       assert.equal(result.proof, 'APP_OPEN');
       assert.ok(result.openObservation.elapsedMs >= 10000);
       assert.deepEqual(appOpenTimingsIssues(result.openTimings), []);
-      assert.equal(result.openTimings.steps.length, 10);
+      assert.equal(result.openTimings.steps.length, 9);
       assert.ok(result.openTimings.steps.every((s) => s.outcome === 'SUCCEEDED'));
       assert.equal(result.openObservation.scope, 'FOREGROUND_POLL_ONLY');
       assert.equal(accountCalls, 0);

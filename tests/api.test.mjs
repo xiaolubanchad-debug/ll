@@ -1,3 +1,4 @@
+import { V114Controller } from '../apps/control-api/dist/v114-controllers.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -332,6 +333,9 @@ test('P0 real PostgreSQL acceptance', async (t) => {
       manifest.routes.push(
         ...JSON.parse(fs.readFileSync('contracts/v17.http.json', 'utf8')).routes,
       );
+      manifest.routes.push(
+        ...JSON.parse(fs.readFileSync('contracts/v114.http.json', 'utf8')).routes,
+      );
       const actual = [];
       manifest.routes.push(
         ...JSON.parse(fs.readFileSync('contracts/v18.http.json', 'utf8')).routes,
@@ -349,6 +353,7 @@ test('P0 real PostgreSQL acceptance', async (t) => {
         V15Controller,
         V17Controller,
         V18Controller,
+        V114Controller,
       ])
         for (const key of Object.getOwnPropertyNames(C.prototype)) {
           const handler = C.prototype[key];

@@ -1,3 +1,4 @@
+import { loadIdentityImage } from './identity-images.js';
 import { setTimeout as delay } from 'node:timers/promises';
 import type { ApkMetadata, TestConfiguration } from '@apk/contracts';
 import { verifyApkIntegrity } from './apk.js';
@@ -11,10 +12,11 @@ import { RegistrationError } from './registration-types.js';
 import type { RegistrationCompletion } from './registration.js';
 
 export interface AppOpenHooks extends AndroidOptions {
+  testBootstrap?: () => Promise<import('@apk/contracts').TestBootstrap>;
   androidFactory?: typeof startAndroid;
   clock?: { now(): number; sleep(ms: number, signal: AbortSignal): Promise<void> };
 }
-// This path never creates accounts, reads APP content, or calls UI automation.
+// This path never reads APP content or calls UI automation. The owned client may report its own account.
 export async function openApk(
   config: TestConfiguration,
   target: Target,
@@ -54,6 +56,9 @@ export async function openApk(
     const profile = config.execution.deviceProfiles[index % config.execution.deviceProfiles.length];
     session = await (hooks.androidFactory ?? startAndroid)(profile, signal, {
       ...hooks,
+      ...(config.execution.appOpen.randomDeviceProfile
+        ? { identityImage: await loadIdentityImage(hooks.sdkRoot, target.variantId ?? '') }
+        : {}),
       controlMode: 'LAUNCH_ONLY',
       measure: timer.measure,
     });
@@ -65,6 +70,17 @@ export async function openApk(
     );
     await stage('INSTALLING', { observation: session.observation });
     await timer.measure('APK_INSTALL', () => session!.install(file));
+    if (config.execution.appOpen.ownedTestClient) {
+      if (
+        apk.packageName !== 'com.apkplatform.testclient' ||
+        !hooks.testBootstrap ||
+        !session.provisionTestClient
+      )
+        throw new RegistrationError('TEST_BOOTSTRAP_REQUIRED');
+      const bootstrap = await hooks.testBootstrap();
+      action();
+      await session.provisionTestClient(bootstrap);
+    }
     action();
     await stage('LAUNCHING');
     await timer.measure('APP_LAUNCH', () => session!.launch(apk.packageName, '@launcher'));

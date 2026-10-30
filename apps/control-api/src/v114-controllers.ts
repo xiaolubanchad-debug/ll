@@ -1,0 +1,65 @@
+import { Body, Controller, Get, Post, Put, Param, Query, Req, Res, HttpCode } from '@nestjs/common';
+import type { Response } from 'express';
+import {
+  testDataPage,
+  viewTestCredentials,
+  testClientInfo,
+  testClientArtifact,
+  issueTestBootstrap,
+  enrollTestClient,
+} from '@apk/platform';
+import { NodeRoute, Public, TestAppRoute } from './auth.js';
+import type { AuthedRequest } from './auth.js';
+import { Database } from './database.js';
+import { uuid } from './p1-controllers.js';
+
+@Controller()
+export class V114Controller {
+  constructor(private readonly db: Database) {}
+  @Get('test-data') list(@Query() query: Record<string, unknown>) {
+    return testDataPage(this.db, query);
+  }
+  @Post('test-data/:id/credentials') @HttpCode(200) credentials(
+    @Param('id') id: string,
+    @Body() body: unknown,
+    @Req() req: AuthedRequest,
+  ) {
+    return viewTestCredentials(this.db, uuid(id), body, req.auth!.admin.id, req.requestId);
+  }
+  @Get('test-client/info') info() {
+    return testClientInfo();
+  }
+  @Public() @Get('test-client') page(@Res() res: Response) {
+    res
+      .type('html')
+      .send(
+        '<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>自有测试 APK</title><body><h1>中台自有测试 APK</h1><p>用于中台模拟器任务的设备观测和测试账户上报。</p><a id="test-apk" href="/api/v1/test-client/apk">下载测试 APK</a></body></html>',
+      );
+  }
+  @Public() @Get('test-client/apk') async apk(@Res() res: Response) {
+    const artifact = await testClientArtifact();
+    res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+    res.setHeader('Content-Disposition', 'attachment; filename="apk-platform-test.apk"');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.send(artifact.bytes);
+  }
+  @NodeRoute() @Put('agent/tasks/:taskId/test-bootstrap') @HttpCode(200) bootstrap(
+    @Param('taskId') id: string,
+    @Body() body: unknown,
+    @Req() req: AuthedRequest,
+  ) {
+    return issueTestBootstrap(this.db, req.nodeToken!, uuid(id), body);
+  }
+  @TestAppRoute() @Post('test-data/enroll') @HttpCode(200) enroll(
+    @Body() body: unknown,
+    @Req() req: AuthedRequest,
+  ) {
+    return enrollTestClient(
+      this.db,
+      req.testAppToken!,
+      body,
+      req.ip ?? '',
+      req.get('user-agent') ?? '',
+    );
+  }
+}

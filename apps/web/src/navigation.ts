@@ -8,9 +8,12 @@ export type Section =
   | 'results'
   | 'assets'
   | 'proxies'
-  | 'tasks';
+  | 'tasks'
+  | 'test-data';
+// Self-owned APK data has its own section and never changes registration history.
 // Task plans own the daily workflow; individual run URLs remain stable.
 const sections: Section[] = [
+  'test-data',
   'tasks',
   'overview',
   'nodes',

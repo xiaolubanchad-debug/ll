@@ -16,3 +16,6 @@ export * from './maintenance.js';
 export { saveSchedule, tickSchedules } from './schedules.js';
 
 export * from './open-budget.js';
+export * from './test-data.js';
+
+export * from './identity.js';

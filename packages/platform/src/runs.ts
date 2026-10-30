@@ -1,3 +1,4 @@
+import { assertIdentityReady } from './identity.js';
 import { Prisma } from '@prisma/client';
 import type { PrismaClient, Run, Delivery, Prisma as P } from '@prisma/client';
 import type {
@@ -276,6 +277,7 @@ export async function createRun(
           '0.10.0',
           '0.11.0',
           '0.11.1',
+          '0.12.0',
         ].includes(node.agentVersion ?? ''))
     )
       fault('NODE_UPGRADE_REQUIRED', '请部署支持每日下载与循环注册的 Agent');
@@ -296,6 +298,7 @@ export async function createRun(
           '0.10.0',
           '0.11.0',
           '0.11.1',
+          '0.12.0',
         ].includes(node.agentVersion ?? ''))
     )
       fault('NODE_UPGRADE_REQUIRED', '自动识别注册入口需要 Agent 0.6.0');
@@ -462,6 +465,14 @@ async function assertIsolatedRun(tx: Tx, run: Run) {
   )
     fault('NODE_UPGRADE_REQUIRED', '并发与每日额度需要 Agent 0.11.0');
   if (!android) return;
+  if (config?.body)
+    assertIdentityReady(
+      config.body as unknown as TestConfiguration,
+      features,
+      node.agentVersion,
+      node.health,
+      run.attemptLimit,
+    );
   if (settings?.appOpen?.concurrency !== undefined) {
     const policy = (run.executionPlan as unknown as DailyExecutionPlan | null)?.openPolicy;
     if (
@@ -897,14 +908,32 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
       }
       if (stage === 'INSTALLING') {
         const observation = p.observation as
-          | { profileId?: string; proxyObservedIp?: string }
+          | {
+              profileId?: string;
+              proxyObservedIp?: string;
+              proxyIpScope?: string;
+              variantId?: string;
+              model?: string;
+              systemImageSha256?: string;
+            }
           | undefined;
         if (
           !observation ||
           !config.execution.deviceProfiles.some((v) => v.id === observation.profileId) ||
-          !isIP(observation.proxyObservedIp ?? '')
+          (!(openOnly && observation.proxyIpScope === 'NOT_CHECKED') &&
+            !isIP(observation.proxyObservedIp ?? ''))
         )
-          fault('EVENT_CONFLICT', '缺少设备与代理探测证据');
+          fault('EVENT_CONFLICT', '缺少设备及代理配置证据');
+        if (config.execution.appOpen?.randomDeviceProfile) {
+          const variantId = plan?.openPolicy?.variantIds?.[task.position];
+          if (
+            !variantId ||
+            observation.variantId !== variantId ||
+            observation.model !== 'QA-Mobile-000' + Number(variantId.slice(-2)) ||
+            !/^[a-f0-9]{64}$/.test(observation.systemImageSha256 ?? '')
+          )
+            fault('EVENT_CONFLICT', '型号档案与本轮分配不一致');
+        }
       }
       if (stage === 'VERIFYING' && !task.submissionId)
         fault('EVENT_CONFLICT', '核验前必须保存提交意图');

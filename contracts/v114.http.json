@@ -1,0 +1,60 @@
+{
+  "version": "1.14.0",
+  "routes": [
+    {
+      "method": "get",
+      "path": "/test-data",
+      "operationId": "testDataList",
+      "response": "TestDataPage",
+      "query": "TestDataQuery",
+      "status": 200
+    },
+    {
+      "method": "post",
+      "path": "/test-data/{id}/credentials",
+      "operationId": "testDataCredentials",
+      "request": "AccountViewInput",
+      "response": "TestDataCredentials",
+      "status": 200
+    },
+    {
+      "method": "get",
+      "path": "/test-client",
+      "operationId": "testClientPage",
+      "public": true,
+      "status": 200
+    },
+    {
+      "method": "get",
+      "path": "/test-client/apk",
+      "operationId": "testClientApk",
+      "public": true,
+      "status": 200
+    },
+    {
+      "method": "get",
+      "path": "/test-client/info",
+      "operationId": "testClientInfo",
+      "response": "TestClientInfo",
+      "status": 200
+    },
+    {
+      "method": "put",
+      "path": "/agent/tasks/{taskId}/test-bootstrap",
+      "operationId": "testClientBootstrap",
+      "request": "TestBootstrapInput",
+      "response": "TestBootstrap",
+      "node": true,
+      "status": 200
+    },
+    {
+      "method": "post",
+      "path": "/test-data/enroll",
+      "operationId": "testClientEnroll",
+      "request": "TestEnrollInput",
+      "response": "TestEnrollResult",
+      "app": true,
+      "status": 200
+    }
+  ]
+}

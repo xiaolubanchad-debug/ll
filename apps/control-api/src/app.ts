@@ -19,6 +19,7 @@ import { P3Controller, P3AgentController } from './p3-controllers.js';
 import { V15Controller, DailyScheduler } from './v15-controllers.js';
 import { V17Controller } from './v17-controllers.js';
 import { V18Controller } from './v18-controllers.js';
+import { V114Controller } from './v114-controllers.js';
 import { digest } from '@apk/platform';
 import { ApiError } from './errors.js';
 
@@ -36,6 +37,7 @@ import { ApiError } from './errors.js';
     V15Controller,
     V17Controller,
     V18Controller,
+    V114Controller,
   ],
   providers: [
     Database,

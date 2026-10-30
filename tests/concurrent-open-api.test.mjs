@@ -46,9 +46,7 @@ test('parallel receipts enforce shared N/M, daily total, cutoff and fixed policy
     locale: 'en-US',
     shellAndroidIdHash: 'b'.repeat(64),
     androidIdScope: 'SHELL_NOT_APP',
-    proxyObservedIp: '93.184.216.34',
-    proxyObservedAt: new Date().toISOString(),
-    proxyIpScope: 'PROBE_ONLY',
+    proxyIpScope: 'NOT_CHECKED',
     appUserAgent: 'UNVERIFIED',
     identitySource: 'EMULATOR_NOT_REAL_DEVICE',
   };
@@ -299,6 +297,33 @@ test('parallel receipts enforce shared N/M, daily total, cutoff and fixed policy
     const plan = await db.$transaction((tx) => prepareDailyPlan(tx, input, version, admission));
     assert.equal(plan.openPolicy.concurrency, 2);
     assert.equal(plan.openPolicy.admissionDeadline, deadline);
+    const variantConfig = structuredClone(config);
+    variantConfig.execution.appOpen.randomDeviceProfile = true;
+    await db.node.update({
+      where: { id: nodeId },
+      data: { agentVersion: '0.12.0', health: { versions: { identityModels: '3' } } },
+    });
+    const release = await db.release.findUniqueOrThrow({ where: { id: releaseId } });
+    await db.release.update({
+      where: { id: releaseId },
+      data: {
+        manifest: {
+          ...release.manifest,
+          features: [...release.manifest.features, 'DEVICE_VARIANTS_V1'],
+        },
+      },
+    });
+    const variantVersion = { ...version, body: variantConfig };
+    const variants = await db.$transaction((tx) =>
+      prepareDailyPlan(tx, { ...input, attemptLimit: 3 }, variantVersion, admission),
+    );
+    assert.equal(new Set(variants.openPolicy.variantIds).size, 3);
+    await assert.rejects(
+      db.$transaction((tx) =>
+        prepareDailyPlan(tx, { ...input, attemptLimit: 4 }, variantVersion, admission),
+      ),
+      (e) => e.code === 'IDENTITY_POOL_EXHAUSTED',
+    );
     await db.run.create({
       data: {
         nodeId,

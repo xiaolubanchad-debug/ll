@@ -12,9 +12,11 @@ import { settings } from './settings.js';
 export const COOKIE = 'apk_session';
 export const Public = () => SetMetadata('public', true);
 export const NodeRoute = () => SetMetadata('nodeRoute', true);
+export const TestAppRoute = () => SetMetadata('testAppRoute', true);
 export interface AuthedRequest extends Request {
   requestId: string;
   nodeToken?: string;
+  testAppToken?: string;
   auth?: { admin: Admin; session: Session; token: string };
 }
 export const digest = (text: string) => createHash('sha256').update(text).digest('hex');
@@ -159,6 +161,18 @@ export class SessionGuard implements CanActivate {
   ) {}
   async canActivate(context: ExecutionContext) {
     const req = context.switchToHttp().getRequest<AuthedRequest>();
+    if (
+      this.reflector.getAllAndOverride<boolean>('testAppRoute', [
+        context.getHandler(),
+        context.getClass(),
+      ])
+    ) {
+      const token = req.get('authorization')?.match(/^Bearer ([-_A-Za-z0-9]{43})$/)?.[1];
+      if (!token) throw new ApiError(401, 'UNAUTHENTICATED', '需要本轮测试凭据');
+      if (!req.is('application/json')) throw new ApiError(400, 'JSON_REQUIRED', '请使用 JSON 请求');
+      req.testAppToken = token;
+      return true;
+    }
     if (
       this.reflector.getAllAndOverride<boolean>('nodeRoute', [
         context.getHandler(),

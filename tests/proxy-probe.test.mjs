@@ -1,7 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createServer } from 'node:http';
-import { probeProxyEndpoints, proxyObservation } from '@apk/automation';
+import { createServer, request } from 'node:http';
+import {
+  probeProxyEndpoints,
+  proxyObservation,
+  startProxyBridge,
+  NetworkPolicy,
+} from '@apk/automation';
 
 async function fixture(work) {
   const sockets = new Set();
@@ -24,6 +29,43 @@ const endpoints = [
   { url: 'https://primary.example.test/ip', format: 'JSON' },
   { url: 'http://owned.example.test/trace', format: 'TRACE' },
 ];
+
+test('proxy bridge makes no probe request and retains real upstream authentication failures', async () => {
+  await fixture(async (server, port) => {
+    let requests = 0;
+    server.on('request', (_req, res) => {
+      requests++;
+      res.writeHead(407).end();
+    });
+    const bridge = await startProxyBridge(
+      { host: '127.0.0.1', port, username: 'owned', password: 'fixture' },
+      new NetworkPolicy(new Set(['http://127.0.0.1:' + port])),
+    );
+    try {
+      assert.equal(requests, 0);
+      bridge.assertHealthy();
+      const status = await new Promise((ok, no) => {
+        const req = request(
+          { host: '127.0.0.1', port: bridge.port, path: 'http://93.184.216.34/owned-test' },
+          (res) => {
+            res.resume();
+            res.once('end', () => ok(res.statusCode));
+          },
+        );
+        req.on('error', no);
+        req.end();
+      });
+      assert.equal(status, 502);
+      assert.equal(requests, 1);
+      assert.throws(
+        () => bridge.assertHealthy(),
+        (e) => e.code === 'PROXY_AUTH_FAILED',
+      );
+    } finally {
+      await bridge.close();
+    }
+  });
+});
 
 test('proxy probe accepts a valid fallback after a TLS reset, without a direct connection', async () => {
   await fixture(async (server, port) => {

@@ -4,6 +4,7 @@ import { arch, totalmem } from 'node:os';
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
 import { executionOSSupported } from '@apk/contracts';
+import { identityManifest } from '@apk/automation';
 export interface AgentHealth {
   ubuntu: string;
   arch: string;
@@ -69,6 +70,12 @@ export async function collectHealth(
     node: process.versions.node,
     systemImage: 'system-images;android-35;google_apis;x86_64',
   };
+  versions.identityModels = String(
+    await identityManifest(sdkRoot).then(
+      (x) => x.length,
+      () => 0,
+    ),
+  );
   const env = {
     ...process.env,
     ANDROID_HOME: sdkRoot,

@@ -52,6 +52,7 @@
         name:
           [
             ca-certificates,
+            e2fsprogs,
             acl,
             nftables,
             curl,
@@ -316,6 +317,34 @@
         ANDROID_HOME: '{{ sdk_root }}'
         JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
       register: boot_check
+      changed_when: false
+    - name: Build private QA model images without changing SDK
+      when: identity_enabled | default(false)
+      ansible.builtin.command:
+        argv: ['{{ runtime_root }}/node/bin/node', '{{ release_root }}/identity-images.js']
+      environment:
+        ANDROID_HOME: '{{ sdk_root }}'
+      changed_when: false
+    - name: Verify each private QA model by actual boot
+      when: identity_enabled | default(false)
+      become_user: apk-runner
+      ansible.builtin.command:
+        argv:
+          [
+            '{{ runtime_root }}/node/bin/node',
+            '{{ release_root }}/boot-check.js',
+            --verify-identities,
+          ]
+      environment:
+        ANDROID_HOME: '{{ sdk_root }}'
+        JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+      changed_when: false
+    - name: Seal verified QA model registry
+      when: identity_enabled | default(false)
+      ansible.builtin.command:
+        argv: ['{{ runtime_root }}/node/bin/node', '{{ release_root }}/identity-images.js', --seal]
+      environment:
+        ANDROID_HOME: '{{ sdk_root }}'
       changed_when: false
     - name: Record actual Android boot proof
       ansible.builtin.copy:

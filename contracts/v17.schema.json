@@ -27,12 +27,7 @@
           "format": "uuid"
         },
         "purpose": {
-          "enum": [
-            "DOWNLOAD",
-            "REGISTER",
-            "LEGACY",
-            "PROXY_CHECK"
-          ]
+          "enum": ["DOWNLOAD", "REGISTER", "LEGACY", "PROXY_CHECK"]
         },
         "status": {
           "enum": [
@@ -60,11 +55,7 @@
           "pattern": "^(?:[1-9]|[1-9][0-9]|100)$"
         },
         "executionKind": {
-          "enum": [
-            "APP_OPEN",
-            "REGISTRATION",
-            "DOWNLOAD_ONLY"
-          ]
+          "enum": ["APP_OPEN", "REGISTRATION", "DOWNLOAD_ONLY"]
         }
       },
       "required": []
@@ -155,11 +146,7 @@
                 ]
               },
               "executionKind": {
-                "enum": [
-                  "APP_OPEN",
-                  "REGISTRATION",
-                  "DOWNLOAD_ONLY"
-                ]
+                "enum": ["APP_OPEN", "REGISTRATION", "DOWNLOAD_ONLY"]
               }
             },
             "required": [
@@ -192,10 +179,7 @@
           ]
         }
       },
-      "required": [
-        "items",
-        "nextCursor"
-      ]
+      "required": ["items", "nextCursor"]
     },
     "ResultsQuery": {
       "type": "object",
@@ -235,10 +219,7 @@
           ]
         },
         "review": {
-          "enum": [
-            "OPEN",
-            "RESOLVED"
-          ]
+          "enum": ["OPEN", "RESOLVED"]
         },
         "cursor": {
           "type": "string",
@@ -289,10 +270,7 @@
       },
       "required": [],
       "not": {
-        "required": [
-          "afterSequence",
-          "beforeSequence"
-        ]
+        "required": ["afterSequence", "beforeSequence"]
       }
     },
     "AssetQuery": {
@@ -447,17 +425,11 @@
                   "maxLength": 256
                 },
                 "versionName": {
-                  "type": [
-                    "string",
-                    "null"
-                  ],
+                  "type": ["string", "null"],
                   "maxLength": 256
                 },
                 "versionCode": {
-                  "type": [
-                    "integer",
-                    "null"
-                  ],
+                  "type": ["integer", "null"],
                   "minimum": 0
                 },
                 "abis": {
@@ -495,10 +467,7 @@
         "reviewOutcome": {
           "anyOf": [
             {
-              "enum": [
-                "SUCCEEDED",
-                "FAILED"
-              ]
+              "enum": ["SUCCEEDED", "FAILED"]
             },
             {
               "type": "null"
@@ -506,11 +475,7 @@
           ]
         },
         "executionKind": {
-          "enum": [
-            "APP_OPEN",
-            "REGISTRATION",
-            "DOWNLOAD_ONLY"
-          ]
+          "enum": ["APP_OPEN", "REGISTRATION", "DOWNLOAD_ONLY"]
         }
       },
       "required": [
@@ -667,17 +632,11 @@
                         "maxLength": 256
                       },
                       "versionName": {
-                        "type": [
-                          "string",
-                          "null"
-                        ],
+                        "type": ["string", "null"],
                         "maxLength": 256
                       },
                       "versionCode": {
-                        "type": [
-                          "integer",
-                          "null"
-                        ],
+                        "type": ["integer", "null"],
                         "minimum": 0
                       },
                       "abis": {
@@ -715,10 +674,7 @@
               "reviewOutcome": {
                 "anyOf": [
                   {
-                    "enum": [
-                      "SUCCEEDED",
-                      "FAILED"
-                    ]
+                    "enum": ["SUCCEEDED", "FAILED"]
                   },
                   {
                     "type": "null"
@@ -726,11 +682,7 @@
                 ]
               },
               "executionKind": {
-                "enum": [
-                  "APP_OPEN",
-                  "REGISTRATION",
-                  "DOWNLOAD_ONLY"
-                ]
+                "enum": ["APP_OPEN", "REGISTRATION", "DOWNLOAD_ONLY"]
               }
             },
             "required": [
@@ -769,10 +721,7 @@
           ]
         }
       },
-      "required": [
-        "items",
-        "nextCursor"
-      ]
+      "required": ["items", "nextCursor"]
     },
     "RegistrationDetailView": {
       "type": "object",
@@ -902,17 +851,11 @@
                       "maxLength": 256
                     },
                     "versionName": {
-                      "type": [
-                        "string",
-                        "null"
-                      ],
+                      "type": ["string", "null"],
                       "maxLength": 256
                     },
                     "versionCode": {
-                      "type": [
-                        "integer",
-                        "null"
-                      ],
+                      "type": ["integer", "null"],
                       "minimum": 0
                     },
                     "abis": {
@@ -950,10 +893,7 @@
             "reviewOutcome": {
               "anyOf": [
                 {
-                  "enum": [
-                    "SUCCEEDED",
-                    "FAILED"
-                  ]
+                  "enum": ["SUCCEEDED", "FAILED"]
                 },
                 {
                   "type": "null"
@@ -961,11 +901,7 @@
               ]
             },
             "executionKind": {
-              "enum": [
-                "APP_OPEN",
-                "REGISTRATION",
-                "DOWNLOAD_ONLY"
-              ]
+              "enum": ["APP_OPEN", "REGISTRATION", "DOWNLOAD_ONLY"]
             }
           },
           "required": [
@@ -1013,15 +949,12 @@
                 "proxyObservedAt": {
                   "type": "string",
                   "format": "date-time"
+                },
+                "proxyIpScope": {
+                  "enum": ["PROBE_ONLY", "NOT_CHECKED"]
                 }
               },
-              "required": [
-                "model",
-                "locale",
-                "shellAndroidIdHash",
-                "proxyObservedIp",
-                "proxyObservedAt"
-              ]
+              "required": ["model", "locale", "shellAndroidIdHash"]
             },
             {
               "type": "null"
@@ -1033,20 +966,10 @@
             {
               "type": "object",
               "additionalProperties": false,
-              "required": [
-                "source",
-                "navigationSteps",
-                "cache",
-                "learned",
-                "needsAdaptation"
-              ],
+              "required": ["source", "navigationSteps", "cache", "learned", "needsAdaptation"],
               "properties": {
                 "source": {
-                  "enum": [
-                    "CONTROLS",
-                    "OCR",
-                    "LEARNED"
-                  ]
+                  "enum": ["CONTROLS", "OCR", "LEARNED"]
                 },
                 "navigationSteps": {
                   "type": "integer",
@@ -1054,11 +977,7 @@
                   "maximum": 12
                 },
                 "cache": {
-                  "enum": [
-                    "MISS",
-                    "HIT",
-                    "INVALIDATED"
-                  ]
+                  "enum": ["MISS", "HIT", "INVALIDATED"]
                 },
                 "learned": {
                   "type": "boolean"
@@ -1073,17 +992,10 @@
                 "automaticIdentity": {
                   "type": "object",
                   "additionalProperties": false,
-                  "required": [
-                    "kind",
-                    "identifierHash",
-                    "scope"
-                  ],
+                  "required": ["kind", "identifierHash", "scope"],
                   "properties": {
                     "kind": {
-                      "enum": [
-                        "GUEST",
-                        "APP_ASSIGNED"
-                      ]
+                      "enum": ["GUEST", "APP_ASSIGNED"]
                     },
                     "identifierHash": {
                       "type": "string",
@@ -1108,10 +1020,7 @@
             "additionalProperties": false,
             "properties": {
               "outcome": {
-                "enum": [
-                  "SUCCEEDED",
-                  "FAILED"
-                ]
+                "enum": ["SUCCEEDED", "FAILED"]
               },
               "reason": {
                 "type": "string"
@@ -1121,20 +1030,11 @@
                 "format": "date-time"
               }
             },
-            "required": [
-              "outcome",
-              "reason",
-              "createdAt"
-            ]
+            "required": ["outcome", "reason", "createdAt"]
           }
         }
       },
-      "required": [
-        "record",
-        "observation",
-        "recognition",
-        "reviews"
-      ]
+      "required": ["record", "observation", "recognition", "reviews"]
     },
     "OverviewView": {
       "type": "object",
@@ -1169,12 +1069,7 @@
               "minimum": 0
             }
           },
-          "required": [
-            "total",
-            "online",
-            "busy",
-            "quarantined"
-          ]
+          "required": ["total", "online", "busy", "quarantined"]
         },
         "downloads": {
           "type": "object",
@@ -1189,10 +1084,7 @@
               "minimum": 0
             }
           },
-          "required": [
-            "validated",
-            "failed"
-          ]
+          "required": ["validated", "failed"]
         },
         "registrations": {
           "type": "object",
@@ -1299,11 +1191,7 @@
                 ]
               },
               "executionKind": {
-                "enum": [
-                  "APP_OPEN",
-                  "REGISTRATION",
-                  "DOWNLOAD_ONLY"
-                ]
+                "enum": ["APP_OPEN", "REGISTRATION", "DOWNLOAD_ONLY"]
               }
             },
             "required": [
@@ -1387,11 +1275,7 @@
               ]
             },
             "executionKind": {
-              "enum": [
-                "APP_OPEN",
-                "REGISTRATION",
-                "DOWNLOAD_ONLY"
-              ]
+              "enum": ["APP_OPEN", "REGISTRATION", "DOWNLOAD_ONLY"]
             }
           },
           "required": [
@@ -1491,11 +1375,7 @@
           "minimum": 0
         },
         "cleanup": {
-          "enum": [
-            "CONFIRMED",
-            "PENDING",
-            "NEEDS_REVIEW"
-          ]
+          "enum": ["CONFIRMED", "PENDING", "NEEDS_REVIEW"]
         },
         "activeTask": {
           "anyOf": [
@@ -1528,13 +1408,7 @@
                   ]
                 }
               },
-              "required": [
-                "id",
-                "position",
-                "label",
-                "stage",
-                "packageName"
-              ]
+              "required": ["id", "position", "label", "stage", "packageName"]
             },
             {
               "type": "null"
@@ -1546,18 +1420,11 @@
           "minimum": 0
         },
         "executionKind": {
-          "enum": [
-            "APP_OPEN",
-            "REGISTRATION",
-            "DOWNLOAD_ONLY"
-          ]
+          "enum": ["APP_OPEN", "REGISTRATION", "DOWNLOAD_ONLY"]
         },
         "concurrency": {
           "type": "integer",
-          "enum": [
-            1,
-            2
-          ]
+          "enum": [1, 2]
         },
         "activeTasks": {
           "type": "array",
@@ -1591,13 +1458,7 @@
                 ]
               }
             },
-            "required": [
-              "id",
-              "position",
-              "label",
-              "stage",
-              "packageName"
-            ]
+            "required": ["id", "position", "label", "stage", "packageName"]
           }
         }
       },
@@ -1686,11 +1547,7 @@
               "openTimings": {
                 "type": "object",
                 "additionalProperties": false,
-                "required": [
-                  "version",
-                  "totalMs",
-                  "steps"
-                ],
+                "required": ["version", "totalMs", "steps"],
                 "properties": {
                   "version": {
                     "const": 1
@@ -1706,12 +1563,7 @@
                     "items": {
                       "type": "object",
                       "additionalProperties": false,
-                      "required": [
-                        "name",
-                        "startedMs",
-                        "elapsedMs",
-                        "outcome"
-                      ],
+                      "required": ["name", "startedMs", "elapsedMs", "outcome"],
                       "properties": {
                         "name": {
                           "enum": [
@@ -1738,11 +1590,7 @@
                           "maximum": 3600000
                         },
                         "outcome": {
-                          "enum": [
-                            "SUCCEEDED",
-                            "FAILED",
-                            "CANCELLED"
-                          ]
+                          "enum": ["SUCCEEDED", "FAILED", "CANCELLED"]
                         }
                       }
                     }
@@ -1794,13 +1642,7 @@
           ]
         }
       },
-      "required": [
-        "items",
-        "hasEarlier",
-        "hasLater",
-        "firstSequence",
-        "lastSequence"
-      ]
+      "required": ["items", "hasEarlier", "hasLater", "firstSequence", "lastSequence"]
     },
     "AssetListView": {
       "type": "object",
@@ -1881,17 +1723,11 @@
                         "maxLength": 256
                       },
                       "versionName": {
-                        "type": [
-                          "string",
-                          "null"
-                        ],
+                        "type": ["string", "null"],
                         "maxLength": 256
                       },
                       "versionCode": {
-                        "type": [
-                          "integer",
-                          "null"
-                        ],
+                        "type": ["integer", "null"],
                         "minimum": 0
                       },
                       "abis": {
@@ -1950,10 +1786,7 @@
           ]
         }
       },
-      "required": [
-        "items",
-        "nextCursor"
-      ]
+      "required": ["items", "nextCursor"]
     },
     "ValidationListView": {
       "type": "object",
@@ -2005,12 +1838,7 @@
                       "minimum": 0
                     }
                   },
-                  "required": [
-                    "name",
-                    "status",
-                    "proof",
-                    "requests"
-                  ]
+                  "required": ["name", "status", "proof", "requests"]
                 }
               }
             },
@@ -2036,19 +1864,12 @@
           ]
         }
       },
-      "required": [
-        "items",
-        "nextCursor"
-      ]
+      "required": ["items", "nextCursor"]
     },
     "AppOpenTimings": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "version",
-        "totalMs",
-        "steps"
-      ],
+      "required": ["version", "totalMs", "steps"],
       "properties": {
         "version": {
           "const": 1
@@ -2064,12 +1885,7 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": [
-              "name",
-              "startedMs",
-              "elapsedMs",
-              "outcome"
-            ],
+            "required": ["name", "startedMs", "elapsedMs", "outcome"],
             "properties": {
               "name": {
                 "enum": [
@@ -2096,11 +1912,7 @@
                 "maximum": 3600000
               },
               "outcome": {
-                "enum": [
-                  "SUCCEEDED",
-                  "FAILED",
-                  "CANCELLED"
-                ]
+                "enum": ["SUCCEEDED", "FAILED", "CANCELLED"]
               }
             }
           }

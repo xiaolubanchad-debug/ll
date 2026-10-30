@@ -179,6 +179,7 @@ try {
   await run(['--test', '--test-concurrency=1', 'tests/v1112.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/app-open.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/open-performance.test.mjs'], env);
+  await run(['--test', '--test-concurrency=1', 'tests/test-data.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/app-open-api.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/concurrent-open.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/concurrent-open-api.test.mjs'], env);
@@ -215,6 +216,7 @@ try {
   await run(['--test', 'tests/web.test.mjs'], { ...env, P0_SCREENSHOT_DIR: dir });
   await run(['--test', 'tests/v110-web.test.mjs'], { ...env, P0_SCREENSHOT_DIR: dir });
   await run(['--test', 'tests/open-performance-web.test.mjs'], env);
+  await run(['--test', 'tests/test-data-web.test.mjs'], env);
   console.log(
     'P0–P3 integration and browser tests passed (real PostgreSQL, SQLite and Chromium; EC2 installer and Appium boundary simulated here, real Android verified separately).',
   );

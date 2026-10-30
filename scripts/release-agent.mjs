@@ -140,6 +140,7 @@ export async function publishAgent() {
   for (const [entry, out] of [
     ['entry', 'agent'],
     ['boot-entry', 'boot-check'],
+    ['identity-entry', 'identity-images'],
     ['egress-entry', 'egress'],
     ['ocr-entry', 'ocr-worker'],
   ])
@@ -168,6 +169,7 @@ export async function publishAgent() {
   await create({ gzip: true, portable: true, cwd: dir, file: staged }, [
     'agent.js',
     'boot-check.js',
+    'identity-images.js',
     'egress.js',
     'ocr-worker.js',
     'npm/package.json',
@@ -180,7 +182,7 @@ export async function publishAgent() {
   const body = {
     id: randomUUID(),
     gitCommit,
-    agentVersion: '0.11.1',
+    agentVersion: '0.12.0',
     protocolVersion: '1.0',
     features: [
       'DOWNLOAD_V1',
@@ -191,6 +193,8 @@ export async function publishAgent() {
       'APP_READINESS_V1',
       'APP_OPEN_V1',
       'APP_OPEN_PARALLEL_V1',
+      'DEVICE_VARIANTS_V1',
+      'OWNED_TEST_CLIENT_V1',
     ],
     artifactName,
     sha256,

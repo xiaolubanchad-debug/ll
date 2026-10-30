@@ -32,6 +32,13 @@ export async function runCachedAppOpens(
     policy.concurrency !== (config.execution.appOpen.concurrency ?? 1)
   )
     throw new DownloadError('OPEN_POLICY_INVALID');
+  if (
+    config.execution.appOpen.randomDeviceProfile &&
+    (!policy.variantIds ||
+      policy.variantIds.length !== plan.attemptLimit ||
+      new Set(policy.variantIds).size !== plan.attemptLimit)
+  )
+    throw new DownloadError('IDENTITY_PLAN_INVALID');
   const deadline = Date.parse(policy.admissionDeadline);
   if (!Number.isFinite(deadline) || policy.dailyLimit !== 800 || plan.attemptLimit > 800)
     throw new DownloadError('OPEN_POLICY_INVALID');
@@ -40,6 +47,7 @@ export async function runCachedAppOpens(
         const asset = plan.assets[position % plan.assets.length];
         return {
           taskId: randomUUID(),
+          ...(policy.variantIds ? { variantId: policy.variantIds[position] } : {}),
           targetKey: sha(canonical([asset.targetKey, position])),
           label: asset.label.slice(0, 180) + ' · ' + (position + 1),
           sourceUrl: asset.sourceUrl,

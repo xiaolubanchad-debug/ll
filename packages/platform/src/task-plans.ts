@@ -1,3 +1,4 @@
+import { assertIdentityReady } from './identity.js';
 import { Prisma } from '@prisma/client';
 import type { PrismaClient, ManagedCycle, ManagedTask, Run, ConfigVersion } from '@prisma/client';
 import type {
@@ -125,6 +126,18 @@ async function readiness(db: PrismaClient, p: PlanRow) {
       )
     )
       add('NODE_UPGRADE_REQUIRED', '启动准备设置需要 Agent 0.9.0', 'nodes');
+    try {
+      assertIdentityReady(
+        c,
+        (release?.manifest as { features?: string[] } | null)?.features,
+        node.agentVersion,
+        node.health,
+        p.attemptLimit,
+      );
+    } catch (e) {
+      const x = e as { code?: string; message?: string };
+      add(x.code ?? 'NODE_NOT_READY', x.message ?? '测试档案尚未就绪', 'tasks');
+    }
     if (c.execution.appOpen) {
       if (
         c.execution.appOpen.concurrency !== undefined &&
@@ -174,6 +187,7 @@ async function readiness(db: PrismaClient, p: PlanRow) {
         '0.10.0',
         '0.11.0',
         '0.11.1',
+        '0.12.0',
       ].includes(node.agentVersion ?? '')
     )
       add('NODE_UPGRADE_REQUIRED', '自动识别需要升级执行环境', 'nodes');
@@ -648,7 +662,7 @@ async function advance(db: PrismaClient, p: ManagedTask, c: CycleRow, now: Date)
     config = (await db.configVersion.findUniqueOrThrow({ where: { id: c.configVersionId } }))
       .body as unknown as TestConfiguration;
   const common = { nodeId: c.nodeId, configVersionId: c.configVersionId, releaseId: c.releaseId };
-  if (config.execution.mode === 'FULL' && !c.proxyRunId) {
+  if (config.execution.mode === 'FULL' && !config.execution.appOpen && !c.proxyRunId) {
     await createRun(
       db,
       {

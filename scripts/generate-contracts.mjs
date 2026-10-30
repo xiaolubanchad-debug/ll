@@ -40,7 +40,17 @@ const v18 = await json('contracts/v18.schema.json'),
   v18Http = await json('contracts/v18.http.json');
 manifest.routes.push(...v18Http.routes);
 manifest.version = v18Http.version;
+const v114 = await json('contracts/v114.schema.json'),
+  v114Http = await json('contracts/v114.http.json');
+manifest.routes.push(...v114Http.routes);
+manifest.version = v114Http.version;
 const schemas = {
+  ...Object.fromEntries(
+    Object.entries(v114.$defs).map(([name, value]) => [
+      name,
+      { ...value, $id: v114.$id + '/' + name },
+    ]),
+  ),
   ...Object.fromEntries(
     Object.entries(v18.$defs).map(([name, value]) => [
       name,
@@ -251,11 +261,13 @@ for (const route of manifest.routes) {
             : p1Http.routes.some((r) => r.operationId === route.operationId)
               ? 'P1'
               : 'P0',
-    security: route.node
-      ? [{ NodeBearer: [] }]
-      : route.public || route.internal
-        ? []
-        : [{ AdminSession: [] }],
+    security: route.app
+      ? [{ TestEnrollment: [] }]
+      : route.node
+        ? [{ NodeBearer: [] }]
+        : route.public || route.internal
+          ? []
+          : [{ AdminSession: [] }],
     responses: {
       [route.status]: {
         description: '成功',
@@ -280,7 +292,7 @@ for (const route of manifest.routes) {
         'application/json': { schema: { $ref: `#/components/schemas/${route.request}` } },
       },
     };
-  if (['post', 'put', 'patch', 'delete'].includes(route.method) && !route.node)
+  if (['post', 'put', 'patch', 'delete'].includes(route.method) && !route.node && !route.app)
     operation.parameters = [
       { in: 'header', name: 'Origin', required: true, schema: { type: 'string' } },
       ...(!route.public
@@ -338,6 +350,11 @@ const openapi = {
   paths,
   components: {
     securitySchemes: {
+      TestEnrollment: {
+        type: 'http',
+        scheme: 'bearer',
+        description: '限本次自有 APK 安装的短期令牌',
+      },
       AdminSession: { type: 'apiKey', in: 'cookie', name: 'apk_session' },
       NodeBearer: { type: 'http', scheme: 'bearer' },
     },

@@ -14,8 +14,8 @@ const props = defineProps<{
       model: string;
       locale: string;
       shellAndroidIdHash: string;
-      proxyObservedIp: string;
-      proxyObservedAt: string;
+      proxyObservedIp?: string;
+      proxyObservedAt?: string;
     };
     reviews?: { outcome: string; reason: string }[];
   };
@@ -124,13 +124,14 @@ onUnmounted(() => {
     <template v-if="task.observation"
       ><p>模拟器实际型号：{{ task.observation.model }} · 语言：{{ task.observation.locale }}</p>
       <p class="fingerprint">Shell Android ID 摘要：{{ task.observation.shellAndroidIdHash }}</p>
-      <p>
+      <p v-if="task.observation.proxyObservedIp">
         代理探测出口：{{ task.observation.proxyObservedIp }} ·
         {{ task.observation.proxyObservedAt }}
       </p>
+      <p v-else>使用已配置代理；本轮未单独探测出口 IP。</p>
       <p class="muted">
-        这是模拟器及 Shell 作用域的观测，不能代表真实手机或 App 读取的设备 ID。App UA
-        未验证；轮询代理的注册出口未确认。
+        这是模拟器及 Shell 作用域的观测，不能代表真实手机或 App 读取的设备 ID。此处不证明 App
+        UA；自有测试 APK 的 UA 和创建请求 IP 请到“测试数据”查看。
       </p></template
     >
     <p class="muted">内容隔离已开启：仅显示功能记录，历史原始画面已隔离。</p>

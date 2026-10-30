@@ -1,3 +1,4 @@
+import { assertIdentityReady, identityCapacity, allocateIdentityModels } from './identity.js';
 import type { Prisma, ConfigVersion } from '@prisma/client';
 import type { DailyExecutionPlan, RunInput, TestConfiguration } from '@apk/contracts';
 import { schemaIssues, registrationAvailable } from '@apk/contracts';
@@ -58,6 +59,17 @@ export async function prepareDailyPlan(
   if (input.purpose === 'PROXY_CHECK') plan.proxySecretVersionId = input.proxySecretVersionId;
   if (input.purpose === 'REGISTER') {
     validateBudget(input.successTarget!, input.attemptLimit!);
+    const identityNode = await tx.node.findUniqueOrThrow({ where: { id: input.nodeId } });
+    const identityRelease = identityNode.agentReleaseId
+      ? await tx.release.findUnique({ where: { id: identityNode.agentReleaseId } })
+      : null;
+    assertIdentityReady(
+      config,
+      (identityRelease?.manifest as { features?: string[] } | null)?.features,
+      identityNode.agentVersion,
+      identityNode.health,
+      input.attemptLimit!,
+    );
     if (config.execution.appOpen) {
       const budget = await dailyOpenUsage(tx, input.nodeId, plan.cacheDay);
       if (input.attemptLimit! > budget.remaining)
@@ -70,6 +82,14 @@ export async function prepareDailyPlan(
           concurrency: config.execution.appOpen.concurrency,
           dailyLimit: 800,
           admissionDeadline: deadline,
+          ...(config.execution.appOpen.randomDeviceProfile
+            ? {
+                variantIds: allocateIdentityModels(
+                  input.attemptLimit!,
+                  identityCapacity(identityNode.health),
+                ),
+              }
+            : {}),
         };
       }
     }
@@ -100,6 +120,11 @@ export async function prepareDailyPlan(
       if (apk.cacheDay !== plan.cacheDay)
         fault('DOWNLOAD_SOURCE_INVALID', '文件日期与当天批次不一致', 422);
       if (!registrationAvailable(config, apk.packageName, task.entryId ?? undefined)) continue;
+      if (
+        config.execution.appOpen?.ownedTestClient &&
+        apk.packageName !== 'com.apkplatform.testclient'
+      )
+        continue;
       plan.assets.push({
         targetKey: task.targetKey,
         label: task.label,

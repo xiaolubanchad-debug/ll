@@ -5,7 +5,7 @@ import {
   schemaIssues,
   parseFunctionalEvidence,
 } from '@apk/contracts';
-import type { TestConfiguration, DailyExecutionPlan } from '@apk/contracts';
+import type { TestConfiguration, DailyExecutionPlan, TestBootstrap } from '@apk/contracts';
 import {
   canonical,
   sha,
@@ -406,6 +406,23 @@ export class TaskEngine {
                       policy: this.options.policy,
                       proxyCheckUrl: this.options.proxyCheckUrl,
                       androidFactory: this.options.androidFactory,
+                      testBootstrap: async () => {
+                        await this.flush(d);
+                        beforeAction();
+                        const value = await this.hub(
+                          'tasks/' + target.taskId + '/test-bootstrap',
+                          {
+                            protocolVersion: '1.0',
+                            nodeId: this.nodeId,
+                            deliveryId: d.deliveryId,
+                            fence: d.fence,
+                          },
+                          attemptSignal,
+                        );
+                        if (schemaIssues('TestBootstrap', value).length)
+                          throw new RegistrationError('TEST_BOOTSTRAP_FAILED');
+                        return value as unknown as TestBootstrap;
+                      },
                       beforeAction,
                       resources: async (record) => {
                         this.store.androidSlot(d.deliveryId, target.taskId, record);

@@ -14,6 +14,7 @@ import ApkAssets from './ApkAssets.vue';
 import ProxyManager from './ProxyManager.vue';
 import ValidationRecords from './ValidationRecords.vue';
 import TaskCenter from './TaskCenter.vue';
+import TestData from './TestData.vue';
 import MaintenanceManager from './MaintenanceManager.vue';
 import { route, navigate } from './navigation';
 import type { Section } from './navigation';
@@ -46,6 +47,7 @@ Reflect.deleteProperty(sample.execution, 'proxySecretVersionId');
 sample.registrationFlows = [];
 const draftText = ref(JSON.stringify(sample, null, 2));
 const labels: Record<Section, string> = {
+  'test-data': '测试数据',
   overview: '工作台',
   tasks: '任务中心',
   config: '任务方案',
@@ -60,6 +62,7 @@ const mainSections = [
   'overview',
   'tasks',
   'results',
+  'test-data',
   'assets',
   'proxies',
   'nodes',
@@ -380,6 +383,7 @@ onMounted(async () => {
         <OverviewPanel v-if="section === 'overview'" />
         <TaskCenter v-else-if="section === 'tasks'" />
         <RegistrationRecords v-else-if="section === 'results'" />
+        <TestData v-else-if="section === 'test-data'" />
         <ApkAssets v-else-if="section === 'assets'" />
         <ProxyManager v-else-if="section === 'proxies'" />
         <ServerManager v-else-if="section === 'nodes'" @changed="refresh" />

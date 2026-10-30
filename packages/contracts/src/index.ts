@@ -1,5 +1,13 @@
 import validators from './generated/validators.js';
 export type {
+  TestEnrollInput,
+  TestEnrollResult,
+  TestBootstrapInput,
+  TestBootstrap,
+  TestDataQuery,
+  TestDataPage,
+  TestDataCredentials,
+  TestClientInfo,
   ResultCategory,
   RegistrationRecordView,
   RegistrationListView,
@@ -91,7 +99,7 @@ export function contentIsolationSupported(
   version: string | null | undefined,
 ): boolean {
   return (
-    ['0.8.0', '0.8.1', '0.9.0', '0.9.1', '0.9.2', '0.10.0', '0.11.0', '0.11.1'].includes(
+    ['0.8.0', '0.8.1', '0.9.0', '0.9.1', '0.9.2', '0.10.0', '0.11.0', '0.11.1', '0.12.0'].includes(
       version ?? '',
     ) && features?.includes('CONTENT_ISOLATION_V1') === true
   );
@@ -101,7 +109,7 @@ export function appReadinessSupported(
   version: string | null | undefined,
 ): boolean {
   return (
-    ['0.9.0', '0.9.1', '0.9.2', '0.10.0', '0.11.0', '0.11.1'].includes(version ?? '') &&
+    ['0.9.0', '0.9.1', '0.9.2', '0.10.0', '0.11.0', '0.11.1', '0.12.0'].includes(version ?? '') &&
     features?.includes('APP_READINESS_V1') === true
   );
 }
@@ -110,7 +118,7 @@ export function appOpenSupported(
   version: string | null | undefined,
 ): boolean {
   return (
-    ['0.10.0', '0.11.0', '0.11.1'].includes(version ?? '') &&
+    ['0.10.0', '0.11.0', '0.11.1', '0.12.0'].includes(version ?? '') &&
     features?.includes('APP_OPEN_V1') === true
   );
 }
@@ -119,7 +127,7 @@ export function parallelAppOpenSupported(
   version: string | null | undefined,
 ): boolean {
   return (
-    ['0.11.0', '0.11.1'].includes(version ?? '') &&
+    ['0.11.0', '0.11.1', '0.12.0'].includes(version ?? '') &&
     features?.includes('APP_OPEN_PARALLEL_V1') === true
   );
 }
@@ -159,6 +167,25 @@ export function configurationIssues(value: unknown): Issue[] {
     });
   if (config.execution.autoRegistration?.enabled && config.execution.mode !== 'FULL')
     issues.push({ path: '/execution/autoRegistration', message: '自动识别注册需要完整模式和代理' });
+  if (
+    (config.execution.appOpen?.randomDeviceProfile || config.execution.appOpen?.ownedTestClient) &&
+    config.execution.appOpen.concurrency === undefined
+  )
+    issues.push({
+      path: '/execution/appOpen/concurrency',
+      message: '测试档案和自有 APK 需要明确并发数',
+    });
+  if (
+    config.execution.appOpen?.randomDeviceProfile &&
+    config.execution.deviceProfiles.some(
+      (p) =>
+        p.systemImage !== 'system-images;android-35;google_apis;x86_64' || p.locale !== 'en-US',
+    )
+  )
+    issues.push({
+      path: '/execution/deviceProfiles',
+      message: '当前测试型号档案只支持 API 35 x86_64 / en-US',
+    });
   let url: URL;
   try {
     url = new URL(config.source.url);
@@ -304,3 +331,17 @@ export type {
   MaintenanceInput,
   MaintenanceResult,
 } from './generated/types.js';
+
+export const IDENTITY_MODELS = ['qa-model-01', 'qa-model-02', 'qa-model-03'] as const;
+export function identitySupported(
+  features: readonly string[] | undefined,
+  version: string | null | undefined,
+) {
+  return version === '0.12.0' && features?.includes('DEVICE_VARIANTS_V1') === true;
+}
+export function ownedTestSupported(
+  features: readonly string[] | undefined,
+  version: string | null | undefined,
+) {
+  return version === '0.12.0' && features?.includes('OWNED_TEST_CLIENT_V1') === true;
+}

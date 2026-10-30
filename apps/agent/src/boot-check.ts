@@ -1,10 +1,15 @@
-import { mkdtemp, mkdir, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, readFile, writeFile } from 'node:fs/promises';
 import { join, resolve, sep } from 'node:path';
 import { createServer } from 'node:net';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { execute } from './health.js';
-export async function bootCheck(sdk: string, base = '/var/lib/apk-platform/health-check') {
+import type { IdentityImage } from '@apk/automation';
+export async function bootCheck(
+  sdk: string,
+  base = '/var/lib/apk-platform/health-check',
+  image?: IdentityImage,
+) {
   await mkdir(base, { recursive: true });
   const dir = await mkdtemp(join(base, 'check-'));
   const name = 'p1_' + randomUUID().replaceAll('-', '');
@@ -30,6 +35,16 @@ export async function bootCheck(sdk: string, base = '/var/lib/apk-platform/healt
       'no\n',
     );
     if (create.code) throw Error('ANDROID_NOT_READY');
+    if (image) {
+      const ini = join(dir, name + '.avd', 'config.ini');
+      await writeFile(
+        ini,
+        (await readFile(ini, 'utf8')).replace(
+          /^image\.sysdir\.1=.*$/m,
+          'image.sysdir.1=' + image.systemDir + '/',
+        ),
+      );
+    }
     let port = 0;
     for (let p = 5554; p < 5584; p += 2) {
       const sockets: ReturnType<typeof createServer>[] = [];
@@ -58,6 +73,7 @@ export async function bootCheck(sdk: string, base = '/var/lib/apk-platform/healt
         '-port',
         String(port),
         '-no-window',
+        ...(image ? ['-writable-system'] : []),
         '-no-audio',
         '-no-snapshot',
         '-no-boot-anim',
@@ -76,7 +92,19 @@ export async function bootCheck(sdk: string, base = '/var/lib/apk-platform/healt
         5000,
         env,
       );
-      if (!result.code && result.text.trim() === '1') return true;
+      if (!result.code && result.text.trim() === '1') {
+        if (image) {
+          const actual = await execute(
+            join(sdk, 'platform-tools/adb'),
+            ['-s', `emulator-${port}`, 'shell', 'getprop', 'ro.product.model'],
+            5000,
+            env,
+          );
+          if (actual.code || actual.text.trim() !== image.model)
+            throw Error('IDENTITY_MODEL_MISMATCH');
+        }
+        return true;
+      }
       await new Promise((r) => setTimeout(r, 2000));
     }
     throw Error('ANDROID_NOT_READY');

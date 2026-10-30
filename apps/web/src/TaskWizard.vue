@@ -1,10 +1,20 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
-import type { TaskPlanDetail, TaskPlanInput, TestConfiguration, NodeView } from '@apk/contracts';
+import type {
+  TaskPlanDetail,
+  TaskPlanInput,
+  TestConfiguration,
+  NodeView,
+  TestClientInfo,
+} from '@apk/contracts';
 import { configurationIssues } from '@apk/contracts';
 import example from '../../../contracts/fixtures/config.valid.json';
 import { api, mutation } from './api';
-const props = defineProps<{ initial?: TaskPlanDetail; initialStep?: number }>(),
+const props = defineProps<{
+    initial?: TaskPlanDetail;
+    initialStep?: number;
+    ownedTest?: boolean;
+  }>(),
   emit = defineEmits<{ saved: [id: string]; cancel: [] }>();
 const step = ref(props.initialStep ?? 1),
   busy = ref(false),
@@ -21,6 +31,12 @@ const step = ref(props.initialStep ?? 1),
 const source = ref(props.initial?.configuration.source.url ?? ''),
   xpath = ref(props.initial?.configuration.source.xpath ?? example.source.xpath),
   mode = ref<'FULL' | 'DOWNLOAD_ONLY'>(props.initial?.configuration.execution.mode ?? 'FULL');
+const randomDeviceProfile = ref(
+    props.initial?.configuration.execution.appOpen?.randomDeviceProfile ?? props.ownedTest ?? false,
+  ),
+  ownedTestClient = ref(
+    props.initial?.configuration.execution.appOpen?.ownedTestClient ?? props.ownedTest ?? false,
+  );
 const base = ref<TestConfiguration>(
   props.initial?.configuration ??
     ({ ...structuredClone(example), registrationFlows: [] } as TestConfiguration),
@@ -47,6 +63,8 @@ const draft = computed(() => {
   if (mode.value === 'FULL') {
     v.execution.proxySecretVersionId = proxyId.value;
     v.execution.appOpen = { dwellMs: 10000, concurrency: concurrency.value };
+    if (randomDeviceProfile.value) v.execution.appOpen.randomDeviceProfile = true;
+    if (ownedTestClient.value) v.execution.appOpen.ownedTestClient = true;
   } else {
     delete v.execution.appOpen;
     delete v.execution.proxySecretVersionId;
@@ -73,6 +91,25 @@ async function choices() {
     all<{ id: string; name: string }>('/configs'),
   ]);
   proxies.value = proxies.value.filter((p) => p.type === 'HTTP_PROXY' && !p.revokedAt);
+  if (props.ownedTest && !props.initial) {
+    const info = await api<TestClientInfo>('/test-client/info');
+    if (!info.ready) throw Error('测试 APK 尚未发布');
+    name.value = '自有 APK 设备信息测试';
+    source.value = info.sourcePageUrl;
+    xpath.value = "//a[@id='test-apk']";
+    target.value = 3;
+    limit.value = 3;
+    concurrency.value = 2;
+    base.value.execution.deviceProfiles = [
+      {
+        id: 'pixel6-api35',
+        name: '自有测试设备',
+        avdDevice: 'pixel_6',
+        systemImage: 'system-images;android-35;google_apis;x86_64',
+        locale: 'en-US',
+      },
+    ];
+  }
   const online = nodes.value.filter(
     (n) => n.connection === 'ONLINE' && n.deploymentStatus === 'INSTALLED',
   );
@@ -89,6 +126,8 @@ function apply(value: string) {
     proxyId.value = c.execution.proxySecretVersionId ?? '';
     mode.value = c.execution.mode;
     concurrency.value = c.execution.appOpen?.concurrency ?? 1;
+    randomDeviceProfile.value = c.execution.appOpen?.randomDeviceProfile ?? false;
+    ownedTestClient.value = c.execution.appOpen?.ownedTestClient ?? false;
     error.value = '';
   } catch (e) {
     error.value = e instanceof Error ? e.message : '配置无效';
@@ -164,6 +203,8 @@ async function save() {
       limit.value < target.value
     )
       throw Error('尝试上限需不小于成功目标');
+    if (randomDeviceProfile.value && limit.value > 3)
+      throw Error('测试型号每批最多 3 轮，请将尝试上限设为 3 或以下');
     const input: TaskPlanInput = {
       name: name.value.trim(),
       nodeId: nodeId.value,
@@ -273,6 +314,19 @@ onUnmounted(() => {
           </select>
           <p class="muted">
             每轮使用独立模拟器及代理，启动 APP 后停留 10 秒再退出清理。无需配置注册入口。
+          </p>
+          <label class="inline-check"
+            ><input
+              v-model="randomDeviceProfile"
+              type="checkbox"
+            />随机测试型号（同批次不重复，受节点档案数限制）</label
+          >
+          <label class="inline-check"
+            ><input v-model="ownedTestClient" type="checkbox" />自有测试 APK
+            上报账户与设备信息</label
+          >
+          <p v-if="ownedTestClient" class="muted">
+            仅用于“中台测试 APK”；账户创建回执显示在“测试数据”，与启动完成数分开。
           </p></template
         >
       </template>

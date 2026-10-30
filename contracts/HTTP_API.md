@@ -1,5 +1,7 @@
 # HTTP 接口契约
 
+1.14 自有测试 APK、测试数据和独立设备档案见 [测试契约](../docs/V114_TEST_DATA_CONTRACT.md)；新增客户端仅用于中台控制的模拟器，实际请求 IP 直接随创建回执保存，不另做出口探测。
+
 1.13.1 增加独立模拟器准备优化和步骤耗时，见 [性能契约](../docs/V1131_PERFORMANCE_CONTRACT.md)，对应 Agent 0.11.1；每轮新模拟器、代理和前台停留 10 秒保持。
 
 1.13 增加 APP 启动停留 1/2 路并发与每日共享额度，见 [并发契约](../docs/V113_CONCURRENCY_CONTRACT.md)，对应 Agent 0.11.0。下载与部署仍整台互斥，完成数和尝试上限由两路共享。
@@ -28,7 +30,7 @@
 
 1.7 中台结果、中文日志、数据库汇总、历史回填与页面操作遵循 [1.7 契约](../docs/V17_CONTRACT.md)，操作见 [使用说明](../docs/V17_SETUP.md)。兼容 Agent 0.6.0，不改变注册提交及未知结果规则。
 
-版本 1.13.1，前缀 /api/v1。已实现路由由 p0.http.json 至 v18.http.json 合并生成 openapi.json，CI 比较 Controller、清单和 OpenAPI。下表保留后续阶段设计，以机器清单判定实现范围。
+版本 1.14.0，前缀 /api/v1。已实现路由由 p0.http.json 至 v18.http.json 以及 v114.http.json 合并生成 openapi.json，CI 比较 Controller、清单和 OpenAPI。下表保留后续阶段设计，以机器清单判定实现范围。
 
 1.6 增加可选 execution.autoRegistration、DISCOVERING 阶段和任务 recognition 摘要，见 [自动识别契约](../docs/V16_CONTRACT.md)。不增加任意截图识别、代码执行或公开 Appium 接口。自动模式仍只允许一次提交，未知结果暂停；启用配置要求新的 AUTO_REGISTRATION_V1 签名发布。
 
@@ -93,8 +95,8 @@ POST 创建批次、部署、配置版本、停止和核验必须带 Idempotency
 | GET /runs/{id}/stream                  | Last-Event-ID                                               | SSE，仅摘要和脱敏日志                                           |
 | POST /tasks/{id}/reconciliations       | outcome,reason,evidenceIds                                  | 不改变原始 UNKNOWN 记录，追加人工核验决议                       |
 | POST /tasks/{id}/account-view          | reason                                                      | 显式授权查看测试账户，短期响应且审计，Cache-Control:no-store    |
-| GET /tasks/{taskId}/artifacts          | 无                                                          | 仅受限功能证据摘要，不返回历史图片或存储路径                                      |
-| GET /artifacts/{id}/content            | 无                                                          | 鉴权返回受限 JSON，历史图片返回 410；无磁盘路径透传                   |
+| GET /tasks/{taskId}/artifacts          | 无                                                          | 仅受限功能证据摘要，不返回历史图片或存储路径                    |
+| GET /artifacts/{id}/content            | 无                                                          | 鉴权返回受限 JSON，历史图片返回 410；无磁盘路径透传             |
 | GET /audit-events                      | cursor,limit                                                | 管理操作审计                                                    |
 | GET /health/live                       | 无，公开                                                    | 进程存活，不返回内部地址或配置                                  |
 | GET /health/ready                      | 无，内部                                                    | 数据库和关键依赖就绪，供部署系统使用                            |
@@ -108,18 +110,18 @@ NodeConnection 凭据上传上限 64 KiB；普通配置正文上限 256 KiB；�
 
 以下业务正文采用 agent.schema.json 中的消息变体。认证仍通过 HTTP Header，节点 ID 同时校验令牌绑定关系。
 
-| 方法与路径                         | 消息或输入                                                                  | 返回与约束                                                                  |
-| ---------------------------------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| POST /agent/enroll                 | kind=enroll，一次性 Bootstrap Bearer                                        | nodeId、credential、protocolVersion、heartbeatIntervalSeconds；no-store     |
-| POST /agent/heartbeats             | kind=heartbeat，可选 report，P1 currentDelivery 必须为 null                 | serverTime、desiredControl、heartbeatIntervalSeconds；执行租约随 P2 扩展    |
-| POST /agent/claims                 | kind=claim                                                                  | 204 无任务；否则 Delivery，不分配其他节点任务                               |
-| POST /agent/deliveries/{id}/accept | kind=accept                                                                 | 接收确认、有效租约；持久化后才能调用                                        |
-| POST /agent/deliveries/{id}/config | 当前 fence                                                                  | 固定配置与本任务 secrets；只有有效租约且未吊销身份可取                      |
-| POST /agent/events                 | kind=events                                                                 | ackedEventIds、appliedThroughSequence、recordedForReview；持久化后响应      |
-| PUT /agent/tasks/{taskId}/account  | kind=account                                                                | 按 accountRef 幂等保存生成账户，重复内容不同则冲突；写入后不回显密码        |
+| 方法与路径                         | 消息或输入                                                                       | 返回与约束                                                                                    |
+| ---------------------------------- | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| POST /agent/enroll                 | kind=enroll，一次性 Bootstrap Bearer                                             | nodeId、credential、protocolVersion、heartbeatIntervalSeconds；no-store                       |
+| POST /agent/heartbeats             | kind=heartbeat，可选 report，P1 currentDelivery 必须为 null                      | serverTime、desiredControl、heartbeatIntervalSeconds；执行租约随 P2 扩展                      |
+| POST /agent/claims                 | kind=claim                                                                       | 204 无任务；否则 Delivery，不分配其他节点任务                                                 |
+| POST /agent/deliveries/{id}/accept | kind=accept                                                                      | 接收确认、有效租约；持久化后才能调用                                                          |
+| POST /agent/deliveries/{id}/config | 当前 fence                                                                       | 固定配置与本任务 secrets；只有有效租约且未吊销身份可取                                        |
+| POST /agent/events                 | kind=events                                                                      | ackedEventIds、appliedThroughSequence、recordedForReview；持久化后响应                        |
+| PUT /agent/tasks/{taskId}/account  | kind=account                                                                     | 按 accountRef 幂等保存生成账户，重复内容不同则冲突；写入后不回显密码                          |
 | POST /agent/artifacts              | JSON/Base64 功能证据、bootId、deliveryId、fence、taskId、kind、sha256、redaction | artifactId，先鉴权后解析大正文；受限规范 JSON ≤64 KiB，Schema、类型及归属校验，不接收任意路径 |
-| POST /agent/reconcile              | nodeId、bootId、未确认 delivery 和提交记录摘要                              | 继续核验、停止或隔离决策；不自动重跑注册                                    |
-| POST /agent/credentials/rotate     | 旧身份认证                                                                  | 新节点凭据和过渡时间，旧凭据按规则失效                                      |
+| POST /agent/reconcile              | nodeId、bootId、未确认 delivery 和提交记录摘要                                   | 继续核验、停止或隔离决策；不自动重跑注册                                                      |
+| POST /agent/credentials/rotate     | 旧身份认证                                                                       | 新节点凭据和过渡时间，旧凭据按规则失效                                                        |
 
 Delivery 包含 kind=delivery、protocolVersion、deliveryId、runId、nodeId、fence、configVersionId、configHash、releaseId、issuedAt、ackDeadline、leaseExpiresAt。任务领取结果不直接携带全部秘密，Agent 接收后通过受保护配置接口获取。响应有 Cache-Control:no-store。
 

@@ -1,0 +1,7 @@
+{
+  "name": "@apk/test-client",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Owned Android observation and account test client; native Java, built with the Android SDK"
+}

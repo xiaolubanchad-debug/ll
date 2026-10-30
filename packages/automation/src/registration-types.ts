@@ -25,9 +25,11 @@ export interface DeviceObservation {
   locale: string;
   shellAndroidIdHash: string;
   androidIdScope: 'SHELL_NOT_APP';
-  proxyObservedIp: string;
-  proxyObservedAt: string;
-  proxyIpScope: 'PROBE_ONLY';
+  proxyObservedIp?: string;
+  proxyObservedAt?: string;
+  proxyIpScope: 'PROBE_ONLY' | 'NOT_CHECKED';
+  variantId?: string;
+  systemImageSha256?: string;
   appUserAgent: 'UNVERIFIED';
   identitySource: 'EMULATOR_NOT_REAL_DEVICE';
 }
@@ -60,6 +62,7 @@ export interface AndroidSession {
   observation: DeviceObservation;
   supportedAbis: string[];
   install(file: string): Promise<void>;
+  provisionTestClient?(bootstrap: import('@apk/contracts').TestBootstrap): Promise<void>;
   launch(packageName: string, activity: string): Promise<void>;
   foreground?(packageName: string): Promise<boolean>;
   find(locator: Locator, timeout: number, signal?: AbortSignal): Promise<string>;

@@ -1,0 +1,378 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.apk-platform.example/v1/v114.schema.json",
+  "$defs": {
+    "TestEnrollInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "installationId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "requestKey": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "androidId": {
+          "type": "string",
+          "pattern": "^[a-fA-F0-9]{1,16}$"
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "manufacturer": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "apiLevel": {
+          "type": "integer",
+          "minimum": 26,
+          "maximum": 100
+        },
+        "locale": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "declaredUserAgent": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "^[ -~]+$"
+        },
+        "defaultWebViewUa": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024,
+          "pattern": "^[ -~]+$"
+        },
+        "appVersion": {
+          "const": "1.0.0"
+        },
+        "appliedWebViewUa": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "^[ -~]+$"
+        }
+      },
+      "required": [
+        "installationId",
+        "requestKey",
+        "androidId",
+        "model",
+        "manufacturer",
+        "apiLevel",
+        "locale",
+        "declaredUserAgent",
+        "defaultWebViewUa",
+        "appVersion",
+        "appliedWebViewUa"
+      ]
+    },
+    "TestEnrollResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "username": {
+          "type": "string",
+          "pattern": "^[a-z]{6,10}$"
+        },
+        "password": {
+          "type": "string",
+          "pattern": "^(?=.*[A-Za-z])(?=.*[0-9])[A-Za-z0-9]{8,12}$"
+        },
+        "sourceIp": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "username", "password", "sourceIp", "createdAt"]
+    },
+    "TestBootstrapInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "protocolVersion": {
+          "const": "1.0"
+        },
+        "nodeId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "deliveryId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "fence": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": ["protocolVersion", "nodeId", "deliveryId", "fence"]
+    },
+    "TestBootstrap": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "apiUrl": {
+          "type": "string",
+          "format": "uri",
+          "maxLength": 2048
+        },
+        "token": {
+          "type": "string",
+          "pattern": "^[-_A-Za-z0-9]{43}$"
+        },
+        "profileId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "expectedModel": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "userAgent": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "^[ -~]+$"
+        },
+        "expiresAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["apiUrl", "token", "profileId", "expectedModel", "userAgent", "expiresAt"]
+    },
+    "TestDataQuery": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "limit": {
+          "type": "string",
+          "pattern": "^([1-9]|[1-9][0-9]|100)$"
+        },
+        "cursor": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "nodeId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "runId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": []
+    },
+    "TestDataPage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "nodeId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "nodeName": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "runId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "taskId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "position": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "username": {
+                "type": "string",
+                "pattern": "^[a-z]{6,10}$"
+              },
+              "sourceIp": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "androidIdHash": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "model": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "manufacturer": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "apiLevel": {
+                "type": "integer",
+                "minimum": 26,
+                "maximum": 100
+              },
+              "userAgent": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "defaultWebViewUa": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1024
+              },
+              "profileId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "uaMatched": {
+                "type": "boolean"
+              },
+              "modelMatched": {
+                "type": "boolean"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "id",
+              "nodeId",
+              "nodeName",
+              "runId",
+              "taskId",
+              "position",
+              "username",
+              "sourceIp",
+              "androidIdHash",
+              "model",
+              "manufacturer",
+              "apiLevel",
+              "userAgent",
+              "defaultWebViewUa",
+              "profileId",
+              "uaMatched",
+              "modelMatched",
+              "createdAt"
+            ]
+          }
+        },
+        "nextCursor": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": ["items", "nextCursor"]
+    },
+    "TestDataCredentials": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "username": {
+          "type": "string",
+          "pattern": "^[a-z]{6,10}$"
+        },
+        "password": {
+          "type": "string",
+          "pattern": "^(?=.*[A-Za-z])(?=.*[0-9])[A-Za-z0-9]{8,12}$"
+        },
+        "androidId": {
+          "type": "string",
+          "pattern": "^[a-fA-F0-9]{1,16}$"
+        }
+      },
+      "required": ["username", "password", "androidId"]
+    },
+    "TestClientInfo": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ready": {
+          "type": "boolean"
+        },
+        "packageName": {
+          "const": "com.apkplatform.testclient"
+        },
+        "sha256": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "version": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 32
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "downloadUrl": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "sourcePageUrl": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        }
+      },
+      "required": ["ready", "packageName", "sha256", "version", "downloadUrl", "sourcePageUrl"]
+    }
+  }
+}

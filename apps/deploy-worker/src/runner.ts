@@ -112,6 +112,7 @@ export class AnsibleRunner implements Runner {
         toolchain: context.manifest.toolchain,
         toolchain_hash: toolchainHash,
         deployment_id: context.deploymentId,
+        identity_enabled: context.manifest.features?.includes('DEVICE_VARIANTS_V1') ?? false,
         download_enabled: context.manifest.features?.includes('DOWNLOAD_V1') ?? false,
         agent_config: {
           nodeId: context.node.id,

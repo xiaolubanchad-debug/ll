@@ -301,6 +301,7 @@ export async function registrationRecord(
           shellAndroidIdHash: o.shellAndroidIdHash,
           proxyObservedIp: o.proxyObservedIp,
           proxyObservedAt: o.proxyObservedAt,
+          ...(o.proxyIpScope ? { proxyIpScope: o.proxyIpScope } : {}),
         }
       : null,
     reviews: row.reviews.map((r) => ({

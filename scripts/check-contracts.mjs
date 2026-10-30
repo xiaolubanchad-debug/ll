@@ -963,6 +963,35 @@ test('1.11.2 credential observation is an unsubmitted adaptation result', () =>
     }),
     [],
   ));
+const enrollFixture = read('contracts/fixtures/test-enroll.valid.json');
+test('1.14 own client request', () =>
+  assert.deepEqual(schemaIssues('TestEnrollInput', enrollFixture), []));
+for (const patch of [
+  { sourceIp: '198.51.100.1' },
+  { androidId: 'not-hex' },
+  { apiLevel: 1 },
+  { declaredUserAgent: 'bad\r\nUA' },
+  { appVersion: '2.0.0' },
+  { requestKey: 'not-a-uuid' },
+])
+  test('1.14 rejects untrusted enrollment fields ' + JSON.stringify(patch), () =>
+    assert.ok(schemaIssues('TestEnrollInput', { ...enrollFixture, ...patch }).length),
+  );
+const selfConfig = read('contracts/fixtures/config.concurrent-open.valid.json');
+selfConfig.execution.appOpen.randomDeviceProfile = true;
+selfConfig.execution.appOpen.ownedTestClient = true;
+test('1.14 explicit owned test configuration', () =>
+  assert.deepEqual(configurationIssues(selfConfig), []));
+for (const change of [
+  (c) => delete c.execution.appOpen.concurrency,
+  (c) => (c.execution.appOpen.randomDeviceProfile = false),
+  (c) => (c.execution.deviceProfiles[0].locale = 'zh-CN'),
+])
+  test('1.14 rejects invalid model policy', () => {
+    const c = structuredClone(selfConfig);
+    change(c);
+    assert.ok(configurationIssues(c).length);
+  });
 process.stdout.write(
   `${passed} contract checks passed${process.exitCode ? '; failures present' : ''}.\n`,
 );

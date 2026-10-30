@@ -4,14 +4,7 @@
   "title": "APK test configuration version 1.0",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "schemaVersion",
-    "name",
-    "source",
-    "download",
-    "execution",
-    "registrationFlows"
-  ],
+  "required": ["schemaVersion", "name", "source", "download", "execution", "registrationFlows"],
   "properties": {
     "schemaVersion": {
       "const": "1.0"
@@ -24,11 +17,7 @@
     "source": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "url",
-        "xpath",
-        "browserUserAgent"
-      ],
+      "required": ["url", "xpath", "browserUserAgent"],
       "properties": {
         "url": {
           "type": "string",
@@ -89,11 +78,7 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": [
-              "host",
-              "by",
-              "selector"
-            ],
+            "required": ["host", "by", "selector"],
             "properties": {
               "host": {
                 "type": "string",
@@ -102,10 +87,7 @@
                 "pattern": "^(\\*|[a-zA-Z0-9.-]+)$"
               },
               "by": {
-                "enum": [
-                  "css",
-                  "xpath"
-                ]
+                "enum": ["css", "xpath"]
               },
               "selector": {
                 "type": "string",
@@ -113,11 +95,7 @@
                 "maxLength": 4096
               },
               "mode": {
-                "enum": [
-                  "AUTO",
-                  "CLICK",
-                  "AUTO_THEN_CLICK"
-                ]
+                "enum": ["AUTO", "CLICK", "AUTO_THEN_CLICK"]
               },
               "autoWaitMs": {
                 "type": "integer",
@@ -138,16 +116,10 @@
     "execution": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "mode",
-        "deviceProfiles"
-      ],
+      "required": ["mode", "deviceProfiles"],
       "properties": {
         "mode": {
-          "enum": [
-            "DOWNLOAD_ONLY",
-            "FULL"
-          ]
+          "enum": ["DOWNLOAD_ONLY", "FULL"]
         },
         "proxySecretVersionId": {
           "type": "string",
@@ -237,20 +209,21 @@
         "appOpen": {
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "dwellMs"
-          ],
+          "required": ["dwellMs"],
           "properties": {
             "dwellMs": {
               "const": 10000
             },
             "concurrency": {
               "type": "integer",
-              "enum": [
-                1,
-                2
-              ],
+              "enum": [1, 2],
               "default": 1
+            },
+            "randomDeviceProfile": {
+              "const": true
+            },
+            "ownedTestClient": {
+              "const": true
             }
           }
         }
@@ -263,14 +236,10 @@
                 "const": "FULL"
               }
             },
-            "required": [
-              "mode"
-            ]
+            "required": ["mode"]
           },
           "then": {
-            "required": [
-              "proxySecretVersionId"
-            ]
+            "required": ["proxySecretVersionId"]
           }
         }
       ]
@@ -287,13 +256,7 @@
     "deviceProfile": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "id",
-        "name",
-        "avdDevice",
-        "systemImage",
-        "locale"
-      ],
+      "required": ["id", "name", "avdDevice", "systemImage", "locale"],
       "properties": {
         "id": {
           "type": "string",
@@ -322,18 +285,10 @@
     "locator": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "by",
-        "value"
-      ],
+      "required": ["by", "value"],
       "properties": {
         "by": {
-          "enum": [
-            "id",
-            "accessibilityId",
-            "xpath",
-            "androidUiAutomator"
-          ]
+          "enum": ["id", "accessibilityId", "xpath", "androidUiAutomator"]
         },
         "value": {
           "type": "string",
@@ -345,29 +300,16 @@
     "step": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "action",
-        "timeoutMs",
-        "optional"
-      ],
+      "required": ["action", "timeoutMs", "optional"],
       "properties": {
         "action": {
-          "enum": [
-            "click",
-            "input",
-            "wait",
-            "back",
-            "submit"
-          ]
+          "enum": ["click", "input", "wait", "back", "submit"]
         },
         "locator": {
           "$ref": "#/$defs/locator"
         },
         "text": {
-          "enum": [
-            "{username}",
-            "{password}"
-          ]
+          "enum": ["{username}", "{password}"]
         },
         "timeoutMs": {
           "type": "integer",
@@ -383,22 +325,13 @@
           "if": {
             "properties": {
               "action": {
-                "enum": [
-                  "click",
-                  "input",
-                  "wait",
-                  "submit"
-                ]
+                "enum": ["click", "input", "wait", "submit"]
               }
             },
-            "required": [
-              "action"
-            ]
+            "required": ["action"]
           },
           "then": {
-            "required": [
-              "locator"
-            ]
+            "required": ["locator"]
           }
         },
         {
@@ -408,20 +341,14 @@
                 "const": "input"
               }
             },
-            "required": [
-              "action"
-            ]
+            "required": ["action"]
           },
           "then": {
-            "required": [
-              "text"
-            ]
+            "required": ["text"]
           },
           "else": {
             "not": {
-              "required": [
-                "text"
-              ]
+              "required": ["text"]
             }
           }
         },
@@ -432,9 +359,7 @@
                 "const": "submit"
               }
             },
-            "required": [
-              "action"
-            ]
+            "required": ["action"]
           },
           "then": {
             "properties": {
@@ -451,15 +376,11 @@
                 "const": "back"
               }
             },
-            "required": [
-              "action"
-            ]
+            "required": ["action"]
           },
           "then": {
             "not": {
-              "required": [
-                "locator"
-              ]
+              "required": ["locator"]
             }
           }
         }
@@ -468,13 +389,7 @@
     "flow": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "packageName",
-        "activity",
-        "enabled",
-        "steps",
-        "success"
-      ],
+      "required": ["packageName", "activity", "enabled", "steps", "success"],
       "properties": {
         "packageName": {
           "type": "string",
@@ -504,9 +419,7 @@
                 "const": "submit"
               }
             },
-            "required": [
-              "action"
-            ]
+            "required": ["action"]
           },
           "minContains": 1,
           "maxContains": 1
@@ -514,10 +427,7 @@
         "success": {
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "locator",
-            "timeoutMs"
-          ],
+          "required": ["locator", "timeoutMs"],
           "properties": {
             "locator": {
               "$ref": "#/$defs/locator"
@@ -532,10 +442,7 @@
         "failure": {
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "locator",
-            "timeoutMs"
-          ],
+          "required": ["locator", "timeoutMs"],
           "properties": {
             "locator": {
               "$ref": "#/$defs/locator"
@@ -560,14 +467,10 @@
                 "const": "*"
               }
             },
-            "required": [
-              "packageName"
-            ]
+            "required": ["packageName"]
           },
           "then": {
-            "required": [
-              "entryId"
-            ]
+            "required": ["entryId"]
           }
         }
       ]
@@ -578,31 +481,23 @@
       "if": {
         "properties": {
           "execution": {
-            "required": [
-              "appOpen"
-            ],
+            "required": ["appOpen"],
             "type": "object"
           }
         },
-        "required": [
-          "execution"
-        ]
+        "required": ["execution"]
       },
       "then": {
         "properties": {
           "execution": {
-            "required": [
-              "contentIsolation"
-            ],
+            "required": ["contentIsolation"],
             "properties": {
               "mode": {
                 "const": "FULL"
               }
             },
             "not": {
-              "required": [
-                "autoRegistration"
-              ]
+              "required": ["autoRegistration"]
             },
             "type": "object"
           },

@@ -28,6 +28,11 @@ export async function startProxyBridge(credential: ProxyCredential, policy = new
     'Basic ' + Buffer.from(credential.username + ':' + credential.password).toString('base64');
   const sockets = new Set<Socket>();
   let closed = false;
+  let failure: string | undefined;
+  const failedConnect = (error: NodeJS.ErrnoException) => {
+    if (['ECONNREFUSED', 'ENETUNREACH', 'EHOSTUNREACH', 'ETIMEDOUT'].includes(error.code ?? ''))
+      failure ??= 'PROXY_CONNECT_FAILED';
+  };
   const track = (socket: Socket) => {
     sockets.add(socket);
     socket.on('error', () => {});
@@ -60,6 +65,7 @@ export async function startProxyBridge(credential: ProxyCredential, policy = new
         },
         (response) => {
           if (response.statusCode === 407) {
+            failure = 'PROXY_AUTH_FAILED';
             response.resume();
             res.writeHead(502).end();
             return;
@@ -75,7 +81,8 @@ export async function startProxyBridge(credential: ProxyCredential, policy = new
         },
       );
       remote.on('socket', track);
-      remote.on('error', () => {
+      remote.on('error', (error: NodeJS.ErrnoException) => {
+        failedConnect(error);
         if (!res.headersSent) res.writeHead(502);
         res.end();
       });
@@ -107,6 +114,7 @@ export async function startProxyBridge(credential: ProxyCredential, policy = new
       remote.on('socket', track);
       remote.on('connect', (response, socket, upstreamHead) => {
         if (response.statusCode !== 200) {
+          if (response.statusCode === 407) failure = 'PROXY_AUTH_FAILED';
           socket.destroy();
           client.end('HTTP/1.1 502 Bad Gateway\r\n\r\n');
           return;
@@ -132,7 +140,10 @@ export async function startProxyBridge(credential: ProxyCredential, policy = new
         socket.pipe(client);
         client.pipe(socket);
       });
-      remote.on('error', () => client.end('HTTP/1.1 502 Bad Gateway\r\n\r\n'));
+      remote.on('error', (error: NodeJS.ErrnoException) => {
+        failedConnect(error);
+        client.end('HTTP/1.1 502 Bad Gateway\r\n\r\n');
+      });
       remote.setTimeout(10000, () => remote.destroy());
       remote.end();
     })().catch(() => client.end('HTTP/1.1 403 Forbidden\r\n\r\n'));
@@ -144,6 +155,9 @@ export async function startProxyBridge(credential: ProxyCredential, policy = new
   const port = (server.address() as { port: number }).port;
   return {
     port,
+    assertHealthy() {
+      if (failure) throw new RegistrationError(failure);
+    },
     url: 'http://127.0.0.1:' + port,
     async close() {
       closed = true;

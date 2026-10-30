@@ -66,6 +66,7 @@ export async function verifyRelease(body: unknown) {
     const seen = new Set<string>();
     if (manifest.features?.includes('DOWNLOAD_V1')) expected.add('egress.js');
     if (manifest.features?.includes('AUTO_REGISTRATION_V1')) expected.add('ocr-worker.js');
+    if (manifest.features?.includes('DEVICE_VARIANTS_V1')) expected.add('identity-images.js');
     let invalid = false;
     const lockChunks: Buffer[] = [];
     await listArchive({

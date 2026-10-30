@@ -45,14 +45,7 @@
     "enroll": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "kind",
-        "protocolVersion",
-        "nodeId",
-        "bootId",
-        "agentVersion",
-        "releaseId"
-      ],
+      "required": ["kind", "protocolVersion", "nodeId", "bootId", "agentVersion", "releaseId"],
       "properties": {
         "kind": {
           "const": "enroll"
@@ -77,11 +70,7 @@
     "currentDelivery": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "deliveryId",
-        "runId",
-        "fence"
-      ],
+      "required": ["deliveryId", "runId", "fence"],
       "properties": {
         "deliveryId": {
           "$ref": "#/$defs/uuid"
@@ -134,12 +123,7 @@
         "capabilities": {
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "download",
-            "android",
-            "kvm",
-            "freeDiskBytes"
-          ],
+          "required": ["download", "android", "kvm", "freeDiskBytes"],
           "properties": {
             "download": {
               "type": "boolean"
@@ -247,6 +231,10 @@
                 "systemImage": {
                   "type": "string",
                   "maxLength": 100
+                },
+                "identityModels": {
+                  "type": "string",
+                  "pattern": "^[0-3]$"
                 }
               }
             },
@@ -272,12 +260,7 @@
     "claim": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "kind",
-        "protocolVersion",
-        "nodeId",
-        "bootId"
-      ],
+      "required": ["kind", "protocolVersion", "nodeId", "bootId"],
       "properties": {
         "kind": {
           "const": "claim"
@@ -353,14 +336,7 @@
     "accept": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "kind",
-        "protocolVersion",
-        "nodeId",
-        "bootId",
-        "deliveryId",
-        "fence"
-      ],
+      "required": ["kind", "protocolVersion", "nodeId", "bootId", "deliveryId", "fence"],
       "properties": {
         "kind": {
           "const": "accept"
@@ -386,14 +362,7 @@
     "events": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "kind",
-        "protocolVersion",
-        "nodeId",
-        "deliveryId",
-        "fence",
-        "events"
-      ],
+      "required": ["kind", "protocolVersion", "nodeId", "deliveryId", "fence", "events"],
       "properties": {
         "kind": {
           "const": "events"
@@ -473,14 +442,7 @@
     "event": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "eventId",
-        "runId",
-        "sequence",
-        "occurredAt",
-        "type",
-        "payload"
-      ],
+      "required": ["eventId", "runId", "sequence", "occurredAt", "type", "payload"],
       "properties": {
         "eventId": {
           "$ref": "#/$defs/uuid"
@@ -525,9 +487,7 @@
                 "const": "RUN_STARTED"
               }
             },
-            "required": [
-              "type"
-            ]
+            "required": ["type"]
           },
           "then": {
             "properties": {
@@ -544,9 +504,7 @@
                 "const": "TARGETS_DISCOVERED"
               }
             },
-            "required": [
-              "type"
-            ]
+            "required": ["type"]
           },
           "then": {
             "properties": {
@@ -563,14 +521,10 @@
                 "const": "TASK_STAGE"
               }
             },
-            "required": [
-              "type"
-            ]
+            "required": ["type"]
           },
           "then": {
-            "required": [
-              "taskId"
-            ],
+            "required": ["taskId"],
             "properties": {
               "payload": {
                 "$ref": "#/$defs/taskStage"
@@ -585,14 +539,10 @@
                 "const": "SUBMISSION_INTENT"
               }
             },
-            "required": [
-              "type"
-            ]
+            "required": ["type"]
           },
           "then": {
-            "required": [
-              "taskId"
-            ],
+            "required": ["taskId"],
             "properties": {
               "payload": {
                 "$ref": "#/$defs/submission"
@@ -607,14 +557,10 @@
                 "const": "TASK_FINISHED"
               }
             },
-            "required": [
-              "type"
-            ]
+            "required": ["type"]
           },
           "then": {
-            "required": [
-              "taskId"
-            ],
+            "required": ["taskId"],
             "properties": {
               "payload": {
                 "$ref": "#/$defs/taskFinished"
@@ -629,9 +575,7 @@
                 "const": "RUN_FINISHED"
               }
             },
-            "required": [
-              "type"
-            ]
+            "required": ["type"]
           },
           "then": {
             "properties": {
@@ -648,9 +592,7 @@
                 "const": "STOP_ACK"
               }
             },
-            "required": [
-              "type"
-            ]
+            "required": ["type"]
           },
           "then": {
             "properties": {
@@ -667,9 +609,7 @@
                 "const": "LOG"
               }
             },
-            "required": [
-              "type"
-            ]
+            "required": ["type"]
           },
           "then": {
             "properties": {
@@ -677,9 +617,7 @@
                 "$ref": "#/$defs/log"
               }
             },
-            "required": [
-              "taskId"
-            ]
+            "required": ["taskId"]
           }
         },
         {
@@ -689,9 +627,7 @@
                 "const": "PROXY_CHECKED"
               }
             },
-            "required": [
-              "type"
-            ]
+            "required": ["type"]
           },
           "then": {
             "properties": {
@@ -708,9 +644,7 @@
                 "const": "BROWSER_ENVIRONMENT"
               }
             },
-            "required": [
-              "type"
-            ]
+            "required": ["type"]
           },
           "then": {
             "properties": {
@@ -727,14 +661,10 @@
                 "const": "APP_OBSTRUCTION"
               }
             },
-            "required": [
-              "type"
-            ]
+            "required": ["type"]
           },
           "then": {
-            "required": [
-              "taskId"
-            ],
+            "required": ["taskId"],
             "properties": {
               "payload": {
                 "$ref": "#/$defs/appObstruction"
@@ -747,10 +677,7 @@
     "runStarted": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "configHash",
-        "releaseId"
-      ],
+      "required": ["configHash", "releaseId"],
       "properties": {
         "configHash": {
           "$ref": "#/$defs/hash"
@@ -763,9 +690,7 @@
     "targets": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "targets"
-      ],
+      "required": ["targets"],
       "properties": {
         "targets": {
           "type": "array",
@@ -773,12 +698,7 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": [
-              "taskId",
-              "targetKey",
-              "label",
-              "sourceUrl"
-            ],
+            "required": ["taskId", "targetKey", "label", "sourceUrl"],
             "properties": {
               "taskId": {
                 "$ref": "#/$defs/uuid"
@@ -816,9 +736,7 @@
     "taskStage": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "stage"
-      ],
+      "required": ["stage"],
       "properties": {
         "stage": {
           "enum": [
@@ -867,17 +785,11 @@
               "maxLength": 256
             },
             "versionName": {
-              "type": [
-                "string",
-                "null"
-              ],
+              "type": ["string", "null"],
               "maxLength": 256
             },
             "versionCode": {
-              "type": [
-                "integer",
-                "null"
-              ],
+              "type": ["integer", "null"],
               "minimum": 0
             },
             "abis": {
@@ -910,20 +822,10 @@
         "recognition": {
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "source",
-            "navigationSteps",
-            "cache",
-            "learned",
-            "needsAdaptation"
-          ],
+          "required": ["source", "navigationSteps", "cache", "learned", "needsAdaptation"],
           "properties": {
             "source": {
-              "enum": [
-                "CONTROLS",
-                "OCR",
-                "LEARNED"
-              ]
+              "enum": ["CONTROLS", "OCR", "LEARNED"]
             },
             "navigationSteps": {
               "type": "integer",
@@ -931,11 +833,7 @@
               "maximum": 12
             },
             "cache": {
-              "enum": [
-                "MISS",
-                "HIT",
-                "INVALIDATED"
-              ]
+              "enum": ["MISS", "HIT", "INVALIDATED"]
             },
             "learned": {
               "type": "boolean"
@@ -950,17 +848,10 @@
             "automaticIdentity": {
               "type": "object",
               "additionalProperties": false,
-              "required": [
-                "kind",
-                "identifierHash",
-                "scope"
-              ],
+              "required": ["kind", "identifierHash", "scope"],
               "properties": {
                 "kind": {
-                  "enum": [
-                    "GUEST",
-                    "APP_ASSIGNED"
-                  ]
+                  "enum": ["GUEST", "APP_ASSIGNED"]
                 },
                 "identifierHash": {
                   "type": "string",
@@ -978,10 +869,7 @@
     "submission": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "submissionId",
-        "accountRef"
-      ],
+      "required": ["submissionId", "accountRef"],
       "properties": {
         "submissionId": {
           "$ref": "#/$defs/uuid"
@@ -994,28 +882,13 @@
     "taskFinished": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "status",
-        "proof",
-        "artifactIds"
-      ],
+      "required": ["status", "proof", "artifactIds"],
       "properties": {
         "status": {
-          "enum": [
-            "SUCCEEDED",
-            "FAILED",
-            "SKIPPED",
-            "CANCELLED",
-            "UNKNOWN"
-          ]
+          "enum": ["SUCCEEDED", "FAILED", "SKIPPED", "CANCELLED", "UNKNOWN"]
         },
         "proof": {
-          "enum": [
-            "APP_UI",
-            "FILE_VALIDATION",
-            "NONE",
-            "APP_OPEN"
-          ]
+          "enum": ["APP_UI", "FILE_VALIDATION", "NONE", "APP_OPEN"]
         },
         "artifactIds": {
           "type": "array",
@@ -1036,20 +909,10 @@
         "recognition": {
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "source",
-            "navigationSteps",
-            "cache",
-            "learned",
-            "needsAdaptation"
-          ],
+          "required": ["source", "navigationSteps", "cache", "learned", "needsAdaptation"],
           "properties": {
             "source": {
-              "enum": [
-                "CONTROLS",
-                "OCR",
-                "LEARNED"
-              ]
+              "enum": ["CONTROLS", "OCR", "LEARNED"]
             },
             "navigationSteps": {
               "type": "integer",
@@ -1057,11 +920,7 @@
               "maximum": 12
             },
             "cache": {
-              "enum": [
-                "MISS",
-                "HIT",
-                "INVALIDATED"
-              ]
+              "enum": ["MISS", "HIT", "INVALIDATED"]
             },
             "learned": {
               "type": "boolean"
@@ -1076,17 +935,10 @@
             "automaticIdentity": {
               "type": "object",
               "additionalProperties": false,
-              "required": [
-                "kind",
-                "identifierHash",
-                "scope"
-              ],
+              "required": ["kind", "identifierHash", "scope"],
               "properties": {
                 "kind": {
-                  "enum": [
-                    "GUEST",
-                    "APP_ASSIGNED"
-                  ]
+                  "enum": ["GUEST", "APP_ASSIGNED"]
                 },
                 "identifierHash": {
                   "type": "string",
@@ -1102,13 +954,7 @@
         "openObservation": {
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "dwellMs",
-            "elapsedMs",
-            "samples",
-            "scope",
-            "cleanupComplete"
-          ],
+          "required": ["dwellMs", "elapsedMs", "samples", "scope", "cleanupComplete"],
           "properties": {
             "dwellMs": {
               "const": 10000
@@ -1134,11 +980,7 @@
         "openTimings": {
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "version",
-            "totalMs",
-            "steps"
-          ],
+          "required": ["version", "totalMs", "steps"],
           "properties": {
             "version": {
               "const": 1
@@ -1154,12 +996,7 @@
               "items": {
                 "type": "object",
                 "additionalProperties": false,
-                "required": [
-                  "name",
-                  "startedMs",
-                  "elapsedMs",
-                  "outcome"
-                ],
+                "required": ["name", "startedMs", "elapsedMs", "outcome"],
                 "properties": {
                   "name": {
                     "enum": [
@@ -1186,11 +1023,7 @@
                     "maximum": 3600000
                   },
                   "outcome": {
-                    "enum": [
-                      "SUCCEEDED",
-                      "FAILED",
-                      "CANCELLED"
-                    ]
+                    "enum": ["SUCCEEDED", "FAILED", "CANCELLED"]
                   }
                 }
               }
@@ -1206,18 +1039,12 @@
                 "const": "SUCCEEDED"
               }
             },
-            "required": [
-              "status"
-            ]
+            "required": ["status"]
           },
           "then": {
             "properties": {
               "proof": {
-                "enum": [
-                  "APP_UI",
-                  "FILE_VALIDATION",
-                  "APP_OPEN"
-                ]
+                "enum": ["APP_UI", "FILE_VALIDATION", "APP_OPEN"]
               }
             }
           }
@@ -1229,14 +1056,10 @@
                 "const": "APP_UI"
               }
             },
-            "required": [
-              "proof"
-            ]
+            "required": ["proof"]
           },
           "then": {
-            "required": [
-              "accountRef"
-            ],
+            "required": ["accountRef"],
             "properties": {
               "artifactIds": {
                 "type": "array",
@@ -1249,15 +1072,10 @@
           "if": {
             "properties": {
               "errorCode": {
-                "enum": [
-                  "NAVIGATION_SITE",
-                  "APP_NAVIGATION_ONLY"
-                ]
+                "enum": ["NAVIGATION_SITE", "APP_NAVIGATION_ONLY"]
               }
             },
-            "required": [
-              "errorCode"
-            ]
+            "required": ["errorCode"]
           },
           "then": {
             "properties": {
@@ -1269,9 +1087,7 @@
               }
             },
             "not": {
-              "required": [
-                "accountRef"
-              ]
+              "required": ["accountRef"]
             }
           }
         },
@@ -1282,9 +1098,7 @@
                 "const": "APP_AUTO_IDENTITY"
               }
             },
-            "required": [
-              "errorCode"
-            ]
+            "required": ["errorCode"]
           },
           "then": {
             "properties": {
@@ -1295,19 +1109,13 @@
                 "const": "NONE"
               },
               "recognition": {
-                "required": [
-                  "automaticIdentity"
-                ],
+                "required": ["automaticIdentity"],
                 "type": "object"
               }
             },
-            "required": [
-              "recognition"
-            ],
+            "required": ["recognition"],
             "not": {
-              "required": [
-                "accountRef"
-              ]
+              "required": ["accountRef"]
             }
           }
         },
@@ -1318,14 +1126,10 @@
                 "const": "APP_OPEN"
               }
             },
-            "required": [
-              "proof"
-            ]
+            "required": ["proof"]
           },
           "then": {
-            "required": [
-              "openObservation"
-            ],
+            "required": ["openObservation"],
             "properties": {
               "status": {
                 "const": "SUCCEEDED"
@@ -1338,19 +1142,13 @@
             "not": {
               "anyOf": [
                 {
-                  "required": [
-                    "accountRef"
-                  ]
+                  "required": ["accountRef"]
                 },
                 {
-                  "required": [
-                    "recognition"
-                  ]
+                  "required": ["recognition"]
                 },
                 {
-                  "required": [
-                    "errorCode"
-                  ]
+                  "required": ["errorCode"]
                 }
               ]
             }
@@ -1358,9 +1156,7 @@
         },
         {
           "if": {
-            "required": [
-              "openObservation"
-            ]
+            "required": ["openObservation"]
           },
           "then": {
             "properties": {
@@ -1375,18 +1171,10 @@
     "runFinished": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "status"
-      ],
+      "required": ["status"],
       "properties": {
         "status": {
-          "enum": [
-            "SUCCEEDED",
-            "PARTIAL_FAILED",
-            "FAILED",
-            "CANCELLED",
-            "NEEDS_REVIEW"
-          ]
+          "enum": ["SUCCEEDED", "PARTIAL_FAILED", "FAILED", "CANCELLED", "NEEDS_REVIEW"]
         },
         "errorCode": {
           "enum": [
@@ -1417,9 +1205,7 @@
     "stopAck": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "cleanupComplete"
-      ],
+      "required": ["cleanupComplete"],
       "properties": {
         "cleanupComplete": {
           "type": "boolean"
@@ -1429,10 +1215,7 @@
     "log": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "level",
-        "message"
-      ],
+      "required": ["level", "message"],
       "properties": {
         "level": {
           "const": "INFO"
@@ -1459,8 +1242,6 @@
         "locale",
         "shellAndroidIdHash",
         "androidIdScope",
-        "proxyObservedIp",
-        "proxyObservedAt",
         "proxyIpScope",
         "appUserAgent",
         "identitySource"
@@ -1501,28 +1282,58 @@
           "$ref": "#/$defs/time"
         },
         "proxyIpScope": {
-          "const": "PROBE_ONLY"
+          "enum": ["PROBE_ONLY", "NOT_CHECKED"]
         },
         "appUserAgent": {
           "const": "UNVERIFIED"
         },
         "identitySource": {
           "const": "EMULATOR_NOT_REAL_DEVICE"
+        },
+        "variantId": {
+          "type": "string",
+          "pattern": "^qa-model-(0[1-9]|10)$"
+        },
+        "systemImageSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "proxyIpScope": {
+                "const": "PROBE_ONLY"
+              }
+            },
+            "required": ["proxyIpScope"]
+          },
+          "then": {
+            "required": ["proxyObservedIp", "proxyObservedAt"]
+          },
+          "else": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": ["proxyObservedIp"]
+                },
+                {
+                  "required": ["proxyObservedAt"]
+                }
+              ]
+            }
+          }
+        }
+      ]
     },
     "proxyChecked": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "status"
-      ],
+      "required": ["status"],
       "properties": {
         "status": {
-          "enum": [
-            "SUCCEEDED",
-            "FAILED"
-          ]
+          "enum": ["SUCCEEDED", "FAILED"]
         },
         "ip": {
           "type": "string",
@@ -1545,10 +1356,7 @@
       "additionalProperties": false,
       "properties": {
         "role": {
-          "enum": [
-            "SOURCE",
-            "LANDING"
-          ]
+          "enum": ["SOURCE", "LANDING"]
         },
         "platform": {
           "const": "Android"
@@ -1575,16 +1383,7 @@
           "const": "EMULATED_BROWSER"
         }
       },
-      "required": [
-        "role",
-        "platform",
-        "mobile",
-        "touch",
-        "width",
-        "height",
-        "userAgent",
-        "scope"
-      ]
+      "required": ["role", "platform", "mobile", "touch", "width", "height", "userAgent", "scope"]
     },
     "appObstruction": {
       "type": "object",
@@ -1602,12 +1401,7 @@
           ]
         },
         "method": {
-          "enum": [
-            "CONTROLS",
-            "OCR",
-            "ICON",
-            "BACK"
-          ]
+          "enum": ["CONTROLS", "OCR", "ICON", "BACK"]
         },
         "index": {
           "type": "integer",
@@ -1615,21 +1409,10 @@
           "maximum": 12
         },
         "phase": {
-          "enum": [
-            "DETECTED",
-            "WAITING",
-            "ACTION_SENT",
-            "CLEARED",
-            "UNCHANGED",
-            "UNVERIFIED"
-          ]
+          "enum": ["DETECTED", "WAITING", "ACTION_SENT", "CLEARED", "UNCHANGED", "UNVERIFIED"]
         }
       },
-      "required": [
-        "action",
-        "method",
-        "index"
-      ],
+      "required": ["action", "method", "index"],
       "allOf": [
         {
           "if": {
@@ -1638,14 +1421,10 @@
                 "const": "ICON"
               }
             },
-            "required": [
-              "method"
-            ]
+            "required": ["method"]
           },
           "then": {
-            "required": [
-              "phase"
-            ]
+            "required": ["phase"]
           }
         },
         {
@@ -1655,17 +1434,12 @@
                 "const": "WAIT_SPLASH"
               }
             },
-            "required": [
-              "action"
-            ]
+            "required": ["action"]
           },
           "then": {
             "properties": {
               "phase": {
-                "enum": [
-                  "DETECTED",
-                  "WAITING"
-                ]
+                "enum": ["DETECTED", "WAITING"]
               }
             }
           }
@@ -1677,23 +1451,16 @@
                 "const": "WAIT_OVERLAY"
               }
             },
-            "required": [
-              "action"
-            ]
+            "required": ["action"]
           },
           "then": {
-            "required": [
-              "phase"
-            ],
+            "required": ["phase"],
             "properties": {
               "method": {
                 "const": "CONTROLS"
               },
               "phase": {
-                "enum": [
-                  "DETECTED",
-                  "WAITING"
-                ]
+                "enum": ["DETECTED", "WAITING"]
               }
             }
           }
@@ -1705,14 +1472,10 @@
                 "const": "BACK"
               }
             },
-            "required": [
-              "method"
-            ]
+            "required": ["method"]
           },
           "then": {
-            "required": [
-              "phase"
-            ],
+            "required": ["phase"],
             "properties": {
               "action": {
                 "const": "CLOSE_POPUP"
@@ -1727,14 +1490,10 @@
                 "const": "RETRY_LOAD"
               }
             },
-            "required": [
-              "action"
-            ]
+            "required": ["action"]
           },
           "then": {
-            "required": [
-              "phase"
-            ],
+            "required": ["phase"],
             "properties": {
               "method": {
                 "const": "CONTROLS"

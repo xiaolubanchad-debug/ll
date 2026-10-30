@@ -1,7 +1,8 @@
+import type { IdentityImage } from './identity-images.js';
 import { spawn } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
 import { createServer } from 'node:net';
-import { mkdtemp, mkdir, readdir, readFile, stat, lstat } from 'node:fs/promises';
+import { mkdtemp, mkdir, readdir, readFile, writeFile, stat, lstat } from 'node:fs/promises';
 import { join, resolve, sep } from 'node:path';
 import { randomUUID, createHash } from 'node:crypto';
 import { AppiumClient } from './webdriver.js';
@@ -9,7 +10,7 @@ import { startProxyBridge, proxyObservation } from './proxy.js';
 import { NetworkPolicy } from './network.js';
 import { recognizeRegistrationScreenshot } from './ocr.js';
 import { removeOwned } from './cache.js';
-import { prepareAndroidInParallel, deviceProperties } from './android-preparation.js';
+import { deviceProperties } from './android-preparation.js';
 import type { MeasureOpenStep } from './open-timings.js';
 import type {
   Profile,
@@ -21,6 +22,7 @@ import { RegistrationError } from './registration-types.js';
 
 export interface AndroidOptions {
   sdkRoot: string;
+  identityImage?: IdentityImage;
   toolsRoot: string;
   root: string;
   proxy: ProxyCredential;
@@ -52,6 +54,7 @@ export async function androidCommand(
   code: string,
   cwd?: string,
   outputLimit = 16384,
+  input?: Buffer,
 ) {
   return new Promise<string>((ok, no) => {
     const child = spawn(file, args, {
@@ -88,7 +91,7 @@ export async function androidCommand(
       ),
     );
     child.stdin.on('error', () => {});
-    child.stdin.end(file.endsWith('avdmanager') ? 'no\n' : '');
+    child.stdin.end(input ?? (file.endsWith('avdmanager') ? 'no\n' : ''));
     if (signal?.aborted) abort();
     else signal?.addEventListener('abort', abort, { once: true });
   });
@@ -298,6 +301,19 @@ export async function startAndroid(
           'DEVICE_PROFILE_UNSUPPORTED',
         );
       });
+      if (options.identityImage) {
+        const ini = join(env.ANDROID_AVD_HOME, avdName + '.avd', 'config.ini');
+        const text = await readFile(ini, 'utf8');
+        if (!/^image\.sysdir\.1=.*$/m.test(text))
+          throw new RegistrationError('IDENTITY_IMAGE_INVALID');
+        await writeFile(
+          ini,
+          text.replace(
+            /^image\.sysdir\.1=.*$/m,
+            'image.sysdir.1=' + options.identityImage.systemDir + '/',
+          ),
+        );
+      }
       await measure('EMULATOR_BOOT', async () => {
         const port = await emulatorPort();
         record.serial = 'emulator-' + port;
@@ -311,6 +327,7 @@ export async function startAndroid(
             '-port',
             String(port),
             '-no-window',
+            ...(options.identityImage ? ['-writable-system'] : []),
             '-no-audio',
             '-no-snapshot',
             '-no-boot-anim',
@@ -354,7 +371,10 @@ export async function startAndroid(
       measure('PROXY_CHECK', () => proxyObservation(bridge!.port, s, options.proxyCheckUrl));
     const observed =
       options.controlMode === 'LAUNCH_ONLY'
-        ? await prepareAndroidInParallel(signal, checkProxy, bootDevice)
+        ? await (async () => {
+            await bootDevice(signal);
+            return undefined;
+          })()
         : await (async () => {
             const observation = await checkProxy(signal);
             await bootDevice(signal);
@@ -472,6 +492,8 @@ export async function startAndroid(
     );
     if (!validShellAndroidId(androidId) || !Number.isInteger(api) || locale !== profile.locale)
       throw new RegistrationError('DEVICE_PROFILE_UNSUPPORTED');
+    if (options.identityImage && model !== options.identityImage.model)
+      throw new RegistrationError('IDENTITY_MODEL_MISMATCH');
     const rpc = () => {
       if (!client) throw new RegistrationError('ANDROID_CONTROL_DISABLED');
       return client;
@@ -480,15 +502,17 @@ export async function startAndroid(
       supportedAbis,
       observation: {
         profileId: profile.id,
+        ...(options.identityImage
+          ? { variantId: options.identityImage.id, systemImageSha256: options.identityImage.sha256 }
+          : {}),
         avdName,
         apiLevel: api,
         model,
         locale,
         shellAndroidIdHash: createHash('sha256').update(androidId).digest('hex'),
         androidIdScope: 'SHELL_NOT_APP',
-        proxyObservedIp: observed.ip,
-        proxyObservedAt: observed.at,
-        proxyIpScope: 'PROBE_ONLY',
+        ...(observed ? { proxyObservedIp: observed.ip, proxyObservedAt: observed.at } : {}),
+        proxyIpScope: observed ? 'PROBE_ONLY' : 'NOT_CHECKED',
         appUserAgent: 'UNVERIFIED',
         identitySource: 'EMULATOR_NOT_REAL_DEVICE',
       },
@@ -501,6 +525,45 @@ export async function startAndroid(
           'APK_INSTALL_FAILED',
         );
         if (!/^Success\s*$/m.test(value)) throw new RegistrationError('APK_INSTALL_FAILED');
+      },
+      async provisionTestClient(bootstrap) {
+        options.beforeAction();
+        await command(
+          adb,
+          [
+            '-s',
+            record.serial!,
+            'shell',
+            'run-as',
+            'com.apkplatform.testclient',
+            'mkdir',
+            '-p',
+            'files',
+          ],
+          10000,
+          'TEST_BOOTSTRAP_FAILED',
+        );
+        await androidCommand(
+          adb,
+          [
+            '-s',
+            record.serial!,
+            'shell',
+            '-T',
+            'run-as',
+            'com.apkplatform.testclient',
+            'sh',
+            '-c',
+            "'cat > files/bootstrap.json'",
+          ],
+          env,
+          signal,
+          10000,
+          'TEST_BOOTSTRAP_FAILED',
+          workspace,
+          16384,
+          Buffer.from(JSON.stringify(bootstrap)),
+        );
       },
       async launch(pkg, activity) {
         options.beforeAction();
@@ -557,6 +620,7 @@ export async function startAndroid(
           throw new RegistrationError('APP_LAUNCH_FAILED');
       },
       async foreground(pkg) {
+        bridge?.assertHealthy();
         options.beforeAction();
         const output = await command(
           adb,
