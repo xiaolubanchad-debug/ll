@@ -7,6 +7,8 @@ import { setImmediate as immediate } from 'node:timers/promises';
 import {
   prepareAndroidInParallel,
   deviceProperties,
+  hasAndroidDefaultNetwork,
+  waitForAndroidNetwork,
   openTimer,
   inspectApk,
   verifyApkIntegrity,
@@ -21,6 +23,83 @@ const deferred = () => {
   });
   return { promise, resolve };
 };
+
+test('Android readiness requires a unique current default network, not Wi-Fi or historical logs', () => {
+  assert.equal(hasAndroidDefaultNetwork('Active default network: 100\nNetwork diagnostics'), true);
+  assert.equal(hasAndroidDefaultNetwork('  Active default network: 103\r\n'), true);
+  for (const text of [
+    '',
+    'Active default network: none',
+    'Active default network: 0',
+    'Wi-Fi enabled\nlog: Active default network: 100',
+    'Active default network: 100\nActive default network: none',
+    'Active default network: 100 trailing text',
+  ])
+    assert.equal(hasAndroidDefaultNetwork(text), false);
+});
+
+test('boot waits for the default route, honors cancellation and bounds unavailable network reads', async () => {
+  let now = 0,
+    reads = 0,
+    checks = 0;
+  const clock = {
+    now: () => now,
+    sleep: async (ms) => {
+      now += ms;
+    },
+  };
+  await waitForAndroidNetwork(
+    new AbortController().signal,
+    async () => {
+      reads++;
+      return reads < 3 ? 'Active default network: none' : 'Active default network: 100';
+    },
+    () => {
+      checks++;
+    },
+    clock,
+  );
+  assert.equal(reads, 3);
+  assert.equal(now, 1000);
+  assert.equal(checks, 6);
+  now = 0;
+  await assert.rejects(
+    waitForAndroidNetwork(
+      new AbortController().signal,
+      async () => {
+        throw Error('private system output');
+      },
+      () => {},
+      clock,
+    ),
+    (e) => e.code === 'ANDROID_NOT_READY',
+  );
+  assert.equal(now, 30000);
+  const cancelled = new AbortController();
+  await assert.rejects(
+    waitForAndroidNetwork(
+      cancelled.signal,
+      async () => {
+        cancelled.abort();
+        return 'Active default network: 100';
+      },
+      () => {},
+      clock,
+    ),
+    (e) => e.code === 'CANCELLED',
+  );
+  await assert.rejects(
+    waitForAndroidNetwork(
+      new AbortController().signal,
+      async () => '',
+      () => {
+        throw new RegistrationError('CANCELLED');
+      },
+      clock,
+    ),
+    (e) => e.code === 'CANCELLED',
+  );
+});
 
 test('preparation overlaps proxy and boot but returns only after both finish', async () => {
   const proxy = deferred(),

@@ -56,6 +56,7 @@ export async function openApk(
     const profile = config.execution.deviceProfiles[index % config.execution.deviceProfiles.length];
     session = await (hooks.androidFactory ?? startAndroid)(profile, signal, {
       ...hooks,
+      ownedTestClient: config.execution.appOpen.ownedTestClient === true,
       ...(config.execution.appOpen.randomDeviceProfile
         ? { identityImage: await loadIdentityImage(hooks.sdkRoot, target.variantId ?? '') }
         : {}),

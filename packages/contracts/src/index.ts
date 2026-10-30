@@ -110,6 +110,7 @@ export function contentIsolationSupported(
       '0.11.1',
       '0.12.0',
       '0.12.1',
+      '0.12.2',
     ].includes(version ?? '') && features?.includes('CONTENT_ISOLATION_V1') === true
   );
 }
@@ -118,9 +119,17 @@ export function appReadinessSupported(
   version: string | null | undefined,
 ): boolean {
   return (
-    ['0.9.0', '0.9.1', '0.9.2', '0.10.0', '0.11.0', '0.11.1', '0.12.0', '0.12.1'].includes(
-      version ?? '',
-    ) && features?.includes('APP_READINESS_V1') === true
+    [
+      '0.9.0',
+      '0.9.1',
+      '0.9.2',
+      '0.10.0',
+      '0.11.0',
+      '0.11.1',
+      '0.12.0',
+      '0.12.1',
+      '0.12.2',
+    ].includes(version ?? '') && features?.includes('APP_READINESS_V1') === true
   );
 }
 export function appOpenSupported(
@@ -128,7 +137,7 @@ export function appOpenSupported(
   version: string | null | undefined,
 ): boolean {
   return (
-    ['0.10.0', '0.11.0', '0.11.1', '0.12.0', '0.12.1'].includes(version ?? '') &&
+    ['0.10.0', '0.11.0', '0.11.1', '0.12.0', '0.12.1', '0.12.2'].includes(version ?? '') &&
     features?.includes('APP_OPEN_V1') === true
   );
 }
@@ -137,7 +146,7 @@ export function parallelAppOpenSupported(
   version: string | null | undefined,
 ): boolean {
   return (
-    ['0.11.0', '0.11.1', '0.12.0', '0.12.1'].includes(version ?? '') &&
+    ['0.11.0', '0.11.1', '0.12.0', '0.12.1', '0.12.2'].includes(version ?? '') &&
     features?.includes('APP_OPEN_PARALLEL_V1') === true
   );
 }
@@ -348,7 +357,7 @@ export function identitySupported(
   version: string | null | undefined,
 ) {
   return (
-    ['0.12.0', '0.12.1'].includes(version ?? '') &&
+    ['0.12.0', '0.12.1', '0.12.2'].includes(version ?? '') &&
     features?.includes('DEVICE_VARIANTS_V1') === true
   );
 }
@@ -357,7 +366,7 @@ export function ownedTestSupported(
   version: string | null | undefined,
 ) {
   return (
-    ['0.12.0', '0.12.1'].includes(version ?? '') &&
+    ['0.12.0', '0.12.1', '0.12.2'].includes(version ?? '') &&
     features?.includes('OWNED_TEST_CLIENT_V1') === true
   );
 }

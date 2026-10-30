@@ -30,6 +30,68 @@ const endpoints = [
   { url: 'http://owned.example.test/trace', format: 'TRACE' },
 ];
 
+test('owned-client CONNECT deadline closes a slow tunnel without poisoning later proxy requests', async () => {
+  await fixture(async (server, port) => {
+    let calls = 0,
+      firstClosed;
+    const firstClose = new Promise((resolve) => {
+      firstClosed = resolve;
+    });
+    server.on('connect', (_req, socket) => {
+      calls++;
+      if (calls === 1) {
+        socket.resume();
+        socket.once('end', () => socket.end());
+        socket.once('close', firstClosed);
+        return;
+      }
+      socket.write('HTTP/1.1 200 Connection Established\r\n\r\n');
+      socket.on('data', (bytes) => socket.write(bytes));
+    });
+    const bridge = await startProxyBridge(
+      { host: '127.0.0.1', port, username: 'owned', password: 'fixture' },
+      new NetworkPolicy(new Set(['http://127.0.0.1:' + port])),
+      100,
+    );
+    const tunnel = () =>
+      new Promise((ok, no) => {
+        const req = request({
+          host: '127.0.0.1',
+          port: bridge.port,
+          method: 'CONNECT',
+          path: '93.184.216.34:443',
+          agent: false,
+        });
+        req.once('connect', (res, socket) => ok({ status: res.statusCode, socket }));
+        req.once('error', no);
+        req.end();
+      });
+    let socket;
+    try {
+      const slow = await tunnel();
+      assert.equal(slow.status, 502);
+      slow.socket.destroy();
+      await firstClose;
+      bridge.assertHealthy();
+      const fast = await tunnel();
+      socket = fast.socket;
+      assert.equal(fast.status, 200);
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      const echoed = new Promise((resolve, reject) => {
+        socket.once('data', resolve);
+        socket.once('error', reject);
+      });
+      socket.write('owned-fixture');
+      assert.equal((await echoed).toString(), 'owned-fixture');
+      assert.equal(calls, 2);
+      bridge.assertHealthy();
+    } finally {
+      socket?.destroy();
+      await bridge.close();
+    }
+  });
+});
+
 test('proxy bridge makes no probe request and retains real upstream authentication failures', async () => {
   await fixture(async (server, port) => {
     let requests = 0;

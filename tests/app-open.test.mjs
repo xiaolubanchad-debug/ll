@@ -95,6 +95,7 @@ test('open-only completion follows measured foreground dwell and cleanup, withou
         },
         androidFactory: async (_profile, _signal, options) => {
           assert.equal(options.controlMode, 'LAUNCH_ONLY');
+          assert.equal(options.ownedTestClient, variant.owned === true);
           const session = {
             supportedAbis: apk.abis,
             observation: { profileId: 'owned-fixture' },

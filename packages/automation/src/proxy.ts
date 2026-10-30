@@ -22,7 +22,13 @@ const cleanHeaders = (headers: Record<string, string | string[] | undefined>) =>
     ),
   );
 
-export async function startProxyBridge(credential: ProxyCredential, policy = new NetworkPolicy()) {
+export async function startProxyBridge(
+  credential: ProxyCredential,
+  policy = new NetworkPolicy(),
+  connectTimeoutMs = 10000,
+) {
+  if (!Number.isInteger(connectTimeoutMs) || connectTimeoutMs < 100 || connectTimeoutMs > 10000)
+    throw new RegistrationError('PROXY_CONNECT_FAILED');
   const upstream = await policy.endpoint('http://' + authority(credential.host, credential.port));
   const authorization =
     'Basic ' + Buffer.from(credential.username + ':' + credential.password).toString('base64');
@@ -111,8 +117,17 @@ export async function startProxyBridge(credential: ProxyCredential, policy = new
         },
         agent: false,
       });
+      // Bound the whole CONNECT handshake, including a provider waiting for a residential peer.
+      // This target timeout must not masquerade as authentication or TCP connection failure.
+      const deadline = setTimeout(
+        () => remote.destroy(Error('PROXY_TUNNEL_TIMEOUT')),
+        connectTimeoutMs,
+      );
+      remote.once('close', () => clearTimeout(deadline));
+      client.once('close', () => remote.destroy());
       remote.on('socket', track);
       remote.on('connect', (response, socket, upstreamHead) => {
+        clearTimeout(deadline);
         if (response.statusCode !== 200) {
           if (response.statusCode === 407) failure = 'PROXY_AUTH_FAILED';
           socket.destroy();
@@ -144,7 +159,6 @@ export async function startProxyBridge(credential: ProxyCredential, policy = new
         failedConnect(error);
         client.end('HTTP/1.1 502 Bad Gateway\r\n\r\n');
       });
-      remote.setTimeout(10000, () => remote.destroy());
       remote.end();
     })().catch(() => client.end('HTTP/1.1 403 Forbidden\r\n\r\n'));
   });

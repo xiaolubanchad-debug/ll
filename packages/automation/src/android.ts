@@ -10,7 +10,7 @@ import { startProxyBridge, proxyObservation } from './proxy.js';
 import { NetworkPolicy } from './network.js';
 import { recognizeRegistrationScreenshot } from './ocr.js';
 import { removeOwned } from './cache.js';
-import { deviceProperties } from './android-preparation.js';
+import { deviceProperties, waitForAndroidNetwork } from './android-preparation.js';
 import type { MeasureOpenStep } from './open-timings.js';
 import type {
   Profile,
@@ -28,6 +28,7 @@ export interface AndroidOptions {
   proxy: ProxyCredential;
   policy?: NetworkPolicy;
   proxyCheckUrl?: string;
+  ownedTestClient?: boolean;
   controlMode?: 'LAUNCH_ONLY';
   measure?: MeasureOpenStep;
   beforeAction: () => void;
@@ -268,7 +269,11 @@ export async function startAndroid(
   try {
     await options.resources(record);
     options.beforeAction();
-    bridge = await startProxyBridge(options.proxy, options.policy);
+    bridge = await startProxyBridge(
+      options.proxy,
+      options.policy,
+      options.ownedTestClient ? 2500 : 10000,
+    );
     const bootDevice = async (preparationSignal: AbortSignal) => {
       const prepareCommand = (
         file: string,
@@ -364,6 +369,21 @@ export async function startAndroid(
           await new Promise((r) => setTimeout(r, 500));
         }
         if (!boot) throw new RegistrationError('ANDROID_NOT_READY');
+        await waitForAndroidNetwork(
+          preparationSignal,
+          () =>
+            androidCommand(
+              adb,
+              ['-s', record.serial!, 'shell', 'dumpsys', 'connectivity'],
+              env,
+              preparationSignal,
+              3000,
+              'ANDROID_NOT_READY',
+              workspace,
+              262144,
+            ),
+          options.beforeAction,
+        );
       });
       options.beforeAction();
     };

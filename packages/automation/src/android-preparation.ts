@@ -54,3 +54,32 @@ export function deviceProperties(text: string) {
     supportedAbis: (values[keys[4]] ?? '').split(',').filter(Boolean),
   };
 }
+
+// A boot-complete broadcast can precede the first usable Android default route.
+// Read only the current summary, never historical logs, IPs, SSIDs or validation probes.
+export function hasAndroidDefaultNetwork(text: string): boolean {
+  const lines = text.split(/\r?\n/).filter((line) => /^\s*Active default network:/i.test(line));
+  return lines.length === 1 && /^\s*Active default network:\s*[1-9][0-9]*\s*$/i.test(lines[0]);
+}
+
+export async function waitForAndroidNetwork(
+  signal: AbortSignal,
+  read: () => Promise<string>,
+  beforeAction: () => void,
+  clock = {
+    now: () => performance.now(),
+    sleep: (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
+  },
+) {
+  const deadline = clock.now() + 30000;
+  while (true) {
+    if (signal.aborted) throw new RegistrationError('CANCELLED');
+    beforeAction();
+    const text = await read().catch(() => '');
+    if (signal.aborted) throw new RegistrationError('CANCELLED');
+    beforeAction();
+    if (clock.now() >= deadline) throw new RegistrationError('ANDROID_NOT_READY');
+    if (hasAndroidDefaultNetwork(text)) return;
+    await clock.sleep(500);
+  }
+}
