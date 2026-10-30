@@ -89,7 +89,7 @@ export function contentIsolationSupported(
   version: string | null | undefined,
 ): boolean {
   return (
-    ['0.8.0', '0.8.1', '0.9.0', '0.9.1'].includes(version ?? '') &&
+    ['0.8.0', '0.8.1', '0.9.0', '0.9.1', '0.9.2'].includes(version ?? '') &&
     features?.includes('CONTENT_ISOLATION_V1') === true
   );
 }
@@ -98,7 +98,8 @@ export function appReadinessSupported(
   version: string | null | undefined,
 ): boolean {
   return (
-    ['0.9.0', '0.9.1'].includes(version ?? '') && features?.includes('APP_READINESS_V1') === true
+    ['0.9.0', '0.9.1', '0.9.2'].includes(version ?? '') &&
+    features?.includes('APP_READINESS_V1') === true
   );
 }
 export function executionOSSupported(distribution: string, version: string): boolean {

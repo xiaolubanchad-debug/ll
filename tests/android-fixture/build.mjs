@@ -90,7 +90,17 @@ try {
 }
 // The signing password is ephemeral; the whole test directory is recreated for a new build.
 const built = [];
-for (const variant of ['alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta', 'eta', 'theta']) {
+for (const variant of [
+  'alpha',
+  'beta',
+  'gamma',
+  'delta',
+  'epsilon',
+  'zeta',
+  'eta',
+  'theta',
+  'iota',
+]) {
   const pkg = 'com.example.p3' + variant,
     work = join(out, variant);
   await mkdir(join(work, 'res/values'), { recursive: true });
@@ -119,6 +129,8 @@ for (const variant of ['alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta', 'et
         'ad_panel',
         'graphic_target',
         'retry_load',
+        'modal_barrier',
+        'modal_panel',
       ]
         .map((id) => '<item type="id" name="' + id + '"/>')
         .join('') +
@@ -142,7 +154,8 @@ for (const variant of ['alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta', 'et
       .replaceAll('FIXTURE_EPSILON', variant === 'epsilon' ? 'true' : 'false')
       .replaceAll('FIXTURE_ZETA', variant === 'zeta' ? 'true' : 'false')
       .replaceAll('FIXTURE_ETA', variant === 'eta' ? 'true' : 'false')
-      .replaceAll('FIXTURE_THETA', variant === 'theta' ? 'true' : 'false'),
+      .replaceAll('FIXTURE_THETA', variant === 'theta' ? 'true' : 'false')
+      .replaceAll('FIXTURE_IOTA', variant === 'iota' ? 'true' : 'false'),
   );
   run(
     join(tools, 'aapt2'),

@@ -256,7 +256,20 @@ export async function discoverRegistration(
         await learning?.drop(key);
       }
       if (candidate.locator) {
-        const id = await session.find(candidate.locator, remain(2000), bounded);
+        let id: string;
+        try {
+          id = await session.find(candidate.locator, remain(2000), bounded);
+        } catch (error) {
+          check();
+          if (error instanceof RegistrationError && error.code === 'FLOW_STEP_FAILED') {
+            const next = await session.source(bounded);
+            if (!sameScreen(next)) {
+              source = next;
+              continue;
+            }
+          }
+          throw error;
+        }
         check();
         await session.click(id, remain(5000));
       } else {

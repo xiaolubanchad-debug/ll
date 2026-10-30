@@ -49,6 +49,7 @@ interface Candidate {
   target?: UiControl;
   index?: number;
   tracking?: { locator: Locator; rect: Rect; allowClip?: boolean }[];
+  startupOnly?: boolean;
 }
 const contains = (outer: Rect, inner: Rect) =>
   inner.x >= outer.x &&
@@ -238,21 +239,23 @@ const choose = (candidates: Candidate[]) => {
   return active[0] ?? candidates.find((c) => c.action === 'WAIT_SPLASH');
 };
 
+function backBlocked(page: UiPage): boolean {
+  return page.controls.some(
+    (c) =>
+      c.editable ||
+      c.checkable ||
+      /WebView$/.test(c.className) ||
+      labels(c).some(
+        (v) =>
+          entryRole(v) ||
+          /隐私|协议|条款|privacy|terms|验证码|人机|滑块|实名认证|身份验证|安全验证|手机验证|登录验证|年龄验证|captcha|(?:age|identity|security|phone|email).?verification/i.test(
+            v,
+          ),
+      ),
+  );
+}
 function noticeBack(page: UiPage): Candidate | undefined {
-  if (
-    !modalBarrier(page) ||
-    page.controls.some(
-      (c) =>
-        c.editable ||
-        c.checkable ||
-        labels(c).some(
-          (v) =>
-            entryRole(v) ||
-            /隐私政策|用户协议|服务条款|privacy.?policy|terms.?of.?service/i.test(v),
-        ),
-    )
-  )
-    return undefined;
+  if (!modalBarrier(page) || backBlocked(page)) return undefined;
   const notices = page.controls.filter(
     (c) =>
       !c.ownClickable &&
@@ -282,6 +285,55 @@ function noticeBack(page: UiPage): Candidate | undefined {
   };
 }
 
+function modalBack(page: UiPage): Candidate | undefined {
+  if (!page.window || !modalBarrier(page) || backBlocked(page)) return undefined;
+  const window = page.window;
+  const barriers = page.controls.filter(
+    (c) =>
+      c.ownClickable &&
+      labels(c).some((v) => obstructionRole(v, false) === 'CLOSE_POPUP') &&
+      c.rect.width * c.rect.height >= window.width * window.height * 0.6,
+  );
+  if (barriers.length !== 1) return undefined;
+  const barrier = barriers[0]!,
+    barrierRef = controlReference(barrier, page);
+  if (!barrierRef) return undefined;
+  const regions = obstructionRegions(page);
+  const panels = page.controls.flatMap((c) => {
+    if (
+      c === barrier ||
+      !/(?:^|\.)(?:View|FrameLayout|LinearLayout|RelativeLayout|ConstraintLayout|ViewGroup|Dialog)$/.test(
+        c.className,
+      ) ||
+      !contains(window, c.rect) ||
+      c.rect.width * c.rect.height < window.width * window.height * 0.06 ||
+      c.rect.width * c.rect.height > window.width * window.height * 0.85 ||
+      !regions.some((r) => equalRect(r, c.rect))
+    )
+      return [];
+    const locator = controlReference(c, page);
+    return locator ? [{ control: c, locator }] : [];
+  });
+  const owners = panels.filter((p) =>
+    panels.every((other) => contains(p.control.rect, other.control.rect)),
+  );
+  if (owners.length !== 1) return undefined;
+  const owner = owners[0]!;
+  if (canonical(owner.locator) === canonical(barrierRef)) return undefined;
+  const tracking = [
+    { locator: barrierRef, rect: barrier.rect, allowClip: true },
+    { locator: owner.locator, rect: owner.control.rect, allowClip: true },
+  ];
+  return {
+    action: 'CLOSE_POPUP',
+    method: 'BACK',
+    rect: owner.control.rect,
+    tracking,
+    startupOnly: true,
+    key: sha(canonical(['MODAL_BACK', tracking])),
+  };
+}
+
 export function appObstructions(
   session: AndroidSession,
   pkg: string,
@@ -304,6 +356,7 @@ export function appObstructions(
   let actions = 0,
     spent = 0,
     loadRetries = 0;
+  let accountCredentialObserved = false;
   const ocrCache = new Map<string, Awaited<ReturnType<NonNullable<AndroidSession['ocr']>>>>();
   const pause = (ms: number, signal: AbortSignal) =>
     new Promise<void>((ok, no) => {
@@ -341,6 +394,25 @@ export function appObstructions(
       return { source, page };
     };
     const identify = async (page: UiPage, strict = true): Promise<Candidate | undefined> => {
+      if (
+        allowStartupRetry() &&
+        modalBarrier(page) &&
+        !page.controls.some((c) => c.editable || c.checkable) &&
+        page.controls.some((c) =>
+          labels(c).some((v) =>
+            /^(账号凭证|账户凭证|登录凭证|accountcredentials?)$/i.test(compactLabel(v)),
+          ),
+        ) &&
+        page.controls.some(
+          (c) =>
+            c.enabled &&
+            c.clickable &&
+            labels(c).some((v) =>
+              /^(保存凭证|保存账号|保存账户|保存到相册|savecredentials?)$/i.test(compactLabel(v)),
+            ),
+        )
+      )
+        accountCredentialObserved = true;
       const native = choose(obstructionCandidates(page, allowStartupRetry()));
       if (native) return native;
       if (appLoading(page)) return undefined;
@@ -351,6 +423,8 @@ export function appObstructions(
       if (!modalBarrier(page) && !obstructionRegions(page).length && nativeScreenKey(page, pkg))
         return undefined;
       if (!screenshotFallback || !session.tap || !session.screenshot) {
+        const fallback = session.attached && allowStartupRetry() ? modalBack(page) : undefined;
+        if (fallback) return fallback;
         if (strict && modalBarrier(page))
           throw new RegistrationError('AUTO_OBSTRUCTION_UNVERIFIED');
         return undefined;
@@ -463,6 +537,8 @@ export function appObstructions(
         if (selected) return selected;
       }
       if (icon) return icon;
+      const fallback = session.attached && allowStartupRetry() ? modalBack(page) : undefined;
+      if (fallback) return fallback;
       if (strict && modalBarrier(page)) throw new RegistrationError('AUTO_OBSTRUCTION_UNVERIFIED');
       return undefined;
     };
@@ -573,6 +649,8 @@ export function appObstructions(
         }
         if (candidate.action === 'RETRY_LOAD' && !allowStartupRetry())
           throw new RegistrationError('AUTO_STARTUP_NETWORK_FAILED');
+        if (candidate.startupOnly && !allowStartupRetry())
+          throw new RegistrationError('AUTO_OBSTRUCTION_UNVERIFIED');
         if (candidate.method === 'BACK') {
           check();
           await session.back(5000, bounded);
@@ -718,5 +796,11 @@ export function appObstructions(
       throw error;
     }
   };
-  return { clear, prepare };
+  return {
+    clear,
+    prepare,
+    get accountCredentialObserved() {
+      return accountCredentialObserved;
+    },
+  };
 }

@@ -31,6 +31,7 @@ public final class MainActivity extends Activity {
     private String username = "";
     private LinearLayout layout;
     private EditText user, password, confirmation;
+    private boolean nativeModalOpen = false;
     private void label(String text) { TextView view = new TextView(this); view.setText(text); layout.addView(view); }
     private void page(String title) {
         layout = new LinearLayout(this); layout.setOrientation(LinearLayout.VERTICAL);
@@ -54,6 +55,7 @@ public final class MainActivity extends Activity {
     }
     @Override public void onCreate(Bundle state) {
         super.onCreate(state); page("Owned P3 fixture");
+        if (FIXTURE_IOTA) { nativeModal(); return; }
         if (FIXTURE_THETA) {
             page("网络连接失败"); button("重试", R.id.retry_load).setOnClickListener(v -> {
                 page("正在加载…"); new Handler(Looper.getMainLooper()).postDelayed(() -> startupSplash(), 2500);
@@ -89,6 +91,25 @@ public final class MainActivity extends Activity {
             }); return;
         }
         button("Open registration", R.id.open_register).setOnClickListener(v -> form());
+    }
+    private void nativeModal() {
+        nativeModalOpen = true;
+        FrameLayout barrier = new FrameLayout(this); barrier.setId(R.id.modal_barrier);
+        barrier.setContentDescription("关闭"); barrier.setClickable(true);
+        barrier.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
+        barrier.setBackgroundColor(Color.LTGRAY);
+        LinearLayout panel = new LinearLayout(this); panel.setId(R.id.modal_panel);
+        panel.setOrientation(LinearLayout.VERTICAL); panel.setBackgroundColor(Color.WHITE);
+        panel.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
+        TextView title = new TextView(this); title.setText("账号保存说明"); panel.addView(title);
+        TextView text = new TextView(this); text.setText("自有测试界面，无需保存图片"); panel.addView(text);
+        float density = getResources().getDisplayMetrics().density;
+        barrier.addView(panel, new FrameLayout.LayoutParams(Math.round(280*density), Math.round(320*density), Gravity.CENTER));
+        setContentView(barrier);
+    }
+    @Override public void onBackPressed() {
+        if (nativeModalOpen) { nativeModalOpen = false; page("Home"); button("注册新账号", R.id.open_register).setOnClickListener(v -> form()); return; }
+        super.onBackPressed();
     }
     private void startupSplash() {
         page("开屏广告");
@@ -169,7 +190,7 @@ public final class MainActivity extends Activity {
                 runOnUiThread(() -> {
                     page("Result"); TextView text = new TextView(this);
                     text.setId("OK".equals(response) ? R.id.account_home : "REJECT".equals(response) ? R.id.rejected : R.id.pending);
-                    text.setText("OK".equals(response) ? (FIXTURE_GAMMA || FIXTURE_DELTA || FIXTURE_EPSILON || FIXTURE_THETA ? "Registration successful" : "Welcome " + name) : "REJECT".equals(response) ? "Rejected" : "Pending result"); layout.addView(text);
+                    text.setText("OK".equals(response) ? (FIXTURE_GAMMA || FIXTURE_DELTA || FIXTURE_EPSILON || FIXTURE_THETA || FIXTURE_IOTA ? "Registration successful" : "Welcome " + name) : "REJECT".equals(response) ? "Rejected" : "Pending result"); layout.addView(text);
                 });
             }).start();
         });

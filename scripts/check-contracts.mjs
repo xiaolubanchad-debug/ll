@@ -870,6 +870,26 @@ for (const payload of [
   test('1.11.1 invalid startup recovery ' + JSON.stringify(payload), () =>
     assert.ok(overlayIssues(payload).length),
   );
+test('1.11.2 credential observation is an unsubmitted adaptation result', () =>
+  assert.deepEqual(
+    agentIssues({
+      ...notes,
+      events: [
+        {
+          ...browserEvent,
+          taskId: '44444444-4444-4444-8444-444444444444',
+          type: 'TASK_FINISHED',
+          payload: {
+            status: 'FAILED',
+            proof: 'NONE',
+            artifactIds: [],
+            errorCode: 'AUTO_ACCOUNT_CREDENTIALS',
+          },
+        },
+      ],
+    }),
+    [],
+  ));
 process.stdout.write(
   `${passed} contract checks passed${process.exitCode ? '; failures present' : ''}.\n`,
 );

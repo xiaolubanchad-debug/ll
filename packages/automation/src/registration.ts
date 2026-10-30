@@ -377,6 +377,12 @@ export async function registerApk(
       let code = error instanceof RegistrationError ? error.code : 'ANDROID_FAILED';
       if (code === 'AUTO_ENTRY_NOT_FOUND' && recognition?.automaticIdentity && !account)
         code = 'APP_AUTO_IDENTITY';
+      if (
+        !account &&
+        ['AUTO_ENTRY_NOT_FOUND', 'AUTO_NAVIGATION_LOOP'].includes(code) &&
+        readiness?.accountCredentialObserved
+      )
+        code = 'AUTO_ACCOUNT_CREDENTIALS';
       if (automatic && (code === 'FLOW_STEP_FAILED' || (discovering && code === 'APPIUM_FAILED')))
         code = discovering ? 'AUTO_PAGE_UNREADABLE' : 'AUTO_FORM_CHANGED';
       if (code === 'CLEANUP_INCOMPLETE') clean = false;

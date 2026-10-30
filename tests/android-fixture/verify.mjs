@@ -23,8 +23,9 @@ process.env.HOME = '/var/lib/apk-platform/home';
 const root = resolve(process.argv[2]),
   config = JSON.parse(await readFile('/var/lib/apk-platform/agent-config.json', 'utf8'));
 const v111 = process.argv[3] === '--v111';
+const v1112 = process.argv[3] === '--v1112';
 const v192 = ['--v192', '--v110'].includes(process.argv[3]);
-const automatic = process.argv[3] === '--auto' || v192 || v111;
+const automatic = process.argv[3] === '--auto' || v192 || v111 || v1112;
 assert.match(
   root,
   automatic
@@ -169,28 +170,30 @@ const policy = new NetworkPolicy(
 );
 const outcomes = [];
 try {
-  const cases = v111
-    ? [['theta', 'SUCCESS', 'SUCCEEDED']]
-    : v192
-      ? [
-          ['epsilon', 'SUCCESS', 'SUCCEEDED'],
-          ['zeta', 'GUEST', 'SKIPPED'],
-          ['eta', 'DIRECTORY', 'SKIPPED'],
-        ]
-      : automatic
+  const cases = v1112
+    ? [['iota', 'SUCCESS', 'SUCCEEDED']]
+    : v111
+      ? [['theta', 'SUCCESS', 'SUCCEEDED']]
+      : v192
         ? [
-            ['gamma', 'SUCCESS', 'SUCCEEDED'],
-            ['gamma', 'SUCCESS', 'SUCCEEDED'],
-            ['delta', 'SUCCESS', 'SUCCEEDED'],
-            ['gamma', 'TIMEOUT', 'UNKNOWN'],
+            ['epsilon', 'SUCCESS', 'SUCCEEDED'],
+            ['zeta', 'GUEST', 'SKIPPED'],
+            ['eta', 'DIRECTORY', 'SKIPPED'],
           ]
-        : [
-            ['alpha', 'SUCCESS', 'SUCCEEDED'],
-            ['beta', 'SUCCESS', 'SUCCEEDED'],
-            ['alpha', 'REJECT', 'FAILED'],
-            ['alpha', 'TIMEOUT', 'UNKNOWN'],
-            ['alpha', 'CHANGED', 'FAILED'],
-          ];
+        : automatic
+          ? [
+              ['gamma', 'SUCCESS', 'SUCCEEDED'],
+              ['gamma', 'SUCCESS', 'SUCCEEDED'],
+              ['delta', 'SUCCESS', 'SUCCEEDED'],
+              ['gamma', 'TIMEOUT', 'UNKNOWN'],
+            ]
+          : [
+              ['alpha', 'SUCCESS', 'SUCCEEDED'],
+              ['beta', 'SUCCESS', 'SUCCEEDED'],
+              ['alpha', 'REJECT', 'FAILED'],
+              ['alpha', 'TIMEOUT', 'UNKNOWN'],
+              ['alpha', 'CHANGED', 'FAILED'],
+            ];
   for (const [caseIndex, [variant, behavior, expected]] of cases.entries()) {
     if (abort.signal.aborted) throw Error('OWNED_VERIFICATION_STOPPED');
     if (automatic && caseIndex === 1) {
@@ -457,9 +460,16 @@ try {
       { mode: 0o600 },
     );
     console.log(JSON.stringify(resultRecord));
-    if (v111) console.log(JSON.stringify({ case: currentCase, startupNotes }));
+    if (v111 || v1112) console.log(JSON.stringify({ case: currentCase, startupNotes }));
     assert.equal(result.cleanupComplete, true);
     assert.equal(result.status, expected);
+    if (v1112) {
+      assert.deepEqual(
+        startupNotes.filter((n) => n.phase === 'ACTION_SENT').map((n) => [n.action, n.method]),
+        [['CLOSE_POPUP', 'BACK']],
+      );
+      assert.equal(startupNotes.filter((n) => n.phase === 'CLEARED').length, 1);
+    }
     if (v111) {
       assert.deepEqual(
         startupNotes.filter((n) => n.phase === 'ACTION_SENT').map((n) => n.action),

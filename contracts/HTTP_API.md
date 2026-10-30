@@ -1,5 +1,7 @@
 # HTTP 接口契约
 
+1.11.2 沿用既有 BACK 关闭事件，账户前的通用弹层后备规则见 [增量契约](../docs/V1112_MODAL_CONTRACT.md)，对应 Agent 0.9.2；没有新增接口或配置字段。
+
 1.11.1 增加只读 WAIT_OVERLAY、账户生成前的一次 RETRY_LOAD 和受限公告 BACK 方法，不新增路由或配置字段；只读退避、阶段校验和加载状态规则见 [读取增量契约](../docs/V1111_READ_CONTRACT.md)，对应 Agent 0.9.1。
 
 1.11 增加可选启动准备设置与受限弹窗阶段事件，见 [增量契约](../docs/V111_CONTRACT.md)，对应 Agent 0.9.0；保留旧配置和无 phase 事件的兼容读取。
@@ -20,7 +22,7 @@
 
 1.7 中台结果、中文日志、数据库汇总、历史回填与页面操作遵循 [1.7 契约](../docs/V17_CONTRACT.md)，操作见 [使用说明](../docs/V17_SETUP.md)。兼容 Agent 0.6.0，不改变注册提交及未知结果规则。
 
-版本 1.11.1，前缀 /api/v1。已实现路由由 p0.http.json 至 v18.http.json 合并生成 openapi.json，CI 比较 Controller、清单和 OpenAPI。下表保留后续阶段设计，以机器清单判定实现范围。
+版本 1.11.2，前缀 /api/v1。已实现路由由 p0.http.json 至 v18.http.json 合并生成 openapi.json，CI 比较 Controller、清单和 OpenAPI。下表保留后续阶段设计，以机器清单判定实现范围。
 
 1.6 增加可选 execution.autoRegistration、DISCOVERING 阶段和任务 recognition 摘要，见 [自动识别契约](../docs/V16_CONTRACT.md)。不增加任意截图识别、代码执行或公开 Appium 接口。自动模式仍只允许一次提交，未知结果暂停；启用配置要求新的 AUTO_REGISTRATION_V1 签名发布。
 

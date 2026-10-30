@@ -1,5 +1,7 @@
 # APK 自动化测试部署中台
 
+1.11.2 原生弹层返回关闭见 [增量契约](docs/V1112_MODAL_CONTRACT.md)，对应 Agent 0.9.2。
+
 1.11.1 的页面切换只读退避和启动加载识别见 [读取增量契约](docs/V1111_READ_CONTRACT.md)，对应 Agent 0.9.1。
 
 1.11 补齐 APP 弹窗关闭确认、可点击父控件、受限图形 × 识别和阶段日志，见 [启动准备契约](docs/V111_CONTRACT.md)，对应 Agent 0.9.0。
