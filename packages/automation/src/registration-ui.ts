@@ -60,6 +60,21 @@ export function entryRole(value: string): EntryRole | undefined {
   return undefined;
 }
 export const labels = (e: UiControl) => [e.text, e.description, e.hint].filter(Boolean);
+export function appLoading(page: UiPage): boolean {
+  if (
+    page.foreign ||
+    page.controls.some((c) => c.editable || c.checkable || (c.enabled && c.clickable)) ||
+    page.controls.some((c) => labels(c).some((v) => entryRole(v)))
+  )
+    return false;
+  return page.controls.some((c) =>
+    labels(c).some((v) =>
+      /^(加载中|正在加载|正在加载中|努力加载中|数据加载中|正在加载数据|正在加载请稍候|正在加载请稍等|加载中请稍候|加载中请稍等|网络连接中|正在连接网络|请稍候|请稍等|loading|loadingpleasewait|pleasewait)$/.test(
+        compactLabel(v).replace(/…+$/u, ''),
+      ),
+    ),
+  );
+}
 const label = (e: UiControl) => labels(e).map(compactLabel).join(' ');
 export const stableValue = (value: string, pkg: string) => value.replaceAll(pkg, '{packageName}');
 const literal = (value: string) =>
@@ -73,6 +88,35 @@ const literal = (value: string) =>
           .map((v) => "'" + v + "'")
           .join(',"\'",') +
         ')';
+
+function xmlValue(value: unknown): string {
+  return String(value ?? '').replace(
+    /&(#(?:x[0-9a-f]+|[0-9]+)|amp|lt|gt|quot|apos);/gi,
+    (_match, entity: string) => {
+      if (!entity.startsWith('#'))
+        return ({ amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" } as Record<string, string>)[
+          entity.toLowerCase()
+        ]!;
+      const point =
+        entity[1]?.toLowerCase() === 'x'
+          ? Number.parseInt(entity.slice(2), 16)
+          : Number.parseInt(entity.slice(1), 10);
+      if (
+        !Number.isSafeInteger(point) ||
+        !(
+          point === 9 ||
+          point === 10 ||
+          point === 13 ||
+          (point >= 32 && point <= 0xd7ff) ||
+          (point >= 0xe000 && point <= 0xfffd) ||
+          (point >= 0x10000 && point <= 0x10ffff)
+        )
+      )
+        throw new RegistrationError('AUTO_PAGE_INVALID');
+      return String.fromCodePoint(point);
+    },
+  );
+}
 
 export function readRegistrationPage(source: string, pkg: string): UiPage {
   if (Buffer.byteLength(source) > 2097152 || /<!DOCTYPE|<!ENTITY/i.test(source))
@@ -125,9 +169,9 @@ export function readRegistrationPage(source: string, pkg: string): UiPage {
         )
           foreign = true;
         if (owner === pkg) {
-          const text = String(row.text ?? ''),
-            description = String(row['content-desc'] ?? ''),
-            hint = String(row.hint ?? '');
+          const text = xmlValue(row.text),
+            description = xmlValue(row['content-desc']),
+            hint = xmlValue(row.hint);
           if (
             [text, description, hint, String(row['resource-id'] ?? '')].some((v) => v.length > 4096)
           )
@@ -137,7 +181,7 @@ export function readRegistrationPage(source: string, pkg: string): UiPage {
             text,
             description,
             hint,
-            resourceId: String(row['resource-id'] ?? ''),
+            resourceId: xmlValue(row['resource-id']),
             editable: String(row.class ?? '').includes('EditText') || row.editable === 'true',
             enabled: row.enabled !== 'false',
             password: row.password === 'true',
@@ -154,7 +198,7 @@ export function readRegistrationPage(source: string, pkg: string): UiPage {
           if (clickable)
             ownTarget = {
               className: String(row.class ?? ''),
-              resourceId: String(row['resource-id'] ?? ''),
+              resourceId: xmlValue(row['resource-id']),
               rect: { x, y, width: x2 - x, height: y2 - y },
             };
         }
@@ -207,6 +251,80 @@ export function readRegistrationPage(source: string, pkg: string): UiPage {
       ),
     ),
   };
+}
+
+export function controlReference(control: UiControl, page: UiPage): Locator | undefined {
+  const all = page.locatorControls ?? page.controls;
+  if (control.resourceId && all.filter((c) => c.resourceId === control.resourceId).length === 1)
+    return { by: 'id', value: control.resourceId };
+  if (
+    control.description &&
+    control.description.length <= 128 &&
+    all.filter((c) => c.description === control.description).length === 1
+  )
+    return { by: 'accessibilityId', value: control.description };
+  if (
+    all.filter(
+      (c) => c.className === control.className && canonical(c.rect) === canonical(control.rect),
+    ).length !== 1
+  )
+    return undefined;
+  const r = control.rect;
+  return {
+    by: 'xpath',
+    value:
+      '//*[@package=' +
+      literal(control.packageName) +
+      ' and @class=' +
+      literal(control.className) +
+      ' and @bounds=' +
+      literal(`[${r.x},${r.y}][${r.x + r.width},${r.y + r.height}]`) +
+      ']',
+  };
+}
+
+export function clickableOwner(control: UiControl, page: UiPage): UiControl | undefined {
+  if (control.ownClickable !== false && control.clickable) return control;
+  const p = control.clickParent;
+  if (!p || !page.window) return undefined;
+  const found = page.controls.filter(
+    (c) =>
+      c.ownClickable &&
+      c.className === p.className &&
+      c.resourceId === p.resourceId &&
+      canonical(c.rect) === canonical(p.rect),
+  );
+  if (found.length !== 1) return undefined;
+  const parent = found[0]!;
+  if (
+    /(?:WebView|ScrollView|RecyclerView|ListView)$/.test(parent.className) ||
+    parent.rect.width * parent.rect.height > page.window.width * page.window.height * 0.12 ||
+    parent.rect.height > page.window.height * 0.22
+  )
+    return undefined;
+  const contains = (a: Rect, b: Rect) =>
+    b.x >= a.x && b.y >= a.y && b.x + b.width <= a.x + a.width && b.y + b.height <= a.y + a.height;
+  if (
+    !contains(parent.rect, control.rect) ||
+    page.controls.some((c) => (c.editable || c.checkable) && contains(parent.rect, c.rect))
+  )
+    return undefined;
+  return parent;
+}
+export function controlHasRole(control: UiControl, page: UiPage, role: EntryRole): boolean {
+  return (
+    labels(control).some((v) => entryRole(v) === role) ||
+    page.controls.some((c) => {
+      if (!labels(c).some((v) => entryRole(v) === role)) return false;
+      const owner = clickableOwner(c, page);
+      return (
+        !!owner &&
+        owner.className === control.className &&
+        owner.resourceId === control.resourceId &&
+        canonical(owner.rect) === canonical(control.rect)
+      );
+    })
+  );
 }
 
 export function controlLocator(control: UiControl, page: UiPage): Locator {
@@ -368,7 +486,7 @@ export function registrationBindingsValid(
     submits.length !== 1 ||
     !submits[0].clickable ||
     (!allowDisabledSubmit && !submits[0].enabled) ||
-    !labels(submits[0]).some((v) => entryRole(v) === 'REGISTER')
+    !controlHasRole(submits[0], page, 'REGISTER')
   )
     return false;
   if (form.agreement) {
@@ -383,7 +501,7 @@ export function registrationForm(page: UiPage, pkg: string): RegistrationForm | 
     /手机号|手机号码|电话|邮箱|邮件|验证码|短信|phone|mobile|email|captcha|verificationcode|otp/;
   if (edits.some((e) => unsafe.test(label(e) + ' ' + compactLabel(e.resourceId))))
     throw new RegistrationError('AUTO_FORM_UNSUPPORTED');
-  const buttons = page.controls.filter((e) => !e.editable && e.clickable);
+  const buttons = page.controls.filter((e) => !e.editable && !!clickableOwner(e, page));
   if (
     buttons.some((e) =>
       /^(发送验证码|获取验证码|sendcode|sendverificationcode)$/.test(compactLabel(e.text)),
@@ -394,18 +512,28 @@ export function registrationForm(page: UiPage, pkg: string): RegistrationForm | 
   if (
     buttons.some((e) => labels(e).some((v) => entryRole(v) === 'LOGIN')) &&
     !page.controls.some(
-      (e) => !e.editable && !e.clickable && labels(e).some((v) => entryRole(v) === 'REGISTER'),
+      (e) =>
+        !e.editable &&
+        !clickableOwner(e, page) &&
+        labels(e).some((v) => entryRole(v) === 'REGISTER'),
     )
   )
     return undefined;
-  const submits = buttons.filter(
-    (e) =>
-      labels(e).some((v) => entryRole(v) === 'REGISTER') &&
-      (e.className.endsWith('Button') ||
-        page.controls.some(
-          (title) => !title.clickable && labels(title).some((v) => entryRole(v) === 'REGISTER'),
-        )),
-  );
+  const submits = [
+    ...new Map(
+      buttons
+        .filter((e) => labels(e).some((v) => entryRole(v) === 'REGISTER'))
+        .flatMap((e) => {
+          const target = clickableOwner(e, page)!;
+          if (
+            page.window &&
+            target.rect.width * target.rect.height >= page.window.width * page.window.height * 0.6
+          )
+            return [];
+          return [[canonical(controlLocator(target, page)), target] as const];
+        }),
+    ).values(),
+  ];
   if (!edits.length || !submits.length) return undefined;
   const named = (e: UiControl) => fieldName(e, page);
   const confirm = edits.filter((e) =>
@@ -523,6 +651,13 @@ export function registrationEntries(page: UiPage, pkg: string): EntryCandidate[]
   for (const e of page.controls.filter(
     (e) => e.enabled && e.clickable && !e.editable && !e.checkable,
   )) {
+    const target = clickableOwner(e, page);
+    if (
+      !target ||
+      (page.window &&
+        target.rect.width * target.rect.height >= page.window.width * page.window.height * 0.6)
+    )
+      continue;
     const roles = new Set(
       labels(e)
         .map(entryRole)
@@ -547,19 +682,71 @@ export function registrationEntries(page: UiPage, pkg: string): EntryCandidate[]
         (role === 'LOGIN' && page.controls.some((v) => v.editable))
       )
         continue;
-      const locator = controlLocator(e, page);
+      const locator = controlLocator(target, page);
       const hash = sha(
         canonical({ role, locator: { ...locator, value: stableValue(locator.value, pkg) } }),
       );
       if (
         !candidates.some(
-          (v) => v.hash === hash || (v.role === role && canonical(v.rect) === canonical(e.rect)),
+          (v) =>
+            v.hash === hash || (v.role === role && canonical(v.rect) === canonical(target.rect)),
         )
       )
-        candidates.push({ role, locator, rect: e.rect, hash });
+        candidates.push({ role, locator, rect: target.rect, hash });
     }
   }
   return candidates;
+}
+
+export function nativeScreenKey(page: UiPage, pkg: string): string | undefined {
+  if (page.foreign) return undefined;
+  const entries = registrationEntries(page, pkg),
+    edits = page.controls.filter((c) => c.editable || c.checkable);
+  const form = edits.some((c) => c.editable) ? registrationForm(page, pkg) : undefined;
+  if (entries.length > 16 || edits.length > 8) return undefined;
+  if (!entries.length && !form) return undefined;
+  const targets = [...entries.map((c) => c.rect), ...edits.map((c) => c.rect)];
+  for (const target of targets) {
+    let at = -1;
+    for (let index = 0; index < page.controls.length; index++)
+      if (canonical(page.controls[index]!.rect) === canonical(target)) at = index;
+    if (
+      page.controls.some(
+        (c, index) =>
+          index > at &&
+          c.ownClickable &&
+          c.rect.x <= target.x &&
+          c.rect.y <= target.y &&
+          c.rect.x + c.rect.width >= target.x + target.width &&
+          c.rect.y + c.rect.height >= target.y + target.height &&
+          c.rect.width * c.rect.height > target.width * target.height * 3,
+      )
+    )
+      return undefined;
+  }
+  return sha(
+    canonical({
+      entries: entries
+        .map(({ role, locator, rect }) => ({
+          role,
+          locator: locator ? { ...locator, value: stableValue(locator.value, pkg) } : undefined,
+          rect,
+        }))
+        .sort((a, b) => canonical(a).localeCompare(canonical(b))),
+      form: form?.hash ?? null,
+      edits: edits.map((c) => ({
+        className: c.className,
+        resourceId: stableValue(c.resourceId, pkg),
+        rect: c.rect,
+        enabled: c.enabled,
+        password: c.password,
+        text: c.text,
+        description: c.description,
+        hint: c.hint,
+        checked: c.checked,
+      })),
+    }),
+  );
 }
 
 export function appNavigationPage(page: UiPage): boolean {

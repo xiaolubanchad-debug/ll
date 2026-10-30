@@ -54,7 +54,11 @@ public final class MainActivity extends Activity {
     }
     @Override public void onCreate(Bundle state) {
         super.onCreate(state); page("Owned P3 fixture");
-        if (FIXTURE_THETA) { startupSplash(); return; }
+        if (FIXTURE_THETA) {
+            page("网络连接失败"); button("重试", R.id.retry_load).setOnClickListener(v -> {
+                page("正在加载…"); new Handler(Looper.getMainLooper()).postDelayed(() -> startupSplash(), 2500);
+            }); return;
+        }
         if (FIXTURE_ZETA) { page("个人中心"); label("游客"); label("用户ID：12345678"); return; }
         if (FIXTURE_ETA) { page("热门推荐"); label("站长精选"); for (int i=0;i<8;i++) button("Owned App "+i, View.generateViewId()); return; }
         if (FIXTURE_EPSILON) {
@@ -98,7 +102,14 @@ public final class MainActivity extends Activity {
     private void startupNotice() {
         page("系统公告");
         Button ack = button("我知道了", R.id.notice_ack);
-        ack.setOnClickListener(v -> { ack.setEnabled(false); new Handler(Looper.getMainLooper()).postDelayed(() -> startupIcon(), 1800); });
+        ack.setOnClickListener(v -> { ack.setEnabled(false); new Handler(Looper.getMainLooper()).postDelayed(() -> startupTransition(), 1800); });
+    }
+    private void startupTransition() {
+        FrameLayout placeholder = new FrameLayout(this);
+        placeholder.setContentDescription("关闭"); placeholder.setClickable(true);
+        placeholder.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
+        setContentView(placeholder);
+        new Handler(Looper.getMainLooper()).postDelayed(() -> startupIcon(), 4000);
     }
     private void startupIcon() {
         page("准备中");

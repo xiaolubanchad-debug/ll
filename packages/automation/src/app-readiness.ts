@@ -8,7 +8,10 @@ import {
   compactLabel,
   labels,
   controlLocator,
+  controlReference,
   entryRole,
+  appLoading,
+  nativeScreenKey,
 } from './registration-ui.js';
 import { canonical, sha } from './common.js';
 import {
@@ -19,8 +22,15 @@ import {
   sameCloseIcon,
 } from './close-icon.js';
 
-type Action = 'SKIP_AD' | 'CLOSE_AD' | 'CLOSE_POPUP' | 'ACK_NOTICE' | 'WAIT_SPLASH';
-type Method = 'CONTROLS' | 'OCR' | 'ICON';
+type Action =
+  | 'SKIP_AD'
+  | 'CLOSE_AD'
+  | 'CLOSE_POPUP'
+  | 'ACK_NOTICE'
+  | 'WAIT_SPLASH'
+  | 'WAIT_OVERLAY'
+  | 'RETRY_LOAD';
+type Method = 'CONTROLS' | 'OCR' | 'ICON' | 'BACK';
 type Phase = 'DETECTED' | 'WAITING' | 'ACTION_SENT' | 'CLEARED' | 'UNCHANGED' | 'UNVERIFIED';
 export interface ObstructionNote {
   action: Action;
@@ -38,6 +48,7 @@ interface Candidate {
   pixels?: string;
   target?: UiControl;
   index?: number;
+  tracking?: { locator: Locator; rect: Rect; allowClip?: boolean }[];
 }
 const contains = (outer: Rect, inner: Rect) =>
   inner.x >= outer.x &&
@@ -99,6 +110,9 @@ function modalBarrier(page: UiPage): boolean {
     )
   );
 }
+export function obstructionEvidence(page: UiPage): boolean {
+  return modalBarrier(page) || obstructionCandidates(page).length > 0;
+}
 function touchTarget(control: UiControl, page: UiPage): UiControl | undefined {
   if (control.ownClickable !== false && control.clickable) return control;
   if (!control.clickParent) return undefined;
@@ -140,17 +154,33 @@ function touchTarget(control: UiControl, page: UiPage): UiControl | undefined {
     return undefined;
   return parent;
 }
-export function obstructionCandidates(page: UiPage): Candidate[] {
+export function obstructionCandidates(page: UiPage, allowStartupRetry = false): Candidate[] {
   const notice = page.controls.some((c) =>
     labels(c).some((v) => /公告|通知|温馨提示|announcement|notice/i.test(v)),
   );
   const scopes = obstructionRegions(page),
     found = new Map<string, Candidate>();
+  const text = page.controls.flatMap(labels).join(' ');
+  const networkRetry =
+    allowStartupRetry &&
+    !page.controls.some((c) => c.editable || c.checkable || labels(c).some((v) => entryRole(v))) &&
+    !/注册|registration|用户名|password|密码/i.test(text) &&
+    (/加载失败|请求失败|failed.?to.?load|unable.?to.?connect/i.test(text) ||
+      (/网络|连接|服务器|network|connection|server/i.test(text) &&
+        /失败|异常|错误|超时|不可用|timeout|error|failed|unavailable/i.test(text)));
   for (const c of page.controls) {
     if (c.editable || c.checkable) continue;
     let action = labels(c)
       .map((v) => obstructionRole(v, notice))
       .find(Boolean);
+    if (
+      !action &&
+      networkRetry &&
+      labels(c).some((v) =>
+        /^(重试|重新加载|点击重试|点击重新加载|retry|reload|tryagain)$/.test(compactLabel(v)),
+      )
+    )
+      action = 'RETRY_LOAD';
     if (
       action === 'SKIP_AD' &&
       (!c.enabled ||
@@ -208,6 +238,50 @@ const choose = (candidates: Candidate[]) => {
   return active[0] ?? candidates.find((c) => c.action === 'WAIT_SPLASH');
 };
 
+function noticeBack(page: UiPage): Candidate | undefined {
+  if (
+    !modalBarrier(page) ||
+    page.controls.some(
+      (c) =>
+        c.editable ||
+        c.checkable ||
+        labels(c).some(
+          (v) =>
+            entryRole(v) ||
+            /隐私政策|用户协议|服务条款|privacy.?policy|terms.?of.?service/i.test(v),
+        ),
+    )
+  )
+    return undefined;
+  const notices = page.controls.filter(
+    (c) =>
+      !c.ownClickable &&
+      labels(c).some((v) => /公告|系统通知|温馨提示|使用提醒|announcement|notice/i.test(v)),
+  );
+  const barrier = page.controls.find(
+    (c) =>
+      c.ownClickable &&
+      labels(c).some((v) => obstructionRole(v, false) === 'CLOSE_POPUP') &&
+      page.window &&
+      c.rect.width * c.rect.height >= page.window.width * page.window.height * 0.6,
+  );
+  if (notices.length !== 1 || !barrier) return undefined;
+  const barrierRef = controlReference(barrier, page),
+    noticeRef = controlReference(notices[0]!, page);
+  if (!barrierRef || !noticeRef) return undefined;
+  const tracking = [
+    { locator: barrierRef, rect: barrier.rect, allowClip: true },
+    { locator: noticeRef, rect: notices[0]!.rect, allowClip: true },
+  ];
+  return {
+    action: 'CLOSE_POPUP',
+    method: 'BACK',
+    rect: notices[0]!.rect,
+    tracking,
+    key: sha(canonical(['BACK', tracking, labels(notices[0]!)])),
+  };
+}
+
 export function appObstructions(
   session: AndroidSession,
   pkg: string,
@@ -215,6 +289,7 @@ export function appObstructions(
   note: (note: ObstructionNote) => Promise<void>,
   screenshotFallback: boolean,
   input: StartupPolicy = {},
+  allowStartupRetry: () => boolean = () => false,
 ) {
   if (schemaIssues('StartupPolicy', input).length)
     throw new RegistrationError('AUTO_STARTUP_CONFIG_INVALID');
@@ -227,7 +302,8 @@ export function appObstructions(
     ...input,
   };
   let actions = 0,
-    spent = 0;
+    spent = 0,
+    loadRetries = 0;
   const ocrCache = new Map<string, Awaited<ReturnType<NonNullable<AndroidSession['ocr']>>>>();
   const pause = (ms: number, signal: AbortSignal) =>
     new Promise<void>((ok, no) => {
@@ -265,8 +341,15 @@ export function appObstructions(
       return { source, page };
     };
     const identify = async (page: UiPage, strict = true): Promise<Candidate | undefined> => {
-      const native = choose(obstructionCandidates(page));
+      const native = choose(obstructionCandidates(page, allowStartupRetry()));
       if (native) return native;
+      if (appLoading(page)) return undefined;
+      if (session.attached) {
+        const notice = noticeBack(page);
+        if (notice) return notice;
+      }
+      if (!modalBarrier(page) && !obstructionRegions(page).length && nativeScreenKey(page, pkg))
+        return undefined;
       if (!screenshotFallback || !session.tap || !session.screenshot) {
         if (strict && modalBarrier(page))
           throw new RegistrationError('AUTO_OBSTRUCTION_UNVERIFIED');
@@ -316,14 +399,35 @@ export function appObstructions(
           )
             return [];
           if (!closeIcon(png, c.rect)) return [];
+          let tracking: Candidate['tracking'];
+          if (session.attached) {
+            const owner = page.controls.find((p) => equalRect(p.rect, scope));
+            if (owner) {
+              try {
+                tracking = [
+                  { locator: controlLocator(target, page), rect: target.rect },
+                  { locator: controlLocator(owner, page), rect: owner.rect, allowClip: true },
+                ];
+                if (canonical(tracking[0]!.locator) === canonical(tracking[1]!.locator))
+                  tracking = undefined;
+              } catch (error) {
+                if (
+                  !(error instanceof RegistrationError) ||
+                  error.code !== 'AUTO_CONTROL_AMBIGUOUS'
+                )
+                  throw error;
+              }
+            }
+          }
           return [
             {
               action: 'CLOSE_POPUP' as const,
               method: 'ICON' as const,
-              key: sha(canonical(['ICON', c.rect, scope])),
+              key: sha(canonical(['ICON', c.rect, scope, tracking?.map((t) => t.locator) ?? []])),
               rect: c.rect,
               scope,
               pixels: closeIconStamp(png, c.rect),
+              ...(tracking ? { tracking } : {}),
             },
           ];
         });
@@ -372,7 +476,8 @@ export function appObstructions(
       check();
     };
     let source = initialSource,
-      waitingSince: number | undefined;
+      waitingSince: number | undefined,
+      overlaySince: number | undefined;
     let pending: Candidate | undefined;
     try {
       for (;;) {
@@ -381,7 +486,26 @@ export function appObstructions(
           source === undefined ? await read() : { source, page: readRegistrationPage(source, pkg) };
         source = undefined;
         if (current.page.foreign) throw new RegistrationError('AUTO_FOREIGN_SCREEN');
-        const candidate = await identify(current.page);
+        let candidate: Candidate | undefined;
+        try {
+          candidate = await identify(current.page);
+        } catch (error) {
+          if (!(error instanceof RegistrationError) || error.code !== 'AUTO_OBSTRUCTION_UNVERIFIED')
+            throw error;
+          if (overlaySince === undefined) {
+            overlaySince = Date.now();
+            await note({
+              action: 'WAIT_OVERLAY',
+              method: 'CONTROLS',
+              index: Math.min(actions + 1, settings.maxActions),
+              phase: 'WAITING',
+            });
+          }
+          if (Date.now() - overlaySince >= 15000) throw error;
+          await pause(400, bounded);
+          continue;
+        }
+        overlaySince = undefined;
         if (!candidate) return current.source;
         if (candidate.action === 'WAIT_SPLASH') {
           if (waitingSince === undefined) {
@@ -399,6 +523,8 @@ export function appObstructions(
           continue;
         }
         waitingSince = undefined;
+        if (candidate.action === 'RETRY_LOAD' && loadRetries >= 1)
+          throw new RegistrationError('AUTO_STARTUP_NETWORK_FAILED');
         if (actions >= settings.maxActions) throw new RegistrationError('AUTO_OBSTRUCTION_LIMIT');
         candidate.index = actions + 1;
         await report(candidate, 'DETECTED');
@@ -420,7 +546,37 @@ export function appObstructions(
           continue;
         }
         check();
-        if (candidate.locator) {
+        const tracked: string[] = [];
+        let trackingChanged = false;
+        for (const target of candidate.tracking ?? []) {
+          const id = await session.find(target.locator, 2000, bounded);
+          check();
+          const actual = await session.rect(id);
+          if (
+            !equalRect(actual, target.rect) &&
+            !(
+              target.allowClip &&
+              actual.width > 0 &&
+              actual.height > 0 &&
+              contains(target.rect, actual)
+            )
+          ) {
+            trackingChanged = true;
+            break;
+          }
+          tracked.push(id);
+        }
+        if (trackingChanged) {
+          await report(candidate, 'UNVERIFIED');
+          await pause(150, bounded);
+          continue;
+        }
+        if (candidate.action === 'RETRY_LOAD' && !allowStartupRetry())
+          throw new RegistrationError('AUTO_STARTUP_NETWORK_FAILED');
+        if (candidate.method === 'BACK') {
+          check();
+          await session.back(5000, bounded);
+        } else if (candidate.locator) {
           const id = await session.find(candidate.locator, 2000, bounded);
           if (session.rect && !equalRect(await session.rect(id), candidate.rect)) {
             await report(candidate, 'UNVERIFIED');
@@ -439,6 +595,7 @@ export function appObstructions(
           );
         }
         actions++;
+        if (candidate.action === 'RETRY_LOAD') loadRetries++;
         pending = candidate;
         await report(candidate, 'ACTION_SENT');
         await report(candidate, 'WAITING');
@@ -450,7 +607,17 @@ export function appObstructions(
           const observation = await read();
           check();
           let absent = false;
-          if (candidate.method === 'CONTROLS' && candidate.target) {
+          if (
+            ['ICON', 'BACK'].includes(candidate.method) &&
+            tracked.length === 2 &&
+            session.attached
+          ) {
+            const first = await session.attached(tracked[0]!, bounded);
+            check();
+            const second = await session.attached(tracked[1]!, bounded);
+            check();
+            absent = !first && !second;
+          } else if (candidate.method === 'CONTROLS' && candidate.target) {
             const target = candidate.target;
             absent = !observation.page.controls.some(
               (c) =>
@@ -464,7 +631,7 @@ export function appObstructions(
             const observed = await identify(observation.page, false);
             absent = !observed || observed.key !== candidate.key;
           }
-          if (candidate.method === 'ICON' && absent && candidate.scope) {
+          if (candidate.method === 'ICON' && absent && candidate.scope && tracked.length !== 2) {
             const scopeRemains = obstructionRegions(observation.page).some((r) =>
               equalRect(r, candidate.scope!),
             );

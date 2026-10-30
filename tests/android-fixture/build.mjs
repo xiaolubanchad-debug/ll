@@ -118,6 +118,7 @@ for (const variant of ['alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta', 'et
         'notice_ack',
         'ad_panel',
         'graphic_target',
+        'retry_load',
       ]
         .map((id) => '<item type="id" name="' + id + '"/>')
         .join('') +

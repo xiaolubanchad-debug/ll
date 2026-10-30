@@ -1435,14 +1435,17 @@
             "CLOSE_AD",
             "CLOSE_POPUP",
             "ACK_NOTICE",
-            "WAIT_SPLASH"
+            "WAIT_SPLASH",
+            "WAIT_OVERLAY",
+            "RETRY_LOAD"
           ]
         },
         "method": {
           "enum": [
             "CONTROLS",
             "OCR",
-            "ICON"
+            "ICON",
+            "BACK"
           ]
         },
         "index": {
@@ -1502,6 +1505,78 @@
                   "DETECTED",
                   "WAITING"
                 ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "WAIT_OVERLAY"
+              }
+            },
+            "required": [
+              "action"
+            ]
+          },
+          "then": {
+            "required": [
+              "phase"
+            ],
+            "properties": {
+              "method": {
+                "const": "CONTROLS"
+              },
+              "phase": {
+                "enum": [
+                  "DETECTED",
+                  "WAITING"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "method": {
+                "const": "BACK"
+              }
+            },
+            "required": [
+              "method"
+            ]
+          },
+          "then": {
+            "required": [
+              "phase"
+            ],
+            "properties": {
+              "action": {
+                "const": "CLOSE_POPUP"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "RETRY_LOAD"
+              }
+            },
+            "required": [
+              "action"
+            ]
+          },
+          "then": {
+            "required": [
+              "phase"
+            ],
+            "properties": {
+              "method": {
+                "const": "CONTROLS"
               }
             }
           }

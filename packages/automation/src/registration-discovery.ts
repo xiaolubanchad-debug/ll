@@ -15,7 +15,11 @@ import {
   registrationForm,
   appNavigationPage,
   automaticIdentity,
+  appLoading,
+  nativeScreenKey,
+  controlHasRole,
 } from './registration-ui.js';
+import { obstructionEvidence } from './app-readiness.js';
 import type { EntryCandidate, RegistrationForm } from './registration-ui.js';
 
 export interface RegistrationLearning {
@@ -78,6 +82,8 @@ export async function discoverRegistration(
   const remain = (max: number) => Math.max(1, Math.min(max, deadline - Date.now()));
   const navigation: LearnedRegistrationTemplate['navigation'] = [],
     visited = new Set<string>();
+  const operatedEntries = new Set<string>();
+  let loading = false;
   try {
     const stored = await learning?.load(key);
     let cached = validLearnedTemplate(stored) ? stored : undefined,
@@ -91,10 +97,39 @@ export async function discoverRegistration(
       if (ready) source = await ready(bounded, source);
       const page = readRegistrationPage(source, pkg);
       if (page.foreign) throw new RegistrationError('AUTO_FOREIGN_SCREEN');
+      loading = appLoading(page);
+      if (loading) {
+        await new Promise<void>((resolve, reject) => {
+          const done = () => {
+            bounded.removeEventListener('abort', abort);
+            resolve();
+          };
+          const abort = () => {
+            clearTimeout(timer);
+            bounded.removeEventListener('abort', abort);
+            reject(new RegistrationError('CANCELLED'));
+          };
+          const timer = setTimeout(done, Math.min(400, remain(400)));
+          bounded.addEventListener('abort', abort, { once: true });
+          if (bounded.aborted) abort();
+        });
+        check();
+        source = await session.source(bounded);
+        continue;
+      }
+      const screenKey = obstructionEvidence(page) ? undefined : nativeScreenKey(page, pkg);
+      const sameScreen = (source: string) => {
+        const next = readRegistrationPage(source, pkg);
+        return (
+          !next.foreign &&
+          !obstructionEvidence(next) &&
+          (next.hash === page.hash || (!!screenKey && nativeScreenKey(next, pkg) === screenKey))
+        );
+      };
       await pause();
       const settledSource = await session.source(bounded);
       check();
-      if (readRegistrationPage(settledSource, pkg).hash !== page.hash) {
+      if (!sameScreen(settledSource)) {
         source = settledSource;
         continue;
       }
@@ -111,6 +146,14 @@ export async function discoverRegistration(
       if (appNavigationPage(page)) throw new RegistrationError('APP_NAVIGATION_ONLY');
       const consent = candidates.filter((c) => c.role === 'CONSENT');
       const form = consent.length ? undefined : registrationForm(page, pkg);
+      if (
+        !form &&
+        !consent.length &&
+        page.controls.some((c) => c.editable) &&
+        candidates.some((c) => c.role === 'REGISTER') &&
+        !page.controls.some((c) => c.ownClickable && controlHasRole(c, page, 'LOGIN'))
+      )
+        throw new RegistrationError('AUTO_FORM_UNSUPPORTED');
       if (form) {
         const body = { version: '1.0' as const, navigation, formHash: form.hash },
           template = { ...body, templateHash: sha(canonical(body)) };
@@ -164,15 +207,22 @@ export async function discoverRegistration(
         )
           throw new RegistrationError('AUTO_ENTRY_NOT_FOUND');
         const refreshed = await session.source(bounded);
-        if (readRegistrationPage(refreshed, pkg).hash !== page.hash) {
+        if (!sameScreen(refreshed)) {
           source = refreshed;
           continue;
         }
       }
       const priorities = { CONSENT: 0, REGISTER: 1, ACCOUNT: 2, LOGIN: 3 };
+      const hadEntries = candidates.length > 0;
+      candidates = candidates.filter(
+        (c) =>
+          !['ACCOUNT', 'LOGIN'].includes(c.role) ||
+          !operatedEntries.has(c.hash + canonical(c.rect)),
+      );
       candidates.sort((a, b) => priorities[a.role] - priorities[b.role]);
       if (!candidates.length) {
         if (identity) throw new RegistrationError('APP_AUTO_IDENTITY');
+        if (hadEntries) throw new RegistrationError('AUTO_NAVIGATION_LOOP');
         if (idle++ < 3) {
           await new Promise((r) => setTimeout(r, 400));
           source = await session.source(bounded);
@@ -187,11 +237,15 @@ export async function discoverRegistration(
       )
         throw new RegistrationError('AUTO_ENTRY_AMBIGUOUS');
       const candidate: EntryCandidate = candidates[0],
-        step = { screenHash: page.hash, role: candidate.role, candidateHash: candidate.hash };
+        step = {
+          screenHash: screenKey ?? page.hash,
+          role: candidate.role,
+          candidateHash: candidate.hash,
+        };
       const mark = sha(canonical(step));
       check();
       const currentSource = picture ? await session.source(bounded) : settledSource;
-      if (readRegistrationPage(currentSource, pkg).hash !== page.hash) {
+      if (!sameScreen(currentSource)) {
         source = currentSource;
         continue;
       }
@@ -222,6 +276,7 @@ export async function discoverRegistration(
         );
       }
       visited.add(mark);
+      operatedEntries.add(candidate.hash + canonical(candidate.rect));
       navigation.push(step);
       recognition.navigationSteps = navigation.length;
       const waitUntil = Date.now() + remain(8000);
@@ -230,17 +285,16 @@ export async function discoverRegistration(
         check();
         await pause();
         next = await session.source(bounded);
-        if (readRegistrationPage(next, pkg).hash !== page.hash) break;
+        if (!sameScreen(next)) break;
       } while (Date.now() < waitUntil);
-      if (readRegistrationPage(next, pkg).hash === page.hash)
-        throw new RegistrationError('AUTO_NAVIGATION_STALLED');
+      if (sameScreen(next)) throw new RegistrationError('AUTO_NAVIGATION_STALLED');
       source = next;
     }
-    throw new RegistrationError('AUTO_SCREEN_CHANGED');
+    throw new RegistrationError(loading ? 'AUTO_LOADING_TIMEOUT' : 'AUTO_SCREEN_CHANGED');
   } catch (error) {
     if (signal.aborted) throw new RegistrationError('CANCELLED');
     if (bounded.aborted || Date.now() >= deadline)
-      throw new RegistrationError('AUTO_DISCOVERY_TIMEOUT');
+      throw new RegistrationError(loading ? 'AUTO_LOADING_TIMEOUT' : 'AUTO_DISCOVERY_TIMEOUT');
     throw error;
   }
 }

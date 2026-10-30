@@ -120,7 +120,7 @@ async function readiness(db: PrismaClient, p: PlanRow) {
       add('NEEDS_ADAPTATION', '请选择自动识别或补充注册规则', 'tasks');
     if (
       c.execution.autoRegistration?.enabled &&
-      !['0.6.0', '0.6.1', '0.7.0', '0.7.1', '0.7.2', '0.8.0', '0.8.1', '0.9.0'].includes(
+      !['0.6.0', '0.6.1', '0.7.0', '0.7.1', '0.7.2', '0.8.0', '0.8.1', '0.9.0', '0.9.1'].includes(
         node.agentVersion ?? '',
       )
     )

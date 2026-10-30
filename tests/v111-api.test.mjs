@@ -132,10 +132,45 @@ test('startup phases require their matching action, remain separate from registr
     await assert.rejects(send({ ...base, phase: 'CLEARED' }), (e) => e.code === 'EVENT_CONFLICT');
     await send({ action: 'CLOSE_AD', method: 'CONTROLS', index: 2 });
     sequence++;
+    await send({ action: 'WAIT_OVERLAY', method: 'CONTROLS', index: 3, phase: 'WAITING' });
+    sequence++;
+    const load = { action: 'RETRY_LOAD', method: 'CONTROLS', index: 4 };
+    for (const phase of ['DETECTED', 'ACTION_SENT', 'WAITING', 'CLEARED']) {
+      await send({ ...load, phase });
+      sequence++;
+    }
+    await send({ ...load, index: 5, phase: 'DETECTED' });
+    sequence++;
+    await assert.rejects(
+      send({ ...load, index: 5, phase: 'ACTION_SENT' }),
+      (e) => e.code === 'EVENT_CONFLICT',
+    );
+    await db.task.update({ where: { id: taskId }, data: { status: 'REGISTERING' } });
+    await assert.rejects(
+      send({ ...load, index: 6, phase: 'DETECTED' }),
+      (e) => e.code === 'EVENT_CONFLICT',
+    );
+    await db.task.update({ where: { id: taskId }, data: { status: 'LAUNCHING' } });
+    await db.accountResult.create({
+      data: {
+        accountRef: randomUUID(),
+        taskId,
+        deliveryId,
+        fence: 1,
+        contentHash: digest('owned-startup-account'),
+        encrypted: { fixture: true },
+      },
+    });
+    await assert.rejects(
+      send({ ...load, index: 6, phase: 'DETECTED' }),
+      (e) => e.code === 'EVENT_CONFLICT',
+    );
+    await db.accountResult.deleteMany({ where: { taskId } });
     const timeline = await runTimeline(db, runId, {});
     assert.ok(timeline.items.some((e) => e.title === '已执行关闭弹窗，正在核对'));
     assert.ok(timeline.items.some((e) => e.title === '已确认遮挡消失：关闭弹窗'));
     assert.ok(timeline.items.some((e) => e.title === '已执行关闭广告，关闭结果未核对'));
+    assert.ok(timeline.items.some((e) => e.title === '等待弹窗加载和稳定'));
     assert.equal((await db.run.findUniqueOrThrow({ where: { id: runId } })).successes, 0);
     await db.task.update({
       where: { id: taskId },
@@ -191,6 +226,7 @@ test('startup phases require their matching action, remain separate from registr
         await db.delivery.findMany({ where: { runId: { in: runs } }, select: { id: true } })
       ).map((d) => d.id);
     await db.runEvent.deleteMany({ where: { deliveryId: { in: ds } } });
+    await db.accountResult.deleteMany({ where: { deliveryId: { in: ds } } });
     await db.task.deleteMany({ where: { runId: { in: runs } } });
     await db.delivery.deleteMany({ where: { id: { in: ds } } });
     await db.run.deleteMany({ where: { id: { in: runs } } });

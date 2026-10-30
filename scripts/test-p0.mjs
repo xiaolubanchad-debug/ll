@@ -175,6 +175,7 @@ try {
   await run(['--test', '--test-concurrency=1', 'tests/v110.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/v110-api.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/v111-api.test.mjs'], env);
+  await run(['--test', '--test-concurrency=1', 'tests/v1111.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/p3.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/v17.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/v18.test.mjs'], env);

@@ -60,8 +60,9 @@ export interface AndroidSession {
   submit(id: string, timeout: number): Promise<void>;
   input(id: string, value: string): Promise<void>;
   hideKeyboard?(): Promise<void>;
-  back(): Promise<void>;
+  back(timeout?: number, signal?: AbortSignal): Promise<void>;
   rect(id: string): Promise<Rect>;
+  attached?(id: string, signal?: AbortSignal): Promise<boolean>;
   screenshot(signal?: AbortSignal): Promise<Buffer>;
   source(signal?: AbortSignal): Promise<string>;
   close(): Promise<boolean>;

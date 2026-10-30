@@ -17,6 +17,8 @@ export const reasonLabels: Record<string, string> = {
   BATCH_ENDED: '批次已结束，此轮未执行',
   AUTO_ADAPTATION_REQUIRED: '注册页面需要适配，剩余次数未执行',
   AUTO_ENTRY_NOT_FOUND: '未找到明确的注册入口',
+  AUTO_LOADING_TIMEOUT: 'APP 启动加载未完成，未提交注册',
+  AUTO_STARTUP_NETWORK_FAILED: 'APP 启动网络异常，已结束加载重试，未提交注册',
   AUTO_ENTRY_AMBIGUOUS: '存在多个注册入口，需要核对',
   AUTO_FORM_UNSUPPORTED: '当前表单超出用户名、密码注册范围',
   AUTO_FORM_AMBIGUOUS: '无法唯一识别注册输入框或按钮',

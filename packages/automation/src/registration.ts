@@ -67,6 +67,7 @@ export async function registerApk(
   let session: AndroidSession | undefined,
     account: Account | undefined,
     submitted = false,
+    startup = true,
     clean = true;
   let result: TaskCompletion = {
     status: 'FAILED',
@@ -122,8 +123,12 @@ export async function registerApk(
       },
       config.execution.autoRegistration?.screenshotFallback ?? false,
       config.execution.autoRegistration?.startup,
+      () => startup && !account && !submitted,
     );
-    if (!automatic) await readiness.clear(signal);
+    if (!automatic) {
+      await readiness.clear(signal);
+      startup = false;
+    }
     if (automatic) {
       recognition = {
         source: 'CONTROLS',
@@ -156,6 +161,7 @@ export async function registerApk(
         readiness.clear,
       );
       discovering = false;
+      startup = false;
       const form = discovery.form;
       const input = (locator: typeof form.username, text: '{username}' | '{password}') => ({
         action: 'input' as const,
@@ -306,7 +312,7 @@ export async function registerApk(
           errorCode: 'REGISTRATION_UNKNOWN',
         };
         if (outcome) {
-          const tree = await session.source(verificationSignal);
+          let tree = await session.source(verificationSignal);
           if (
             automatic &&
             registrationOutcome(tree, apk.packageName, account, beforeSubmit) !== outcome
@@ -336,8 +342,14 @@ export async function registerApk(
             )
               throw new RegistrationError('EVIDENCE_UNSAFE');
           }
-          if (tree !== (await session.source(verificationSignal)))
-            throw new RegistrationError('EVIDENCE_UNSAFE');
+          const confirmedTree = await session.source(verificationSignal);
+          if (automatic) {
+            if (
+              registrationOutcome(confirmedTree, apk.packageName, account, beforeSubmit) !== outcome
+            )
+              throw new RegistrationError('EVIDENCE_UNSAFE');
+            tree = confirmedTree;
+          } else if (tree !== confirmedTree) throw new RegistrationError('EVIDENCE_UNSAFE');
           const bytes = functionalEvidence(tree, apk.packageName, { outcome, automatic });
           if (Date.now() >= deadline) throw new RegistrationError('REGISTRATION_UNKNOWN');
           const artifactId = await hooks.evidence(target.taskId, bytes, verificationSignal);

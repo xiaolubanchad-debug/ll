@@ -268,13 +268,14 @@ export async function createRun(
           '0.8.0',
           '0.8.1',
           '0.9.0',
+          '0.9.1',
         ].includes(node.agentVersion ?? ''))
     )
       fault('NODE_UPGRADE_REQUIRED', '请部署支持每日下载与循环注册的 Agent');
     if (
       configuration.execution.autoRegistration !== undefined &&
       (!manifest?.features?.includes('AUTO_REGISTRATION_V1') ||
-        !['0.6.0', '0.6.1', '0.7.0', '0.7.1', '0.7.2', '0.8.0', '0.8.1', '0.9.0'].includes(
+        !['0.6.0', '0.6.1', '0.7.0', '0.7.1', '0.7.2', '0.8.0', '0.8.1', '0.9.0', '0.9.1'].includes(
           node.agentVersion ?? '',
         ))
     )
@@ -596,6 +597,35 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
       )
         fault('EVENT_CONFLICT', '当前阶段不能处理 APP 弹窗');
       if (event.type === 'APP_OBSTRUCTION' && p.phase) {
+        if (p.action === 'RETRY_LOAD') {
+          if (
+            !['LAUNCHING', 'DISCOVERING'].includes(task.status) ||
+            task.accountRef ||
+            (await tx.accountResult.findUnique({
+              where: { taskId: task.id },
+              select: { accountRef: true },
+            }))
+          )
+            fault('EVENT_CONFLICT', '启动加载重试不能用于账户流程');
+          if (
+            p.phase === 'ACTION_SENT' &&
+            (await tx.runEvent.findFirst({
+              where: {
+                delivery: { runId },
+                sequence: { lt: event.sequence },
+                recordedForReview: false,
+                AND: [
+                  { body: { path: ['taskId'], equals: event.taskId } },
+                  { body: { path: ['type'], equals: 'APP_OBSTRUCTION' } },
+                  { body: { path: ['payload', 'action'], equals: 'RETRY_LOAD' } },
+                  { body: { path: ['payload', 'phase'], equals: 'ACTION_SENT' } },
+                ],
+              },
+              select: { id: true },
+            }))
+          )
+            fault('EVENT_CONFLICT', '启动加载只能重试一次');
+        }
         const prior = await tx.runEvent.findMany({
           where: {
             delivery: { runId },
@@ -623,7 +653,9 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
           terminal ||
           (p.phase === 'ACTION_SENT' && (!detected || sent)) ||
           (['CLEARED', 'UNCHANGED'].includes(String(p.phase)) && (!sent || terminal)) ||
-          (p.phase === 'WAITING' && p.action !== 'WAIT_SPLASH' && !sent) ||
+          (p.phase === 'WAITING' &&
+            !['WAIT_SPLASH', 'WAIT_OVERLAY'].includes(String(p.action)) &&
+            !sent) ||
           (p.phase === 'UNVERIFIED' && !detected && !sent) ||
           (p.phase === 'DETECTED' && sent)
         )

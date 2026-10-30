@@ -177,6 +177,11 @@ function sessionFixture(pkg, variant = {}) {
     source: async () => {
       const xml = pageXml(pkg, state, values, variant);
       sourceReads++;
+      if (variant.movingTarget)
+        return xml.replace(
+          'bounds="[20,30][600,85]"',
+          `bounds="[20,${30 + sourceReads}][600,${85 + sourceReads}]"`,
+        );
       return variant.unstable || (variant.startingAnimation && sourceReads <= 3)
         ? xml.replace('text=""', `text="Owned animation ${sourceReads}"`)
         : xml;
@@ -453,13 +458,16 @@ test('untrusted UI and tampered learned recipes cannot become commands or succes
   );
 });
 
-test('startup layout changes are reread before actions and unending changes cannot submit', async (t) => {
+test('background animation permits stable native controls, but a moving target cannot submit', async (t) => {
   const h = await harness(t);
   const stable = await h.run('com.example.animation', { nested: true, startingAnimation: true });
   assert.equal(stable.result.status, 'SUCCEEDED');
   assert.equal(stable.intents, 1);
   assert.equal(stable.result.recognition.navigationSteps, 3);
-  const unstable = await h.run('com.example.unstable', { unstable: true });
+  const animated = await h.run('com.example.animatedresult', { unstable: true });
+  assert.equal(animated.result.status, 'SUCCEEDED');
+  assert.equal(animated.intents, 1);
+  const unstable = await h.run('com.example.unstable', { movingTarget: true });
   assert.equal(unstable.result.status, 'FAILED');
   assert.equal(unstable.result.errorCode, 'AUTO_SCREEN_CHANGED');
   assert.equal(unstable.result.recognition.needsAdaptation, true);

@@ -812,6 +812,64 @@ test('1.10 legacy image upload disabled', () =>
       redaction: 'CREDENTIAL_MASKED',
     }).length,
   ));
+const overlayIssues = (payload) =>
+  agentIssues({
+    ...notes,
+    events: [
+      {
+        ...browserEvent,
+        taskId: '44444444-4444-4444-8444-444444444444',
+        type: 'APP_OBSTRUCTION',
+        payload,
+      },
+    ],
+  });
+test('1.11.1 overlay transition is a readonly waiting event', () =>
+  assert.deepEqual(
+    overlayIssues({
+      action: 'WAIT_OVERLAY',
+      method: 'CONTROLS',
+      index: 1,
+      phase: 'WAITING',
+    }),
+    [],
+  ));
+for (const phase of ['ACTION_SENT', 'CLEARED', 'UNCHANGED', undefined])
+  test('1.11.1 overlay cannot mutate ' + String(phase), () =>
+    assert.ok(
+      overlayIssues({
+        action: 'WAIT_OVERLAY',
+        method: 'CONTROLS',
+        index: 1,
+        ...(phase ? { phase } : {}),
+      }).length,
+    ),
+  );
+test('1.11.1 native notice Back is phase-bound', () =>
+  assert.deepEqual(
+    overlayIssues({ action: 'CLOSE_POPUP', method: 'BACK', index: 1, phase: 'DETECTED' }),
+    [],
+  ));
+for (const payload of [
+  { action: 'CLOSE_POPUP', method: 'BACK', index: 1 },
+  { action: 'SKIP_AD', method: 'BACK', index: 1, phase: 'ACTION_SENT' },
+])
+  test('1.11.1 invalid notice Back ' + JSON.stringify(payload), () =>
+    assert.ok(overlayIssues(payload).length),
+  );
+test('1.11.1 startup recovery is a phase-bound native control action', () =>
+  assert.deepEqual(
+    overlayIssues({ action: 'RETRY_LOAD', method: 'CONTROLS', index: 1, phase: 'ACTION_SENT' }),
+    [],
+  ));
+for (const payload of [
+  { action: 'RETRY_LOAD', method: 'CONTROLS', index: 1 },
+  { action: 'RETRY_LOAD', method: 'BACK', index: 1, phase: 'ACTION_SENT' },
+  { action: 'RETRY_LOAD', method: 'ICON', index: 1, phase: 'ACTION_SENT' },
+])
+  test('1.11.1 invalid startup recovery ' + JSON.stringify(payload), () =>
+    assert.ok(overlayIssues(payload).length),
+  );
 process.stdout.write(
   `${passed} contract checks passed${process.exitCode ? '; failures present' : ''}.\n`,
 );

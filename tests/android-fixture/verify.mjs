@@ -463,10 +463,11 @@ try {
     if (v111) {
       assert.deepEqual(
         startupNotes.filter((n) => n.phase === 'ACTION_SENT').map((n) => n.action),
-        ['SKIP_AD', 'ACK_NOTICE', 'CLOSE_POPUP'],
+        ['RETRY_LOAD', 'SKIP_AD', 'ACK_NOTICE', 'CLOSE_POPUP'],
       );
-      assert.equal(startupNotes.filter((n) => n.phase === 'CLEARED').length, 3);
+      assert.equal(startupNotes.filter((n) => n.phase === 'CLEARED').length, 4);
       assert.ok(startupNotes.some((n) => n.method === 'ICON' && n.phase === 'CLEARED'));
+      assert.ok(startupNotes.some((n) => n.action === 'WAIT_OVERLAY' && n.phase === 'WAITING'));
     }
     if (automatic) {
       assert.ok(result.recognition);

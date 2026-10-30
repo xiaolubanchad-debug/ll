@@ -1,10 +1,11 @@
 import { request } from 'node:http';
+import { setTimeout as delay } from 'node:timers/promises';
 import type { Locator, Rect } from './registration-types.js';
 import { RegistrationError } from './registration-types.js';
 import { safeUiSelector } from '@apk/contracts';
 
 // Only this fixed adapter may address the job-owned loopback Appium server.
-// Commands are sent once. Only the read-only element lookup is polled.
+// Mutations are sent once. Only read-only lookup and snapshot recovery may retry within policy.
 export class AppiumClient {
   session = '';
   constructor(
@@ -51,6 +52,12 @@ export class AppiumClient {
               const result = JSON.parse(Buffer.concat(chunks).toString()) as { value?: unknown };
               if ((res.statusCode ?? 500) >= 400) {
                 const value = result.value as { error?: string } | undefined;
+                if (
+                  method === 'GET' &&
+                  /\/element\/[A-Za-z0-9-]+\/enabled$/.test(path) &&
+                  ['stale element reference', 'no such element'].includes(value?.error ?? '')
+                )
+                  throw new RegistrationError('APPIUM_ELEMENT_GONE');
                 throw new RegistrationError(
                   !reading
                     ? 'APPIUM_FAILED'
@@ -191,8 +198,8 @@ export class AppiumClient {
     if (shown === true) await this.command('POST', this.path('/appium/device/hide_keyboard'), {});
     else if (shown !== false) throw new RegistrationError('AUTO_PAGE_UNREADABLE');
   }
-  async back() {
-    await this.command('POST', this.path('/back'), {});
+  async back(timeout = 10000, signal?: AbortSignal) {
+    await this.command('POST', this.path('/back'), {}, timeout, signal ?? this.signal ?? null);
   }
   async rect(id: string) {
     const r = (await this.command(
@@ -212,6 +219,23 @@ export class AppiumClient {
       throw new RegistrationError('EVIDENCE_UNSAFE');
     return value;
   }
+  async attached(id: string, signal?: AbortSignal): Promise<boolean> {
+    if (!/^[A-Za-z0-9-]{1,100}$/.test(id)) throw new RegistrationError('APPIUM_FAILED');
+    try {
+      const value = await this.command(
+        'GET',
+        this.path('/element/' + id + '/enabled'),
+        undefined,
+        2000,
+        signal ?? this.signal ?? null,
+      );
+      if (typeof value !== 'boolean') throw new RegistrationError('APPIUM_READ_INVALID');
+      return true;
+    } catch (error) {
+      if (error instanceof RegistrationError && error.code === 'APPIUM_ELEMENT_GONE') return false;
+      throw error;
+    }
+  }
   async screenshot(signal?: AbortSignal) {
     const value = await this.read('/screenshot', signal);
     if (typeof value !== 'string' || value.length > 13981016)
@@ -219,6 +243,7 @@ export class AppiumClient {
     return Buffer.from(value, 'base64');
   }
   private async read(path: string, signal?: AbortSignal): Promise<unknown> {
+    const effectiveSignal = signal ?? this.signal;
     for (let attempt = 0; ; attempt++) {
       try {
         return await this.command(
@@ -226,18 +251,23 @@ export class AppiumClient {
           this.path(path),
           undefined,
           35000,
-          signal ?? this.signal ?? null,
+          effectiveSignal ?? null,
         );
       } catch (error) {
         if (
           attempt !== 0 ||
-          signal?.aborted ||
+          effectiveSignal?.aborted ||
           !(error instanceof RegistrationError) ||
           !['APPIUM_READ_TIMEOUT', 'APPIUM_READ_CONNECTION', 'APPIUM_READ_SERVER'].includes(
             error.code,
           )
         )
           throw error;
+        try {
+          await delay(400, undefined, { signal: effectiveSignal });
+        } catch {
+          throw new RegistrationError('CANCELLED');
+        }
       }
     }
   }

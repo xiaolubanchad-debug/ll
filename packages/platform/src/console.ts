@@ -528,6 +528,8 @@ function title(type: string, p: Record<string, unknown>) {
           CLOSE_POPUP: '关闭弹窗',
           ACK_NOTICE: '确认公告',
           WAIT_SPLASH: '等待开屏广告倒计时',
+          WAIT_OVERLAY: '等待弹窗加载和稳定',
+          RETRY_LOAD: '重试 APP 启动加载',
         } as Record<string, string>
       )[String(p.action)] ?? '处理 APP 遮挡';
     if (!p.phase)
@@ -536,7 +538,9 @@ function title(type: string, p: Record<string, unknown>) {
       (
         {
           DETECTED: '发现遮挡：' + action,
-          WAITING: p.action === 'WAIT_SPLASH' ? '等待开屏广告倒计时' : '等待关闭操作生效',
+          WAITING: ['WAIT_SPLASH', 'WAIT_OVERLAY'].includes(String(p.action))
+            ? action
+            : '等待关闭操作生效',
           ACTION_SENT: '已执行' + action + '，正在核对',
           CLEARED: '已确认遮挡消失：' + action,
           UNCHANGED: '关闭操作未生效，已停止重复点击',
