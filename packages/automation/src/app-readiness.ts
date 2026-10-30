@@ -676,5 +676,47 @@ export function appObstructions(
       ocrCache.clear();
     }
   };
-  return { clear };
+  const prepare = async (signal: AbortSignal): Promise<string> => {
+    const remaining = settings.totalTimeoutMs - spent;
+    if (remaining <= 0) throw new RegistrationError('AUTO_OBSTRUCTION_TIMEOUT');
+    const bounded = AbortSignal.any([signal, AbortSignal.timeout(remaining)]);
+    let loading = false;
+    try {
+      for (;;) {
+        beforeAction();
+        const readAt = Date.now();
+        let initial: string;
+        try {
+          initial = await session.source(bounded);
+        } finally {
+          spent += Date.now() - readAt;
+        }
+        const page = readRegistrationPage(initial, pkg);
+        if (page.foreign) throw new RegistrationError('AUTO_FOREIGN_SCREEN');
+        loading = appLoading(page);
+        if (
+          !loading &&
+          !modalBarrier(page) &&
+          !obstructionRegions(page).length &&
+          !obstructionCandidates(page, allowStartupRetry()).length
+        )
+          return initial;
+        const source = await clear(bounded, initial);
+        loading = appLoading(readRegistrationPage(source, pkg));
+        if (!loading) return source;
+        const started = Date.now();
+        try {
+          await pause(Math.max(1, Math.min(400, settings.totalTimeoutMs - spent)), bounded);
+        } finally {
+          spent += Date.now() - started;
+        }
+      }
+    } catch (error) {
+      if (signal.aborted) throw new RegistrationError('CANCELLED');
+      if (bounded.aborted)
+        throw new RegistrationError(loading ? 'AUTO_LOADING_TIMEOUT' : 'AUTO_OBSTRUCTION_TIMEOUT');
+      throw error;
+    }
+  };
+  return { clear, prepare };
 }

@@ -137,6 +137,7 @@ export async function registerApk(
         learned: false,
         needsAdaptation: false,
       };
+      await readiness.prepare(signal);
       await stage('DISCOVERING');
       discovering = true;
       learningKey = sha(

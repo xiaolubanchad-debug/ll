@@ -69,8 +69,8 @@ export function appLoading(page: UiPage): boolean {
     return false;
   return page.controls.some((c) =>
     labels(c).some((v) =>
-      /^(加载中|正在加载|正在加载中|努力加载中|数据加载中|正在加载数据|正在加载请稍候|正在加载请稍等|加载中请稍候|加载中请稍等|网络连接中|正在连接网络|请稍候|请稍等|loading|loadingpleasewait|pleasewait)$/.test(
-        compactLabel(v).replace(/…+$/u, ''),
+      /^(?:(?:加载中|正在加载|正在加载中|努力加载中|数据加载中|正在加载数据)(?:请稍候|请稍等)?|网络连接中|正在连接网络|请稍候|请稍等|loading|loadingpleasewait|pleasewait)$/.test(
+        compactLabel(v).replace(/…+/gu, ''),
       ),
     ),
   );

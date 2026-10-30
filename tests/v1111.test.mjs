@@ -111,13 +111,20 @@ test('a unique short close description distinguishes a barrier from equal-size w
 });
 
 test('only a noninteractive explicit loading page is treated as startup loading', () => {
-  for (const text of ['正在加载…', '加载中，请稍候', 'Loading...', '网络连接中']) {
+  for (const text of [
+    '正在加载…',
+    '加载中，请稍候',
+    '正在加载中……请稍等……',
+    'Loading...',
+    '网络连接中',
+  ]) {
     assert.equal(appLoading(readRegistrationPage(tree(row('loading', text)), pkg)), true, text);
   }
   for (const content of [
     row('error', '网络失败，请重试'),
     row('empty', ''),
     row('content', '推荐'),
+    row('content', '推荐内容中提到正在加载中，请稍等'),
     row('loading', '加载中') + row('login', '登录', 'Button', true),
     row('loading', '加载中') + row('accept', '我知道了', 'Button', true),
   ]) {
@@ -632,4 +639,74 @@ test('a persistent account tab does not hide a new explicit login entry after na
   );
   assert.ok(found.form);
   assert.deepEqual(clicks, ['mine', 'login']);
+});
+
+test('startup preparation has its own bounded loading time before the shorter discovery phase', async () => {
+  const until = Date.now() + 1400;
+  const session = {
+    source: async () => (Date.now() < until ? tree(row('loading', '正在加载中……请稍等……')) : form),
+    screenshot: async () => assert.fail('native preparation must not capture'),
+  };
+  const handler = appObstructions(
+    session,
+    pkg,
+    () => {},
+    async () => {},
+    true,
+    { totalTimeoutMs: 10000 },
+  );
+  await handler.prepare(new AbortController().signal);
+  const result = await discoverRegistration(
+    session,
+    pkg,
+    { ...settings, timeoutMs: 800 },
+    'separate-startup',
+    new AbortController().signal,
+    () => {},
+    recognition(),
+    undefined,
+    handler.clear,
+  );
+  assert.ok(result.form);
+});
+
+test('startup preparation and subsequent clearing share one action budget, and loading stop is immediate', async () => {
+  let state = 'ad',
+    clicks = 0;
+  const ad = tree(row('skip', '跳过', 'Button', true));
+  const session = {
+    source: async () => (state === 'ad' ? ad : form),
+    find: async () => 'skip',
+    click: async () => {
+      clicks++;
+      state = 'form';
+    },
+  };
+  const handler = appObstructions(
+    session,
+    pkg,
+    () => {},
+    async () => {},
+    false,
+    { maxActions: 1 },
+  );
+  await handler.prepare(new AbortController().signal);
+  state = 'ad';
+  await assert.rejects(
+    handler.clear(new AbortController().signal),
+    (e) => e.code === 'AUTO_OBSTRUCTION_LIMIT',
+  );
+  assert.equal(clicks, 1);
+  const stop = new AbortController();
+  setTimeout(() => stop.abort(), 50);
+  await assert.rejects(
+    appObstructions(
+      { source: async () => tree(row('loading', '加载中')) },
+      pkg,
+      () => {},
+      async () => {},
+      false,
+    ).prepare(stop.signal),
+    (e) => e.code === 'CANCELLED',
+  );
 });
