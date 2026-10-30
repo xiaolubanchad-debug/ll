@@ -9,6 +9,7 @@ export * from './registration-types.js';
 export * from './registration.js';
 export * from './android.js';
 export * from './app-open.js';
+export * from './concurrent-open.js';
 export * from './proxy.js';
 export * from './screenshot.js';
 export * from './functional-evidence.js';

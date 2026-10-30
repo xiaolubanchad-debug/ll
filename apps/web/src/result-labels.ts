@@ -14,6 +14,10 @@ export const dailyLabels: Record<string, string> = {
   WAITING: '等待条件就绪',
 };
 export const reasonLabels: Record<string, string> = {
+  DAY_CUTOFF: '今日已停止新增轮次，等待次日下载与执行',
+  DAILY_OPEN_LIMIT: '本服务器今日剩余尝试额度不足',
+  APP_OPEN_DAILY_REQUIRED: '请通过任务中心复用当天 APK 执行',
+  OPEN_POLICY_INVALID: '执行策略不一致，请重新保存任务并升级节点',
   APP_NOT_FOREGROUND: 'APP 未保持在前台，本轮未完成',
   APP_FOREGROUND_FAILED: '无法读取 APP 前台状态，本轮未完成',
   APP_OPEN_FAILED: 'APP 启动停留执行失败',

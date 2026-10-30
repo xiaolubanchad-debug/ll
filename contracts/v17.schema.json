@@ -1551,6 +1551,54 @@
             "REGISTRATION",
             "DOWNLOAD_ONLY"
           ]
+        },
+        "concurrency": {
+          "type": "integer",
+          "enum": [
+            1,
+            2
+          ]
+        },
+        "activeTasks": {
+          "type": "array",
+          "maxItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "position": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "label": {
+                "type": "string"
+              },
+              "stage": {
+                "type": "string"
+              },
+              "packageName": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "position",
+              "label",
+              "stage",
+              "packageName"
+            ]
+          }
         }
       },
       "required": [

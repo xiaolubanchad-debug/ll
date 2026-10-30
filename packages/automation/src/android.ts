@@ -99,15 +99,19 @@ async function availablePort(port = 0) {
   await new Promise<void>((r) => s.close(() => r()));
   return selected;
 }
+const reservedEmulatorPorts = new Set<number>();
 async function emulatorPort() {
-  for (let p = 5554; p < 5584; p += 2)
+  for (let p = 5554; p < 5584; p += 2) {
+    if (reservedEmulatorPorts.has(p)) continue;
+    reservedEmulatorPorts.add(p);
     try {
       await availablePort(p);
       await availablePort(p + 1);
       return p;
     } catch {
-      /* Try another dedicated pair. */
+      reservedEmulatorPorts.delete(p);
     }
+  }
   throw new RegistrationError('ANDROID_NOT_READY');
 }
 async function matchingProcesses(record: AndroidRecord) {
@@ -247,6 +251,8 @@ export async function startAndroid(
     const clean = await cleanupAndroid(base, record);
     if (clean) {
       closed = true;
+      if (record.serial)
+        reservedEmulatorPorts.delete(Number(record.serial.slice('emulator-'.length)));
       await options.resources(null);
     }
     return clean;

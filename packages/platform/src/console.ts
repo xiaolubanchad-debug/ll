@@ -461,22 +461,39 @@ export async function runSummary(db: PrismaClient, id: string): Promise<RunSumma
     async (tx) => {
       const row = await tx.run.findUnique({ where: { id }, select: runSelect });
       if (!row) fault('NOT_FOUND', '执行批次不存在', 404);
-      const [counts, taskCount, activeTask, automaticIdentityCount] = await Promise.all([
-        categoryCounts(tx, { runId: id }),
-        tx.task.count({ where: { runId: id } }),
-        tx.task.findFirst({
-          where: { runId: id, status: { notIn: terminal } },
-          orderBy: { position: 'asc' },
-          select: { id: true, position: true, label: true, status: true, apk: true },
-        }),
-        tx.task.count({
-          where: {
-            runId: id,
-            recognition: { path: ['automaticIdentity', 'scope'], equals: 'APP_UI_ONLY' },
-          },
-        }),
-      ]);
+      const [counts, taskCount, activeTask, automaticIdentityCount, activeTasks] =
+        await Promise.all([
+          categoryCounts(tx, { runId: id }),
+          tx.task.count({ where: { runId: id } }),
+          tx.task.findFirst({
+            where: { runId: id, status: { notIn: terminal } },
+            orderBy: { position: 'asc' },
+            select: { id: true, position: true, label: true, status: true, apk: true },
+          }),
+          tx.task.count({
+            where: {
+              runId: id,
+              recognition: { path: ['automaticIdentity', 'scope'], equals: 'APP_UI_ONLY' },
+            },
+          }),
+          tx.task.findMany({
+            where: { runId: id, attemptStarted: true, status: { notIn: terminal } },
+            orderBy: { position: 'asc' },
+            take: 2,
+            select: { id: true, position: true, label: true, status: true, apk: true },
+          }),
+        ]);
+      const c = row.configVersion?.body as unknown as TestConfiguration | null;
+      const mapActive = (task: NonNullable<typeof activeTask>) => ({
+        id: task.id,
+        position: task.position + 1,
+        label: task.label,
+        stage: task.status,
+        packageName: apkView(task.apk)?.packageName ?? null,
+      });
       return output('RunSummaryView', {
+        concurrency: c?.execution.appOpen?.concurrency ?? 1,
+        activeTasks: activeTasks.map(mapActive),
         executionKind:
           row.purpose === 'DOWNLOAD'
             ? 'DOWNLOAD_ONLY'
@@ -493,15 +510,19 @@ export async function runSummary(db: PrismaClient, id: string): Promise<RunSumma
         taskCount,
         cleanup:
           row.status === 'NEEDS_REVIEW' ? 'NEEDS_REVIEW' : row.finishedAt ? 'CONFIRMED' : 'PENDING',
-        activeTask: activeTask
-          ? {
-              id: activeTask.id,
-              position: activeTask.position + 1,
-              label: activeTask.label,
-              stage: activeTask.status,
-              packageName: apkView(activeTask.apk)?.packageName ?? null,
-            }
-          : null,
+        activeTask: c?.execution.appOpen
+          ? activeTasks[0]
+            ? mapActive(activeTasks[0])
+            : null
+          : activeTask
+            ? {
+                id: activeTask.id,
+                position: activeTask.position + 1,
+                label: activeTask.label,
+                stage: activeTask.status,
+                packageName: apkView(activeTask.apk)?.packageName ?? null,
+              }
+            : null,
       });
     },
     { isolationLevel: 'RepeatableRead' },

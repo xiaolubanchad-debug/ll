@@ -185,6 +185,11 @@ onUnmounted(() => {
             >查看执行日志与结果 →</a
           >
         </div>
+        <p v-if="task.executionKind === 'APP_OPEN'" class="muted">
+          并发 {{ task.concurrency ?? 1 }} 路 · 每台服务器共享额度：今日已用
+          {{ task.dailyUsage?.used ?? 0 }} / {{ task.dailyUsage?.limit ?? 800 }}，剩余
+          {{ task.dailyUsage?.remaining ?? 800 }} 轮尝试。
+        </p>
         <p v-if="task.nextRunAt" class="muted">
           下次自动执行：{{ when(task.nextRunAt) }}（北京时间）
         </p>

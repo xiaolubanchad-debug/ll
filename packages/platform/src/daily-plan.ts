@@ -3,6 +3,7 @@ import type { DailyExecutionPlan, RunInput, TestConfiguration } from '@apk/contr
 import { schemaIssues, registrationAvailable } from '@apk/contracts';
 import { digest, canonical } from './security.js';
 import { fault } from './errors.js';
+import { dailyOpenUsage, openAdmissionDeadline } from './open-budget.js';
 
 export function beijingDay(now: Date) {
   return new Intl.DateTimeFormat('en-CA', {
@@ -57,6 +58,21 @@ export async function prepareDailyPlan(
   if (input.purpose === 'PROXY_CHECK') plan.proxySecretVersionId = input.proxySecretVersionId;
   if (input.purpose === 'REGISTER') {
     validateBudget(input.successTarget!, input.attemptLimit!);
+    if (config.execution.appOpen) {
+      const budget = await dailyOpenUsage(tx, input.nodeId, plan.cacheDay);
+      if (input.attemptLimit! > budget.remaining)
+        fault('DAILY_OPEN_LIMIT', '当日剩余执行额度不足，请降低目标和尝试上限', 422);
+      if (config.execution.appOpen.concurrency !== undefined) {
+        const deadline = openAdmissionDeadline(plan.cacheDay);
+        if (now.getTime() >= Date.parse(deadline))
+          fault('DAY_CUTOFF', '今日停止新增轮次，请等待次日下载', 422);
+        plan.openPolicy = {
+          concurrency: config.execution.appOpen.concurrency,
+          dailyLimit: 800,
+          admissionDeadline: deadline,
+        };
+      }
+    }
     if (config.execution.mode !== 'FULL')
       fault('PROXY_CONFIG_INVALID', '请在完整配置中应用代理并保存版本', 422);
     const source = await tx.run.findUnique({

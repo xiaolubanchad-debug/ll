@@ -1342,7 +1342,8 @@
             "FLOW_LAYOUT_CHANGED",
             "AUTO_ADAPTATION_REQUIRED",
             "NO_APK_AVAILABLE",
-            "NO_REGISTERABLE_APK"
+            "NO_REGISTERABLE_APK",
+            "DAY_CUTOFF"
           ]
         }
       }

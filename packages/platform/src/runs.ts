@@ -13,6 +13,7 @@ import {
   contentIsolationSupported,
   appReadinessSupported,
   appOpenSupported,
+  parallelAppOpenSupported,
 } from '@apk/contracts';
 import { readFunctionalArtifact } from './functional-artifacts.js';
 import { checked, readSecret } from './secrets.js';
@@ -25,6 +26,7 @@ import { isIP } from 'node:net';
 import { beijingDay, prepareDailyPlan, dailyTargetKey } from './daily-plan.js';
 import type { DailyExecutionPlan } from '@apk/contracts';
 import { lockLibrary } from './library-lock.js';
+import { dailyOpenUsage, openAdmissionDeadline } from './open-budget.js';
 type Tx = P.TransactionClient;
 export const ACTIVE_RUNS = ['ASSIGNED', 'RUNNING', 'STOP_REQUESTED'] as const;
 export const RUN_END = ['SUCCEEDED', 'PARTIAL_FAILED', 'FAILED', 'CANCELLED', 'NEEDS_REVIEW'];
@@ -272,6 +274,7 @@ export async function createRun(
           '0.9.1',
           '0.9.2',
           '0.10.0',
+          '0.11.0',
         ].includes(node.agentVersion ?? ''))
     )
       fault('NODE_UPGRADE_REQUIRED', '请部署支持每日下载与循环注册的 Agent');
@@ -290,11 +293,19 @@ export async function createRun(
           '0.9.1',
           '0.9.2',
           '0.10.0',
+          '0.11.0',
         ].includes(node.agentVersion ?? ''))
     )
       fault('NODE_UPGRADE_REQUIRED', '自动识别注册入口需要 Agent 0.6.0');
     if (configuration.execution.appOpen && !appOpenSupported(manifest?.features, node.agentVersion))
       fault('NODE_UPGRADE_REQUIRED', '启动停留需要 Agent 0.10.0');
+    if (configuration.execution.appOpen && !input.purpose)
+      fault('APP_OPEN_DAILY_REQUIRED', '启动停留请使用每日缓存执行入口', 422);
+    if (
+      configuration.execution.appOpen?.concurrency !== undefined &&
+      !parallelAppOpenSupported(manifest?.features, node.agentVersion)
+    )
+      fault('NODE_UPGRADE_REQUIRED', '并发与每日额度需要 Agent 0.11.0');
     const plan = await prepareDailyPlan(tx, input, config, now);
     if (input.purpose === 'PROXY_CHECK')
       await readSecret(tx, input.proxySecretVersionId!, ['HTTP_PROXY']);
@@ -443,7 +454,23 @@ async function assertIsolatedRun(tx: Tx, run: Run) {
   const features = (release?.manifest as { features?: string[] } | null)?.features;
   if (settings?.appOpen && !appOpenSupported(features, node.agentVersion))
     fault('NODE_UPGRADE_REQUIRED', '启动停留需要 Agent 0.10.0');
+  if (
+    settings?.appOpen?.concurrency !== undefined &&
+    !parallelAppOpenSupported(features, node.agentVersion)
+  )
+    fault('NODE_UPGRADE_REQUIRED', '并发与每日额度需要 Agent 0.11.0');
   if (!android) return;
+  if (settings?.appOpen?.concurrency !== undefined) {
+    const policy = (run.executionPlan as unknown as DailyExecutionPlan | null)?.openPolicy;
+    if (
+      !policy ||
+      policy.concurrency !== settings.appOpen.concurrency ||
+      policy.dailyLimit !== 800 ||
+      !run.cacheDay ||
+      policy.admissionDeadline !== openAdmissionDeadline(run.cacheDay)
+    )
+      fault('OPEN_POLICY_INVALID', '执行策略与配置不一致');
+  }
   if (!contentIsolationSupported(features, node.agentVersion))
     fault('NODE_UPGRADE_REQUIRED', '注册任务需要默认内容隔离的 Agent 0.8.0');
   if (settings?.autoRegistration?.startup && !appReadinessSupported(features, node.agentVersion))
@@ -825,11 +852,18 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
           task.status !== 'QUEUED' ||
           task.attemptStarted ||
           task.position !== run.attemptsStarted ||
-          active ||
+          active >= (openOnly ? (plan?.openPolicy?.concurrency ?? 1) : 1) ||
+          (openOnly && run.successes + active >= run.successTarget) ||
           run.attemptsStarted >= run.attemptLimit ||
           run.successes >= run.successTarget
         )
           fault('EVENT_CONFLICT', '上一轮尚未结束或已达到注册配额');
+        if (openOnly) {
+          if (plan?.openPolicy && Date.now() >= Date.parse(plan.openPolicy.admissionDeadline))
+            fault('DAY_CUTOFF', '今日停止新增轮次');
+          if ((await dailyOpenUsage(tx, run.nodeId)).remaining < 1)
+            fault('DAILY_OPEN_LIMIT', '已用完今日额度');
+        }
         await tx.run.update({ where: { id: runId }, data: { attemptsStarted: { increment: 1 } } });
         await tx.task.update({ where: { id: task.id }, data: { attemptStarted: true } });
       }
@@ -1092,6 +1126,11 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
           t.attemptStarted && !['SUCCEEDED', 'FAILED', 'SKIPPED', 'CANCELLED'].includes(t.status),
       );
       const reached = run.successes >= run.successTarget;
+      const cutoff =
+        openOnly &&
+        !!plan?.openPolicy &&
+        p.errorCode === 'DAY_CUTOFF' &&
+        Date.now() >= Date.parse(plan.openPolicy.admissionDeadline);
       const empty = !plan?.assets.length;
       const missing =
         p.errorCode === 'CACHE_MISSING' &&
@@ -1131,6 +1170,7 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
           !changed &&
           !adaptation &&
           !noRegisterable &&
+          !cutoff &&
           run.attemptsStarted < run.attemptLimit)
       )
         fault('EVENT_CONFLICT', '注册循环尚未达到终止条件');
@@ -1147,7 +1187,9 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
                 ? 'FLOW_LAYOUT_CHANGED'
                 : missing
                   ? 'CACHE_MISSING'
-                  : 'ATTEMPT_LIMIT';
+                  : cutoff
+                    ? 'DAY_CUTOFF'
+                    : 'ATTEMPT_LIMIT';
       if (p.status !== expected || p.errorCode !== code)
         fault('EVENT_CONFLICT', '配额结果或原因不一致');
       await tx.task.updateMany({
@@ -1276,6 +1318,8 @@ export async function reconcileAgent(db: PrismaClient, token: string, body: unkn
     await lockNode(tx, input.nodeId);
     await nodeAuth(tx, token, input.nodeId);
     const slot = await tx.nodeSlot.findUnique({ where: { nodeId: input.nodeId } });
+    if (!input.cleanupComplete && !slot?.runId)
+      await tx.nodeSlot.update({ where: { nodeId: input.nodeId }, data: { quarantined: true } });
     if (slot?.runId) {
       const run = await tx.run.findUniqueOrThrow({
         where: { id: slot.runId },
@@ -1338,7 +1382,7 @@ export async function reconcileAgent(db: PrismaClient, token: string, body: unkn
       where: { nodeId: input.nodeId },
       data: { bootId: input.bootId },
     });
-    return { reconciled: true, mayClaim: !slot?.runId && !slot?.quarantined };
+    return { reconciled: true, mayClaim: input.cleanupComplete && !slot?.runId && !slot?.quarantined };
   });
 }
 export async function reconcileRun(

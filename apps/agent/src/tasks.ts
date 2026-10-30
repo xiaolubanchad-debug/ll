@@ -40,6 +40,8 @@ export class TaskEngine {
   private control = 'CONTINUE';
   private busy = false;
   private closed = false;
+  private recoveryBlocked = false;
+  private pendingFlush: Promise<void> = Promise.resolve();
   private constructor(
     readonly store: AgentStore,
     private readonly unlock: () => Promise<void>,
@@ -78,6 +80,15 @@ export class TaskEngine {
         cleared = await cleanupAndroid(join(this.store.root, 'android/jobs'), row.android);
         if (cleared) this.store.android(row.id, null);
       }
+      if (row.androidSlots.length) {
+        let slotsClean = true;
+        for (const { slot, record } of row.androidSlots) {
+          const ok = await cleanupAndroid(join(this.store.root, 'android/jobs'), record);
+          if (ok) this.store.androidSlot(row.id, slot, null);
+          else slotsClean = false;
+        }
+        cleared = slotsClean && (!row.android || cleared);
+      }
       if (row.browser) {
         let browserClean = await cleanupBrowser(
           join(this.store.root, 'downloads'),
@@ -93,8 +104,9 @@ export class TaskEngine {
             browserClean = false;
           }
         if (browserClean) this.store.browser(row.id, null);
-        cleared = browserClean && (!row.android || cleared);
+        cleared = browserClean && ((!row.android && !row.androidSlots.length) || cleared);
       }
+      cleared = cleared && this.store.deliveries().find((r) => r.id === row.id)?.clean === true;
       if (!cleared) clean = false;
       if (cleared) this.store.browser(row.id, null);
       if (row.status !== 'DONE') this.store.status(row.id, 'REVIEW', cleared);
@@ -106,6 +118,7 @@ export class TaskEngine {
         submissions: this.store.submissions(row.id),
       });
     }
+    this.recoveryBlocked = !clean;
     await this.hub('reconcile', {
       protocolVersion: '1.0',
       nodeId: this.nodeId,
@@ -116,7 +129,14 @@ export class TaskEngine {
     // The new boot identity is now bound; supplement old evidence without executing it.
     for (const row of previous) await this.flush(row.payload).catch(() => {});
   }
-  async flush(delivery: Delivery, signal?: AbortSignal) {
+  flush(delivery: Delivery, signal?: AbortSignal): Promise<void> {
+    const pending = this.pendingFlush
+      .catch(() => {})
+      .then(() => this.flushEvents(delivery, signal));
+    this.pendingFlush = pending;
+    return pending;
+  }
+  private async flushEvents(delivery: Delivery, signal?: AbortSignal) {
     for (const account of this.store.pendingAccounts(delivery)) {
       const response = await this.hub(
         'tasks/' + account.taskId + '/account',
@@ -211,7 +231,7 @@ export class TaskEngine {
     }
   }
   async tick() {
-    if (this.closed) return;
+    if (this.closed || this.recoveryBlocked) return;
     if (this.current && Date.now() >= this.lease) {
       this.control = 'REVIEW';
       this.abort?.abort();
@@ -308,6 +328,18 @@ export class TaskEngine {
             plan.assets.some((a) => a.apk.cacheDay !== plan.cacheDay))))
     )
       throw Error('EXECUTION_PLAN_INVALID');
+    if (
+      plan?.openPolicy &&
+      (!config.execution.appOpen ||
+        plan.openPolicy.concurrency !== (config.execution.appOpen.concurrency ?? 1))
+    )
+      throw Error('OPEN_POLICY_INVALID');
+    if (
+      plan?.purpose === 'REGISTER' &&
+      config.execution.appOpen?.concurrency !== undefined &&
+      !plan.openPolicy
+    )
+      throw Error('OPEN_POLICY_INVALID');
     let proxy: ProxyCredential | undefined;
     if (
       plan?.purpose === 'PROXY_CHECK' ||
@@ -360,9 +392,13 @@ export class TaskEngine {
         beforeAction,
         ...(plan?.purpose === 'REGISTER' || (!plan && config.execution.mode === 'FULL')
           ? {
-              afterDownload: (target, apk, file, index) =>
-                config.execution.appOpen
-                  ? openApk(config, target, apk, file, index, signal, emit, {
+              afterDownload: async (target, apk, file, index, attemptSignal = signal) => {
+                if (config.execution.appOpen) {
+                  await this.flush(d);
+                  beforeAction();
+                }
+                return config.execution.appOpen
+                  ? openApk(config, target, apk, file, index, attemptSignal, emit, {
                       sdkRoot: this.options.sdkRoot!,
                       toolsRoot: this.toolsRoot,
                       root: join(this.store.root, 'android'),
@@ -372,7 +408,7 @@ export class TaskEngine {
                       androidFactory: this.options.androidFactory,
                       beforeAction,
                       resources: async (record) => {
-                        this.store.android(d.deliveryId, record);
+                        this.store.androidSlot(d.deliveryId, target.taskId, record);
                       },
                     })
                   : registerApk(config, target, apk, file, index, signal, emit, {
@@ -412,7 +448,8 @@ export class TaskEngine {
                         await this.flush(d, verificationSignal);
                         return id;
                       },
-                    }),
+                    });
+              },
             }
           : {}),
         onBrowser: async (record) => {
@@ -509,6 +546,7 @@ export class TaskEngine {
     this.control = 'REVIEW';
     this.abort?.abort();
     await this.running;
+    await this.pendingFlush.catch(() => {});
     this.store.close();
     await this.unlock();
   }

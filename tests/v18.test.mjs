@@ -638,6 +638,7 @@ test('1.8 managed tasks: real PostgreSQL, persistent orchestration and browser c
         await page.getByRole('button', { name: '下一步', exact: true }).click();
         await page.getByLabel('执行服务器', { exact: true }).selectOption(node.id);
         await page.getByLabel('APP 网络代理', { exact: true }).selectOption(proxy.id);
+        await page.getByLabel('同时执行轮数', { exact: true }).selectOption('2');
         await page.getByRole('button', { name: '下一步', exact: true }).click();
         await page.getByLabel('所有 APK 合计完成轮数', { exact: true }).fill('5');
         await page.getByLabel('总尝试上限', { exact: true }).fill('15');
@@ -649,15 +650,15 @@ test('1.8 managed tasks: real PostgreSQL, persistent orchestration and browser c
         await expect(page.locator('.readiness-list')).toContainText('启动停留需要 Agent 0.10.0');
         await db.node.update({
           where: { id: node.id },
-          data: { agentVersion: '0.10.0', lastSeenAt: new Date() },
+          data: { agentVersion: '0.11.0', lastSeenAt: new Date() },
         });
         await db.release.update({
           where: { id: release.id },
           data: {
             manifest: {
               ...release.manifest,
-              agentVersion: '0.10.0',
-              features: [...release.manifest.features, 'APP_OPEN_V1'],
+              agentVersion: '0.11.0',
+              features: [...release.manifest.features, 'APP_OPEN_V1', 'APP_OPEN_PARALLEL_V1'],
             },
           },
         });
@@ -676,7 +677,7 @@ test('1.8 managed tasks: real PostgreSQL, persistent orchestration and browser c
         const browserConfig = await db.configVersion.findUniqueOrThrow({
           where: { id: browserTask.currentVersionId },
         });
-        assert.deepEqual(browserConfig.body.execution.appOpen, { dwellMs: 10000 });
+        assert.deepEqual(browserConfig.body.execution.appOpen, { dwellMs: 10000, concurrency: 2 });
         assert.equal(browserConfig.body.execution.autoRegistration, undefined);
         assert.deepEqual(browserConfig.body.registrationFlows, []);
         const freeVersion = await saveConfiguration(

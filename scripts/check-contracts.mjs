@@ -21,6 +21,16 @@ const agentCheck = ajv.compile(read('contracts/agent.schema.json'));
 const config = read('contracts/fixtures/config.valid.json');
 const messages = read('contracts/fixtures/agent.valid.json');
 let passed = 0;
+const concurrentOpenConfig = read('contracts/fixtures/config.concurrent-open.valid.json');
+test('1.13 parallel open configuration', () =>
+  assert.deepEqual(configurationIssues(concurrentOpenConfig), []));
+for (const concurrency of [0, 3, '2'])
+  test('1.13 rejects invalid worker count ' + concurrency, () => {
+    const c = structuredClone(concurrentOpenConfig);
+    c.execution.appOpen.concurrency = concurrency;
+    assert.ok(configurationIssues(c).length);
+  });
+
 const appOpenConfig = read('contracts/fixtures/config.app-open.valid.json');
 test('1.12 fixed APP open configuration', () =>
   assert.deepEqual(configurationIssues(appOpenConfig), []));

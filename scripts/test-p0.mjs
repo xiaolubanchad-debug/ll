@@ -179,6 +179,8 @@ try {
   await run(['--test', '--test-concurrency=1', 'tests/v1112.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/app-open.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/app-open-api.test.mjs'], env);
+  await run(['--test', '--test-concurrency=1', 'tests/concurrent-open.test.mjs'], env);
+  await run(['--test', '--test-concurrency=1', 'tests/concurrent-open-api.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/p3.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/v17.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/v18.test.mjs'], env);

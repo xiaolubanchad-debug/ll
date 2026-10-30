@@ -14,6 +14,7 @@ import {
   contentIsolationSupported,
   appReadinessSupported,
   appOpenSupported,
+  parallelAppOpenSupported,
 } from '@apk/contracts';
 import { checked } from './secrets.js';
 import { configBody, configSecrets } from './configurations.js';
@@ -22,6 +23,7 @@ import { idempotent } from './jobs.js';
 import { lockLibrary } from './library-lock.js';
 import { lockNode, idle } from './nodes.js';
 import { fault, PlatformError } from './errors.js';
+import { dailyOpenUsage } from './open-budget.js';
 import { beijingDay, validateBudget } from './daily-plan.js';
 import { createRun, stopRun, requestRunStop, downloadRetryParent, RUN_END } from './runs.js';
 type Tx = Prisma.TransactionClient;
@@ -60,6 +62,7 @@ async function cycleView(db: PrismaClient, c: CycleRow): Promise<TaskCycleView> 
       : snapshot.execution.mode === 'FULL'
         ? 'REGISTRATION'
         : 'DOWNLOAD_ONLY',
+    concurrency: snapshot.execution.appOpen?.concurrency ?? 1,
     day: c.day,
     round: c.round,
     status: c.status,
@@ -122,6 +125,19 @@ async function readiness(db: PrismaClient, p: PlanRow) {
       )
     )
       add('NODE_UPGRADE_REQUIRED', '启动准备设置需要 Agent 0.9.0', 'nodes');
+    if (c.execution.appOpen) {
+      if (
+        c.execution.appOpen.concurrency !== undefined &&
+        !parallelAppOpenSupported(
+          (release?.manifest as { features?: string[] } | null)?.features,
+          node.agentVersion,
+        )
+      )
+        add('NODE_UPGRADE_REQUIRED', '并发与每日额度需要 Agent 0.11.0', 'nodes');
+      const budget = await dailyOpenUsage(db, node.id);
+      if (!p.enabled && p.attemptLimit > budget.remaining)
+        add('DAILY_OPEN_LIMIT', '当日剩余额度不足，请降低目标及尝试上限', 'tasks');
+    }
     const proxy = c.execution.proxySecretVersionId;
     if (
       !proxy ||
@@ -156,6 +172,7 @@ async function readiness(db: PrismaClient, p: PlanRow) {
         '0.9.1',
         '0.9.2',
         '0.10.0',
+        '0.11.0',
       ].includes(node.agentVersion ?? '')
     )
       add('NODE_UPGRADE_REQUIRED', '自动识别需要升级执行环境', 'nodes');
@@ -175,6 +192,9 @@ async function view(db: PrismaClient, p: PlanRow): Promise<TaskPlanView> {
       : (p.currentVersion.body as unknown as TestConfiguration).execution.mode === 'FULL'
         ? 'REGISTRATION'
         : 'DOWNLOAD_ONLY',
+    concurrency:
+      (p.currentVersion.body as unknown as TestConfiguration).execution.appOpen?.concurrency ?? 1,
+    dailyUsage: await dailyOpenUsage(db, p.nodeId),
     name: p.name,
     nodeId: p.nodeId,
     nodeName: p.node.name,

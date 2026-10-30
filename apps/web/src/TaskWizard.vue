@@ -14,6 +14,7 @@ const step = ref(props.initialStep ?? 1),
   proxyId = ref(props.initial?.configuration.execution.proxySecretVersionId ?? ''),
   automatic = ref(props.initial?.task.automatic ?? false),
   time = ref(props.initial?.task.time ?? '00:05'),
+  concurrency = ref<1 | 2>(props.initial?.configuration.execution.appOpen?.concurrency ?? 1),
   target = ref(props.initial?.task.successTarget ?? 10),
   limit = ref(props.initial?.task.attemptLimit ?? 30),
   importId = ref(props.initial?.task.configId ?? '');
@@ -33,7 +34,7 @@ const proxyName = ref(''),
   user = ref(''),
   password = ref('');
 watch(target, (value, previous) => {
-  if (limit.value === previous * 3) limit.value = Math.min(1000, value * 3);
+  if (limit.value === previous * 3) limit.value = Math.min(800, value * 3);
 });
 const draft = computed(() => {
   const v = JSON.parse(JSON.stringify(base.value)) as TestConfiguration;
@@ -45,7 +46,7 @@ const draft = computed(() => {
   v.registrationFlows = [];
   if (mode.value === 'FULL') {
     v.execution.proxySecretVersionId = proxyId.value;
-    v.execution.appOpen = { dwellMs: 10000 };
+    v.execution.appOpen = { dwellMs: 10000, concurrency: concurrency.value };
   } else {
     delete v.execution.appOpen;
     delete v.execution.proxySecretVersionId;
@@ -87,6 +88,7 @@ function apply(value: string) {
     xpath.value = c.source.xpath;
     proxyId.value = c.execution.proxySecretVersionId ?? '';
     mode.value = c.execution.mode;
+    concurrency.value = c.execution.appOpen?.concurrency ?? 1;
     error.value = '';
   } catch (e) {
     error.value = e instanceof Error ? e.message : '配置无效';
@@ -264,6 +266,11 @@ onUnmounted(() => {
             </div>
             <el-button @click="saveProxy">保存代理并选中</el-button>
           </details>
+          <label for="task-concurrency">同时执行轮数</label
+          ><select id="task-concurrency" v-model="concurrency">
+            <option :value="1">1 路（默认）</option>
+            <option :value="2">2 路并发</option>
+          </select>
           <p class="muted">
             每轮使用独立模拟器及代理，启动 APP 后停留 10 秒再退出清理。无需配置注册入口。
           </p></template
@@ -277,14 +284,14 @@ onUnmounted(() => {
               v-model.number="target"
               type="number"
               min="1"
-              max="1000" /></label
+              max="800" /></label
           ><label for="task-limit"
             >总尝试上限<input
               id="task-limit"
               v-model.number="limit"
               type="number"
               :min="target"
-              max="1000"
+              max="800"
           /></label>
         </div>
         <p v-if="mode === 'DOWNLOAD_ONLY'" class="muted">本任务只下载 APK，不创建注册账户。</p>
@@ -304,7 +311,11 @@ onUnmounted(() => {
                 : '仅在点击开始后执行本轮。'
             }}
           </p>
-          <small>停留完成后关闭模拟器并清理；APK 保留复用。保存后请点击开始。</small>
+          <small
+            >停留完成后关闭模拟器并清理；APK 保留复用。最多同时
+            {{ concurrency }} 轮，完成目标由所有路共享。每台服务器每日最多尝试 800 轮，23:55
+            停止新增。保存后请点击开始。</small
+          >
         </div>
         <details class="advanced-settings" :open="initialStep === 3">
           <summary @click="raw = draft">高级设置</summary>

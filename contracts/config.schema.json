@@ -243,6 +243,14 @@
           "properties": {
             "dwellMs": {
               "const": 10000
+            },
+            "concurrency": {
+              "type": "integer",
+              "enum": [
+                1,
+                2
+              ],
+              "default": 1
             }
           }
         }

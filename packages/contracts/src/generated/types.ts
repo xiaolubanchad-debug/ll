@@ -70,6 +70,7 @@ export interface APKTestConfigurationVersion10 {
     contentIsolation?: true;
     appOpen?: {
       dwellMs: 10000;
+      concurrency?: 1 | 2;
     };
   };
   /**
@@ -132,6 +133,7 @@ export interface TaskCycleView {
   apkCount: number;
   downloadRetryOf: string | null;
   executionKind?: 'APP_OPEN' | 'REGISTRATION' | 'DOWNLOAD_ONLY';
+  concurrency?: 1 | 2;
 }
 
 export interface TaskPlanView {
@@ -165,6 +167,7 @@ export interface TaskPlanView {
     apkCount: number;
     downloadRetryOf: string | null;
     executionKind?: 'APP_OPEN' | 'REGISTRATION' | 'DOWNLOAD_ONLY';
+    concurrency?: 1 | 2;
   } | null;
   readiness: {
     code: string;
@@ -173,6 +176,13 @@ export interface TaskPlanView {
   }[];
   nextRunAt: string | null;
   executionKind?: 'APP_OPEN' | 'REGISTRATION' | 'DOWNLOAD_ONLY';
+  concurrency?: 1 | 2;
+  dailyUsage?: {
+    day: string;
+    limit: 800;
+    used: number;
+    remaining: number;
+  };
 }
 
 export interface TaskPlanDetail {
@@ -207,6 +217,7 @@ export interface TaskPlanDetail {
       apkCount: number;
       downloadRetryOf: string | null;
       executionKind?: 'APP_OPEN' | 'REGISTRATION' | 'DOWNLOAD_ONLY';
+      concurrency?: 1 | 2;
     } | null;
     readiness: {
       code: string;
@@ -215,6 +226,13 @@ export interface TaskPlanDetail {
     }[];
     nextRunAt: string | null;
     executionKind?: 'APP_OPEN' | 'REGISTRATION' | 'DOWNLOAD_ONLY';
+    concurrency?: 1 | 2;
+    dailyUsage?: {
+      day: string;
+      limit: 800;
+      used: number;
+      remaining: number;
+    };
   };
   configuration: APKTestConfigurationVersion10;
   cycles: {
@@ -234,6 +252,7 @@ export interface TaskPlanDetail {
     apkCount: number;
     downloadRetryOf: string | null;
     executionKind?: 'APP_OPEN' | 'REGISTRATION' | 'DOWNLOAD_ONLY';
+    concurrency?: 1 | 2;
   }[];
 }
 export interface APKTestConfigurationVersion10 {
@@ -297,6 +316,7 @@ export interface APKTestConfigurationVersion10 {
     contentIsolation?: true;
     appOpen?: {
       dwellMs: 10000;
+      concurrency?: 1 | 2;
     };
   };
   /**
@@ -370,6 +390,7 @@ export interface TaskPlanList {
       apkCount: number;
       downloadRetryOf: string | null;
       executionKind?: 'APP_OPEN' | 'REGISTRATION' | 'DOWNLOAD_ONLY';
+      concurrency?: 1 | 2;
     } | null;
     readiness: {
       code: string;
@@ -378,6 +399,13 @@ export interface TaskPlanList {
     }[];
     nextRunAt: string | null;
     executionKind?: 'APP_OPEN' | 'REGISTRATION' | 'DOWNLOAD_ONLY';
+    concurrency?: 1 | 2;
+    dailyUsage?: {
+      day: string;
+      limit: 800;
+      used: number;
+      remaining: number;
+    };
   }[];
   nextCursor: string | null;
 }
@@ -746,6 +774,17 @@ export interface RunSummaryView {
   } | null;
   automaticIdentityCount: number;
   executionKind?: 'APP_OPEN' | 'REGISTRATION' | 'DOWNLOAD_ONLY';
+  concurrency?: 1 | 2;
+  /**
+   * @maxItems 2
+   */
+  activeTasks?: {
+    id: string;
+    position: number;
+    label: string;
+    stage: string;
+    packageName: string | null;
+  }[];
 }
 
 export interface TimelinePage {
@@ -875,6 +914,7 @@ export interface TestConfiguration {
     contentIsolation?: true;
     appOpen?: {
       dwellMs: 10000;
+      concurrency?: 1 | 2;
     };
   };
   /**
@@ -1133,7 +1173,7 @@ export interface ReleaseInput {
     npmLockSha256: string;
   };
   /**
-   * @maxItems 7
+   * @maxItems 8
    */
   features?: (
     | 'DOWNLOAD_V1'
@@ -1143,6 +1183,7 @@ export interface ReleaseInput {
     | 'CONTENT_ISOLATION_V1'
     | 'APP_READINESS_V1'
     | 'APP_OPEN_V1'
+    | 'APP_OPEN_PARALLEL_V1'
   )[];
 }
 
@@ -1366,6 +1407,11 @@ export interface DailyExecutionPlan {
     };
     entryId?: string;
   }[];
+  openPolicy?: {
+    concurrency: 1 | 2;
+    dailyLimit: 800;
+    admissionDeadline: string;
+  };
 }
 
 export interface AutoRegistration {

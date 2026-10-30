@@ -204,6 +204,9 @@ onUnmounted(() => {
       <p v-if="summary.run.errorCode" class="result-explanation">
         {{ reasonLabels[summary.run.errorCode] ?? summary.run.errorCode }}
       </p>
+      <p v-if="summary.executionKind === 'APP_OPEN'" class="muted">
+        最多同时 {{ summary.concurrency ?? 1 }} 轮，完成目标和尝试上限由所有路共享。
+      </p>
       <div v-if="summary.run.purpose === 'REGISTER'" class="quota-strip">
         <strong
           >{{ summary.executionKind === 'APP_OPEN' ? '完成轮数' : '成功账户' }}
@@ -235,16 +238,21 @@ onUnmounted(() => {
           }[summary.cleanup]
         }}
       </p>
-      <div v-if="summary.activeTask" class="active-task">
-        <strong
-          >当前第 {{ summary.activeTask.position }} 项 ·
-          {{ stateLabels[summary.activeTask.stage] ?? summary.activeTask.stage }}</strong
-        >
-        <p>{{ summary.activeTask.packageName ?? summary.activeTask.label }}</p>
+      <div
+        v-for="a in summary.executionKind === 'APP_OPEN'
+          ? (summary.activeTasks ?? [])
+          : summary.activeTask
+            ? [summary.activeTask]
+            : []"
+        :key="a.id"
+        class="active-task"
+      >
+        <strong>当前第 {{ a.position }} 项 · {{ stateLabels[a.stage] ?? a.stage }}</strong>
+        <p>{{ a.packageName ?? a.label }}</p>
         <el-button
           v-if="summary.run.purpose === 'REGISTER' && summary.executionKind !== 'APP_OPEN'"
           text
-          @click="selectTask(summary.activeTask!.id)"
+          @click="selectTask(a.id)"
           >查看当前轮次</el-button
         >
       </div>

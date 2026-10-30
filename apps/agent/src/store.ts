@@ -21,6 +21,7 @@ export interface LocalDelivery {
   status: string;
   browser: { profile: string; pid: number } | null;
   android: AndroidRecord | null;
+  androidSlots: { slot: string; record: AndroidRecord }[];
   clean: boolean;
 }
 export class AgentStore {
@@ -55,6 +56,9 @@ export class AgentStore {
     );
     this.db.exec(
       'CREATE TABLE IF NOT EXISTS registration_templates (key TEXT PRIMARY KEY,sealed BLOB NOT NULL,used_at INTEGER NOT NULL)',
+    );
+    this.db.exec(
+      'CREATE TABLE IF NOT EXISTS android_slots (delivery TEXT NOT NULL,slot TEXT NOT NULL,record TEXT NOT NULL,PRIMARY KEY(delivery,slot))',
     );
   }
   loadRegistrationTemplate(key: string): LearnedRegistrationTemplate | undefined {
@@ -118,6 +122,7 @@ export class AgentStore {
         status: String(r.status),
         browser: r.browser ? JSON.parse(String(r.browser)) : null,
         android: r.android ? JSON.parse(String(r.android)) : null,
+        androidSlots: this.androidSlots(String(r.id)),
         clean: !!r.clean,
       }));
   }
@@ -129,6 +134,10 @@ export class AgentStore {
       .run(d.deliveryId, JSON.stringify(d), 'RECEIVED');
   }
   status(id: string, status: string, clean?: boolean) {
+    if (clean) {
+      const row = this.db.prepare('SELECT browser,android FROM deliveries WHERE id=?').get(id);
+      clean = !!row && !row.browser && !row.android && this.androidSlots(id).length === 0;
+    }
     this.db
       .prepare('UPDATE deliveries SET status=?,clean=COALESCE(?,clean) WHERE id=?')
       .run(status, clean === undefined ? null : clean ? 1 : 0, id);
@@ -136,16 +145,40 @@ export class AgentStore {
   browser(id: string, value: LocalDelivery['browser']) {
     this.db
       .prepare(
-        'UPDATE deliveries SET browser=?,clean=CASE WHEN ? IS NULL AND android IS NULL THEN 1 ELSE 0 END WHERE id=?',
+        'UPDATE deliveries SET browser=?,clean=CASE WHEN ? IS NULL AND android IS NULL AND NOT EXISTS(SELECT 1 FROM android_slots WHERE delivery=deliveries.id) THEN 1 ELSE 0 END WHERE id=?',
       )
       .run(value ? JSON.stringify(value) : null, value ? 1 : null, id);
   }
   android(id: string, value: AndroidRecord | null) {
     this.db
       .prepare(
-        'UPDATE deliveries SET android=?,clean=CASE WHEN ? IS NULL AND browser IS NULL THEN 1 ELSE 0 END WHERE id=?',
+        'UPDATE deliveries SET android=?,clean=CASE WHEN ? IS NULL AND browser IS NULL AND NOT EXISTS(SELECT 1 FROM android_slots WHERE delivery=deliveries.id) THEN 1 ELSE 0 END WHERE id=?',
       )
       .run(value ? JSON.stringify(value) : null, value ? 1 : null, id);
+  }
+  androidSlots(id: string): { slot: string; record: AndroidRecord }[] {
+    return this.db
+      .prepare('SELECT slot,record FROM android_slots WHERE delivery=? ORDER BY slot')
+      .all(id)
+      .map((r) => ({
+        slot: String(r.slot),
+        record: JSON.parse(String(r.record)) as AndroidRecord,
+      }));
+  }
+  androidSlot(id: string, slot: string, value: AndroidRecord | null) {
+    if (!/^[a-f0-9-]{36}$/.test(slot)) throw Error('ANDROID_SLOT_INVALID');
+    if (value)
+      this.db
+        .prepare(
+          'INSERT INTO android_slots(delivery,slot,record) VALUES(?,?,?) ON CONFLICT(delivery,slot) DO UPDATE SET record=excluded.record',
+        )
+        .run(id, slot, JSON.stringify(value));
+    else this.db.prepare('DELETE FROM android_slots WHERE delivery=? AND slot=?').run(id, slot);
+    this.db
+      .prepare(
+        'UPDATE deliveries SET clean=CASE WHEN browser IS NULL AND android IS NULL AND NOT EXISTS(SELECT 1 FROM android_slots WHERE delivery=deliveries.id) THEN 1 ELSE 0 END WHERE id=?',
+      )
+      .run(id);
   }
   private appendRow(
     d: Delivery,

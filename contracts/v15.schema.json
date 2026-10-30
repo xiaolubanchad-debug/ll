@@ -208,8 +208,59 @@
               }
             }
           }
+        },
+        "openPolicy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "concurrency",
+            "dailyLimit",
+            "admissionDeadline"
+          ],
+          "properties": {
+            "concurrency": {
+              "type": "integer",
+              "enum": [
+                1,
+                2
+              ]
+            },
+            "dailyLimit": {
+              "const": 800
+            },
+            "admissionDeadline": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "openPolicy"
+            ]
+          },
+          "then": {
+            "properties": {
+              "purpose": {
+                "const": "REGISTER"
+              },
+              "successTarget": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 800
+              },
+              "attemptLimit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 800
+              }
+            }
+          }
+        }
+      ]
     }
   }
 }

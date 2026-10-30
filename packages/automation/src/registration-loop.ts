@@ -8,6 +8,7 @@ import { canonical, sha, DownloadError } from './common.js';
 import { startProxyBridge, proxyObservation } from './proxy.js';
 import type { ProxyCredential } from './registration-types.js';
 import type { NetworkPolicy } from './network.js';
+import { runCachedAppOpens } from './concurrent-open.js';
 
 export async function runCachedRegistrations(
   config: TestConfiguration,
@@ -22,8 +23,11 @@ export async function runCachedRegistrations(
     apk: DailyExecutionPlan['assets'][number]['apk'],
     file: string,
     index: number,
+    signal: AbortSignal,
   ) => Promise<RegistrationCompletion>,
 ) {
+  if (config.execution.appOpen && plan.openPolicy)
+    return runCachedAppOpens(config, plan, nodeId, root, signal, emit, beforeAction, register);
   const targets: Target[] = plan.assets.length
     ? Array.from({ length: plan.attemptLimit }, (_, position) => {
         const asset = plan.assets[position % plan.assets.length];
@@ -112,6 +116,7 @@ export async function runCachedRegistrations(
           asset.apk,
           cache.path(cache.key(nodeId, plan.cacheDay, asset.targetKey)),
           index,
+          signal,
         );
       }
       const { cleanupComplete, ...payload } = completion;

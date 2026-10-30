@@ -25,7 +25,8 @@ const root = resolve(process.argv[2]),
   config = JSON.parse(await readFile('/var/lib/apk-platform/agent-config.json', 'utf8'));
 const v111 = process.argv[3] === '--v111';
 const v1112 = process.argv[3] === '--v1112';
-const appOpen = process.argv[3] === '--app-open';
+const parallelOpen = process.argv[3] === '--parallel-open';
+const appOpen = process.argv[3] === '--app-open' || parallelOpen;
 const v192 = ['--v192', '--v110'].includes(process.argv[3]);
 const automatic = process.argv[3] === '--auto' || v192 || v111 || v1112 || appOpen;
 assert.match(
@@ -171,6 +172,8 @@ const policy = new NetworkPolicy(
   ]),
 );
 const outcomes = [];
+const activeNative = new Set();
+let peakConcurrentEmulators = 0;
 try {
   const cases =
     v1112 || appOpen
@@ -288,175 +291,198 @@ try {
       testConfig.registrationFlows = [];
     }
     console.log(JSON.stringify({ case: currentCase, stage: 'STARTING' }));
-    const result = await (appOpen ? openApk : registerApk)(
-      testConfig,
-      { taskId, ...(automatic ? { entryId: variant } : {}) },
-      metadata,
-      file,
-      0,
-      abort.signal,
-      async (event) => {
-        store.append(d, event);
-        if (event.type === 'APP_OBSTRUCTION') startupNotes.push(event.payload);
-        console.log(JSON.stringify({ case: currentCase, stage: event.payload.stage }));
-      },
-      {
-        sdkRoot: config.sdkRoot,
-        toolsRoot: config.toolsRoot,
-        root: join(root, 'android'),
-        proxy: credential,
-        policy,
-        proxyCheckUrl: 'http://203.0.113.10:18080/ip',
-        beforeAction: () => {
-          if (abort.signal.aborted) throw Error('OWNED_VERIFICATION_STOPPED');
+    const ownedAction = async (targetId = taskId) =>
+      await (appOpen ? openApk : registerApk)(
+        testConfig,
+        { taskId: targetId, ...(automatic ? { entryId: variant } : {}) },
+        metadata,
+        file,
+        0,
+        abort.signal,
+        async (event) => {
+          store.append(d, event);
+          if (event.type === 'APP_OBSTRUCTION') startupNotes.push(event.payload);
+          console.log(JSON.stringify({ case: currentCase, stage: event.payload.stage }));
         },
-        ...(automatic && !appOpen
-          ? {
-              learning: {
-                load: async (key) => store.loadRegistrationTemplate(key),
-                save: async (key, value) => store.saveRegistrationTemplate(key, value),
-                drop: async (key) => store.dropRegistrationTemplate(key),
-              },
-              androidFactory: async (...args) => {
-                const session = await startAndroid(...args);
-                let inspectedIcon = false;
-                const inspectedNative = new Set();
-                return {
-                  ...session,
-                  rect: async (id) => {
-                    const rect = await session.rect(id);
-                    if (v111)
-                      console.log(JSON.stringify({ case: currentCase, ownedActionRect: rect }));
-                    return rect;
-                  },
-                  source: async (signal) => {
-                    const source = await session.source(signal);
-                    if (v111 && !inspectedIcon) {
-                      const page = readRegistrationPage(source, pkg);
-                      for (const kind of ['skip_ad', 'notice_ack']) {
-                        const native = page.controls.find((c) =>
-                          c.resourceId.endsWith(':id/' + kind),
+        {
+          sdkRoot: config.sdkRoot,
+          toolsRoot: config.toolsRoot,
+          root: join(root, 'android'),
+          proxy: credential,
+          policy,
+          proxyCheckUrl: 'http://203.0.113.10:18080/ip',
+          beforeAction: () => {
+            if (abort.signal.aborted) throw Error('OWNED_VERIFICATION_STOPPED');
+          },
+          ...(automatic && !appOpen
+            ? {
+                learning: {
+                  load: async (key) => store.loadRegistrationTemplate(key),
+                  save: async (key, value) => store.saveRegistrationTemplate(key, value),
+                  drop: async (key) => store.dropRegistrationTemplate(key),
+                },
+                androidFactory: async (...args) => {
+                  const session = await startAndroid(...args);
+                  let inspectedIcon = false;
+                  const inspectedNative = new Set();
+                  return {
+                    ...session,
+                    rect: async (id) => {
+                      const rect = await session.rect(id);
+                      if (v111)
+                        console.log(JSON.stringify({ case: currentCase, ownedActionRect: rect }));
+                      return rect;
+                    },
+                    source: async (signal) => {
+                      const source = await session.source(signal);
+                      if (v111 && !inspectedIcon) {
+                        const page = readRegistrationPage(source, pkg);
+                        for (const kind of ['skip_ad', 'notice_ack']) {
+                          const native = page.controls.find((c) =>
+                            c.resourceId.endsWith(':id/' + kind),
+                          );
+                          if (native && !inspectedNative.has(kind)) {
+                            inspectedNative.add(kind);
+                            console.log(
+                              JSON.stringify({
+                                case: currentCase,
+                                ownedSourceRect: { kind, rect: native.rect },
+                              }),
+                            );
+                          }
+                        }
+                        const target = page.controls.find((c) =>
+                          c.resourceId.endsWith(':id/graphic_target'),
                         );
-                        if (native && !inspectedNative.has(kind)) {
-                          inspectedNative.add(kind);
+                        if (target) {
+                          inspectedIcon = true;
                           console.log(
                             JSON.stringify({
                               case: currentCase,
-                              ownedSourceRect: { kind, rect: native.rect },
+                              ownedIconProbe: {
+                                className: target.className,
+                                rect: target.rect,
+                                clickable: target.clickable,
+                                ownClickable: target.ownClickable,
+                                enabled: target.enabled,
+                                labelled: !!(target.text || target.description),
+                                scopes: obstructionRegions(page),
+                                validGlyph: closeIcon(
+                                  screenshotPixels(await session.screenshot(signal)),
+                                  target.rect,
+                                ),
+                              },
                             }),
                           );
                         }
                       }
-                      const target = page.controls.find((c) =>
-                        c.resourceId.endsWith(':id/graphic_target'),
-                      );
-                      if (target) {
-                        inspectedIcon = true;
+                      return source;
+                    },
+                    submit: async (...values) => {
+                      const started = Date.now();
+                      try {
+                        await session.submit(...values);
                         console.log(
                           JSON.stringify({
                             case: currentCase,
-                            ownedIconProbe: {
-                              className: target.className,
-                              rect: target.rect,
-                              clickable: target.clickable,
-                              ownClickable: target.ownClickable,
-                              enabled: target.enabled,
-                              labelled: !!(target.text || target.description),
-                              scopes: obstructionRegions(page),
-                              validGlyph: closeIcon(
-                                screenshotPixels(await session.screenshot(signal)),
-                                target.rect,
-                              ),
+                            submitTransport: 'ACK',
+                            elapsedMs: Date.now() - started,
+                          }),
+                        );
+                      } catch (error) {
+                        console.log(
+                          JSON.stringify({
+                            case: currentCase,
+                            submitTransport: 'UNKNOWN',
+                            elapsedMs: Date.now() - started,
+                            code:
+                              error instanceof Error && 'code' in error
+                                ? error.code
+                                : 'UNAVAILABLE',
+                          }),
+                        );
+                        throw error;
+                      }
+                    },
+                    close: async () => {
+                      try {
+                        const page = readRegistrationPage(
+                          await session.source(AbortSignal.timeout(5000)),
+                          pkg,
+                        );
+                        console.log(
+                          JSON.stringify({
+                            case: currentCase,
+                            finalUi: {
+                              fields: page.controls
+                                .filter((e) => e.editable)
+                                .map((e) => ({
+                                  filled: !!e.text && e.text !== e.hint,
+                                  password: e.password,
+                                })),
+                              submitEnabled: page.controls.find((e) =>
+                                e.resourceId.endsWith(':id/submit'),
+                              )?.enabled,
+                              result: page.controls.some(
+                                (e) => e.text === 'Registration successful',
+                              )
+                                ? 'SUCCESS'
+                                : page.controls.some((e) => e.text === 'Pending result')
+                                  ? 'PENDING'
+                                  : 'OTHER',
                             },
                           }),
                         );
+                      } catch {
+                        console.log(JSON.stringify({ case: currentCase, finalUi: 'UNAVAILABLE' }));
                       }
-                    }
-                    return source;
-                  },
-                  submit: async (...values) => {
-                    const started = Date.now();
-                    try {
-                      await session.submit(...values);
-                      console.log(
-                        JSON.stringify({
-                          case: currentCase,
-                          submitTransport: 'ACK',
-                          elapsedMs: Date.now() - started,
-                        }),
-                      );
-                    } catch (error) {
-                      console.log(
-                        JSON.stringify({
-                          case: currentCase,
-                          submitTransport: 'UNKNOWN',
-                          elapsedMs: Date.now() - started,
-                          code:
-                            error instanceof Error && 'code' in error ? error.code : 'UNAVAILABLE',
-                        }),
-                      );
-                      throw error;
-                    }
-                  },
-                  close: async () => {
-                    try {
-                      const page = readRegistrationPage(
-                        await session.source(AbortSignal.timeout(5000)),
-                        pkg,
-                      );
-                      console.log(
-                        JSON.stringify({
-                          case: currentCase,
-                          finalUi: {
-                            fields: page.controls
-                              .filter((e) => e.editable)
-                              .map((e) => ({
-                                filled: !!e.text && e.text !== e.hint,
-                                password: e.password,
-                              })),
-                            submitEnabled: page.controls.find((e) =>
-                              e.resourceId.endsWith(':id/submit'),
-                            )?.enabled,
-                            result: page.controls.some((e) => e.text === 'Registration successful')
-                              ? 'SUCCESS'
-                              : page.controls.some((e) => e.text === 'Pending result')
-                                ? 'PENDING'
-                                : 'OTHER',
-                          },
-                        }),
-                      );
-                    } catch {
-                      console.log(JSON.stringify({ case: currentCase, finalUi: 'UNAVAILABLE' }));
-                    }
-                    return session.close();
-                  },
-                };
-              },
-            }
-          : {}),
-        resources: async (record) => {
-          store.android(d.deliveryId, record);
-          if (record) resources.push({ ...record });
+                      return session.close();
+                    },
+                  };
+                },
+              }
+            : {}),
+          resources: async (record) => {
+            if (parallelOpen) store.androidSlot(d.deliveryId, targetId, record);
+            else store.android(d.deliveryId, record);
+            if (record?.emulatorPid) activeNative.add(targetId);
+            if (!record) activeNative.delete(targetId);
+            peakConcurrentEmulators = Math.max(peakConcurrentEmulators, activeNative.size);
+            if (record) resources.push({ ...record, slot: targetId });
+          },
+          account: async (id) => {
+            accountCalls++;
+            currentAccount = store.account(d, id);
+            store.accountAck(currentAccount.accountRef);
+            return currentAccount;
+          },
+          intent: async (id, ref) => {
+            intentCalls++;
+            return store.intent(d, id, ref);
+          },
+          evidence: async (id, bytes) => {
+            assert.ok(parseFunctionalEvidence(bytes.toString()));
+            assert.ok(!bytes.includes(Buffer.from('12345678')));
+            const artifactId = store.evidence(d, id, bytes);
+            await writeFile(join(root, artifactId + '.json'), bytes, { flag: 'wx', mode: 0o600 });
+            return artifactId;
+          },
         },
-        account: async (id) => {
-          accountCalls++;
-          currentAccount = store.account(d, id);
-          store.accountAck(currentAccount.accountRef);
-          return currentAccount;
-        },
-        intent: async (id, ref) => {
-          intentCalls++;
-          return store.intent(d, id, ref);
-        },
-        evidence: async (id, bytes) => {
-          assert.ok(parseFunctionalEvidence(bytes.toString()));
-          assert.ok(!bytes.includes(Buffer.from('12345678')));
-          const artifactId = store.evidence(d, id, bytes);
-          await writeFile(join(root, artifactId + '.json'), bytes, { flag: 'wx', mode: 0o600 });
-          return artifactId;
-        },
-      },
-    );
+      );
+    let result;
+    if (parallelOpen) {
+      const together = await Promise.allSettled([ownedAction(), ownedAction(randomUUID())]);
+      assert.equal(together.filter((r) => r.status === 'fulfilled').length, 2);
+      for (const r of together) {
+        assert.equal(r.value.status, 'SUCCEEDED');
+        assert.equal(r.value.proof, 'APP_OPEN');
+        assert.equal(r.value.cleanupComplete, true);
+      }
+      assert.equal(peakConcurrentEmulators, 2);
+      assert.equal(new Set(resources.map((r) => r.serial).filter(Boolean)).size, 2);
+      result = together[0].value;
+      outcomes.push({ case: currentCase + '-slot2', ...together[1].value, requests: 0 });
+    } else result = await ownedAction();
     const resultRecord = { case: currentCase, ...result, requests: requests - before };
     outcomes.push(resultRecord);
     await writeFile(
@@ -562,6 +588,7 @@ try {
       {
         finished: true,
         passed,
+        peakConcurrentEmulators,
         cleanupComplete: store.deliveries().every((d) => d.clean),
         outcomes,
         requests: reports,

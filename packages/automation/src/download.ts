@@ -64,6 +64,7 @@ export interface DownloadOptions {
     apk: ApkMetadata,
     file: string,
     index: number,
+    signal?: AbortSignal,
   ) => Promise<RegistrationCompletion>;
 }
 const pause = (ms: number, signal: AbortSignal) =>
