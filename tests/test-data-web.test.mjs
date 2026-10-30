@@ -9,7 +9,7 @@ test('test data shows observed identities and reveals credentials only after an 
   const preview = resolve('.tmp/test-data-preview-' + randomUUID() + '.mjs');
   await writeFile(
     preview,
-    "import {createApp} from 'vue';import ElementPlus from 'element-plus';import 'element-plus/dist/index.css';import View from '/src/TestData.vue';createApp(View).use(ElementPlus).mount('#app');",
+    "import {createApp} from 'vue';import {ElAlert,ElButton,ElInput,ElInputNumber,ElTable,ElTableColumn} from 'element-plus';import 'element-plus/dist/index.css';import View from '/src/TestData.vue';createApp(View).use(ElAlert).use(ElButton).use(ElInput).use(ElInputNumber).use(ElTable).use(ElTableColumn).mount('#app');",
   );
   const browser = await chromium.launch({ headless: true });
   try {
@@ -59,6 +59,7 @@ test('test data shows observed identities and reveals credentials only after an 
       }),
     );
     await page.goto(process.env.APP_ORIGIN + '/__owned-test-data');
+    await expect(page.getByRole('combobox', { name: '筛选服务器' })).toBeVisible();
     await expect(page.getByText('198.51.100.114', { exact: true })).toBeVisible();
     await expect(page.getByText('QA-Mobile-0001', { exact: false })).toBeVisible();
     assert.equal(requests.length, 0);

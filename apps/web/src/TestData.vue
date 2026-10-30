@@ -1,5 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
+import { ElDialog, ElSelect, ElOption } from 'element-plus';
+import 'element-plus/es/components/dialog/style/css';
+import 'element-plus/es/components/select/style/css';
+import 'element-plus/es/components/option/style/css';
 import type { TestDataPage, TestDataCredentials, TestClientInfo } from '@apk/contracts';
 import { api } from './api';
 import { when } from './console-format';
