@@ -58,6 +58,13 @@
         "limit": {
           "type": "string",
           "pattern": "^(?:[1-9]|[1-9][0-9]|100)$"
+        },
+        "executionKind": {
+          "enum": [
+            "APP_OPEN",
+            "REGISTRATION",
+            "DOWNLOAD_ONLY"
+          ]
         }
       },
       "required": []
@@ -145,6 +152,13 @@
                   {
                     "type": "null"
                   }
+                ]
+              },
+              "executionKind": {
+                "enum": [
+                  "APP_OPEN",
+                  "REGISTRATION",
+                  "DOWNLOAD_ONLY"
                 ]
               }
             },
@@ -490,6 +504,13 @@
               "type": "null"
             }
           ]
+        },
+        "executionKind": {
+          "enum": [
+            "APP_OPEN",
+            "REGISTRATION",
+            "DOWNLOAD_ONLY"
+          ]
         }
       },
       "required": [
@@ -702,6 +723,13 @@
                   {
                     "type": "null"
                   }
+                ]
+              },
+              "executionKind": {
+                "enum": [
+                  "APP_OPEN",
+                  "REGISTRATION",
+                  "DOWNLOAD_ONLY"
                 ]
               }
             },
@@ -930,6 +958,13 @@
                 {
                   "type": "null"
                 }
+              ]
+            },
+            "executionKind": {
+              "enum": [
+                "APP_OPEN",
+                "REGISTRATION",
+                "DOWNLOAD_ONLY"
               ]
             }
           },
@@ -1262,6 +1297,13 @@
                     "type": "null"
                   }
                 ]
+              },
+              "executionKind": {
+                "enum": [
+                  "APP_OPEN",
+                  "REGISTRATION",
+                  "DOWNLOAD_ONLY"
+                ]
               }
             },
             "required": [
@@ -1342,6 +1384,13 @@
                 {
                   "type": "null"
                 }
+              ]
+            },
+            "executionKind": {
+              "enum": [
+                "APP_OPEN",
+                "REGISTRATION",
+                "DOWNLOAD_ONLY"
               ]
             }
           },
@@ -1495,6 +1544,13 @@
         "automaticIdentityCount": {
           "type": "integer",
           "minimum": 0
+        },
+        "executionKind": {
+          "enum": [
+            "APP_OPEN",
+            "REGISTRATION",
+            "DOWNLOAD_ONLY"
+          ]
         }
       },
       "required": [

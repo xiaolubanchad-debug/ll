@@ -637,14 +637,31 @@ test('1.8 managed tasks: real PostgreSQL, persistent orchestration and browser c
           .fill('https://owned-browser.example.test/');
         await page.getByRole('button', { name: '下一步', exact: true }).click();
         await page.getByLabel('执行服务器', { exact: true }).selectOption(node.id);
-        await page.getByLabel('注册代理', { exact: true }).selectOption(proxy.id);
+        await page.getByLabel('APP 网络代理', { exact: true }).selectOption(proxy.id);
         await page.getByRole('button', { name: '下一步', exact: true }).click();
-        await page.getByLabel('所有 APK 合计成功账户数', { exact: true }).fill('5');
+        await page.getByLabel('所有 APK 合计完成轮数', { exact: true }).fill('5');
         await page.getByLabel('总尝试上限', { exact: true }).fill('15');
         await page.getByRole('button', { name: '保存任务', exact: true }).click();
         await expect(
           page.getByRole('heading', { name: '1.8 浏览器自有任务', exact: true }),
         ).toBeVisible();
+        await expect(page.getByRole('button', { name: '开始任务', exact: true })).toBeDisabled();
+        await expect(page.locator('.readiness-list')).toContainText('启动停留需要 Agent 0.10.0');
+        await db.node.update({
+          where: { id: node.id },
+          data: { agentVersion: '0.10.0', lastSeenAt: new Date() },
+        });
+        await db.release.update({
+          where: { id: release.id },
+          data: {
+            manifest: {
+              ...release.manifest,
+              agentVersion: '0.10.0',
+              features: [...release.manifest.features, 'APP_OPEN_V1'],
+            },
+          },
+        });
+        await page.getByRole('button', { name: '刷新', exact: true }).click();
         await expect(page.getByRole('button', { name: '开始任务', exact: true })).toBeEnabled();
         await expect(page.getByRole('button', { name: '停止任务', exact: true })).toBeDisabled();
         await page.getByRole('button', { name: '开始任务', exact: true }).click();
@@ -656,6 +673,12 @@ test('1.8 managed tasks: real PostgreSQL, persistent orchestration and browser c
         const browserTask = await db.managedTask.findFirstOrThrow({
           where: { name: '1.8 浏览器自有任务' },
         });
+        const browserConfig = await db.configVersion.findUniqueOrThrow({
+          where: { id: browserTask.currentVersionId },
+        });
+        assert.deepEqual(browserConfig.body.execution.appOpen, { dwellMs: 10000 });
+        assert.equal(browserConfig.body.execution.autoRegistration, undefined);
+        assert.deepEqual(browserConfig.body.registrationFlows, []);
         const freeVersion = await saveConfiguration(
           db,
           browserTask.configId,

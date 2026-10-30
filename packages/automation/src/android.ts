@@ -24,12 +24,21 @@ export interface AndroidOptions {
   proxy: ProxyCredential;
   policy?: NetworkPolicy;
   proxyCheckUrl?: string;
+  controlMode?: 'LAUNCH_ONLY';
   beforeAction: () => void;
   resources: (record: AndroidRecord | null) => Promise<void>;
 }
 // SettingsProvider uses Long.toHexString; leading zeroes are not guaranteed.
 export function validShellAndroidId(value: string): boolean {
   return /^[a-f0-9]{1,16}$/i.test(value) && !/^0+$/.test(value);
+}
+export function isForegroundPackage(output: string, pkg: string): boolean {
+  const top = output.split(/\r?\n/).filter((line) => /^\s*topResumedActivity[=:]/.test(line));
+  const lines = top.length
+    ? top
+    : output.split(/\r?\n/).filter((line) => /^\s*mResumedActivity[=:]/.test(line));
+  const packages = lines.map((line) => /\bu\d+\s+([A-Za-z][A-Za-z0-9_.]*)\//.exec(line)?.[1]);
+  return packages.length > 0 && packages.every((p) => p === pkg);
 }
 export async function androidCommand(
   file: string,
@@ -318,71 +327,73 @@ export async function startAndroid(
     }
     if (!boot) throw new RegistrationError('ANDROID_NOT_READY');
     options.beforeAction();
-    const appiumPort = await availablePort();
-    record.systemPort = await availablePort();
-    await options.resources(record);
-    await mkdir(record.appiumTmp, { recursive: true, mode: 0o700 });
-    const appium = spawn(
-      process.execPath,
-      [
-        join(options.toolsRoot, 'node_modules/appium/build/lib/main.js'),
-        '--address',
-        '127.0.0.1',
-        '--port',
-        String(appiumPort),
-        '--base-path',
-        '/',
-        '--tmp',
-        record.appiumTmp,
-        '--log-level',
-        'error',
-        '--log-no-colors',
-      ],
-      { env, cwd: workspace, stdio: 'ignore', detached: true, windowsHide: true, shell: false },
-    );
-    children.push(appium);
-    appium.on('error', () => {});
-    record.appiumPid = appium.pid;
-    await options.resources(record);
-    client = new AppiumClient(appiumPort, signal);
-    let ready = false;
-    for (let i = 0; i < 100; i++) {
-      options.beforeAction();
-      if (appium.exitCode !== null) throw new RegistrationError('APPIUM_FAILED');
-      try {
-        await client.command('GET', '/status', undefined, 1000);
-        ready = true;
-        break;
-      } catch {
-        /* Wait for this job's server only. */
+    if (options.controlMode !== 'LAUNCH_ONLY') {
+      const appiumPort = await availablePort();
+      record.systemPort = await availablePort();
+      await options.resources(record);
+      await mkdir(record.appiumTmp, { recursive: true, mode: 0o700 });
+      const appium = spawn(
+        process.execPath,
+        [
+          join(options.toolsRoot, 'node_modules/appium/build/lib/main.js'),
+          '--address',
+          '127.0.0.1',
+          '--port',
+          String(appiumPort),
+          '--base-path',
+          '/',
+          '--tmp',
+          record.appiumTmp,
+          '--log-level',
+          'error',
+          '--log-no-colors',
+        ],
+        { env, cwd: workspace, stdio: 'ignore', detached: true, windowsHide: true, shell: false },
+      );
+      children.push(appium);
+      appium.on('error', () => {});
+      record.appiumPid = appium.pid;
+      await options.resources(record);
+      client = new AppiumClient(appiumPort, signal);
+      let ready = false;
+      for (let i = 0; i < 100; i++) {
+        options.beforeAction();
+        if (appium.exitCode !== null) throw new RegistrationError('APPIUM_FAILED');
+        try {
+          await client.command('GET', '/status', undefined, 1000);
+          ready = true;
+          break;
+        } catch {
+          /* Wait for this job's server only. */
+        }
+        await new Promise((r) => setTimeout(r, 200));
       }
-      await new Promise((r) => setTimeout(r, 200));
+      if (!ready) throw new RegistrationError('APPIUM_FAILED');
+      await client.start({
+        platformName: 'Android',
+        'appium:automationName': 'UiAutomator2',
+        'appium:udid': record.serial,
+        'appium:systemPort': record.systemPort,
+        'appium:noReset': true,
+        'appium:autoLaunch': false,
+        'appium:skipLogcatCapture': true,
+        'appium:printPageSourceOnFindFailure': false,
+        'appium:clearSystemFiles': true,
+        'appium:newCommandTimeout': 120,
+        'appium:language': profile.locale.split('-')[0],
+        'appium:locale': profile.locale.split('-')[1],
+      });
+      await client.command('POST', client.path('/timeouts'), { implicit: 0 });
+      await client.command('POST', client.path('/appium/settings'), {
+        settings: {
+          waitForIdleTimeout: 0,
+          waitForSelectorTimeout: 1000,
+          snapshotMaxDepth: 25,
+          ignoreUnimportantViews: true,
+          simpleBoundsCalculation: true,
+        },
+      });
     }
-    if (!ready) throw new RegistrationError('APPIUM_FAILED');
-    await client.start({
-      platformName: 'Android',
-      'appium:automationName': 'UiAutomator2',
-      'appium:udid': record.serial,
-      'appium:systemPort': record.systemPort,
-      'appium:noReset': true,
-      'appium:autoLaunch': false,
-      'appium:skipLogcatCapture': true,
-      'appium:printPageSourceOnFindFailure': false,
-      'appium:clearSystemFiles': true,
-      'appium:newCommandTimeout': 120,
-      'appium:language': profile.locale.split('-')[0],
-      'appium:locale': profile.locale.split('-')[1],
-    });
-    await client.command('POST', client.path('/timeouts'), { implicit: 0 });
-    await client.command('POST', client.path('/appium/settings'), {
-      settings: {
-        waitForIdleTimeout: 0,
-        waitForSelectorTimeout: 1000,
-        snapshotMaxDepth: 25,
-        ignoreUnimportantViews: true,
-        simpleBoundsCalculation: true,
-      },
-    });
     const get = async (args: string[]) =>
       (await command(adb, ['-s', record.serial!, 'shell', ...args])).trim();
     const api = Number(await get(['getprop', 'ro.build.version.sdk'])),
@@ -396,7 +407,10 @@ export async function startAndroid(
       .filter(Boolean);
     if (!validShellAndroidId(androidId) || !Number.isInteger(api) || locale !== profile.locale)
       throw new RegistrationError('DEVICE_PROFILE_UNSUPPORTED');
-    const rpc = client;
+    const rpc = () => {
+      if (!client) throw new RegistrationError('ANDROID_CONTROL_DISABLED');
+      return client;
+    };
     return {
       supportedAbis,
       observation: {
@@ -463,18 +477,28 @@ export async function startAndroid(
         if (!/Status: ok/.test(value) || /Error:|Error type/.test(value))
           throw new RegistrationError('APP_LAUNCH_FAILED');
       },
-      find: (l, t, s) => rpc.find(l, t, s),
-      click: (id, t) => rpc.click(id, t),
-      tap: (x, y, t) => rpc.tap(x, y, t),
+      async foreground(pkg) {
+        options.beforeAction();
+        const output = await command(
+          adb,
+          ['-s', record.serial!, 'shell', 'dumpsys', 'activity', 'activities'],
+          3000,
+          'APP_FOREGROUND_FAILED',
+        );
+        return isForegroundPackage(output, pkg);
+      },
+      find: (l, t, s) => rpc().find(l, t, s),
+      click: (id, t) => rpc().click(id, t),
+      tap: (x, y, t) => rpc().tap(x, y, t),
       ocr: (bytes, s) => recognizeRegistrationScreenshot(bytes, options.toolsRoot, workspace, s),
-      submit: (id, t) => rpc.submit(id, t),
-      input: (id, value) => rpc.input(id, value),
-      hideKeyboard: () => rpc.hideKeyboard(),
-      back: (t, s) => rpc.back(t, s),
-      rect: (id) => rpc.rect(id),
-      attached: (id, s) => rpc.attached(id, s),
-      screenshot: (s) => rpc.screenshot(s),
-      source: (s) => rpc.source(s),
+      submit: (id, t) => rpc().submit(id, t),
+      input: (id, value) => rpc().input(id, value),
+      hideKeyboard: () => rpc().hideKeyboard(),
+      back: (t, s) => rpc().back(t, s),
+      rect: (id) => rpc().rect(id),
+      attached: (id, s) => rpc().attached(id, s),
+      screenshot: (s) => rpc().screenshot(s),
+      source: (s) => rpc().source(s),
       close,
     };
   } catch (error) {

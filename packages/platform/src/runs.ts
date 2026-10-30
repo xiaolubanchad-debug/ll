@@ -12,6 +12,7 @@ import {
   registrationFlowFor,
   contentIsolationSupported,
   appReadinessSupported,
+  appOpenSupported,
 } from '@apk/contracts';
 import { readFunctionalArtifact } from './functional-artifacts.js';
 import { checked, readSecret } from './secrets.js';
@@ -270,6 +271,7 @@ export async function createRun(
           '0.9.0',
           '0.9.1',
           '0.9.2',
+          '0.10.0',
         ].includes(node.agentVersion ?? ''))
     )
       fault('NODE_UPGRADE_REQUIRED', '请部署支持每日下载与循环注册的 Agent');
@@ -287,9 +289,12 @@ export async function createRun(
           '0.9.0',
           '0.9.1',
           '0.9.2',
+          '0.10.0',
         ].includes(node.agentVersion ?? ''))
     )
       fault('NODE_UPGRADE_REQUIRED', '自动识别注册入口需要 Agent 0.6.0');
+    if (configuration.execution.appOpen && !appOpenSupported(manifest?.features, node.agentVersion))
+      fault('NODE_UPGRADE_REQUIRED', '启动停留需要 Agent 0.10.0');
     const plan = await prepareDailyPlan(tx, input, config, now);
     if (input.purpose === 'PROXY_CHECK')
       await readSecret(tx, input.proxySecretVersionId!, ['HTTP_PROXY']);
@@ -424,34 +429,24 @@ export async function boundDelivery(
 }
 const bound = boundDelivery;
 async function assertIsolatedRun(tx: Tx, run: Run) {
-  if (run.purpose === 'DOWNLOAD' || run.purpose === 'PROXY_CHECK') return;
-  if (run.purpose !== 'REGISTER') {
-    const config = run.configVersionId
-      ? await tx.configVersion.findUnique({ where: { id: run.configVersionId } })
-      : null;
-    if ((config?.body as unknown as TestConfiguration)?.execution.mode !== 'FULL') return;
-  }
+  const config = run.configVersionId
+    ? await tx.configVersion.findUnique({ where: { id: run.configVersionId } })
+    : null;
+  const settings = (config?.body as unknown as TestConfiguration | null)?.execution;
+  const android =
+    run.purpose === 'REGISTER' || (run.purpose === 'LEGACY' && settings?.mode === 'FULL');
+  if (!android && !settings?.appOpen) return;
   const [node, release] = await Promise.all([
     tx.node.findUniqueOrThrow({ where: { id: run.nodeId } }),
     tx.release.findUnique({ where: { id: run.releaseId ?? '' } }),
   ]);
-  if (
-    !contentIsolationSupported(
-      (release?.manifest as { features?: string[] } | null)?.features,
-      node.agentVersion,
-    )
-  )
+  const features = (release?.manifest as { features?: string[] } | null)?.features;
+  if (settings?.appOpen && !appOpenSupported(features, node.agentVersion))
+    fault('NODE_UPGRADE_REQUIRED', '启动停留需要 Agent 0.10.0');
+  if (!android) return;
+  if (!contentIsolationSupported(features, node.agentVersion))
     fault('NODE_UPGRADE_REQUIRED', '注册任务需要默认内容隔离的 Agent 0.8.0');
-  const config = run.configVersionId
-    ? await tx.configVersion.findUnique({ where: { id: run.configVersionId } })
-    : null;
-  if (
-    (config?.body as unknown as TestConfiguration)?.execution.autoRegistration?.startup &&
-    !appReadinessSupported(
-      (release?.manifest as { features?: string[] } | null)?.features,
-      node.agentVersion,
-    )
-  )
+  if (settings?.autoRegistration?.startup && !appReadinessSupported(features, node.agentVersion))
     fault('NODE_UPGRADE_REQUIRED', '启动准备设置需要 Agent 0.9.0');
 }
 function authorized(d: Delivery & { run: Run }) {
@@ -582,6 +577,7 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
   const config = version?.body as unknown as TestConfiguration;
   const full =
     run.purpose === 'REGISTER' || (run.purpose === 'LEGACY' && config?.execution.mode === 'FULL');
+  const openOnly = full && config?.execution.appOpen !== undefined;
   const plan = run.executionPlan as unknown as DailyExecutionPlan | null;
   const p = event.payload as Record<string, unknown>;
   if (event.type === 'LOG') {
@@ -591,7 +587,8 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
     return;
   }
   if (event.type === 'BROWSER_ENVIRONMENT' || event.type === 'APP_OBSTRUCTION') {
-    if (run.purpose === 'PROXY_CHECK') fault('EVENT_CONFLICT', '代理检查不接受页面事件');
+    if (run.purpose === 'PROXY_CHECK' || (openOnly && event.type === 'APP_OBSTRUCTION'))
+      fault('EVENT_CONFLICT', '当前任务不接受页面事件');
     if (event.type === 'APP_OBSTRUCTION' || event.taskId) {
       const task = await tx.task.findUnique({ where: { id: event.taskId } });
       if (
@@ -756,6 +753,7 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
     return;
   }
   if (event.type === 'SUBMISSION_INTENT') {
+    if (openOnly) fault('EVENT_CONFLICT', '启动停留不接受注册提交');
     const task = await tx.task.findUnique({ where: { id: event.taskId } });
     const account = await tx.accountResult.findUnique({
       where: { accountRef: String(p.accountRef) },
@@ -840,9 +838,9 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
         'PREPARING',
         'INSTALLING',
         'LAUNCHING',
-        ...(automatic ? ['DISCOVERING'] : []),
-        'REGISTERING',
-        'VERIFYING',
+        ...(openOnly
+          ? ['HOLDING']
+          : [...(automatic ? ['DISCOVERING'] : []), 'REGISTERING', 'VERIFYING']),
       ];
       const androidForward =
         full &&
@@ -882,7 +880,9 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
           status: stage,
           lastStage: stage,
           startedAt: task.startedAt ?? new Date(),
-          ...(!task.registrationStartedAt && (run.purpose === 'REGISTER' || stage === 'PREPARING')
+          ...(!openOnly &&
+          !task.registrationStartedAt &&
+          (run.purpose === 'REGISTER' || stage === 'PREPARING')
             ? { registrationStartedAt: new Date() }
             : {}),
           ...(stage === 'DOWNLOADED'
@@ -916,7 +916,29 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
       (p.artifactIds as string[]).length === 0;
     if (!full && status === 'SKIPPED' && !navigationSkip)
       fault('EVENT_CONFLICT', '下载跳过必须是未下载的导航站');
-    if (full) {
+    if (p.proof === 'APP_OPEN' && !openOnly) fault('EVENT_CONFLICT', '启动停留证明与配置不符');
+    if (openOnly) {
+      if (
+        p.accountRef ||
+        p.recognition ||
+        task.submissionId ||
+        (p.artifactIds as string[]).length ||
+        status === 'UNKNOWN'
+      )
+        fault('EVENT_CONFLICT', '启动停留不接受账户或注册证据');
+      if (
+        status === 'SUCCEEDED' &&
+        (task.status !== 'HOLDING' ||
+          !task.apk ||
+          !task.observation ||
+          p.proof !== 'APP_OPEN' ||
+          !p.openObservation)
+      )
+        fault('EVENT_CONFLICT', '启动停留完成缺少前台停留与清理证明');
+      if (status !== 'SUCCEEDED' && (p.proof !== 'NONE' || p.openObservation))
+        fault('EVENT_CONFLICT', '未完成停留不能携带完成证明');
+    }
+    if (full && !openOnly) {
       const account = p.accountRef
         ? await tx.accountResult.findUnique({ where: { accountRef: String(p.accountRef) } })
         : null;
@@ -991,6 +1013,7 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
         status,
         finishedAt: new Date(),
         ...(full &&
+        !openOnly &&
         !task.registrationStartedAt &&
         status === 'SKIPPED' &&
         p.errorCode !== 'NAVIGATION_SITE'

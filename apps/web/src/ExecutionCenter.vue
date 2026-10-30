@@ -376,7 +376,13 @@ onUnmounted(() => clearInterval(timer));
                 {{ r.configName }} · v{{ r.configVersion }}<small>{{ when(r.createdAt) }}</small>
               </td>
               <td>{{ r.nodeName }}</td>
-              <td>{{ purposeLabels[r.purpose] ?? r.purpose }}</td>
+              <td>
+                {{
+                  r.executionKind === 'APP_OPEN'
+                    ? 'APP 启动停留'
+                    : (purposeLabels[r.purpose] ?? r.purpose)
+                }}
+              </td>
               <td>
                 {{ stateLabels[r.status] ?? r.status
                 }}<small>{{ r.errorCode ? (reasonLabels[r.errorCode] ?? r.errorCode) : '' }}</small>
@@ -384,7 +390,12 @@ onUnmounted(() => clearInterval(timer));
               <td>
                 {{
                   r.purpose === 'REGISTER'
-                    ? r.successes + ' / ' + r.successTarget + ' · 尝试 ' + r.attemptsStarted
+                    ? (r.executionKind === 'APP_OPEN' ? '完成轮数 ' : '成功账户 ') +
+                      r.successes +
+                      ' / ' +
+                      r.successTarget +
+                      ' · 尝试 ' +
+                      r.attemptsStarted
                     : '—'
                 }}
               </td>

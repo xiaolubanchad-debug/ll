@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import type { PrismaClient } from '@prisma/client';
 import type {
   ResultCategory,
+  TestConfiguration,
   ResultsQuery,
   RegistrationRecordView,
   RegistrationDetailView,
@@ -157,7 +158,7 @@ const select = {
       createdAt: true,
       finishedAt: true,
       node: { select: { name: true } },
-      configVersion: { select: { version: true, config: { select: { name: true } } } },
+      configVersion: { select: { body: true, version: true, config: { select: { name: true } } } },
     },
   },
 } satisfies Prisma.TaskSelect;
@@ -335,13 +336,19 @@ const runSelect = {
   cacheDay: true,
   configVersionId: true,
   node: { select: { name: true } },
-  configVersion: { select: { version: true, config: { select: { name: true } } } },
+  configVersion: { select: { body: true, version: true, config: { select: { name: true } } } },
 } satisfies Prisma.RunSelect;
 type RunRow = Prisma.RunGetPayload<{ select: typeof runSelect }>;
 const runView = (r: RunRow) => ({
   id: r.id,
   nodeName: r.node.name,
   configName: r.configVersion?.config.name ?? '历史配置',
+  executionKind:
+    r.purpose === 'DOWNLOAD'
+      ? ('DOWNLOAD_ONLY' as const)
+      : (r.configVersion?.body as unknown as TestConfiguration | null)?.execution.appOpen
+        ? ('APP_OPEN' as const)
+        : ('REGISTRATION' as const),
   purpose: r.purpose,
   status: r.status,
   createdAt: r.createdAt.toISOString(),
@@ -470,6 +477,12 @@ export async function runSummary(db: PrismaClient, id: string): Promise<RunSumma
         }),
       ]);
       return output('RunSummaryView', {
+        executionKind:
+          row.purpose === 'DOWNLOAD'
+            ? 'DOWNLOAD_ONLY'
+            : (row.configVersion?.body as unknown as TestConfiguration | null)?.execution.appOpen
+              ? 'APP_OPEN'
+              : 'REGISTRATION',
         run: runView(row),
         nodeId: row.nodeId,
         configVersion: row.configVersion?.version ?? 0,
@@ -500,6 +513,7 @@ const stageTitles: Record<string, string> = {
   PREPARING: '准备独立模拟器',
   INSTALLING: '安装 APK',
   LAUNCHING: '启动 APP',
+  HOLDING: 'APP 前台停留 10 秒',
   DISCOVERING: '寻找注册入口',
   REGISTERING: '填写注册表单',
   VERIFYING: '核验已提交的注册结果',
@@ -554,7 +568,12 @@ function title(type: string, p: Record<string, unknown>) {
     return (
       (
         {
-          SUCCEEDED: p.proof === 'APP_UI' ? 'APP 已确认注册成功' : 'APK 下载校验成功',
+          SUCCEEDED:
+            p.proof === 'APP_OPEN'
+              ? 'APP 启动停留 10 秒并清理完成'
+              : p.proof === 'APP_UI'
+                ? 'APP 已确认注册成功'
+                : 'APK 下载校验成功',
           FAILED: p.proof === 'APP_UI' ? 'APP 明确拒绝注册' : '本轮执行未完成',
           UNKNOWN: '提交结果未知，等待人工核验；不会重复提交',
           SKIPPED: '本轮已跳过',

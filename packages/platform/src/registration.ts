@@ -21,6 +21,8 @@ async function fullTask(tx: Prisma.TransactionClient, runId: string, taskId: str
     include: { run: { include: { configVersion: true } } },
   });
   if (!task || task.runId !== runId) fault('NOT_FOUND', '任务不存在', 404);
+  if ((task.run.configVersion?.body as { execution?: { appOpen?: unknown } })?.execution?.appOpen)
+    fault('FEATURE_UNAVAILABLE', '启动停留模式不接收注册数据', 422);
   if (
     (task.run.configVersion?.body as { execution?: { mode?: string } })?.execution?.mode !== 'FULL'
   )

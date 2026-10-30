@@ -21,6 +21,35 @@ const agentCheck = ajv.compile(read('contracts/agent.schema.json'));
 const config = read('contracts/fixtures/config.valid.json');
 const messages = read('contracts/fixtures/agent.valid.json');
 let passed = 0;
+const appOpenConfig = read('contracts/fixtures/config.app-open.valid.json');
+test('1.12 fixed APP open configuration', () =>
+  assert.deepEqual(configurationIssues(appOpenConfig), []));
+for (const change of [
+  (c) => {
+    c.execution.appOpen.dwellMs = 9999;
+  },
+  (c) => {
+    c.execution.mode = 'DOWNLOAD_ONLY';
+  },
+  (c) => {
+    delete c.execution.proxySecretVersionId;
+  },
+  (c) => {
+    delete c.execution.contentIsolation;
+  },
+  (c) => {
+    c.registrationFlows = config.registrationFlows;
+  },
+  (c) => {
+    c.execution.autoRegistration = { enabled: false };
+  },
+])
+  test('1.12 rejects conflicting open configuration', () => {
+    const c = structuredClone(appOpenConfig);
+    change(c);
+    assert.ok(configurationIssues(c).length);
+  });
+
 for (const userAgent of [
   'Mozilla/5.0 (iPhone) Mobile Safari/605.1',
   'Mozilla/5.0 (Windows NT 10.0) Chrome/149.0',
@@ -225,6 +254,22 @@ test('1.6 capability allows four declared features', () => {
   );
   assert.ok(check(['DOWNLOAD_V1', 'REGISTRATION_V1', 'DAILY_V1', 'AUTO_REGISTRATION_V1']));
   assert.equal(check(['DOWNLOAD_V1', 'ARBITRARY_CODE']), false);
+});
+test('1.12 signed capability supports the bounded seven-feature release', () => {
+  const check = ajv.compile(
+    read('contracts/p1.schema.json').$defs.ReleaseInput.properties.features,
+  );
+  const features = [
+    'DOWNLOAD_V1',
+    'REGISTRATION_V1',
+    'DAILY_V1',
+    'AUTO_REGISTRATION_V1',
+    'CONTENT_ISOLATION_V1',
+    'APP_READINESS_V1',
+    'APP_OPEN_V1',
+  ];
+  assert.equal(check(features), true);
+  assert.equal(check([...features, 'ARBITRARY_CODE']), false);
 });
 test('1.6 adaptation stop is an allowed terminal event', () => {
   const input = structuredClone(messages.find((m) => m.kind === 'events'));

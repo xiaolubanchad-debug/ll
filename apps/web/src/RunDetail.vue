@@ -174,7 +174,11 @@ onUnmounted(() => {
     <section v-if="summary" class="surface">
       <div class="section-heading">
         <div>
-          <span class="phase-tag">{{ purposeLabels[summary.run.purpose] ?? '执行批次' }}</span>
+          <span class="phase-tag">{{
+            summary.executionKind === 'APP_OPEN'
+              ? 'APP 启动停留'
+              : (purposeLabels[summary.run.purpose] ?? '执行批次')
+          }}</span>
           <h2>
             {{ summary.run.configName }} ·
             {{ stateLabels[summary.run.status] ?? summary.run.status }}
@@ -201,19 +205,23 @@ onUnmounted(() => {
         {{ reasonLabels[summary.run.errorCode] ?? summary.run.errorCode }}
       </p>
       <div v-if="summary.run.purpose === 'REGISTER'" class="quota-strip">
-        <strong>成功 {{ summary.run.successes }} / {{ summary.run.successTarget }}</strong
+        <strong
+          >{{ summary.executionKind === 'APP_OPEN' ? '完成轮数' : '成功账户' }}
+          {{ summary.run.successes }} / {{ summary.run.successTarget }}</strong
         ><span>已尝试 {{ summary.run.attemptsStarted }} / {{ summary.run.attemptLimit }}</span
         ><small>所有 APK 合计；未执行配额不计尝试。</small>
       </div>
       <div class="status-strip">
-        <span v-if="summary.run.purpose === 'REGISTER'"
+        <span v-if="summary.run.purpose === 'REGISTER' && summary.executionKind !== 'APP_OPEN'"
           >自动身份观察 {{ summary.automaticIdentityCount }} 次（不计入成功）</span
         >
         <span v-for="(count, key) in summary.counts" :key="key"
           >{{
-            summary.run.purpose === 'DOWNLOAD' && key === 'SUCCESS'
-              ? '下载成功'
-              : categoryLabels[key]
+            summary.executionKind === 'APP_OPEN' && key === 'SUCCESS'
+              ? '启动停留完成'
+              : summary.run.purpose === 'DOWNLOAD' && key === 'SUCCESS'
+                ? '下载成功'
+                : categoryLabels[key]
           }}
           {{ count }}</span
         >
@@ -234,7 +242,7 @@ onUnmounted(() => {
         >
         <p>{{ summary.activeTask.packageName ?? summary.activeTask.label }}</p>
         <el-button
-          v-if="summary.run.purpose === 'REGISTER'"
+          v-if="summary.run.purpose === 'REGISTER' && summary.executionKind !== 'APP_OPEN'"
           text
           @click="selectTask(summary.activeTask!.id)"
           >查看当前轮次</el-button
@@ -296,7 +304,9 @@ onUnmounted(() => {
               <td>
                 <el-button v-if="t.registrationStartedAt" text @click="selectTask(t.id)"
                   >查看证据与账户</el-button
-                ><span v-else class="muted">尚未进入注册</span>
+                ><span v-else class="muted">{{
+                  summary?.executionKind === 'APP_OPEN' ? '详情见执行日志' : '尚未进入注册'
+                }}</span>
               </td>
             </tr>
           </tbody>

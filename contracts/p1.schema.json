@@ -441,7 +441,7 @@
         },
         "features": {
           "type": "array",
-          "maxItems": 6,
+          "maxItems": 7,
           "uniqueItems": true,
           "items": {
             "enum": [
@@ -450,7 +450,8 @@
               "DAILY_V1",
               "AUTO_REGISTRATION_V1",
               "CONTENT_ISOLATION_V1",
-              "APP_READINESS_V1"
+              "APP_READINESS_V1",
+              "APP_OPEN_V1"
             ]
           }
         }

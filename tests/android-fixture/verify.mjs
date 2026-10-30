@@ -8,6 +8,7 @@ import { URLSearchParams } from 'node:url';
 import { parseFunctionalEvidence } from '@apk/contracts';
 import {
   registerApk,
+  openApk,
   inspectApk,
   NetworkPolicy,
   cacheDay,
@@ -24,8 +25,9 @@ const root = resolve(process.argv[2]),
   config = JSON.parse(await readFile('/var/lib/apk-platform/agent-config.json', 'utf8'));
 const v111 = process.argv[3] === '--v111';
 const v1112 = process.argv[3] === '--v1112';
+const appOpen = process.argv[3] === '--app-open';
 const v192 = ['--v192', '--v110'].includes(process.argv[3]);
-const automatic = process.argv[3] === '--auto' || v192 || v111 || v1112;
+const automatic = process.argv[3] === '--auto' || v192 || v111 || v1112 || appOpen;
 assert.match(
   root,
   automatic
@@ -170,30 +172,31 @@ const policy = new NetworkPolicy(
 );
 const outcomes = [];
 try {
-  const cases = v1112
-    ? [['iota', 'SUCCESS', 'SUCCEEDED']]
-    : v111
-      ? [['theta', 'SUCCESS', 'SUCCEEDED']]
-      : v192
-        ? [
-            ['epsilon', 'SUCCESS', 'SUCCEEDED'],
-            ['zeta', 'GUEST', 'SKIPPED'],
-            ['eta', 'DIRECTORY', 'SKIPPED'],
-          ]
-        : automatic
+  const cases =
+    v1112 || appOpen
+      ? [['iota', 'SUCCESS', 'SUCCEEDED']]
+      : v111
+        ? [['theta', 'SUCCESS', 'SUCCEEDED']]
+        : v192
           ? [
-              ['gamma', 'SUCCESS', 'SUCCEEDED'],
-              ['gamma', 'SUCCESS', 'SUCCEEDED'],
-              ['delta', 'SUCCESS', 'SUCCEEDED'],
-              ['gamma', 'TIMEOUT', 'UNKNOWN'],
+              ['epsilon', 'SUCCESS', 'SUCCEEDED'],
+              ['zeta', 'GUEST', 'SKIPPED'],
+              ['eta', 'DIRECTORY', 'SKIPPED'],
             ]
-          : [
-              ['alpha', 'SUCCESS', 'SUCCEEDED'],
-              ['beta', 'SUCCESS', 'SUCCEEDED'],
-              ['alpha', 'REJECT', 'FAILED'],
-              ['alpha', 'TIMEOUT', 'UNKNOWN'],
-              ['alpha', 'CHANGED', 'FAILED'],
-            ];
+          : automatic
+            ? [
+                ['gamma', 'SUCCESS', 'SUCCEEDED'],
+                ['gamma', 'SUCCESS', 'SUCCEEDED'],
+                ['delta', 'SUCCESS', 'SUCCEEDED'],
+                ['gamma', 'TIMEOUT', 'UNKNOWN'],
+              ]
+            : [
+                ['alpha', 'SUCCESS', 'SUCCEEDED'],
+                ['beta', 'SUCCESS', 'SUCCEEDED'],
+                ['alpha', 'REJECT', 'FAILED'],
+                ['alpha', 'TIMEOUT', 'UNKNOWN'],
+                ['alpha', 'CHANGED', 'FAILED'],
+              ];
   for (const [caseIndex, [variant, behavior, expected]] of cases.entries()) {
     if (abort.signal.aborted) throw Error('OWNED_VERIFICATION_STOPPED');
     if (automatic && caseIndex === 1) {
@@ -278,8 +281,14 @@ try {
       };
       testConfig.registrationFlows = [];
     }
+    if (appOpen) {
+      testConfig.execution.appOpen = { dwellMs: 10000 };
+      testConfig.execution.contentIsolation = true;
+      delete testConfig.execution.autoRegistration;
+      testConfig.registrationFlows = [];
+    }
     console.log(JSON.stringify({ case: currentCase, stage: 'STARTING' }));
-    const result = await registerApk(
+    const result = await (appOpen ? openApk : registerApk)(
       testConfig,
       { taskId, ...(automatic ? { entryId: variant } : {}) },
       metadata,
@@ -301,7 +310,7 @@ try {
         beforeAction: () => {
           if (abort.signal.aborted) throw Error('OWNED_VERIFICATION_STOPPED');
         },
-        ...(automatic
+        ...(automatic && !appOpen
           ? {
               learning: {
                 load: async (key) => store.loadRegistrationTemplate(key),
@@ -463,6 +472,19 @@ try {
     if (v111 || v1112) console.log(JSON.stringify({ case: currentCase, startupNotes }));
     assert.equal(result.cleanupComplete, true);
     assert.equal(result.status, expected);
+    if (appOpen) {
+      assert.equal(result.proof, 'APP_OPEN');
+      assert.ok(result.openObservation.elapsedMs >= 10000);
+      assert.equal(result.openObservation.scope, 'FOREGROUND_POLL_ONLY');
+      assert.equal(accountCalls, 0);
+      assert.equal(intentCalls, 0);
+      assert.equal(requests - before, 0);
+      assert.equal(startupNotes.length, 0);
+      assert.equal(result.artifactIds.length, 0);
+      assert.ok(resources.every((r) => !r.appiumPid && !r.systemPort));
+      assert.equal((await readdir(join(root, 'android/jobs'))).length, 0);
+      continue;
+    }
     if (v1112) {
       assert.deepEqual(
         startupNotes.filter((n) => n.phase === 'ACTION_SENT').map((n) => [n.action, n.method]),
@@ -525,7 +547,8 @@ try {
     JSON.stringify({
       verified: true,
       cases: outcomes.length,
-      singleRequestPerSubmittedCase: true,
+      singleRequestPerSubmittedCase: !appOpen,
+      appOpenOnly: appOpen,
       cleanupComplete: true,
       appIdentifiersObservedInOwnedFixtureOnly: true,
       syntheticProxyProbe: true,

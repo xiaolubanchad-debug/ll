@@ -830,7 +830,8 @@
             "LAUNCHING",
             "REGISTERING",
             "VERIFYING",
-            "DISCOVERING"
+            "DISCOVERING",
+            "HOLDING"
           ]
         },
         "cacheHit": {
@@ -1012,7 +1013,8 @@
           "enum": [
             "APP_UI",
             "FILE_VALIDATION",
-            "NONE"
+            "NONE",
+            "APP_OPEN"
           ]
         },
         "artifactIds": {
@@ -1096,6 +1098,38 @@
               }
             }
           }
+        },
+        "openObservation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "dwellMs",
+            "elapsedMs",
+            "samples",
+            "scope",
+            "cleanupComplete"
+          ],
+          "properties": {
+            "dwellMs": {
+              "const": 10000
+            },
+            "elapsedMs": {
+              "type": "integer",
+              "minimum": 10000,
+              "maximum": 60000
+            },
+            "samples": {
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 200
+            },
+            "scope": {
+              "const": "FOREGROUND_POLL_ONLY"
+            },
+            "cleanupComplete": {
+              "const": true
+            }
+          }
         }
       },
       "allOf": [
@@ -1115,7 +1149,8 @@
               "proof": {
                 "enum": [
                   "APP_UI",
-                  "FILE_VALIDATION"
+                  "FILE_VALIDATION",
+                  "APP_OPEN"
                 ]
               }
             }
@@ -1207,6 +1242,65 @@
               "required": [
                 "accountRef"
               ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "proof": {
+                "const": "APP_OPEN"
+              }
+            },
+            "required": [
+              "proof"
+            ]
+          },
+          "then": {
+            "required": [
+              "openObservation"
+            ],
+            "properties": {
+              "status": {
+                "const": "SUCCEEDED"
+              },
+              "artifactIds": {
+                "maxItems": 0,
+                "type": "array"
+              }
+            },
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "accountRef"
+                  ]
+                },
+                {
+                  "required": [
+                    "recognition"
+                  ]
+                },
+                {
+                  "required": [
+                    "errorCode"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "openObservation"
+            ]
+          },
+          "then": {
+            "properties": {
+              "proof": {
+                "const": "APP_OPEN"
+              }
             }
           }
         }

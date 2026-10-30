@@ -68,6 +68,9 @@ export interface APKTestConfigurationVersion10 {
      * 默认开启，仅保留功能证据，不上传或展示原始业务画面
      */
     contentIsolation?: true;
+    appOpen?: {
+      dwellMs: 10000;
+    };
   };
   /**
    * @maxItems 100
@@ -128,6 +131,7 @@ export interface TaskCycleView {
   deferredDownloadRules: boolean;
   apkCount: number;
   downloadRetryOf: string | null;
+  executionKind?: 'APP_OPEN' | 'REGISTRATION' | 'DOWNLOAD_ONLY';
 }
 
 export interface TaskPlanView {
@@ -160,6 +164,7 @@ export interface TaskPlanView {
     deferredDownloadRules: boolean;
     apkCount: number;
     downloadRetryOf: string | null;
+    executionKind?: 'APP_OPEN' | 'REGISTRATION' | 'DOWNLOAD_ONLY';
   } | null;
   readiness: {
     code: string;
@@ -167,6 +172,7 @@ export interface TaskPlanView {
     section: string;
   }[];
   nextRunAt: string | null;
+  executionKind?: 'APP_OPEN' | 'REGISTRATION' | 'DOWNLOAD_ONLY';
 }
 
 export interface TaskPlanDetail {
@@ -200,6 +206,7 @@ export interface TaskPlanDetail {
       deferredDownloadRules: boolean;
       apkCount: number;
       downloadRetryOf: string | null;
+      executionKind?: 'APP_OPEN' | 'REGISTRATION' | 'DOWNLOAD_ONLY';
     } | null;
     readiness: {
       code: string;
@@ -207,6 +214,7 @@ export interface TaskPlanDetail {
       section: string;
     }[];
     nextRunAt: string | null;
+    executionKind?: 'APP_OPEN' | 'REGISTRATION' | 'DOWNLOAD_ONLY';
   };
   configuration: APKTestConfigurationVersion10;
   cycles: {
@@ -225,6 +233,7 @@ export interface TaskPlanDetail {
     deferredDownloadRules: boolean;
     apkCount: number;
     downloadRetryOf: string | null;
+    executionKind?: 'APP_OPEN' | 'REGISTRATION' | 'DOWNLOAD_ONLY';
   }[];
 }
 export interface APKTestConfigurationVersion10 {
@@ -286,6 +295,9 @@ export interface APKTestConfigurationVersion10 {
      * 默认开启，仅保留功能证据，不上传或展示原始业务画面
      */
     contentIsolation?: true;
+    appOpen?: {
+      dwellMs: 10000;
+    };
   };
   /**
    * @maxItems 100
@@ -357,6 +369,7 @@ export interface TaskPlanList {
       deferredDownloadRules: boolean;
       apkCount: number;
       downloadRetryOf: string | null;
+      executionKind?: 'APP_OPEN' | 'REGISTRATION' | 'DOWNLOAD_ONLY';
     } | null;
     readiness: {
       code: string;
@@ -364,6 +377,7 @@ export interface TaskPlanList {
       section: string;
     }[];
     nextRunAt: string | null;
+    executionKind?: 'APP_OPEN' | 'REGISTRATION' | 'DOWNLOAD_ONLY';
   }[];
   nextCursor: string | null;
 }
@@ -457,6 +471,7 @@ export interface RunQuery {
   cacheDay?: string;
   cursor?: string;
   limit?: string;
+  executionKind?: 'APP_OPEN' | 'REGISTRATION' | 'DOWNLOAD_ONLY';
 }
 
 export interface ConsoleRunListView {
@@ -476,6 +491,7 @@ export interface ConsoleRunListView {
     configVersionId: string | null;
     configVersion: number;
     cacheDay: string | null;
+    executionKind?: 'APP_OPEN' | 'REGISTRATION' | 'DOWNLOAD_ONLY';
   }[];
   nextCursor: string | null;
 }
@@ -545,6 +561,7 @@ export interface RegistrationRecordView {
   } | null;
   hasAccount: boolean;
   reviewOutcome: ('SUCCEEDED' | 'FAILED') | null;
+  executionKind?: 'APP_OPEN' | 'REGISTRATION' | 'DOWNLOAD_ONLY';
 }
 
 export interface RegistrationListView {
@@ -581,6 +598,7 @@ export interface RegistrationListView {
     } | null;
     hasAccount: boolean;
     reviewOutcome: ('SUCCEEDED' | 'FAILED') | null;
+    executionKind?: 'APP_OPEN' | 'REGISTRATION' | 'DOWNLOAD_ONLY';
   }[];
   nextCursor: string | null;
 }
@@ -619,6 +637,7 @@ export interface RegistrationDetailView {
     } | null;
     hasAccount: boolean;
     reviewOutcome: ('SUCCEEDED' | 'FAILED') | null;
+    executionKind?: 'APP_OPEN' | 'REGISTRATION' | 'DOWNLOAD_ONLY';
   };
   observation: {
     model: string;
@@ -683,6 +702,7 @@ export interface OverviewView {
     attemptsStarted: number;
     attemptLimit: number;
     errorCode: string | null;
+    executionKind?: 'APP_OPEN' | 'REGISTRATION' | 'DOWNLOAD_ONLY';
   }[];
 }
 
@@ -699,6 +719,7 @@ export interface RunSummaryView {
     attemptsStarted: number;
     attemptLimit: number;
     errorCode: string | null;
+    executionKind?: 'APP_OPEN' | 'REGISTRATION' | 'DOWNLOAD_ONLY';
   };
   nodeId: string;
   configVersion: number;
@@ -724,6 +745,7 @@ export interface RunSummaryView {
     packageName: string | null;
   } | null;
   automaticIdentityCount: number;
+  executionKind?: 'APP_OPEN' | 'REGISTRATION' | 'DOWNLOAD_ONLY';
 }
 
 export interface TimelinePage {
@@ -851,6 +873,9 @@ export interface TestConfiguration {
      * 默认开启，仅保留功能证据，不上传或展示原始业务画面
      */
     contentIsolation?: true;
+    appOpen?: {
+      dwellMs: 10000;
+    };
   };
   /**
    * @maxItems 100
@@ -1108,7 +1133,7 @@ export interface ReleaseInput {
     npmLockSha256: string;
   };
   /**
-   * @maxItems 6
+   * @maxItems 7
    */
   features?: (
     | 'DOWNLOAD_V1'
@@ -1117,6 +1142,7 @@ export interface ReleaseInput {
     | 'AUTO_REGISTRATION_V1'
     | 'CONTENT_ISOLATION_V1'
     | 'APP_READINESS_V1'
+    | 'APP_OPEN_V1'
   )[];
 }
 

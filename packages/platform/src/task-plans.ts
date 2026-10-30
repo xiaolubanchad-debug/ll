@@ -9,7 +9,12 @@ import type {
   TaskControlInput,
   TestConfiguration,
 } from '@apk/contracts';
-import { schemaIssues, contentIsolationSupported, appReadinessSupported } from '@apk/contracts';
+import {
+  schemaIssues,
+  contentIsolationSupported,
+  appReadinessSupported,
+  appOpenSupported,
+} from '@apk/contracts';
 import { checked } from './secrets.js';
 import { configBody, configSecrets } from './configurations.js';
 import { canonical, digest } from './security.js';
@@ -41,6 +46,8 @@ function counts(c: CycleRow) {
   };
 }
 async function cycleView(db: PrismaClient, c: CycleRow): Promise<TaskCycleView> {
+  const snapshot = (await db.configVersion.findUniqueOrThrow({ where: { id: c.configVersionId } }))
+    .body as unknown as TestConfiguration;
   const apkCount = c.downloadRunId
     ? await db.task.count({
         where: { runId: c.downloadRunId, status: 'SUCCEEDED', proof: 'FILE_VALIDATION' },
@@ -48,6 +55,11 @@ async function cycleView(db: PrismaClient, c: CycleRow): Promise<TaskCycleView> 
     : 0;
   return {
     id: c.id,
+    executionKind: snapshot.execution.appOpen
+      ? 'APP_OPEN'
+      : snapshot.execution.mode === 'FULL'
+        ? 'REGISTRATION'
+        : 'DOWNLOAD_ONLY',
     day: c.day,
     round: c.round,
     status: c.status,
@@ -116,7 +128,19 @@ async function readiness(db: PrismaClient, p: PlanRow) {
       !(await db.secretVersion.count({ where: { id: proxy, type: 'HTTP_PROXY', revokedAt: null } }))
     )
       add('PROXY_REQUIRED', '请选择有效代理', 'proxies');
-    if (!c.execution.autoRegistration?.enabled && !c.registrationFlows.some((f) => f.enabled))
+    if (
+      c.execution.appOpen &&
+      !appOpenSupported(
+        (release?.manifest as { features?: string[] } | null)?.features,
+        node.agentVersion,
+      )
+    )
+      add('NODE_UPGRADE_REQUIRED', '启动停留需要 Agent 0.10.0', 'nodes');
+    if (
+      !c.execution.appOpen &&
+      !c.execution.autoRegistration?.enabled &&
+      !c.registrationFlows.some((f) => f.enabled)
+    )
       add('NEEDS_ADAPTATION', '请选择自动识别或补充注册规则', 'tasks');
     if (
       c.execution.autoRegistration?.enabled &&
@@ -131,6 +155,7 @@ async function readiness(db: PrismaClient, p: PlanRow) {
         '0.9.0',
         '0.9.1',
         '0.9.2',
+        '0.10.0',
       ].includes(node.agentVersion ?? '')
     )
       add('NODE_UPGRADE_REQUIRED', '自动识别需要升级执行环境', 'nodes');
@@ -145,6 +170,11 @@ async function view(db: PrismaClient, p: PlanRow): Promise<TaskPlanView> {
     next = new Date(next.getTime() + 86400000);
   return checkedOutput('TaskPlanView', {
     id: p.id,
+    executionKind: (p.currentVersion.body as unknown as TestConfiguration).execution.appOpen
+      ? 'APP_OPEN'
+      : (p.currentVersion.body as unknown as TestConfiguration).execution.mode === 'FULL'
+        ? 'REGISTRATION'
+        : 'DOWNLOAD_ONLY',
     name: p.name,
     nodeId: p.nodeId,
     nodeName: p.node.name,
@@ -417,6 +447,7 @@ export async function controlTaskPlan(
         const settings = selected.body as unknown as TestConfiguration;
         if (
           settings.execution.mode === 'FULL' &&
+          !settings.execution.appOpen &&
           !settings.execution.autoRegistration?.enabled &&
           !settings.registrationFlows.some((f) => f.enabled)
         )
@@ -453,6 +484,14 @@ export async function controlTaskPlan(
           )
             fault('NODE_NOT_READY', '服务器尚未就绪，请检查服务器');
           if (latest && input.action === 'START') {
+            const prior = await tx.configVersion.findUniqueOrThrow({
+              where: { id: latest.configVersionId },
+            });
+            if (
+              !!(prior.body as unknown as TestConfiguration).execution.appOpen !==
+              !!settings.execution.appOpen
+            )
+              fault('NEW_ROUND_REQUIRED', '执行模式已变更，请新增一轮，历史计数保留');
             if (latest.nodeId !== p.nodeId)
               fault('NEW_ROUND_REQUIRED', '更换服务器后请显式新增一轮');
             if (latest.runs.some((r) => r.status === 'NEEDS_REVIEW' && !r.reviewResolvedAt))

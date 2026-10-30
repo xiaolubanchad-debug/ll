@@ -33,7 +33,11 @@ const statuses: Record<string, string> = {
 function status(task: TaskPlanView) {
   if (task.archivedAt) return '已归档';
   const c = task.latestCycle;
-  return c ? (statuses[c.status] ?? c.status) : '尚未开始';
+  return c
+    ? c.executionKind === 'APP_OPEN' && c.status === 'REGISTERING'
+      ? '启动停留中'
+      : (statuses[c.status] ?? c.status)
+    : '尚未开始';
 }
 function logId(c: TaskCycleView) {
   return c.activeRunId ?? c.registerRunIds.at(-1) ?? c.downloadRunId;
@@ -186,7 +190,8 @@ onUnmounted(() => {
         </p>
         <div v-if="task.latestCycle" class="quota-strip">
           <strong v-if="task.latestCycle.successTarget > 0"
-            >成功 {{ task.latestCycle.successes }} / {{ task.latestCycle.successTarget }}</strong
+            >{{ task.latestCycle.executionKind === 'APP_OPEN' ? '完成轮数' : '成功账户' }}
+            {{ task.latestCycle.successes }} / {{ task.latestCycle.successTarget }}</strong
           ><span v-if="task.latestCycle.attemptLimit > 0"
             >已尝试 {{ task.latestCycle.attemptsStarted }} /
             {{ task.latestCycle.attemptLimit }}</span
@@ -194,7 +199,8 @@ onUnmounted(() => {
           ><span>{{ task.latestCycle.day }} · 第 {{ task.latestCycle.round }} 轮</span>
         </div>
         <p v-else class="muted">
-          成功目标 {{ task.successTarget }}，最多尝试 {{ task.attemptLimit }} 次，所有 APK 合计。
+          {{ task.executionKind === 'APP_OPEN' ? '完成轮数目标' : '成功目标' }}
+          {{ task.successTarget }}，最多尝试 {{ task.attemptLimit }} 次，所有 APK 合计。
         </p>
         <p v-if="task.latestCycle?.errorCode" class="result-explanation">
           {{ reasonLabels[task.latestCycle.errorCode] ?? task.latestCycle.errorCode }}
@@ -242,15 +248,24 @@ onUnmounted(() => {
                 <tr>
                   <th>日期 / 轮次</th>
                   <th>状态</th>
-                  <th>成功 / 尝试</th>
+                  <th>完成或成功 / 尝试</th>
                   <th>操作</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="c in detail.cycles" :key="c.id">
                   <td>{{ c.day }} · 第 {{ c.round }} 轮</td>
-                  <td>{{ statuses[c.status] ?? c.status }}</td>
-                  <td>{{ c.successes }} / {{ c.attemptsStarted }}</td>
+                  <td>
+                    {{
+                      c.executionKind === 'APP_OPEN' && c.status === 'REGISTERING'
+                        ? '启动停留中'
+                        : (statuses[c.status] ?? c.status)
+                    }}
+                  </td>
+                  <td>
+                    {{ c.executionKind === 'APP_OPEN' ? '完成轮数' : '成功账户' }}
+                    {{ c.successes }} / {{ c.attemptsStarted }}
+                  </td>
                   <td><a v-if="logId(c)" :href="href('runs', logId(c)!)">日志与证据</a></td>
                 </tr>
               </tbody>

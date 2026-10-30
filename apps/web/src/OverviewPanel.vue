@@ -91,14 +91,21 @@ onUnmounted(() => clearInterval(timer));
           <div>
             <strong>{{ run.configName }}</strong>
             <p>
-              {{ run.nodeName }} · {{ purposeLabels[run.purpose] ?? run.purpose }} ·
+              {{ run.nodeName }} ·
+              {{
+                run.executionKind === 'APP_OPEN'
+                  ? 'APP 启动停留'
+                  : (purposeLabels[run.purpose] ?? run.purpose)
+              }}
+              ·
               {{ stateLabels[run.status] ?? run.status }}
             </p>
             <small v-if="run.errorCode">{{ reasonLabels[run.errorCode] ?? run.errorCode }}</small>
           </div>
           <div>
             <p v-if="run.purpose === 'REGISTER'">
-              成功 {{ run.successes }} / {{ run.successTarget }} · 尝试 {{ run.attemptsStarted }} /
+              {{ run.executionKind === 'APP_OPEN' ? '完成轮数' : '成功账户' }} {{ run.successes }} /
+              {{ run.successTarget }} · 尝试 {{ run.attemptsStarted }} /
               {{ run.attemptLimit }}
             </p>
             <a :href="href('runs', run.id)">查看详情与日志 →</a>

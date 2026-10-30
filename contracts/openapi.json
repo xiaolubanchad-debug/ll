@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "APK 部署中台 API",
-    "version": "1.11.2"
+    "version": "1.12.0"
   },
   "paths": {
     "/api/v1/auth/login": {
@@ -2979,6 +2979,18 @@
               "pattern": "^(?:[1-9]|[1-9][0-9]|100)$"
             },
             "required": false
+          },
+          {
+            "in": "query",
+            "name": "executionKind",
+            "schema": {
+              "enum": [
+                "APP_OPEN",
+                "REGISTRATION",
+                "DOWNLOAD_ONLY"
+              ]
+            },
+            "required": false
           }
         ]
       }
@@ -4070,6 +4082,13 @@
                 "type": "null"
               }
             ]
+          },
+          "executionKind": {
+            "enum": [
+              "APP_OPEN",
+              "REGISTRATION",
+              "DOWNLOAD_ONLY"
+            ]
           }
         },
         "required": [
@@ -4183,6 +4202,13 @@
               "null"
             ],
             "format": "date-time"
+          },
+          "executionKind": {
+            "enum": [
+              "APP_OPEN",
+              "REGISTRATION",
+              "DOWNLOAD_ONLY"
+            ]
           }
         },
         "required": [
@@ -4519,6 +4545,13 @@
           "limit": {
             "type": "string",
             "pattern": "^(?:[1-9]|[1-9][0-9]|100)$"
+          },
+          "executionKind": {
+            "enum": [
+              "APP_OPEN",
+              "REGISTRATION",
+              "DOWNLOAD_ONLY"
+            ]
           }
         },
         "required": []
@@ -4606,6 +4639,13 @@
                     {
                       "type": "null"
                     }
+                  ]
+                },
+                "executionKind": {
+                  "enum": [
+                    "APP_OPEN",
+                    "REGISTRATION",
+                    "DOWNLOAD_ONLY"
                   ]
                 }
               },
@@ -4951,6 +4991,13 @@
                 "type": "null"
               }
             ]
+          },
+          "executionKind": {
+            "enum": [
+              "APP_OPEN",
+              "REGISTRATION",
+              "DOWNLOAD_ONLY"
+            ]
           }
         },
         "required": [
@@ -5163,6 +5210,13 @@
                     {
                       "type": "null"
                     }
+                  ]
+                },
+                "executionKind": {
+                  "enum": [
+                    "APP_OPEN",
+                    "REGISTRATION",
+                    "DOWNLOAD_ONLY"
                   ]
                 }
               },
@@ -5391,6 +5445,13 @@
                   {
                     "type": "null"
                   }
+                ]
+              },
+              "executionKind": {
+                "enum": [
+                  "APP_OPEN",
+                  "REGISTRATION",
+                  "DOWNLOAD_ONLY"
                 ]
               }
             },
@@ -5723,6 +5784,13 @@
                       "type": "null"
                     }
                   ]
+                },
+                "executionKind": {
+                  "enum": [
+                    "APP_OPEN",
+                    "REGISTRATION",
+                    "DOWNLOAD_ONLY"
+                  ]
                 }
               },
               "required": [
@@ -5803,6 +5871,13 @@
                   {
                     "type": "null"
                   }
+                ]
+              },
+              "executionKind": {
+                "enum": [
+                  "APP_OPEN",
+                  "REGISTRATION",
+                  "DOWNLOAD_ONLY"
                 ]
               }
             },
@@ -5956,6 +6031,13 @@
           "automaticIdentityCount": {
             "type": "integer",
             "minimum": 0
+          },
+          "executionKind": {
+            "enum": [
+              "APP_OPEN",
+              "REGISTRATION",
+              "DOWNLOAD_ONLY"
+            ]
           }
         },
         "required": [
@@ -6565,6 +6647,18 @@
                 "const": true,
                 "default": true,
                 "description": "默认开启，仅保留功能证据，不上传或展示原始业务画面"
+              },
+              "appOpen": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "dwellMs"
+                ],
+                "properties": {
+                  "dwellMs": {
+                    "const": 10000
+                  }
+                }
               }
             },
             "allOf": [
@@ -6884,7 +6978,48 @@
               }
             ]
           }
-        }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "execution": {
+                  "required": [
+                    "appOpen"
+                  ],
+                  "type": "object"
+                }
+              },
+              "required": [
+                "execution"
+              ]
+            },
+            "then": {
+              "properties": {
+                "execution": {
+                  "required": [
+                    "contentIsolation"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "FULL"
+                    }
+                  },
+                  "not": {
+                    "required": [
+                      "autoRegistration"
+                    ]
+                  },
+                  "type": "object"
+                },
+                "registrationFlows": {
+                  "maxItems": 0,
+                  "type": "array"
+                }
+              }
+            }
+          }
+        ]
       },
       "AgentMessage": {
         "title": "APK node protocol 1.0 messages",
@@ -7716,7 +7851,8 @@
                   "LAUNCHING",
                   "REGISTERING",
                   "VERIFYING",
-                  "DISCOVERING"
+                  "DISCOVERING",
+                  "HOLDING"
                 ]
               },
               "cacheHit": {
@@ -7898,7 +8034,8 @@
                 "enum": [
                   "APP_UI",
                   "FILE_VALIDATION",
-                  "NONE"
+                  "NONE",
+                  "APP_OPEN"
                 ]
               },
               "artifactIds": {
@@ -7982,6 +8119,38 @@
                     }
                   }
                 }
+              },
+              "openObservation": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "dwellMs",
+                  "elapsedMs",
+                  "samples",
+                  "scope",
+                  "cleanupComplete"
+                ],
+                "properties": {
+                  "dwellMs": {
+                    "const": 10000
+                  },
+                  "elapsedMs": {
+                    "type": "integer",
+                    "minimum": 10000,
+                    "maximum": 60000
+                  },
+                  "samples": {
+                    "type": "integer",
+                    "minimum": 2,
+                    "maximum": 200
+                  },
+                  "scope": {
+                    "const": "FOREGROUND_POLL_ONLY"
+                  },
+                  "cleanupComplete": {
+                    "const": true
+                  }
+                }
               }
             },
             "allOf": [
@@ -8001,7 +8170,8 @@
                     "proof": {
                       "enum": [
                         "APP_UI",
-                        "FILE_VALIDATION"
+                        "FILE_VALIDATION",
+                        "APP_OPEN"
                       ]
                     }
                   }
@@ -8093,6 +8263,65 @@
                     "required": [
                       "accountRef"
                     ]
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "proof": {
+                      "const": "APP_OPEN"
+                    }
+                  },
+                  "required": [
+                    "proof"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "openObservation"
+                  ],
+                  "properties": {
+                    "status": {
+                      "const": "SUCCEEDED"
+                    },
+                    "artifactIds": {
+                      "maxItems": 0,
+                      "type": "array"
+                    }
+                  },
+                  "not": {
+                    "anyOf": [
+                      {
+                        "required": [
+                          "accountRef"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "recognition"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "errorCode"
+                        ]
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "if": {
+                  "required": [
+                    "openObservation"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "proof": {
+                      "const": "APP_OPEN"
+                    }
                   }
                 }
               }
@@ -8949,7 +9178,7 @@
           },
           "features": {
             "type": "array",
-            "maxItems": 6,
+            "maxItems": 7,
             "uniqueItems": true,
             "items": {
               "enum": [
@@ -8958,7 +9187,8 @@
                 "DAILY_V1",
                 "AUTO_REGISTRATION_V1",
                 "CONTENT_ISOLATION_V1",
-                "APP_READINESS_V1"
+                "APP_READINESS_V1",
+                "APP_OPEN_V1"
               ]
             }
           }

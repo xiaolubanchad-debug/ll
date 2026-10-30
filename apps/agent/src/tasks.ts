@@ -14,6 +14,7 @@ import {
   cleanupAndroid,
   removeOwned,
   registerApk,
+  openApk,
   RegistrationError,
   runCachedRegistrations,
   runProxyCheck,
@@ -360,44 +361,58 @@ export class TaskEngine {
         ...(plan?.purpose === 'REGISTER' || (!plan && config.execution.mode === 'FULL')
           ? {
               afterDownload: (target, apk, file, index) =>
-                registerApk(config, target, apk, file, index, signal, emit, {
-                  sdkRoot: this.options.sdkRoot!,
-                  toolsRoot: this.toolsRoot,
-                  root: join(this.store.root, 'android'),
-                  proxy: proxy!,
-                  policy: this.options.policy,
-                  proxyCheckUrl: this.options.proxyCheckUrl,
-                  androidFactory: this.options.androidFactory,
-                  learning: {
-                    load: async (key) => this.store.loadRegistrationTemplate(key),
-                    save: async (key, value) => this.store.saveRegistrationTemplate(key, value),
-                    drop: async (key) => this.store.dropRegistrationTemplate(key),
-                  },
-                  beforeAction,
-                  resources: async (record) => {
-                    this.store.android(d.deliveryId, record);
-                  },
-                  account: async (taskId) => {
-                    await this.flush(d);
-                    const account = this.store.account(d, taskId);
-                    try {
-                      await this.flush(d);
-                    } catch {
-                      throw new RegistrationError('ACCOUNT_SYNC_FAILED');
-                    }
-                    return account;
-                  },
-                  intent: async (taskId, ref, verificationSignal) => {
-                    beforeAction();
-                    this.store.intent(d, taskId, ref);
-                    await this.flush(d, verificationSignal).catch(() => {});
-                  },
-                  evidence: async (taskId, bytes, verificationSignal) => {
-                    const id = this.store.evidence(d, taskId, bytes);
-                    await this.flush(d, verificationSignal);
-                    return id;
-                  },
-                }),
+                config.execution.appOpen
+                  ? openApk(config, target, apk, file, index, signal, emit, {
+                      sdkRoot: this.options.sdkRoot!,
+                      toolsRoot: this.toolsRoot,
+                      root: join(this.store.root, 'android'),
+                      proxy: proxy!,
+                      policy: this.options.policy,
+                      proxyCheckUrl: this.options.proxyCheckUrl,
+                      androidFactory: this.options.androidFactory,
+                      beforeAction,
+                      resources: async (record) => {
+                        this.store.android(d.deliveryId, record);
+                      },
+                    })
+                  : registerApk(config, target, apk, file, index, signal, emit, {
+                      sdkRoot: this.options.sdkRoot!,
+                      toolsRoot: this.toolsRoot,
+                      root: join(this.store.root, 'android'),
+                      proxy: proxy!,
+                      policy: this.options.policy,
+                      proxyCheckUrl: this.options.proxyCheckUrl,
+                      androidFactory: this.options.androidFactory,
+                      learning: {
+                        load: async (key) => this.store.loadRegistrationTemplate(key),
+                        save: async (key, value) => this.store.saveRegistrationTemplate(key, value),
+                        drop: async (key) => this.store.dropRegistrationTemplate(key),
+                      },
+                      beforeAction,
+                      resources: async (record) => {
+                        this.store.android(d.deliveryId, record);
+                      },
+                      account: async (taskId) => {
+                        await this.flush(d);
+                        const account = this.store.account(d, taskId);
+                        try {
+                          await this.flush(d);
+                        } catch {
+                          throw new RegistrationError('ACCOUNT_SYNC_FAILED');
+                        }
+                        return account;
+                      },
+                      intent: async (taskId, ref, verificationSignal) => {
+                        beforeAction();
+                        this.store.intent(d, taskId, ref);
+                        await this.flush(d, verificationSignal).catch(() => {});
+                      },
+                      evidence: async (taskId, bytes, verificationSignal) => {
+                        const id = this.store.evidence(d, taskId, bytes);
+                        await this.flush(d, verificationSignal);
+                        return id;
+                      },
+                    }),
             }
           : {}),
         onBrowser: async (record) => {

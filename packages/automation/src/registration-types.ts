@@ -42,17 +42,25 @@ export interface AndroidRecord {
 }
 export interface TaskCompletion {
   status: 'SUCCEEDED' | 'FAILED' | 'SKIPPED' | 'CANCELLED' | 'UNKNOWN';
-  proof: 'APP_UI' | 'FILE_VALIDATION' | 'NONE';
+  proof: 'APP_UI' | 'FILE_VALIDATION' | 'APP_OPEN' | 'NONE';
   artifactIds: string[];
   accountRef?: string;
   errorCode?: string;
   recognition?: RegistrationRecognition;
+  openObservation?: {
+    dwellMs: 10000;
+    elapsedMs: number;
+    samples: number;
+    scope: 'FOREGROUND_POLL_ONLY';
+    cleanupComplete: true;
+  };
 }
 export interface AndroidSession {
   observation: DeviceObservation;
   supportedAbis: string[];
   install(file: string): Promise<void>;
   launch(packageName: string, activity: string): Promise<void>;
+  foreground?(packageName: string): Promise<boolean>;
   find(locator: Locator, timeout: number, signal?: AbortSignal): Promise<string>;
   click(id: string, timeout?: number): Promise<void>;
   tap?(x: number, y: number, timeout?: number): Promise<void>;

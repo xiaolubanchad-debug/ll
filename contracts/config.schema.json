@@ -233,6 +233,18 @@
           "const": true,
           "default": true,
           "description": "默认开启，仅保留功能证据，不上传或展示原始业务画面"
+        },
+        "appOpen": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "dwellMs"
+          ],
+          "properties": {
+            "dwellMs": {
+              "const": 10000
+            }
+          }
         }
       },
       "allOf": [
@@ -552,5 +564,46 @@
         }
       ]
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "execution": {
+            "required": [
+              "appOpen"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "execution"
+        ]
+      },
+      "then": {
+        "properties": {
+          "execution": {
+            "required": [
+              "contentIsolation"
+            ],
+            "properties": {
+              "mode": {
+                "const": "FULL"
+              }
+            },
+            "not": {
+              "required": [
+                "autoRegistration"
+              ]
+            },
+            "type": "object"
+          },
+          "registrationFlows": {
+            "maxItems": 0,
+            "type": "array"
+          }
+        }
+      }
+    }
+  ]
 }

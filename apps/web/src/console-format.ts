@@ -25,6 +25,7 @@ export const stateLabels: Record<string, string> = {
   PREPARING: '准备模拟器',
   INSTALLING: '安装 APK',
   LAUNCHING: '启动 APP',
+  HOLDING: '前台停留 10 秒',
   DISCOVERING: '寻找注册入口',
   REGISTERING: '填写注册表单',
   VERIFYING: '核验提交结果',

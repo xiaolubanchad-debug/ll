@@ -156,6 +156,13 @@
               "type": "null"
             }
           ]
+        },
+        "executionKind": {
+          "enum": [
+            "APP_OPEN",
+            "REGISTRATION",
+            "DOWNLOAD_ONLY"
+          ]
         }
       },
       "required": [
@@ -269,6 +276,13 @@
             "null"
           ],
           "format": "date-time"
+        },
+        "executionKind": {
+          "enum": [
+            "APP_OPEN",
+            "REGISTRATION",
+            "DOWNLOAD_ONLY"
+          ]
         }
       },
       "required": [

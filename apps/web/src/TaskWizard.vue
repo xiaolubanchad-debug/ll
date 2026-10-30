@@ -4,8 +4,6 @@ import type { TaskPlanDetail, TaskPlanInput, TestConfiguration, NodeView } from 
 import { configurationIssues } from '@apk/contracts';
 import example from '../../../contracts/fixtures/config.valid.json';
 import { api, mutation } from './api';
-import RegistrationFlowEditor from './RegistrationFlowEditor.vue';
-import AutomaticRegistrationEditor from './AutomaticRegistrationEditor.vue';
 const props = defineProps<{ initial?: TaskPlanDetail; initialStep?: number }>(),
   emit = defineEmits<{ saved: [id: string]; cancel: [] }>();
 const step = ref(props.initialStep ?? 1),
@@ -21,11 +19,7 @@ const step = ref(props.initialStep ?? 1),
   importId = ref(props.initial?.task.configId ?? '');
 const source = ref(props.initial?.configuration.source.url ?? ''),
   xpath = ref(props.initial?.configuration.source.xpath ?? example.source.xpath),
-  mode = ref<'FULL' | 'DOWNLOAD_ONLY'>(props.initial?.configuration.execution.mode ?? 'FULL'),
-  autoEntry = ref(
-    props.initial?.configuration.execution.autoRegistration?.enabled ??
-      !props.initial?.configuration.registrationFlows.some((f) => f.enabled),
-  );
+  mode = ref<'FULL' | 'DOWNLOAD_ONLY'>(props.initial?.configuration.execution.mode ?? 'FULL');
 const base = ref<TestConfiguration>(
   props.initial?.configuration ??
     ({ ...structuredClone(example), registrationFlows: [] } as TestConfiguration),
@@ -47,21 +41,14 @@ const draft = computed(() => {
   v.source = { ...v.source, url: source.value, xpath: xpath.value };
   v.execution.mode = mode.value;
   v.execution.contentIsolation = true;
+  delete v.execution.autoRegistration;
+  v.registrationFlows = [];
   if (mode.value === 'FULL') {
     v.execution.proxySecretVersionId = proxyId.value;
-    if (autoEntry.value)
-      v.execution.autoRegistration = {
-        screenshotFallback: true,
-        maxNavigationSteps: 8,
-        timeoutMs: 60000,
-        successTimeoutMs: 60000,
-        ...v.execution.autoRegistration,
-        enabled: true,
-      };
-    else delete v.execution.autoRegistration;
+    v.execution.appOpen = { dwellMs: 10000 };
   } else {
+    delete v.execution.appOpen;
     delete v.execution.proxySecretVersionId;
-    delete v.execution.autoRegistration;
   }
   return JSON.stringify(v, null, 2);
 });
@@ -100,7 +87,6 @@ function apply(value: string) {
     xpath.value = c.source.xpath;
     proxyId.value = c.execution.proxySecretVersionId ?? '';
     mode.value = c.execution.mode;
-    autoEntry.value = c.execution.autoRegistration?.enabled === true;
     error.value = '';
   } catch (e) {
     error.value = e instanceof Error ? e.message : '配置无效';
@@ -128,11 +114,6 @@ async function importConfig() {
       '/configs/' + importId.value + '/versions/' + p.items[0].id,
     );
     apply(JSON.stringify(v.body));
-    if (
-      v.body.execution.autoRegistration === undefined &&
-      !v.body.registrationFlows.some((f) => f.enabled)
-    )
-      autoEntry.value = true;
     name.value = configs.value.find((c) => c.id === importId.value)?.name ?? v.body.name;
   });
 }
@@ -164,7 +145,7 @@ function next() {
     return;
   }
   if (step.value === 2 && (!nodeId.value || (mode.value === 'FULL' && !proxyId.value))) {
-    error.value = '请选择服务器及注册代理';
+    error.value = '请选择服务器及 APP 网络代理';
     return;
   }
   step.value++;
@@ -238,7 +219,7 @@ onUnmounted(() => {
           id="task-name"
           v-model="name"
           maxlength="100"
-          placeholder="例如：每日 APP 注册测试"
+          placeholder="例如：每日 APP 启动测试"
         />
         <label for="task-url">网站 URL</label
         ><input id="task-url" v-model="source" placeholder="https://example.com/" />
@@ -258,11 +239,11 @@ onUnmounted(() => {
         </select>
         <label for="task-mode">执行内容</label
         ><select id="task-mode" v-model="mode">
-          <option value="FULL">下载 APK 并注册</option>
+          <option value="FULL">下载、安装并启动 APP（停留 10 秒）</option>
           <option value="DOWNLOAD_ONLY">只下载 APK</option>
         </select>
         <template v-if="mode === 'FULL'"
-          ><label for="task-proxy">注册代理</label
+          ><label for="task-proxy">APP 网络代理</label
           ><select id="task-proxy" v-model="proxyId">
             <option value="">请选择已保存代理</option>
             <option v-for="p in proxies" :key="p.id" :value="p.id">
@@ -283,18 +264,15 @@ onUnmounted(() => {
             </div>
             <el-button @click="saveProxy">保存代理并选中</el-button>
           </details>
-          <label class="inline-check"
-            ><input v-model="autoEntry" type="checkbox" />自动寻找各 APP 的注册入口</label
-          >
           <p class="muted">
-            无法可靠识别的 APP 会提示待适配，可查看功能记录并补充规则。注册前自动检查代理。
+            每轮使用独立模拟器及代理，启动 APP 后停留 10 秒再退出清理。无需配置注册入口。
           </p></template
         >
       </template>
       <template v-else>
         <div v-if="mode === 'FULL'" class="filter-grid">
           <label for="task-target"
-            >所有 APK 合计成功账户数<input
+            >所有 APK 合计完成轮数<input
               id="task-target"
               v-model.number="target"
               type="number"
@@ -317,30 +295,27 @@ onUnmounted(() => {
         /></label>
         <div class="selection-summary">
           {{ name }} · {{ nodes.find((n) => n.id === nodeId)?.name }} ·
-          {{ mode === 'FULL' ? '下载并注册' : '只下载' }}
+          {{ mode === 'FULL' ? '启动并停留 10 秒' : '只下载' }}
           <p>
-            <span v-if="mode === 'FULL'">成功目标 {{ target }}，最多尝试 {{ limit }} 次。</span
+            <span v-if="mode === 'FULL'">完成目标 {{ target }}，最多尝试 {{ limit }} 次。</span
             >{{
               automatic
                 ? '开始后立即执行，并在每天 ' + time + ' 自动执行。'
                 : '仅在点击开始后执行本轮。'
             }}
           </p>
-          <small>用户名、密码自动生成；网页和 APP 使用手机屏幕。保存后请在任务卡片点击开始。</small>
+          <small>停留完成后关闭模拟器并清理；APK 保留复用。保存后请点击开始。</small>
         </div>
         <details class="advanced-settings" :open="initialStep === 3">
-          <summary @click="raw = draft">高级设置与手工注册规则</summary>
-          <AutomaticRegistrationEditor :draft-text="draft" @load="apply" /><RegistrationFlowEditor
-            :draft-text="draft"
-            @load="apply"
-          /><label for="task-json">完整配置 JSON</label
+          <summary @click="raw = draft">高级设置</summary>
+          <label for="task-json">完整配置 JSON</label
           ><textarea id="task-json" v-model="raw" class="json-editor" /><el-button
             @click="apply(raw)"
             >应用高级配置</el-button
           >
         </details>
         <p v-if="initial" class="muted">
-          保存不影响正在执行的批次；停止并确认清理后，剩余尝试可采用新注册配置。原轮次额度保持，下载规则修改次日生效。
+          保存不影响正在执行的批次。旧注册任务保存后切换到启动停留模式，请停止并确认清理后新增一轮；下载规则修改次日生效。
         </p>
       </template>
     </fieldset>
