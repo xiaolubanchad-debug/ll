@@ -1130,6 +1130,72 @@
               "const": true
             }
           }
+        },
+        "openTimings": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "version",
+            "totalMs",
+            "steps"
+          ],
+          "properties": {
+            "version": {
+              "const": 1
+            },
+            "totalMs": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 3600000
+            },
+            "steps": {
+              "type": "array",
+              "maxItems": 10,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name",
+                  "startedMs",
+                  "elapsedMs",
+                  "outcome"
+                ],
+                "properties": {
+                  "name": {
+                    "enum": [
+                      "PROXY_CHECK",
+                      "AVD_CREATE",
+                      "EMULATOR_BOOT",
+                      "DEVICE_CHECK",
+                      "APK_VERIFY",
+                      "APK_INSTALL",
+                      "APP_LAUNCH",
+                      "FOREGROUND_CHECK",
+                      "FOREGROUND_DWELL",
+                      "CLEANUP"
+                    ]
+                  },
+                  "startedMs": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 3600000
+                  },
+                  "elapsedMs": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 3600000
+                  },
+                  "outcome": {
+                    "enum": [
+                      "SUCCEEDED",
+                      "FAILED",
+                      "CANCELLED"
+                    ]
+                  }
+                }
+              }
+            }
+          }
         }
       },
       "allOf": [

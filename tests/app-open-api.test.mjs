@@ -147,6 +147,7 @@ test('open completion cannot create account success or accept registration/legac
       status: 'SUCCEEDED',
       proof: 'APP_OPEN',
       artifactIds: [],
+      openTimings: JSON.parse(await readFile('contracts/fixtures/open-timings.valid.json', 'utf8')),
       openObservation: {
         dwellMs: 10000,
         elapsedMs: 10021,
@@ -216,6 +217,9 @@ test('open completion cannot create account success or accept registration/legac
     await db.configVersion.update({ where: { id: versionId }, data: { body: legacy } });
     await assert.rejects(send('TASK_FINISHED', success), (e) => e.code === 'EVENT_CONFLICT');
     await db.configVersion.update({ where: { id: versionId }, data: { body: config } });
+    const invalidTiming = structuredClone(success);
+    invalidTiming.openTimings.steps.push(invalidTiming.openTimings.steps[0]);
+    await assert.rejects(send('TASK_FINISHED', invalidTiming));
     await send('TASK_FINISHED', success);
     sequence++;
     assert.equal((await db.run.findUniqueOrThrow({ where: { id: runId } })).successes, 1);
@@ -230,6 +234,10 @@ test('open completion cannot create account success or accept registration/legac
       (await runTimeline(db, runId, {})).items.some(
         (e) => e.title === 'APP 启动停留 10 秒并清理完成',
       ),
+    );
+    assert.deepEqual(
+      (await runTimeline(db, runId, {})).items.find((e) => e.type === 'TASK_FINISHED').openTimings,
+      success.openTimings,
     );
     await send('RUN_FINISHED', { status: 'SUCCEEDED' });
     assert.equal((await db.run.findUniqueOrThrow({ where: { id: runId } })).status, 'SUCCEEDED');

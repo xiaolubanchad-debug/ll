@@ -5,6 +5,19 @@ import { api } from './api';
 import { when } from './console-format';
 import { reasonLabels } from './result-labels';
 const props = defineProps<{ runId: string; taskId?: string }>();
+const timingLabels: Record<string, string> = {
+  PROXY_CHECK: '代理检查',
+  AVD_CREATE: '创建独立模拟器',
+  EMULATOR_BOOT: '安卓冷启动',
+  DEVICE_CHECK: '设备信息检查',
+  APK_VERIFY: '安装文件复核',
+  APK_INSTALL: '安装 APK',
+  APP_LAUNCH: '启动 APP',
+  FOREGROUND_CHECK: '首次前台确认',
+  FOREGROUND_DWELL: '前台停留',
+  CLEANUP: '关闭并清理',
+};
+const seconds = (ms: number) => (ms / 1000).toFixed(2) + ' 秒';
 const items = ref<TimelinePage['items']>([]),
   earlier = ref(false),
   later = ref(false),
@@ -117,6 +130,41 @@ onUnmounted(() => {
         <p v-if="event.errorCode" class="muted">
           {{ reasonLabels[event.errorCode] ?? event.errorCode }}
         </p>
+        <details v-if="event.openTimings" class="step-timings">
+          <summary>查看步骤耗时 · 本轮 {{ seconds(event.openTimings.totalMs) }}</summary>
+          <p class="muted">
+            从准备模拟器到清理完成；缓存读取另计。准备步骤可能重叠，耗时不能直接相加。
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>步骤</th>
+                <th>耗时</th>
+                <th>结果</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="step in [...event.openTimings.steps].sort(
+                  (a, b) => a.startedMs - b.startedMs,
+                )"
+                :key="step.name"
+              >
+                <td>{{ timingLabels[step.name] }}</td>
+                <td>{{ seconds(step.elapsedMs) }}</td>
+                <td>
+                  {{
+                    step.outcome === 'SUCCEEDED'
+                      ? '完成'
+                      : step.outcome === 'CANCELLED'
+                        ? '已取消'
+                        : '未完成'
+                  }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </details>
         <small v-if="event.taskId" class="muted">轮次引用 {{ event.taskId.slice(0, 8) }}</small>
       </li>
     </ol>

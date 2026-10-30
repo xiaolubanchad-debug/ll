@@ -135,6 +135,7 @@ export async function runCachedAppOpens(
         artifactIds: [],
         errorCode: 'CLEANUP_INCOMPLETE',
         cleanupComplete: false,
+        ...(completion.openTimings ? { openTimings: completion.openTimings } : {}),
       };
     }
     const { cleanupComplete, ...payload } = completion;

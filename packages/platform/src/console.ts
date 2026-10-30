@@ -16,7 +16,8 @@ import type {
   RunQuery,
   ConsoleRunListView,
 } from '@apk/contracts';
-import { schemaIssues } from '@apk/contracts';
+import { schemaIssues, appOpenTimingsIssues } from '@apk/contracts';
+import type { AppOpenTimings } from '@apk/contracts';
 import { checked } from './secrets.js';
 import { fault } from './errors.js';
 import { canonical, digest } from './security.js';
@@ -688,6 +689,11 @@ export async function runTimeline(
         type: b.type,
         stage: typeof p.stage === 'string' ? p.stage : null,
         title: title(b.type, p),
+        ...(b.type === 'TASK_FINISHED' &&
+        p.openTimings &&
+        !appOpenTimingsIssues(p.openTimings).length
+          ? { openTimings: p.openTimings as AppOpenTimings }
+          : {}),
         errorCode: typeof p.errorCode === 'string' ? p.errorCode : null,
         recordedForReview: r.recordedForReview,
         applied: !r.recordedForReview && r.sequence <= d.appliedThroughSequence,

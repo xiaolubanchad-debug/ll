@@ -9,6 +9,7 @@ import {
   agentIssues,
   schemaIssues,
   registrationFlowFor,
+  appOpenTimingsIssues,
 } from '../packages/contracts/dist/index.js';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
@@ -21,6 +22,23 @@ const agentCheck = ajv.compile(read('contracts/agent.schema.json'));
 const config = read('contracts/fixtures/config.valid.json');
 const messages = read('contracts/fixtures/agent.valid.json');
 let passed = 0;
+const openTimings = read('contracts/fixtures/open-timings.valid.json');
+test('1.13.1 overlapping step timings', () =>
+  assert.deepEqual(appOpenTimingsIssues(openTimings), []));
+for (const change of [
+  (t) => (t.totalMs = -1),
+  (t) => (t.steps[0].startedMs = -1),
+  (t) => (t.steps[0].elapsedMs = 50001),
+  (t) => t.steps.push(t.steps[0]),
+  (t) => (t.steps[0].name = 'ARBITRARY_SHELL'),
+  (t) => (t.steps[0].outcome = 'UNKNOWN'),
+  (t) => (t.proxyPassword = 'forbidden'),
+])
+  test('1.13.1 rejects invalid step timings', () => {
+    const t = structuredClone(openTimings);
+    change(t);
+    assert.ok(appOpenTimingsIssues(t).length);
+  });
 const concurrentOpenConfig = read('contracts/fixtures/config.concurrent-open.valid.json');
 test('1.13 parallel open configuration', () =>
   assert.deepEqual(configurationIssues(concurrentOpenConfig), []));

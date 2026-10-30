@@ -9,6 +9,8 @@ import { startProxyBridge, proxyObservation } from './proxy.js';
 import { NetworkPolicy } from './network.js';
 import { recognizeRegistrationScreenshot } from './ocr.js';
 import { removeOwned } from './cache.js';
+import { prepareAndroidInParallel, deviceProperties } from './android-preparation.js';
+import type { MeasureOpenStep } from './open-timings.js';
 import type {
   Profile,
   ProxyCredential,
@@ -25,6 +27,7 @@ export interface AndroidOptions {
   policy?: NetworkPolicy;
   proxyCheckUrl?: string;
   controlMode?: 'LAUNCH_ONLY';
+  measure?: MeasureOpenStep;
   beforeAction: () => void;
   resources: (record: AndroidRecord | null) => Promise<void>;
 }
@@ -48,6 +51,7 @@ export async function androidCommand(
   timeout: number,
   code: string,
   cwd?: string,
+  outputLimit = 16384,
 ) {
   return new Promise<string>((ok, no) => {
     const child = spawn(file, args, {
@@ -75,7 +79,7 @@ export async function androidCommand(
       finish(new RegistrationError(code));
     }, timeout);
     child.stdout.on('data', (b: Buffer) => {
-      if (text.length < 16384) text += b.toString();
+      if (text.length < outputLimit) text += b.toString().slice(0, outputLimit - text.length);
     });
     child.on('error', () => finish(new RegistrationError(code)));
     child.on('exit', (status) =>
@@ -227,6 +231,7 @@ export async function startAndroid(
     PATH: join(resolve(process.execPath, '../..'), 'bin') + ':/usr/bin:/bin',
   };
   const adb = join(options.sdkRoot, 'platform-tools/adb');
+  const measure: MeasureOpenStep = options.measure ?? (async (_name, work) => work());
   const command = (
     file: string,
     args: string[],
@@ -261,77 +266,100 @@ export async function startAndroid(
     await options.resources(record);
     options.beforeAction();
     bridge = await startProxyBridge(options.proxy, options.policy);
-    const observed = await proxyObservation(bridge.port, signal, options.proxyCheckUrl);
-    options.beforeAction();
-    for (const path of [
-      env.ANDROID_AVD_HOME,
-      env.ANDROID_USER_HOME,
-      env.ANDROID_EMULATOR_HOME,
-      env.TMPDIR,
-    ])
-      await mkdir(path, { recursive: true, mode: 0o700 });
-    await command(
-      join(options.sdkRoot, 'cmdline-tools/current/bin/avdmanager'),
-      [
-        'create',
-        'avd',
-        '--name',
-        avdName,
-        '--package',
-        profile.systemImage,
-        '--device',
-        profile.avdDevice,
-      ],
-      60000,
-      'DEVICE_PROFILE_UNSUPPORTED',
-    );
-    const port = await emulatorPort();
-    record.serial = 'emulator-' + port;
-    await options.resources(record);
-    options.beforeAction();
-    const emulator = spawn(
-      join(options.sdkRoot, 'emulator/emulator'),
-      [
-        '-avd',
-        avdName,
-        '-port',
-        String(port),
-        '-no-window',
-        '-no-audio',
-        '-no-snapshot',
-        '-no-boot-anim',
-        '-gpu',
-        'software',
-        '-cores',
-        '2',
-        '-memory',
-        '2048',
-        '-http-proxy',
-        bridge.url,
-      ],
-      { env, cwd: workspace, stdio: 'ignore', detached: true, windowsHide: true, shell: false },
-    );
-    children.push(emulator);
-    emulator.on('error', () => {});
-    record.emulatorPid = emulator.pid;
-    await options.resources(record);
-    const deadline = Date.now() + 180000;
-    let boot = false;
-    while (Date.now() < deadline) {
+    const bootDevice = async (preparationSignal: AbortSignal) => {
+      const prepareCommand = (
+        file: string,
+        args: string[],
+        timeout = 10000,
+        code = 'ANDROID_NOT_READY',
+      ) => androidCommand(file, args, env, preparationSignal, timeout, code, workspace);
       options.beforeAction();
-      if (emulator.exitCode !== null) throw new RegistrationError('ANDROID_NOT_READY');
-      const value = await command(
-        adb,
-        ['-s', record.serial, 'shell', 'getprop', 'sys.boot_completed'],
-        3000,
-      ).catch(() => '');
-      if (value.trim() === '1') {
-        boot = true;
-        break;
-      }
-      await new Promise((r) => setTimeout(r, 500));
-    }
-    if (!boot) throw new RegistrationError('ANDROID_NOT_READY');
+      await measure('AVD_CREATE', async () => {
+        for (const path of [
+          env.ANDROID_AVD_HOME,
+          env.ANDROID_USER_HOME,
+          env.ANDROID_EMULATOR_HOME,
+          env.TMPDIR,
+        ])
+          await mkdir(path, { recursive: true, mode: 0o700 });
+        await prepareCommand(
+          join(options.sdkRoot, 'cmdline-tools/current/bin/avdmanager'),
+          [
+            'create',
+            'avd',
+            '--name',
+            avdName,
+            '--package',
+            profile.systemImage,
+            '--device',
+            profile.avdDevice,
+          ],
+          60000,
+          'DEVICE_PROFILE_UNSUPPORTED',
+        );
+      });
+      await measure('EMULATOR_BOOT', async () => {
+        const port = await emulatorPort();
+        record.serial = 'emulator-' + port;
+        await options.resources(record);
+        options.beforeAction();
+        const emulator = spawn(
+          join(options.sdkRoot, 'emulator/emulator'),
+          [
+            '-avd',
+            avdName,
+            '-port',
+            String(port),
+            '-no-window',
+            '-no-audio',
+            '-no-snapshot',
+            '-no-boot-anim',
+            '-gpu',
+            'software',
+            '-cores',
+            '2',
+            '-memory',
+            '2048',
+            '-http-proxy',
+            bridge!.url,
+          ],
+          { env, cwd: workspace, stdio: 'ignore', detached: true, windowsHide: true, shell: false },
+        );
+        children.push(emulator);
+        emulator.on('error', () => {});
+        record.emulatorPid = emulator.pid;
+        await options.resources(record);
+        const deadline = Date.now() + 180000;
+        let boot = false;
+        while (Date.now() < deadline) {
+          options.beforeAction();
+          if (preparationSignal.aborted) throw new RegistrationError('CANCELLED');
+          if (emulator.exitCode !== null) throw new RegistrationError('ANDROID_NOT_READY');
+          const value = await prepareCommand(
+            adb,
+            ['-s', record.serial, 'shell', 'getprop', 'sys.boot_completed'],
+            3000,
+          ).catch(() => '');
+          if (value.trim() === '1') {
+            boot = true;
+            break;
+          }
+          await new Promise((r) => setTimeout(r, 500));
+        }
+        if (!boot) throw new RegistrationError('ANDROID_NOT_READY');
+      });
+      options.beforeAction();
+    };
+    const checkProxy = (s: AbortSignal) =>
+      measure('PROXY_CHECK', () => proxyObservation(bridge!.port, s, options.proxyCheckUrl));
+    const observed =
+      options.controlMode === 'LAUNCH_ONLY'
+        ? await prepareAndroidInParallel(signal, checkProxy, bootDevice)
+        : await (async () => {
+            const observation = await checkProxy(signal);
+            await bootDevice(signal);
+            return observation;
+          })();
     options.beforeAction();
     if (options.controlMode !== 'LAUNCH_ONLY') {
       const appiumPort = await availablePort();
@@ -402,15 +430,46 @@ export async function startAndroid(
     }
     const get = async (args: string[]) =>
       (await command(adb, ['-s', record.serial!, 'shell', ...args])).trim();
-    const api = Number(await get(['getprop', 'ro.build.version.sdk'])),
-      model = (await get(['getprop', 'ro.product.model'])).slice(0, 200),
-      androidId = await get(['settings', 'get', 'secure', 'android_id']);
-    const locale =
-      (await get(['getprop', 'persist.sys.locale'])) ||
-      (await get(['getprop', 'ro.product.locale']));
-    const supportedAbis = (await get(['getprop', 'ro.product.cpu.abilist']))
-      .split(',')
-      .filter(Boolean);
+    const { api, model, androidId, locale, supportedAbis } = await measure(
+      'DEVICE_CHECK',
+      async () => {
+        if (options.controlMode === 'LAUNCH_ONLY') {
+          const [text, androidId] = await Promise.all([
+            androidCommand(
+              adb,
+              ['-s', record.serial!, 'shell', 'getprop'],
+              env,
+              signal,
+              10000,
+              'DEVICE_PROFILE_UNSUPPORTED',
+              workspace,
+              262144,
+            ),
+            get(['settings', 'get', 'secure', 'android_id']),
+          ]);
+          const values = { ...deviceProperties(text), androidId };
+          if (
+            !validShellAndroidId(androidId) ||
+            !Number.isInteger(values.api) ||
+            !values.model ||
+            !values.supportedAbis.length ||
+            values.locale !== profile.locale
+          )
+            throw new RegistrationError('DEVICE_PROFILE_UNSUPPORTED');
+          return values;
+        }
+        const api = Number(await get(['getprop', 'ro.build.version.sdk'])),
+          model = (await get(['getprop', 'ro.product.model'])).slice(0, 200),
+          androidId = await get(['settings', 'get', 'secure', 'android_id']);
+        const locale =
+          (await get(['getprop', 'persist.sys.locale'])) ||
+          (await get(['getprop', 'ro.product.locale']));
+        const supportedAbis = (await get(['getprop', 'ro.product.cpu.abilist']))
+          .split(',')
+          .filter(Boolean);
+        return { api, model, androidId, locale, supportedAbis };
+      },
+    );
     if (!validShellAndroidId(androidId) || !Number.isInteger(api) || locale !== profile.locale)
       throw new RegistrationError('DEVICE_PROFILE_UNSUPPORTED');
     const rpc = () => {
@@ -476,11 +535,25 @@ export async function startAndroid(
         }
         const value = await command(
           adb,
-          ['-s', record.serial!, 'shell', 'am', 'start', '-W', '-n', "'" + component + "'"],
+          [
+            '-s',
+            record.serial!,
+            'shell',
+            'am',
+            'start',
+            ...(options.controlMode === 'LAUNCH_ONLY' ? [] : ['-W']),
+            '-n',
+            "'" + component + "'",
+          ],
           30000,
           'APP_LAUNCH_FAILED',
         );
-        if (!/Status: ok/.test(value) || /Error:|Error type/.test(value))
+        if (
+          !(options.controlMode === 'LAUNCH_ONLY'
+            ? /^Starting: Intent /m.test(value)
+            : /Status: ok/.test(value)) ||
+          /Error:|Error type/.test(value)
+        )
           throw new RegistrationError('APP_LAUNCH_FAILED');
       },
       async foreground(pkg) {
@@ -513,7 +586,7 @@ export async function startAndroid(
         ? error
         : new RegistrationError(signal.aborted ? 'CANCELLED' : 'ANDROID_NOT_READY');
     console.error('ANDROID_PREPARATION_' + failure.code);
-    const clean = await close();
+    const clean = await measure('CLEANUP', close);
     if (!clean) throw new RegistrationError('CLEANUP_INCOMPLETE');
     throw failure;
   }

@@ -5,7 +5,7 @@ import { readFile, writeFile, mkdir, readdir, access } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { randomUUID, randomBytes, createHash } from 'node:crypto';
 import { URLSearchParams } from 'node:url';
-import { parseFunctionalEvidence } from '@apk/contracts';
+import { parseFunctionalEvidence, appOpenTimingsIssues } from '@apk/contracts';
 import {
   registerApk,
   openApk,
@@ -501,6 +501,9 @@ try {
     if (appOpen) {
       assert.equal(result.proof, 'APP_OPEN');
       assert.ok(result.openObservation.elapsedMs >= 10000);
+      assert.deepEqual(appOpenTimingsIssues(result.openTimings), []);
+      assert.equal(result.openTimings.steps.length, 10);
+      assert.ok(result.openTimings.steps.every((s) => s.outcome === 'SUCCEEDED'));
       assert.equal(result.openObservation.scope, 'FOREGROUND_POLL_ONLY');
       assert.equal(accountCalls, 0);
       assert.equal(intentCalls, 0);

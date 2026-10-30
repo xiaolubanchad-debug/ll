@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "totalMs": 50000,
+  "steps": [
+    {
+      "name": "PROXY_CHECK",
+      "startedMs": 0,
+      "elapsedMs": 3000,
+      "outcome": "SUCCEEDED"
+    },
+    {
+      "name": "EMULATOR_BOOT",
+      "startedMs": 1000,
+      "elapsedMs": 35000,
+      "outcome": "SUCCEEDED"
+    }
+  ]
+}

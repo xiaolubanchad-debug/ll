@@ -1,5 +1,7 @@
 # HTTP 接口契约
 
+1.13.1 增加独立模拟器准备优化和步骤耗时，见 [性能契约](../docs/V1131_PERFORMANCE_CONTRACT.md)，对应 Agent 0.11.1；每轮新模拟器、代理和前台停留 10 秒保持。
+
 1.13 增加 APP 启动停留 1/2 路并发与每日共享额度，见 [并发契约](../docs/V113_CONCURRENCY_CONTRACT.md)，对应 Agent 0.11.0。下载与部署仍整台互斥，完成数和尝试上限由两路共享。
 
 1.12 新任务默认使用 APK 启动、前台停留 10 秒和清理，完成轮数不代表注册账户，见 [启动停留契约](../docs/V112_APP_OPEN_CONTRACT.md)，对应 Agent 0.10.0。旧注册历史保持原有含义。
@@ -26,7 +28,7 @@
 
 1.7 中台结果、中文日志、数据库汇总、历史回填与页面操作遵循 [1.7 契约](../docs/V17_CONTRACT.md)，操作见 [使用说明](../docs/V17_SETUP.md)。兼容 Agent 0.6.0，不改变注册提交及未知结果规则。
 
-版本 1.13.0，前缀 /api/v1。已实现路由由 p0.http.json 至 v18.http.json 合并生成 openapi.json，CI 比较 Controller、清单和 OpenAPI。下表保留后续阶段设计，以机器清单判定实现范围。
+版本 1.13.1，前缀 /api/v1。已实现路由由 p0.http.json 至 v18.http.json 合并生成 openapi.json，CI 比较 Controller、清单和 OpenAPI。下表保留后续阶段设计，以机器清单判定实现范围。
 
 1.6 增加可选 execution.autoRegistration、DISCOVERING 阶段和任务 recognition 摘要，见 [自动识别契约](../docs/V16_CONTRACT.md)。不增加任意截图识别、代码执行或公开 Appium 接口。自动模式仍只允许一次提交，未知结果暂停；启用配置要求新的 AUTO_REGISTRATION_V1 签名发布。
 

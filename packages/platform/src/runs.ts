@@ -275,6 +275,7 @@ export async function createRun(
           '0.9.2',
           '0.10.0',
           '0.11.0',
+          '0.11.1',
         ].includes(node.agentVersion ?? ''))
     )
       fault('NODE_UPGRADE_REQUIRED', '请部署支持每日下载与循环注册的 Agent');
@@ -294,6 +295,7 @@ export async function createRun(
           '0.9.2',
           '0.10.0',
           '0.11.0',
+          '0.11.1',
         ].includes(node.agentVersion ?? ''))
     )
       fault('NODE_UPGRADE_REQUIRED', '自动识别注册入口需要 Agent 0.6.0');
@@ -951,6 +953,7 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
     if (!full && status === 'SKIPPED' && !navigationSkip)
       fault('EVENT_CONFLICT', '下载跳过必须是未下载的导航站');
     if (p.proof === 'APP_OPEN' && !openOnly) fault('EVENT_CONFLICT', '启动停留证明与配置不符');
+    if (p.openTimings && !openOnly) fault('EVENT_CONFLICT', '步骤耗时仅用于启动停留');
     if (openOnly) {
       if (
         p.accountRef ||
@@ -1382,7 +1385,10 @@ export async function reconcileAgent(db: PrismaClient, token: string, body: unkn
       where: { nodeId: input.nodeId },
       data: { bootId: input.bootId },
     });
-    return { reconciled: true, mayClaim: input.cleanupComplete && !slot?.runId && !slot?.quarantined };
+    return {
+      reconciled: true,
+      mayClaim: input.cleanupComplete && !slot?.runId && !slot?.quarantined,
+    };
   });
 }
 export async function reconcileRun(

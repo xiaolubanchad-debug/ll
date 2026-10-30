@@ -1,4 +1,4 @@
-import type { TestConfiguration, RegistrationRecognition } from '@apk/contracts';
+import type { TestConfiguration, RegistrationRecognition, AppOpenTimings } from '@apk/contracts';
 export type Locator = TestConfiguration['registrationFlows'][number]['success']['locator'];
 export type Profile = TestConfiguration['execution']['deviceProfiles'][number];
 export interface Account {
@@ -47,6 +47,7 @@ export interface TaskCompletion {
   accountRef?: string;
   errorCode?: string;
   recognition?: RegistrationRecognition;
+  openTimings?: AppOpenTimings;
   openObservation?: {
     dwellMs: 10000;
     elapsedMs: number;

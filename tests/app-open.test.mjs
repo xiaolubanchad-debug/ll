@@ -34,6 +34,7 @@ test('foreground uses resumed package only and rejects missing, ambiguous or for
   assert.equal(appOpenSupported(['APP_OPEN_V1'], '0.9.2'), false);
   assert.equal(appOpenSupported([], '0.10.0'), false);
   assert.equal(appOpenSupported(['APP_OPEN_V1'], '0.10.0'), true);
+  assert.equal(appOpenSupported(['APP_OPEN_V1'], '0.11.1'), true);
 });
 
 test('open-only completion follows measured foreground dwell and cleanup, without any UI/account calls', async (t) => {
@@ -89,6 +90,7 @@ test('open-only completion follows measured foreground dwell and cleanup, withou
             },
             foreground: async () => {
               samples++;
+              if (variant.neverForeground || (variant.delayForeground && now < 1000)) return false;
               return !(variant.crash && now >= 4000);
             },
             close: async () => {
@@ -108,7 +110,12 @@ test('open-only completion follows measured foreground dwell and cleanup, withou
       },
     );
     assert.equal(closed, true);
-    assert.deepEqual(stages, ['PREPARING', 'INSTALLING', 'LAUNCHING', 'HOLDING']);
+    assert.deepEqual(
+      stages,
+      variant.neverForeground
+        ? ['PREPARING', 'INSTALLING', 'LAUNCHING']
+        : ['PREPARING', 'INSTALLING', 'LAUNCHING', 'HOLDING'],
+    );
     return { result, now, samples };
   }
   const { result, now, samples } = await run();
@@ -118,11 +125,16 @@ test('open-only completion follows measured foreground dwell and cleanup, withou
   assert.equal(result.proof, 'APP_OPEN');
   assert.equal(result.openObservation.elapsedMs, 10000);
   assert.equal(result.cleanupComplete, true);
+  const delayed = await run({ delayForeground: true });
+  assert.equal(delayed.result.status, 'SUCCEEDED');
+  assert.equal(delayed.now, 11000);
+  assert.equal(delayed.result.openObservation.elapsedMs, 10000);
   for (const [variant, code] of [
     [{ crash: true }, 'APP_NOT_FOREGROUND'],
     [{ stop: true }, 'CANCELLED'],
     [{ stopInCleanup: true }, 'CANCELLED'],
     [{ dirty: true }, 'CLEANUP_INCOMPLETE'],
+    [{ neverForeground: true }, 'APP_NOT_FOREGROUND'],
   ]) {
     const { result: failed } = await run(variant);
     assert.notEqual(failed.status, 'SUCCEEDED');
@@ -173,6 +185,12 @@ test('open-only completion follows measured foreground dwell and cleanup, withou
     },
     (p) => {
       p.artifactIds = [randomUUID()];
+    },
+    (p) => {
+      p.openTimings.steps.push(p.openTimings.steps[0]);
+    },
+    (p) => {
+      p.openTimings.steps[0].elapsedMs = p.openTimings.totalMs + 1;
     },
   ]) {
     const e = structuredClone(envelope);

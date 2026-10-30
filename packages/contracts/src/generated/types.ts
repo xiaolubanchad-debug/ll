@@ -800,6 +800,29 @@ export interface TimelinePage {
     errorCode: string | null;
     recordedForReview: boolean;
     applied: boolean;
+    openTimings?: {
+      version: 1;
+      totalMs: number;
+      /**
+       * @maxItems 10
+       */
+      steps: {
+        name:
+          | 'PROXY_CHECK'
+          | 'AVD_CREATE'
+          | 'EMULATOR_BOOT'
+          | 'DEVICE_CHECK'
+          | 'APK_VERIFY'
+          | 'APK_INSTALL'
+          | 'APP_LAUNCH'
+          | 'FOREGROUND_CHECK'
+          | 'FOREGROUND_DWELL'
+          | 'CLEANUP';
+        startedMs: number;
+        elapsedMs: number;
+        outcome: 'SUCCEEDED' | 'FAILED' | 'CANCELLED';
+      }[];
+    };
   }[];
   hasEarlier: boolean;
   hasLater: boolean;
@@ -851,6 +874,30 @@ export interface ValidationListView {
     }[];
   }[];
   nextCursor: string | null;
+}
+
+export interface AppOpenTimings {
+  version: 1;
+  totalMs: number;
+  /**
+   * @maxItems 10
+   */
+  steps: {
+    name:
+      | 'PROXY_CHECK'
+      | 'AVD_CREATE'
+      | 'EMULATOR_BOOT'
+      | 'DEVICE_CHECK'
+      | 'APK_VERIFY'
+      | 'APK_INSTALL'
+      | 'APP_LAUNCH'
+      | 'FOREGROUND_CHECK'
+      | 'FOREGROUND_DWELL'
+      | 'CLEANUP';
+    startedMs: number;
+    elapsedMs: number;
+    outcome: 'SUCCEEDED' | 'FAILED' | 'CANCELLED';
+  }[];
 }
 
 export interface TestConfiguration {

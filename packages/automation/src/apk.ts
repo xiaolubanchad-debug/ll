@@ -1,10 +1,51 @@
-import { createReadStream } from 'node:fs';
-import { stat } from 'node:fs/promises';
+import { createReadStream, constants } from 'node:fs';
+import { stat, lstat, open } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import yauzl from 'yauzl';
 import type { Entry, ZipFile } from 'yauzl';
 import type { ApkMetadata } from '@apk/contracts';
 import { DownloadError } from './common.js';
+
+// Identical bytes retain the structure/CRC/manifest validation already performed
+// by inspectApk. Still hash the actual installation file immediately beforehand.
+export async function verifyApkIntegrity(
+  file: string,
+  expected: ApkMetadata,
+  max: number,
+  signal: AbortSignal,
+) {
+  const before = await lstat(file, { bigint: true });
+  if (
+    before.isSymbolicLink() ||
+    !before.isFile() ||
+    before.size !== BigInt(expected.size) ||
+    expected.size > max
+  )
+    throw new DownloadError('APK_INVALID');
+  const handle = await open(file, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+  const same = (a: typeof before, b: typeof before) =>
+    a.dev === b.dev &&
+    a.ino === b.ino &&
+    a.size === b.size &&
+    a.mtimeNs === b.mtimeNs &&
+    a.ctimeNs === b.ctimeNs;
+  try {
+    if (signal.aborted) throw new DownloadError('CANCELLED');
+    if (!same(before, await handle.stat({ bigint: true }))) throw new DownloadError('APK_INVALID');
+    const hash = createHash('sha256');
+    for await (const bytes of handle.createReadStream({ autoClose: false, signal }))
+      hash.update(bytes);
+    if (signal.aborted) throw new DownloadError('CANCELLED');
+    if (
+      hash.digest('hex') !== expected.apkSha256 ||
+      !same(before, await handle.stat({ bigint: true })) ||
+      !same(before, await lstat(file, { bigint: true }))
+    )
+      throw new DownloadError('APK_INVALID');
+  } finally {
+    await handle.close();
+  }
+}
 const table = Array.from({ length: 256 }, (_, n) => {
   for (let i = 0; i < 8; i++) n = n & 1 ? 0xedb88320 ^ (n >>> 1) : n >>> 1;
   return n >>> 0;

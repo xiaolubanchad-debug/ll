@@ -7,6 +7,7 @@ export type {
   OverviewView,
   RunSummaryView,
   TimelinePage,
+  AppOpenTimings,
   AssetListView,
   ValidationListView,
   ResultsQuery,
@@ -29,6 +30,7 @@ export type {
   TaskReconcileInput,
 } from './generated/types.js';
 import type { FunctionalEvidence } from './generated/types.js';
+import type { AppOpenTimings } from './generated/types.js';
 export type { ScheduleInput, DailyExecutionPlan, ProxyObservation } from './generated/types.js';
 export type {
   AutoRegistration,
@@ -89,8 +91,9 @@ export function contentIsolationSupported(
   version: string | null | undefined,
 ): boolean {
   return (
-    ['0.8.0', '0.8.1', '0.9.0', '0.9.1', '0.9.2', '0.10.0', '0.11.0'].includes(version ?? '') &&
-    features?.includes('CONTENT_ISOLATION_V1') === true
+    ['0.8.0', '0.8.1', '0.9.0', '0.9.1', '0.9.2', '0.10.0', '0.11.0', '0.11.1'].includes(
+      version ?? '',
+    ) && features?.includes('CONTENT_ISOLATION_V1') === true
   );
 }
 export function appReadinessSupported(
@@ -98,7 +101,7 @@ export function appReadinessSupported(
   version: string | null | undefined,
 ): boolean {
   return (
-    ['0.9.0', '0.9.1', '0.9.2', '0.10.0', '0.11.0'].includes(version ?? '') &&
+    ['0.9.0', '0.9.1', '0.9.2', '0.10.0', '0.11.0', '0.11.1'].includes(version ?? '') &&
     features?.includes('APP_READINESS_V1') === true
   );
 }
@@ -106,13 +109,19 @@ export function appOpenSupported(
   features: readonly string[] | undefined,
   version: string | null | undefined,
 ): boolean {
-  return ['0.10.0', '0.11.0'].includes(version ?? '') && features?.includes('APP_OPEN_V1') === true;
+  return (
+    ['0.10.0', '0.11.0', '0.11.1'].includes(version ?? '') &&
+    features?.includes('APP_OPEN_V1') === true
+  );
 }
 export function parallelAppOpenSupported(
   features: readonly string[] | undefined,
   version: string | null | undefined,
 ): boolean {
-  return version === '0.11.0' && features?.includes('APP_OPEN_PARALLEL_V1') === true;
+  return (
+    ['0.11.0', '0.11.1'].includes(version ?? '') &&
+    features?.includes('APP_OPEN_PARALLEL_V1') === true
+  );
 }
 export function executionOSSupported(distribution: string, version: string): boolean {
   return schemaIssues('ExecutionOS', { distribution, version }).length === 0;
@@ -240,6 +249,16 @@ export function agentIssues(value: unknown): Issue[] {
     if (new Set(message.events.map((e) => e.eventId)).size !== message.events.length)
       issues.push({ path: '/events', message: '事件编号重复' });
     message.events.forEach((event, i) => {
+      if (event.type === 'TASK_FINISHED') {
+        const timings = (event.payload as { openTimings?: unknown }).openTimings;
+        if (timings !== undefined)
+          issues.push(
+            ...appOpenTimingsIssues(timings).map((issue) => ({
+              ...issue,
+              path: `/events/${i}/payload/openTimings${issue.path}`,
+            })),
+          );
+      }
       if (event.type === 'BROWSER_ENVIRONMENT') {
         const ua = (event.payload as { userAgent?: string }).userAgent;
         if (!ua || !androidBrowserUa(ua))
@@ -256,6 +275,16 @@ export function agentIssues(value: unknown): Issue[] {
         issues.push({ path: '/events', message: '事件顺序或批次不一致' });
     });
   }
+  return issues;
+}
+export function appOpenTimingsIssues(value: unknown): Issue[] {
+  const issues = schemaIssues('AppOpenTimings', value);
+  if (issues.length) return issues;
+  const timings = value as AppOpenTimings;
+  if (new Set(timings.steps.map((s) => s.name)).size !== timings.steps.length)
+    issues.push({ path: '/steps', message: '步骤名称重复' });
+  if (timings.steps.some((s) => s.startedMs + s.elapsedMs > timings.totalMs))
+    issues.push({ path: '/steps', message: '步骤时间超过本轮总耗时' });
   return issues;
 }
 export const loginIssues = (value: unknown) => schemaIssues('LoginInput', value);
