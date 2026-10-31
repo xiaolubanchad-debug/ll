@@ -177,6 +177,7 @@ try {
   await run(['--test', '--test-concurrency=1', 'tests/v15-download.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/v15-entry.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/proxy-probe.test.mjs'], env);
+  await run(['--test', '--test-concurrency=1', 'tests/owned-client-network.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/registration-discovery.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/app-obstructions.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/app-readiness.test.mjs'], env);

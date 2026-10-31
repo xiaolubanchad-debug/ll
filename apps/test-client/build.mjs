@@ -64,11 +64,18 @@ for (const appNumber of [0, ...Array.from({ length: 10 }, (_, i) => i + 1)]) {
     join(work, 'AndroidManifest.xml'),
     '<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="' +
       pkg +
-      '" android:versionCode="3" android:versionName="1.1.0"><uses-sdk android:minSdkVersion="26" android:targetSdkVersion="35"/><uses-permission android:name="android.permission.INTERNET"/><application android:label="@string/app_name" android:theme="@android:style/Theme.Material.Light.NoActionBar" android:allowBackup="false" android:debuggable="true" android:usesCleartextTraffic="false"><activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity></application></manifest>',
+      '" android:versionCode="4" android:versionName="1.1.1"><uses-sdk android:minSdkVersion="26" android:targetSdkVersion="35"/><uses-permission android:name="android.permission.INTERNET"/><application android:label="@string/app_name" android:theme="@android:style/Theme.Material.Light.NoActionBar" android:allowBackup="false" android:debuggable="true" android:usesCleartextTraffic="false"><activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity></application></manifest>',
   );
   await writeFile(
     join(work, 'MainActivity.java'),
     (await readFile(join(source, 'MainActivity.java'), 'utf8')).replace(
+      'package com.apkplatform.testclient;',
+      'package ' + pkg + ';',
+    ),
+  );
+  await writeFile(
+    join(work, 'EnrollmentSender.java'),
+    (await readFile(join(source, 'EnrollmentSender.java'), 'utf8')).replace(
       'package com.apkplatform.testclient;',
       'package ' + pkg + ';',
     ),
@@ -100,6 +107,7 @@ for (const appNumber of [0, ...Array.from({ length: 10 }, (_, i) => i + 1)]) {
     '-d',
     join(work, 'classes'),
     join(work, 'MainActivity.java'),
+    join(work, 'EnrollmentSender.java'),
   ]);
   const classes = [];
   async function walk(p) {
@@ -147,13 +155,13 @@ for (const appNumber of [0, ...Array.from({ length: 10 }, (_, i) => i + 1)]) {
       number: appNumber,
       packageName: pkg,
       sha256,
-      version: '1.1.0',
+      version: '1.1.1',
       filename: appNumber + '.apk',
     });
   else
     await writeFile(
       join(out, 'current.json'),
-      JSON.stringify({ sha256, version: '1.1.0', packageName: pkg }) + '\n',
+      JSON.stringify({ sha256, version: '1.1.1', packageName: pkg }) + '\n',
       { mode: 0o644 },
     );
   console.log(JSON.stringify({ built: true, sha256, packageName: pkg }));

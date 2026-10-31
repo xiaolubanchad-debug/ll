@@ -188,7 +188,8 @@ test('owned APP accounts bind one installation, retain first request IP and rema
       declaredUserAgent: boot.userAgent,
       appliedWebViewUa: 'NOT_COLLECTED',
       defaultWebViewUa: 'NOT_COLLECTED',
-      appVersion: '1.0.1',
+      appVersion: '1.1.1',
+      packageName: 'com.apkplatform.testclient',
     };
     await assert.rejects(
       enrollTestClient(

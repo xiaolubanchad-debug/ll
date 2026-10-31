@@ -1051,6 +1051,17 @@ test('1.14.1 accepts only pinned public artifact queries', () => {
 const enrollFixture = read('contracts/fixtures/test-enroll.valid.json');
 test('1.14 own client request', () =>
   assert.deepEqual(schemaIssues('TestEnrollInput', enrollFixture), []));
+test('1.15.3 accepts current owned client with an explicit package', () =>
+  assert.deepEqual(
+    schemaIssues('TestEnrollInput', {
+      ...enrollFixture,
+      appVersion: '1.1.1',
+      packageName: 'com.apkplatform.testclient.app10',
+    }),
+    [],
+  ));
+test('1.15.3 rejects a current client without its package', () =>
+  assert.ok(schemaIssues('TestEnrollInput', { ...enrollFixture, appVersion: '1.1.1' }).length));
 for (const patch of [
   { sourceIp: '198.51.100.1' },
   { androidId: 'not-hex' },

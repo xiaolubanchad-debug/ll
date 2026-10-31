@@ -1,5 +1,7 @@
 # APK 自动化测试部署中台
 
+1.15.3 自有客户端回传总预算、幂等和持续验收规则见 [回传契约](docs/V1153_REPORTING_CONTRACT.md)。
+
 1.15.2 的稳定依赖选择和启动退出处理见 [运行环境契约](docs/V1152_RUNTIME_CONTRACT.md)。
 
 1.15.1 按用户最新要求，每台 EC2 同时仅运行一个模拟器，覆盖旧双路执行要求；见 [单模拟器契约](docs/V1151_SERIAL_DEVICE_CONTRACT.md)。设备内仍可随机测试多个不同 APP。

@@ -51,7 +51,7 @@
           "pattern": "^[ -~]+$"
         },
         "appVersion": {
-          "enum": ["1.0.0", "1.0.1", "1.1.0"]
+          "enum": ["1.0.0", "1.0.1", "1.1.0", "1.1.1"]
         },
         "appliedWebViewUa": {
           "type": "string",
@@ -82,7 +82,7 @@
           "if": {
             "properties": {
               "appVersion": {
-                "const": "1.1.0"
+                "enum": ["1.1.0", "1.1.1"]
               }
             },
             "required": ["appVersion"]

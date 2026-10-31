@@ -19,6 +19,7 @@ import java.util.UUID;
 public final class MainActivity extends Activity {
   private TextView state, details;
   private SharedPreferences prefs;
+  private EnrollmentSender sender;
   private volatile boolean closed;
   @Override public void onCreate(Bundle saved) {
     super.onCreate(saved);
@@ -53,44 +54,44 @@ public final class MainActivity extends Activity {
         body.put("androidId",deviceId); body.put("model",Build.MODEL); body.put("manufacturer",Build.MANUFACTURER);
         body.put("apiLevel",Build.VERSION.SDK_INT); body.put("locale",Locale.getDefault().toLanguageTag());
         body.put("declaredUserAgent",ua); body.put("appliedWebViewUa","NOT_COLLECTED");
-        body.put("defaultWebViewUa","NOT_COLLECTED"); body.put("appVersion","1.1.0"); body.put("packageName",getPackageName());
+        body.put("defaultWebViewUa","NOT_COLLECTED"); body.put("appVersion","1.1.1"); body.put("packageName",getPackageName());
         payload=body.toString();
         if(!prefs.edit().putString("pendingBody",payload).commit()) throw new IOException("JOURNAL_FAILED");
       }
       final String stableBody=payload;
       details.setText("型号："+Build.MODEL+"\n系统 API："+Build.VERSION.SDK_INT+"\n正在通过本轮网络上报");
+      sender=new EnrollmentSender();
       new Thread(() -> enroll(url,token,ua,stableBody),"owned-test-enroll").start();
     } catch(Exception e) { report("CONFIG_ERROR"); state.setText("测试配置不可用；未创建新账户"); }
   }
   private void show(String text) { if(!closed)runOnUiThread(()->{if(!closed)state.setText(text);}); }
   private void enroll(URL url,String token,String ua,String body) {
-    for(int attempt=0;attempt<3&&!closed;attempt++) {
-      HttpURLConnection connection=null;
-      try {
-        connection=(HttpURLConnection)url.openConnection(); connection.setRequestMethod("POST");
-        connection.setInstanceFollowRedirects(false); connection.setConnectTimeout(7000); connection.setReadTimeout(7000);
-        connection.setRequestProperty("Authorization","Bearer "+token); connection.setRequestProperty("Content-Type","application/json");
-        connection.setRequestProperty("User-Agent",ua); connection.setDoOutput(true);
-        byte[] bytes=body.getBytes(StandardCharsets.UTF_8); connection.setFixedLengthStreamingMode(bytes.length);
-        try(OutputStream out=connection.getOutputStream()) { out.write(bytes); }
-        int status=connection.getResponseCode();
-        report("HTTP_"+status);
-        if(status==200) {
-          JSONObject response=new JSONObject(read(connection.getInputStream(),16384));
-          prefs.edit().putString("accountId",response.getString("id")).putString("username",response.getString("username")).commit();
-          show("账户创建并上报成功\n用户名："+response.getString("username")+"\n创建请求 IP："+response.getString("sourceIp")+"\n密码已加密保存到中台");
-          return;
-        }
-        if(status>=400&&status<500) { show("本轮上报未获接受（"+status+"），未更换请求编号"); return; }
-      } catch(Exception e) { report(e instanceof javax.net.ssl.SSLException ? "NETWORK_TLS" : e instanceof java.net.SocketTimeoutException ? "NETWORK_TIMEOUT" : e instanceof java.net.ConnectException ? "NETWORK_CONNECT" : "NETWORK_ERROR"); /* Retry the same persisted body; no exception text enters logs. */ }
-      finally { if(connection!=null)connection.disconnect(); }
-      try { Thread.sleep(500L*(attempt+1)); } catch(InterruptedException e) { Thread.currentThread().interrupt(); return; }
-    }
-    show("上报结果尚未确认；中台记录为准，不重复生成账户");
+    sender.send(url,token,ua,body,new EnrollmentSender.Listener() {
+      @Override public void status(String code) {
+        if(closed)return;
+        report(code);
+        if(!"HTTP_200".equals(code))show("上报结果尚未确认；中台记录为准，不重复生成账户");
+      }
+      @Override public void accepted(String value) throws Exception {
+        if(closed)throw new IOException("CANCELLED");
+        JSONObject response=new JSONObject(value);
+        String id=response.getString("id"), username=response.getString("username");
+        String password=response.getString("password"), ip=response.getString("sourceIp");
+        if(!id.matches("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"))throw new IOException("INVALID_RESPONSE");
+        UUID.fromString(id);
+        java.time.Instant.parse(response.getString("createdAt"));
+        if(!username.matches("[a-z]{6,10}") || !password.matches("(?=.*[A-Za-z])(?=.*[0-9])[A-Za-z0-9]{8,12}") || !ip.matches("[0-9A-Fa-f:.]{2,64}"))throw new IOException("INVALID_RESPONSE");
+        if(!prefs.edit().putString("accountId",id).putString("username",username).commit())throw new IOException("JOURNAL_FAILED");
+        show("账户创建并上报成功\n用户名："+username+"\n创建请求 IP："+ip+"\n密码已加密保存到中台");
+      }
+    });
   }
   private void report(String code) {
     if(!code.matches("(?:PREPARING|CONFIG_ERROR|NETWORK_(?:ERROR|TLS|TIMEOUT|CONNECT)|HTTP_[1-5][0-9]{2})"))return;
-    try(FileOutputStream out=new FileOutputStream(new File(getFilesDir(),"report-status"))) { out.write(code.getBytes(StandardCharsets.US_ASCII)); } catch(IOException ignored) {}
+    android.util.AtomicFile file=new android.util.AtomicFile(new File(getFilesDir(),"report-status"));
+    FileOutputStream out=null;
+    try { out=file.startWrite(); out.write(code.getBytes(StandardCharsets.US_ASCII)); file.finishWrite(out); }
+    catch(IOException ignored) { if(out!=null)file.failWrite(out); }
     android.util.Log.i("ApkPlatformTest",code);
   }
   private static String read(InputStream in,int max) throws IOException {
@@ -99,5 +100,5 @@ public final class MainActivity extends Activity {
       return new String(out.toByteArray(),StandardCharsets.UTF_8);
     }
   }
-  @Override public void onDestroy() { closed=true; super.onDestroy(); }
+  @Override public void onDestroy() { closed=true; if(sender!=null)sender.cancel(); super.onDestroy(); }
 }

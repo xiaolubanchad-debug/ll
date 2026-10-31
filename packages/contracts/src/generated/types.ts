@@ -9,7 +9,7 @@ export interface TestEnrollInput {
   locale: string;
   declaredUserAgent: string;
   defaultWebViewUa: string;
-  appVersion: '1.0.0' | '1.0.1' | '1.1.0';
+  appVersion: '1.0.0' | '1.0.1' | '1.1.0' | '1.1.1';
   appliedWebViewUa: string;
   packageName?: string;
 }
