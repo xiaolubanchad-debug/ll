@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { execute } from './health.js';
 import { deviceVariant } from '@apk/contracts';
 import type { IdentityImage } from '@apk/automation';
+import { bootProcessExited, stopBootProcess } from './boot-process.js';
 export async function bootCheck(
   sdk: string,
   base = '/var/lib/apk-platform/health-check',
@@ -86,12 +87,12 @@ export async function bootCheck(
         '-gpu',
         'software',
       ],
-      { env, stdio: 'ignore', windowsHide: true },
+      { env, cwd: dir, stdio: 'ignore', windowsHide: true },
     );
     child.on('error', () => {});
     const deadline = Date.now() + 120000;
     while (Date.now() < deadline) {
-      if (child.exitCode !== null) throw Error('ANDROID_NOT_READY');
+      if (bootProcessExited(child)) throw Error('ANDROID_NOT_READY');
       const result = await execute(
         join(sdk, 'platform-tools/adb'),
         ['-s', `emulator-${port}`, 'shell', 'getprop', 'sys.boot_completed'],
@@ -122,11 +123,19 @@ export async function bootCheck(
               5000,
               env,
             );
+            const brand = await execute(
+              join(sdk, 'platform-tools/adb'),
+              ['-s', `emulator-${port}`, 'shell', 'getprop', 'ro.product.brand'],
+              5000,
+              env,
+            );
             if (
               api.code ||
               Number(api.text.trim()) !== variant.apiLevel ||
               manufacturer.code ||
-              manufacturer.text.trim() !== variant.manufacturer
+              manufacturer.text.trim() !== variant.manufacturer ||
+              brand.code ||
+              brand.text.trim() !== variant.brand
             )
               throw Error('IDENTITY_MODEL_MISMATCH');
           }
@@ -149,6 +158,7 @@ export async function bootCheck(
           model: image?.model,
           apiLevel: image?.apiLevel ?? 35,
           sha256: image?.sha256,
+          vendorSha256: image?.vendorSha256,
           supportedAbis,
         };
       }
@@ -156,15 +166,7 @@ export async function bootCheck(
     }
     throw Error('ANDROID_NOT_READY');
   } finally {
-    if (child && child.exitCode === null) {
-      const exited = new Promise<void>((r) => child!.once('exit', () => r()));
-      child.kill('SIGTERM');
-      await Promise.race([exited, new Promise<void>((r) => setTimeout(r, 5000))]);
-      if (child.exitCode === null) {
-        child.kill('SIGKILL');
-        await exited;
-      }
-    }
+    if (child) await stopBootProcess(child);
     const target = resolve(dir),
       prefix = resolve(base) + sep;
     if (target.startsWith(prefix)) await rm(target, { recursive: true, force: true });

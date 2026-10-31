@@ -68,7 +68,7 @@ const proxyName = ref(''),
   password = ref('');
 watch(nodeId, (id) => {
   if (!props.initial && !props.ownedTest)
-    multiApp.value = ['0.13.0', '0.13.1'].includes(
+    multiApp.value = ['0.13.0', '0.13.1', '0.13.2'].includes(
       nodes.value.find((n) => n.id === id)?.agentVersion ?? '',
     );
 });

@@ -9,6 +9,7 @@ export function verifiedBootReceipts(value: unknown, sdk: string, images: Identi
       model: string;
       apiLevel: number;
       sha256: string;
+      vendorSha256?: string;
       supportedAbis: string[];
     }[];
   } | null;
@@ -29,6 +30,7 @@ export function verifiedBootReceipts(value: unknown, sdk: string, images: Identi
       actual.model !== image.model ||
       actual.apiLevel !== (image.apiLevel ?? 35) ||
       actual.sha256 !== image.sha256 ||
+      actual.vendorSha256 !== image.vendorSha256 ||
       !Array.isArray(actual.supportedAbis) ||
       !actual.supportedAbis.length ||
       actual.supportedAbis.length > 8 ||

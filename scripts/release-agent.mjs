@@ -36,7 +36,12 @@ export function sdkArchive(xml, packagePath, role, base) {
     Object.values(document).find((v) => v && typeof v === 'object' && v.remotePackage);
   const packages = Array.isArray(repo.remotePackage) ? repo.remotePackage : [repo.remotePackage];
   const pkg = packages.find(
-    (p) => p.path === packagePath && p.obsolete !== true && p.obsolete !== 'true',
+    (p) =>
+      p.path === packagePath &&
+      p.obsolete !== true &&
+      p.obsolete !== 'true' &&
+      (!p.channelRef || p.channelRef.ref === 'channel-0') &&
+      p.revision?.preview === undefined,
   );
   if (!pkg) throw Error('SDK_PACKAGE_MISSING');
   const archives = Array.isArray(pkg.archives.archive)
@@ -207,7 +212,7 @@ export async function publishAgent() {
   const body = {
     id: randomUUID(),
     gitCommit,
-    agentVersion: '0.13.1',
+    agentVersion: '0.13.2',
     protocolVersion: '1.0',
     features: [
       'DOWNLOAD_V1',

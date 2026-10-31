@@ -166,6 +166,9 @@ try {
   await run(['--test', '--test-concurrency=1', 'tests/agent-compatibility.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/agent-startup.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/boot-receipts.test.mjs'], env);
+  await run(['--test', '--test-concurrency=1', 'tests/identity-layout.test.mjs'], env);
+  await run(['--test', '--test-concurrency=1', 'tests/boot-process.test.mjs'], env);
+  await run(['--test', '--test-concurrency=1', 'tests/sdk-archive.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/api.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/p1.test.mjs'], env);
   await run(['--test', '--test-reporter=tap', '--test-concurrency=1', 'tests/p2.test.mjs'], env);

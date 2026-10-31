@@ -18,6 +18,7 @@ export interface IdentityImage {
   model: string;
   systemDir: string;
   sha256: string;
+  vendorSha256?: string;
   apiLevel?: number;
   supportedAbis?: string[];
 }
@@ -25,7 +26,7 @@ export interface IdentityImage {
 export function phoneImageRoot(sdk: string) {
   return (
     identityImageRoot(sdk) +
-    '-phones-r2-' +
+    '-phones-r3-' +
     createHash('sha256').update(JSON.stringify(DEVICE_CATALOG)).digest('hex').slice(0, 16)
   );
 }
@@ -47,12 +48,13 @@ export async function phoneManifest(
       model: string;
       apiLevel: number;
       sha256: string;
+      vendorSha256: string;
       verified: boolean;
       supportedAbis?: string[];
     }[];
   };
   if (
-    m.version !== 2 ||
+    m.version !== 3 ||
     m.sdkRoot !== resolve(sdk) ||
     !Array.isArray(m.images) ||
     m.images.length !== 30
@@ -66,6 +68,7 @@ export async function phoneManifest(
       item.model !== expected.model ||
       item.apiLevel !== expected.apiLevel ||
       !/^[a-f0-9]{64}$/.test(item.sha256) ||
+      !/^[a-f0-9]{64}$/.test(item.vendorSha256) ||
       (!allowUnverified &&
         (item.verified !== true ||
           !Array.isArray(item.supportedAbis) ||
@@ -77,6 +80,7 @@ export async function phoneManifest(
     await sealed(dir, true);
     if ((await realpath(dir)) !== dir) throw new RegistrationError('IDENTITY_IMAGE_INVALID');
     await sealed(join(dir, 'system.img'));
+    await sealed(join(dir, 'vendor.img'));
     result.push({
       id: item.id,
       model: item.model,
@@ -84,6 +88,7 @@ export async function phoneManifest(
       supportedAbis: item.supportedAbis,
       systemDir: dir,
       sha256: item.sha256,
+      vendorSha256: item.vendorSha256,
     });
   }
   return result;
@@ -154,14 +159,19 @@ export async function loadIdentityImage(sdk: string, id: string): Promise<Identi
   const image = (await (deviceVariant(id) ? phoneManifest(sdk) : identityManifest(sdk))).find(
     (x) => x.id === id,
   )!;
-  const path = join(image.systemDir, 'system.img'),
-    s = await sealed(path);
-  const key = [path, s.ino, s.size, s.mtimeMs, s.ctimeMs].join(':');
-  let pending = hashes.get(key);
-  if (!pending) {
-    pending = imageDigest(path);
-    hashes.set(key, pending);
+  for (const [name, expected] of [
+    ['system.img', image.sha256],
+    ...(image.vendorSha256 ? [['vendor.img', image.vendorSha256]] : []),
+  ]) {
+    const path = join(image.systemDir, name),
+      s = await sealed(path);
+    const key = [path, s.ino, s.size, s.mtimeMs, s.ctimeMs].join(':');
+    let pending = hashes.get(key);
+    if (!pending) {
+      pending = imageDigest(path);
+      hashes.set(key, pending);
+    }
+    if ((await pending) !== expected) throw new RegistrationError('IDENTITY_IMAGE_INVALID');
   }
-  if ((await pending) !== image.sha256) throw new RegistrationError('IDENTITY_IMAGE_INVALID');
   return image;
 }

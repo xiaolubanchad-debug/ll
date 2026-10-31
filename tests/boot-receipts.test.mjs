@@ -26,6 +26,7 @@ test('sealed boot receipt reuse binds all models, real APIs, digests, ABI and SD
     model: 'Model ' + i,
     apiLevel: i < 3 ? undefined : 29 + (i % 8),
     sha256: i.toString(16).padStart(64, '0'),
+    vendorSha256: i < 3 ? undefined : 'b'.repeat(64),
     systemDir: '/unused',
   }));
   const proof = {
@@ -46,6 +47,8 @@ test('sealed boot receipt reuse binds all models, real APIs, digests, ABI and SD
     (p) => (p.images[0].model = 'Other'),
     (p) => (p.images[3].apiLevel = 99),
     (p) => (p.images[4].sha256 = 'f'.repeat(64)),
+    (p) => (p.images[4].vendorSha256 = 'f'.repeat(64)),
+    (p) => delete p.images[4].vendorSha256,
     (p) => (p.images[5].supportedAbis = []),
     (p) => (p.images[6].supportedAbis = ['x86_64', 'x86_64']),
     (p) => (p.images[7].supportedAbis = ['x86_64;bad']),

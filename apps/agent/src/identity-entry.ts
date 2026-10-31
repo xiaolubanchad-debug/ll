@@ -31,9 +31,15 @@ async function main() {
     if (process.getuid?.() !== 0) throw Error('IDENTITY_ROOT_REQUIRED');
     const images = [...(await identityManifest(sdk)), ...(await phoneManifest(sdk))];
     await loadProof(images);
-    for (const image of images)
+    for (const image of images) {
       if ((await imageDigest(join(image.systemDir, 'system.img'))) !== image.sha256)
         throw Error('IDENTITY_IMAGE_INVALID');
+      if (
+        image.vendorSha256 &&
+        (await imageDigest(join(image.systemDir, 'vendor.img'))) !== image.vendorSha256
+      )
+        throw Error('IDENTITY_IMAGE_INVALID');
+    }
     console.log('IDENTITY_CACHE_VERIFIED');
     return;
   }

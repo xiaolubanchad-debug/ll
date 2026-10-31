@@ -402,6 +402,7 @@ const knownAgentVersions: readonly string[] = [
   '0.12.3',
   '0.13.0',
   '0.13.1',
+  '0.13.2',
 ];
 function knownAgentAtLeast(version: string | null | undefined, minimum: string): boolean {
   const index = knownAgentVersions.indexOf(version ?? '');

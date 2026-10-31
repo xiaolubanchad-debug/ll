@@ -388,7 +388,8 @@ export async function startAndroid(
         while (Date.now() < deadline) {
           options.beforeAction();
           if (preparationSignal.aborted) throw new RegistrationError('CANCELLED');
-          if (emulator.exitCode !== null) throw new RegistrationError('ANDROID_NOT_READY');
+          if (!emulator.pid || emulator.exitCode !== null || emulator.signalCode !== null)
+            throw new RegistrationError('ANDROID_NOT_READY');
           const value = await prepareCommand(
             adb,
             ['-s', record.serial, 'shell', 'getprop', 'sys.boot_completed'],

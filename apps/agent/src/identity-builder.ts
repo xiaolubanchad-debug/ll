@@ -38,7 +38,7 @@ export function propertyPatch(text: string, model: string): { text: string; chan
   if (Buffer.byteLength(padded) !== Buffer.byteLength(text)) throw Error('IDENTITY_PROPERTY_SPACE');
   return { text: padded, changed };
 }
-async function patchImage(dest: string, model: string) {
+export async function patchImage(dest: string, model: string) {
   const f = await open(dest, 'r+'),
     size = (await f.stat()).size;
   const read = async (n: number, at: number) => {
@@ -86,6 +86,7 @@ async function patchImage(dest: string, model: string) {
     let sup = 0,
       vb = 0,
       superEnd = 0;
+    const direct: { offset: number; length: number }[] = [];
     for (let i = 0; i < count; i++) {
       const e = entries.subarray(i * entrySize, (i + 1) * entrySize),
         name = e.subarray(56, 128).toString('utf16le').replaceAll('\0', '');
@@ -94,6 +95,20 @@ async function patchImage(dest: string, model: string) {
         superEnd = (num(e.readBigUInt64LE(40)) + 1) * 512;
       }
       if (name === 'vbmeta') vb = num(e.readBigUInt64LE(32)) * 512;
+      if (['system', 'system_ext', 'product', 'vendor', 'odm'].includes(name)) {
+        const offset = num(e.readBigUInt64LE(32)) * 512,
+          end = (num(e.readBigUInt64LE(40)) + 1) * 512;
+        if (!offset || end <= offset || end > size) throw Error('IDENTITY_LAYOUT_UNSUPPORTED');
+        direct.push({ offset, length: end - offset });
+      }
+    }
+    // Older ODM images place ext4 directly in GPT rather than in a logical super partition.
+    if (!sup && direct.length) {
+      for (const part of direct)
+        changes += await patchExt4(dest, part.offset, part.length, f, model);
+      if (changes < 3) throw Error('IDENTITY_LAYOUT_UNSUPPORTED');
+      await f.sync();
+      return;
     }
     if (!sup || !vb || superEnd > size) throw Error('IDENTITY_LAYOUT_UNSUPPORTED');
     const h = await read(256, sup + 12288);
@@ -112,7 +127,7 @@ async function patchImage(dest: string, model: string) {
       if (at + 52 > tables.length) throw Error('IDENTITY_LAYOUT_UNSUPPORTED');
       const p = tables.subarray(at, at + 52),
         name = p.subarray(0, 36).toString().replaceAll('\0', '');
-      if (!['system', 'system_ext', 'product', 'vendor'].includes(name)) continue;
+      if (!['system', 'system_ext', 'product', 'vendor', 'odm'].includes(name)) continue;
       const extent = h.readUInt32LE(92) + p.readUInt32LE(40) * 24;
       if (p.readUInt32LE(44) !== 1 || extent + 24 > tables.length)
         throw Error('IDENTITY_LAYOUT_UNSUPPORTED');
@@ -130,7 +145,7 @@ async function patchImage(dest: string, model: string) {
       const blockSize = 1024 * 2 ** sb.readUInt32LE(24);
       for (const path of name === 'system'
         ? ['/system/build.prop', '/build.prop', '/system/etc/prop.default']
-        : ['/build.prop', '/etc/build.prop']) {
+        : ['/build.prop', '/etc/build.prop', '/odm/build.prop', '/odm/etc/build.prop']) {
         const original = debug(['-R', 'cat ' + path, file]);
         if (!original) continue;
         const patch = propertyPatch(original, model);
@@ -247,7 +262,7 @@ async function patchExt4(
   model: string,
 ) {
   const debug = (command: string) =>
-    execFileSync('/usr/sbin/debugfs', ['-R', command, file], {
+    execFileSync('/usr/sbin/debugfs', ['-R', command, offset ? file + '?offset=' + offset : file], {
       encoding: 'utf8',
       maxBuffer: 262144,
       stdio: ['ignore', 'pipe', 'ignore'],
@@ -255,7 +270,7 @@ async function patchExt4(
   const input = await open(file, 'r'),
     sb = Buffer.alloc(1024);
   try {
-    await input.read(sb, 0, 1024, 1024);
+    await input.read(sb, 0, 1024, offset + 1024);
   } finally {
     await input.close();
   }
@@ -268,6 +283,8 @@ async function patchExt4(
     '/build.prop',
     '/system/etc/prop.default',
     '/etc/build.prop',
+    '/odm/build.prop',
+    '/odm/etc/build.prop',
   ]) {
     const original = debug('cat ' + path);
     if (!original) continue;
@@ -342,15 +359,8 @@ export async function buildPhoneImages(sdk: string) {
       try {
         const stat = await lstat(vendor);
         if (stat.isFile()) {
-          const handle = await open(vendor, 'r+');
-          const magic = Buffer.alloc(2);
-          try {
-            await handle.read(magic, 0, 2, 1080);
-            if (magic.readUInt16LE(0) === 0xef53)
-              await patchExt4(vendor, 0, stat.size, handle, variant.model);
-          } finally {
-            await handle.close();
-          }
+          await patchImage(vendor, variant.model);
+          await chmod(vendor, 0o444);
         }
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
@@ -366,6 +376,7 @@ export async function buildPhoneImages(sdk: string) {
         model: variant.model,
         apiLevel: variant.apiLevel,
         sha256: await imageDigest(join(dir, 'system.img')),
+        vendorSha256: await imageDigest(vendor),
         sourceSha256,
         verified: false,
       });
@@ -373,7 +384,7 @@ export async function buildPhoneImages(sdk: string) {
     await writeFile(
       join(temp, 'manifest.json'),
       JSON.stringify({
-        version: 2,
+        version: 3,
         sdkRoot: resolve(sdk),
         testImage: true,
         verifiedBootDisabled: true,
