@@ -6,9 +6,37 @@ import {
   phoneManifest,
   phoneImageRoot,
 } from '@apk/automation';
+import { verifiedBootReceipts } from './boot-receipts.js';
+import { imageDigest } from '@apk/automation';
 import { buildIdentityImages, buildPhoneImages } from './identity-builder.js';
 const sdk = process.env.ANDROID_HOME ?? '';
+async function loadProof(images: import('@apk/automation').IdentityImage[]) {
+  const path = join(sdk, 'phone-boot-proof.json'),
+    stat = await lstat(path);
+  if (
+    !stat.isFile() ||
+    stat.isSymbolicLink() ||
+    stat.uid !== 0 ||
+    stat.mode & 0o022 ||
+    stat.size > 65536
+  )
+    throw Error('IDENTITY_PROOF_INVALID');
+  const value = JSON.parse(
+    (await readFile(path, 'utf8')).split(/\r?\n/).find((line) => line.startsWith('{')) ?? 'null',
+  );
+  return verifiedBootReceipts(value, sdk, images);
+}
 async function main() {
+  if (process.argv.slice(2).join(' ') === '--check') {
+    if (process.getuid?.() !== 0) throw Error('IDENTITY_ROOT_REQUIRED');
+    const images = [...(await identityManifest(sdk)), ...(await phoneManifest(sdk))];
+    await loadProof(images);
+    for (const image of images)
+      if ((await imageDigest(join(image.systemDir, 'system.img'))) !== image.sha256)
+        throw Error('IDENTITY_IMAGE_INVALID');
+    console.log('IDENTITY_CACHE_VERIFIED');
+    return;
+  }
   if (process.argv.slice(2).join(' ') === '--seal') {
     if (process.getuid?.() !== 0) throw Error('IDENTITY_ROOT_REQUIRED');
     const phones = process.env.DEVICE_SESSIONS === '1';
@@ -16,58 +44,13 @@ async function main() {
     const root = phones ? phoneImageRoot(sdk) : identityImageRoot(sdk),
       path = join(root, 'manifest.json');
     if (phones) {
-      const proofPath = join(sdk, 'phone-boot-proof.json');
-      const stat = await lstat(proofPath);
-      if (
-        !stat.isFile() ||
-        stat.isSymbolicLink() ||
-        stat.uid !== 0 ||
-        stat.mode & 0o022 ||
-        stat.size > 65536
-      )
-        throw Error('IDENTITY_PROOF_INVALID');
-      const receipt = JSON.parse(
-        (await readFile(proofPath, 'utf8')).split(/\r?\n/).find((line) => line.startsWith('{')) ??
-          'null',
-      ) as {
-        version: number;
-        sdkRoot: string;
-        images: {
-          id: string;
-          model: string;
-          apiLevel: number;
-          sha256: string;
-          supportedAbis: string[];
-        }[];
-      };
-      if (
-        receipt?.version !== 1 ||
-        receipt.sdkRoot !== sdk ||
-        !Array.isArray(receipt.images) ||
-        receipt.images.length !== 33 ||
-        new Set(receipt.images.map((p) => p.id)).size !== 33
-      )
-        throw Error('IDENTITY_PROOF_INVALID');
       const images = await phoneManifest(sdk, true);
-      for (const image of images) {
-        const actual = receipt.images.find((p) => p.id === image.id);
-        if (
-          !actual ||
-          actual.model !== image.model ||
-          actual.apiLevel !== image.apiLevel ||
-          actual.sha256 !== image.sha256 ||
-          !Array.isArray(actual.supportedAbis) ||
-          !actual.supportedAbis.length ||
-          actual.supportedAbis.length > 8 ||
-          actual.supportedAbis.some((a) => !/^[A-Za-z0-9_-]{1,40}$/.test(a))
-        )
-          throw Error('IDENTITY_PROOF_INVALID');
-      }
+      const actualAbis = await loadProof([...(await identityManifest(sdk, true)), ...images]);
       const manifest = JSON.parse(await readFile(path, 'utf8')) as {
         images: { id: string; supportedAbis?: string[] }[];
       };
       manifest.images.forEach((p) => {
-        p.supportedAbis = receipt.images.find((r) => r.id === p.id)!.supportedAbis;
+        p.supportedAbis = actualAbis.get(p.id)!;
       });
       await writeFile(path, JSON.stringify(manifest), { mode: 0o644 });
       const legacy = identityImageRoot(sdk) + '/manifest.json';

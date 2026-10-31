@@ -1,8 +1,8 @@
-import type { DailyExecutionPlan } from '@apk/contracts';
+import { EXECUTION_DEVICE_LIMIT, type DailyExecutionPlan } from '@apk/contracts';
 import type { AutomationEvent } from './download.js';
 import { DownloadError } from './common.js';
 
-// Admission is synchronous before launching work: both lanes share N/M reservations.
+// A device must close before the next session is admitted; N/M still count APP attempts.
 export async function scheduleDeviceSessions(
   plan: DailyExecutionPlan,
   signal: AbortSignal,
@@ -58,7 +58,7 @@ export async function scheduleDeviceSessions(
       signal.throwIfAborted();
       const cutoff = now() >= Date.parse(policy.admissionDeadline);
       if (!fatal && !dirty && !missing && !cutoff && successes < plan.successTarget) {
-        while (active.size < Math.min(policy.concurrency, plan.successTarget - successes)) {
+        while (active.size < Math.min(EXECUTION_DEVICE_LIMIT, plan.successTarget - successes)) {
           const candidate = groups.find((g) => !used.has(g.id));
           if (
             candidate?.variantId &&

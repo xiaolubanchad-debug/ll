@@ -8,7 +8,7 @@ import { setImmediate } from 'node:timers';
 import { startAgent } from '../apps/agent/dist/main.js';
 import { agentProtocolsForVersion } from '@apk/contracts';
 
-for (const agentVersion of ['0.12.3', '0.13.0'])
+for (const agentVersion of ['0.12.3', '0.13.1'])
   test(
     'real Agent startup advertises both protocols and polls claims: ' + agentVersion,
     { timeout: 12000 },

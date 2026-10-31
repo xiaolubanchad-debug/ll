@@ -77,7 +77,7 @@ test('task wizard saves random apps per device and ten-app source with productio
     await page.getByRole('button', { name: '保存任务' }).click();
     await expect.poll(() => saved.length).toBe(1);
     assert.deepEqual(saved[0].configuration.execution.appOpen.appsPerDevice, { min: 2, max: 4 });
-    assert.equal(saved[0].configuration.execution.appOpen.concurrency, 2);
+    assert.equal(saved[0].configuration.execution.appOpen.concurrency, 1);
     assert.equal(saved[0].configuration.execution.contentIsolation, true);
     assert.deepEqual(configurationIssues(saved[0].configuration), []);
     assert.deepEqual(errors, []);

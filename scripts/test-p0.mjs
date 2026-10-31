@@ -165,6 +165,7 @@ try {
   console.log('Real PostgreSQL version:', version[0].server_version);
   await run(['--test', '--test-concurrency=1', 'tests/agent-compatibility.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/agent-startup.test.mjs'], env);
+  await run(['--test', '--test-concurrency=1', 'tests/boot-receipts.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/api.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/p1.test.mjs'], env);
   await run(['--test', '--test-reporter=tap', '--test-concurrency=1', 'tests/p2.test.mjs'], env);

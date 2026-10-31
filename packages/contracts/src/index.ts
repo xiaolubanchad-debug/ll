@@ -1,4 +1,6 @@
 import validators from './generated/validators.js';
+// Historical snapshots may contain 2; all new plans and execution use this limit.
+export const EXECUTION_DEVICE_LIMIT = 1;
 export type {
   TestEnrollInput,
   TestEnrollResult,
@@ -399,6 +401,7 @@ const knownAgentVersions: readonly string[] = [
   '0.12.2',
   '0.12.3',
   '0.13.0',
+  '0.13.1',
 ];
 function knownAgentAtLeast(version: string | null | undefined, minimum: string): boolean {
   const index = knownAgentVersions.indexOf(version ?? '');

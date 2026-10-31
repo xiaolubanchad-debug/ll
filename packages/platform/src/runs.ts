@@ -9,6 +9,7 @@ import type {
 } from '@apk/contracts';
 import {
   agentIssues,
+  EXECUTION_DEVICE_LIMIT,
   deviceAssignments,
   deviceVariant,
   isOwnedTestPackage,
@@ -499,7 +500,8 @@ async function assertIsolatedRun(tx: Tx, run: Run) {
     const policy = (run.executionPlan as unknown as DailyExecutionPlan | null)?.openPolicy;
     if (
       !policy ||
-      policy.concurrency !== settings.appOpen.concurrency ||
+      (policy.concurrency !== EXECUTION_DEVICE_LIMIT &&
+        policy.concurrency !== settings.appOpen.concurrency) ||
       policy.dailyLimit !== 800 ||
       !run.cacheDay ||
       policy.admissionDeadline !== openAdmissionDeadline(run.cacheDay)

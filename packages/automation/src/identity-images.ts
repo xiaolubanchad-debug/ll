@@ -25,7 +25,7 @@ export interface IdentityImage {
 export function phoneImageRoot(sdk: string) {
   return (
     identityImageRoot(sdk) +
-    '-phones-r1-' +
+    '-phones-r2-' +
     createHash('sha256').update(JSON.stringify(DEVICE_CATALOG)).digest('hex').slice(0, 16)
   );
 }

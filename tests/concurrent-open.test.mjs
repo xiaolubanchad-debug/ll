@@ -63,7 +63,7 @@ test('parallel configuration is bounded, quota cannot exceed 800, and capability
   assert.equal(parallelAppOpenSupported(['APP_OPEN_PARALLEL_V1'], '0.11.0'), true);
 });
 
-test('two workers share exact success/attempt reservations, cache pin and cutoff', async (t) => {
+test('legacy two-worker snapshots execute serially with exact quotas, cache pin and cutoff', async (t) => {
   const root = await mkdtemp(join(resolve('.tmp'), 'concurrent-open-'));
   t.after(() => rm(root, { recursive: true, force: true }));
   const config = JSON.parse(
@@ -124,9 +124,6 @@ test('two workers share exact success/attempt reservations, cache pin and cutoff
         peak = Math.max(peak, active);
         assert.equal(path, cache.path(cache.key(nodeId, day, targetKey)));
         try {
-          if (index < 2 && n > 1) {
-            while (launched.length < 2) await delay(1);
-          }
           if (stop && index === 0) abort.abort();
           if (dirty && index === 1) {
             while (!signal.aborted) await delay(1);
@@ -147,7 +144,7 @@ test('two workers share exact success/attempt reservations, cache pin and cutoff
     else await promise;
     assert.equal(active, 0);
     assert.equal(closed.length, launched.length);
-    assert.equal(peak, 2);
+    assert.equal(peak, 1);
     const check = await ApkCache.open(join(root, 'cache'));
     assert.equal(check.db.prepare('SELECT active FROM cache').get().active, 0);
     assert.ok(await check.get(nodeId, day, targetKey, 268435456, new AbortController().signal));
@@ -169,13 +166,13 @@ test('two workers share exact success/attempt reservations, cache pin and cutoff
   assert.equal(failures.launched.length, 5);
   assert.equal(failures.final.errorCode, 'ATTEMPT_LIMIT');
   const stopped = await run({ stop: true });
-  assert.equal(stopped.launched.length, 2);
+  assert.equal(stopped.launched.length, 1);
   const unclean = await run({ dirty: true });
-  assert.equal(unclean.launched.length, 2);
+  assert.equal(unclean.launched.length, 1);
   assert.equal(unclean.final.errorCode, 'CLEANUP_INCOMPLETE');
   assert.equal(unclean.final.status, 'NEEDS_REVIEW');
   const ended = await run({ cutoff: true });
-  assert.equal(ended.launched.length, 2);
+  assert.equal(ended.launched.length, 1);
   assert.equal(ended.final.errorCode, 'DAY_CUTOFF');
 });
 

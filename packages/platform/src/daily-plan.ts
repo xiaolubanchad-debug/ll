@@ -1,5 +1,10 @@
 import { randomInt, randomUUID } from 'node:crypto';
-import { isOwnedTestPackage, deviceVariant, devicePlanIssues } from '@apk/contracts';
+import {
+  isOwnedTestPackage,
+  deviceVariant,
+  devicePlanIssues,
+  EXECUTION_DEVICE_LIMIT,
+} from '@apk/contracts';
 import {
   assertIdentityReady,
   identityCapacity,
@@ -91,7 +96,7 @@ export async function prepareDailyPlan(
         if (now.getTime() >= Date.parse(deadline))
           fault('DAY_CUTOFF', '今日停止新增轮次，请等待次日下载', 422);
         plan.openPolicy = {
-          concurrency: config.execution.appOpen.concurrency,
+          concurrency: EXECUTION_DEVICE_LIMIT,
           dailyLimit: 800,
           admissionDeadline: deadline,
           ...(config.execution.appOpen.randomDeviceProfile &&

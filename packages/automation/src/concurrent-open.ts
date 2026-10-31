@@ -1,7 +1,7 @@
 import { scheduleDeviceSessions } from './device-sessions.js';
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
-import { devicePlanIssues } from '@apk/contracts';
+import { devicePlanIssues, EXECUTION_DEVICE_LIMIT } from '@apk/contracts';
 import type { DailyExecutionPlan, TestConfiguration } from '@apk/contracts';
 import type { Target, AutomationEvent } from './download.js';
 import type { RegistrationCompletion } from './registration.js';
@@ -33,7 +33,8 @@ export async function runCachedAppOpens(
   if (
     !policy ||
     !config.execution.appOpen ||
-    policy.concurrency !== (config.execution.appOpen.concurrency ?? 1)
+    (policy.concurrency !== EXECUTION_DEVICE_LIMIT &&
+      policy.concurrency !== (config.execution.appOpen.concurrency ?? 1))
   )
     throw new DownloadError('OPEN_POLICY_INVALID');
   if (
@@ -209,7 +210,7 @@ export async function runCachedAppOpens(
           !missing &&
           !cutoff &&
           next < targets.length &&
-          running.size < policy.concurrency &&
+          running.size < EXECUTION_DEVICE_LIMIT &&
           successes + running.size < plan.successTarget
         ) {
           const index = next++;

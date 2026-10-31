@@ -15,7 +15,7 @@ import {
 export function propertyPatch(text: string, model: string): { text: string; changed: number } {
   const variant = DEVICE_CATALOG.find((v) => v.model === model);
   let changed = 0;
-  const output = text.replace(
+  let output = text.replace(
     /^(ro\.product(?:\.[a-z_]+)?\.(?:model|brand|manufacturer))=([^\r\n]*)/gm,
     (line: string, key: string, value: string) => {
       const v = key.endsWith('.model')
@@ -28,12 +28,17 @@ export function propertyPatch(text: string, model: string): { text: string; chan
       return key + '=' + (variant ? v : v.padEnd(value.length, ' '));
     },
   );
+  // Keep the inode length: reclaim only inert generated headings, never a property or licence.
+  if (variant && Buffer.byteLength(output) > Buffer.byteLength(text))
+    output = output.replace(
+      /^#(?:#{1,}[^\r\n]*|[ \t]+(?:begin\b|end\b|auto-?generated\b|generated\b|from build\/)[^\r\n]*)/gim,
+      '#',
+    );
   const padded = variant ? output.padEnd(text.length, ' ') : output;
-  if (Buffer.byteLength(padded) !== Buffer.byteLength(text))
-    throw Error('IDENTITY_LAYOUT_UNSUPPORTED');
+  if (Buffer.byteLength(padded) !== Buffer.byteLength(text)) throw Error('IDENTITY_PROPERTY_SPACE');
   return { text: padded, changed };
 }
-async function patchImage(dest: string, temp: string, model: string) {
+async function patchImage(dest: string, model: string) {
   const f = await open(dest, 'r+'),
     size = (await f.stat()).size;
   const read = async (n: number, at: number) => {
@@ -117,26 +122,9 @@ async function patchImage(dest: string, temp: string, model: string) {
       const offset = sup + num(e.readBigUInt64LE(12)) * 512,
         length = num(e.readBigUInt64LE(0)) * 512;
       if (offset < sup || offset + length > superEnd) throw Error('IDENTITY_LAYOUT_UNSUPPORTED');
-      const file = join(temp, name + '.partition.img'),
-        out = await open(file, 'wx', 0o600),
-        buffer = Buffer.alloc(1048576);
-      try {
-        for (let pos = 0; pos < length; pos += buffer.length) {
-          const n = Math.min(buffer.length, length - pos);
-          if ((await f.read(buffer, 0, n, offset + pos)).bytesRead !== n)
-            throw Error('IDENTITY_LAYOUT_UNSUPPORTED');
-          await out.write(buffer, 0, n, pos);
-        }
-      } finally {
-        await out.close();
-      }
-      const part = await open(file, 'r'),
-        sb = Buffer.alloc(1024);
-      try {
-        await part.read(sb, 0, 1024, 1024);
-      } finally {
-        await part.close();
-      }
+      // libext2fs opens a read-only partition view at a validated offset.
+      const file = dest + '?offset=' + offset,
+        sb = await read(1024, offset + 1024);
       if (sb.readUInt16LE(56) !== 0xef53 || sb.readUInt32LE(24) > 6)
         throw Error('IDENTITY_LAYOUT_UNSUPPORTED');
       const blockSize = 1024 * 2 ** sb.readUInt32LE(24);
@@ -161,7 +149,6 @@ async function patchImage(dest: string, temp: string, model: string) {
         }
         changes += patch.changed;
       }
-      await rm(file);
     }
     const avb = await read(256, vb);
     if (avb.subarray(0, 4).toString() !== 'AVB0' || changes < 3)
@@ -220,7 +207,7 @@ export async function buildIdentityImages(sdk: string) {
         errorOnExist: true,
         force: false,
       });
-      await patchImage(join(dir, 'system.img'), dir, identityModel(id));
+      await patchImage(join(dir, 'system.img'), identityModel(id));
       execFileSync('/usr/bin/fallocate', ['--dig-holes', join(dir, 'system.img')], {
         stdio: 'ignore',
         timeout: 120000,
@@ -316,7 +303,8 @@ export async function buildPhoneImages(sdk: string) {
   const lock = await open(join(temp, 'build.lock'), 'wx', 0o600);
   await lock.close();
   try {
-    const images = [];
+    const images = [],
+      sourceDigests = new Map<number, string>();
     for (const variant of DEVICE_CATALOG) {
       const src = join(sdk, 'system-images/android-' + variant.apiLevel + '/google_apis/x86_64'),
         dir = join(temp, variant.id);
@@ -336,11 +324,20 @@ export async function buildPhoneImages(sdk: string) {
             force: false,
           });
         else if (info.isFile()) {
-          await copyFile(from, join(dir, name));
+          if (name.endsWith('.img'))
+            execFileSync(
+              '/usr/bin/cp',
+              ['--sparse=always', '--reflink=auto', '--', from, join(dir, name)],
+              {
+                stdio: 'ignore',
+                timeout: 300000,
+              },
+            );
+          else await copyFile(from, join(dir, name));
           await chmod(join(dir, name), 0o644);
         }
       }
-      await patchImage(join(dir, 'system.img'), dir, variant.model);
+      await patchImage(join(dir, 'system.img'), variant.model);
       const vendor = join(dir, 'vendor.img');
       try {
         const stat = await lstat(vendor);
@@ -358,17 +355,18 @@ export async function buildPhoneImages(sdk: string) {
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
       }
-      execFileSync('/usr/bin/fallocate', ['--dig-holes', join(dir, 'system.img')], {
-        stdio: 'ignore',
-        timeout: 120000,
-      });
       await chmod(join(dir, 'system.img'), 0o444);
+      let sourceSha256 = sourceDigests.get(variant.apiLevel);
+      if (!sourceSha256) {
+        sourceSha256 = await imageDigest(join(src, 'system.img'));
+        sourceDigests.set(variant.apiLevel, sourceSha256);
+      }
       images.push({
         id: variant.id,
         model: variant.model,
         apiLevel: variant.apiLevel,
         sha256: await imageDigest(join(dir, 'system.img')),
-        sourceSha256: await imageDigest(join(src, 'system.img')),
+        sourceSha256,
         verified: false,
       });
     }

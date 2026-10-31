@@ -24,7 +24,7 @@ const step = ref(props.initialStep ?? 1),
   proxyId = ref(props.initial?.configuration.execution.proxySecretVersionId ?? ''),
   automatic = ref(props.initial?.task.automatic ?? false),
   time = ref(props.initial?.task.time ?? '00:05'),
-  concurrency = ref<1 | 2>(props.initial?.configuration.execution.appOpen?.concurrency ?? 1),
+  concurrency = ref<1>(1),
   target = ref(props.initial?.task.successTarget ?? 10),
   limit = ref(props.initial?.task.attemptLimit ?? 30),
   importId = ref(props.initial?.task.configId ?? '');
@@ -68,7 +68,9 @@ const proxyName = ref(''),
   password = ref('');
 watch(nodeId, (id) => {
   if (!props.initial && !props.ownedTest)
-    multiApp.value = nodes.value.find((n) => n.id === id)?.agentVersion === '0.13.0';
+    multiApp.value = ['0.13.0', '0.13.1'].includes(
+      nodes.value.find((n) => n.id === id)?.agentVersion ?? '',
+    );
 });
 watch(target, (value, previous) => {
   if (limit.value === previous * 3) limit.value = Math.min(800, value * 3);
@@ -134,7 +136,7 @@ async function choices() {
     appsMin.value = 3;
     appsMax.value = 3;
     multiApp.value = true;
-    concurrency.value = 2;
+    concurrency.value = 1;
     base.value.execution.deviceProfiles = [
       {
         id: 'pixel6-api35',
@@ -160,7 +162,7 @@ function apply(value: string) {
     xpath.value = c.source.xpath;
     proxyId.value = c.execution.proxySecretVersionId ?? '';
     mode.value = c.execution.mode;
-    concurrency.value = c.execution.appOpen?.concurrency ?? 1;
+    concurrency.value = 1;
     multiApp.value = !!c.execution.appOpen?.appsPerDevice;
     appsMin.value = c.execution.appOpen?.appsPerDevice?.min ?? 1;
     appsMax.value = c.execution.appOpen?.appsPerDevice?.max ?? 1;
@@ -348,12 +350,15 @@ onUnmounted(() => {
             <el-button @click="saveProxy">保存代理并选中</el-button>
           </details>
           <label for="task-concurrency">{{ multiApp ? '同时运行模拟器数' : '同时执行轮数' }}</label
-          ><select id="task-concurrency" v-model="concurrency">
-            <option :value="1">1 路（默认）</option>
-            <option :value="2">2 路并发</option>
+          ><select id="task-concurrency" v-model="concurrency" disabled>
+            <option :value="1">1 台（顺序执行，降低 CPU 压力）</option>
           </select>
           <p class="muted">
-            每轮使用独立模拟器及代理，启动 APP 后停留 10 秒再退出清理。无需配置注册入口。
+            {{
+              multiApp
+                ? '每台设备启动一次新模拟器，依次安装不同 APP；每个 APP 停留 10 秒后关闭并卸载，全部结束后关闭模拟器。'
+                : '每轮使用独立模拟器及代理，启动 APP 后停留 10 秒再退出清理。'
+            }}无需配置注册入口。
           </p>
           <label class="inline-check"
             ><input v-model="randomDeviceProfile" type="checkbox" />随机机型档案（多 APP
@@ -424,9 +429,17 @@ onUnmounted(() => {
             }}
           </p>
           <small
-            >停留完成后关闭模拟器并清理；APK 保留复用。最多同时
-            {{ concurrency }} 轮，完成目标由所有路共享。每台服务器每日最多尝试 800 轮，23:55
-            停止新增。保存后请点击开始。</small
+            >{{
+              multiApp
+                ? '每台模拟器随机安装 ' +
+                  appsMin +
+                  '～' +
+                  appsMax +
+                  ' 个不同 APP，逐个卸载后再关闭整机；'
+                : '停留完成后关闭模拟器并清理；'
+            }}APK 保留复用。最多同时运行
+            {{ concurrency }} 台模拟器，完成目标由所有路共享。每台服务器每日最多尝试 800 次
+            APP，23:55 停止新增。保存后请点击开始。</small
           >
         </div>
         <details class="advanced-settings" :open="initialStep === 3">

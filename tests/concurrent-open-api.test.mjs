@@ -239,7 +239,7 @@ test('parallel receipts enforce shared N/M, daily total, cutoff and fixed policy
     );
     await db.node.update({ where: { id: nodeId }, data: { agentVersion: '0.11.0' } });
     const wrong = structuredClone(batch.plan);
-    wrong.openPolicy.concurrency = 1;
+    wrong.openPolicy.concurrency = 3;
     await db.run.update({ where: { id: batch.runId }, data: { executionPlan: wrong } });
     await assert.rejects(
       acceptRun(db, token, batch.deliveryId, {
@@ -295,7 +295,7 @@ test('parallel receipts enforce shared N/M, daily total, cutoff and fixed policy
       attemptLimit: 5,
     };
     const plan = await db.$transaction((tx) => prepareDailyPlan(tx, input, version, admission));
-    assert.equal(plan.openPolicy.concurrency, 2);
+    assert.equal(plan.openPolicy.concurrency, 1);
     assert.equal(plan.openPolicy.admissionDeadline, deadline);
     const variantConfig = structuredClone(config);
     variantConfig.execution.appOpen.randomDeviceProfile = true;

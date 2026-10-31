@@ -69,19 +69,26 @@ test('thirty distinct real model codes and six actual Android API targets; malfo
   assert.ok(devicePlanIssues(config, bad).length);
 });
 
-test('two devices each run three apps sequentially and close once, with exact global reservations', async () => {
+test('two successive devices each run three apps sequentially and close once, with exact global reservations', async () => {
   const { plan } = await fixture();
   const assignments = deviceAssignments(plan),
     events = [],
     busy = new Set(),
     closed = [],
-    seen = new Map();
+    seen = new Map(),
+    devices = new Set();
   let peak = 0;
   const result = await scheduleDeviceSessions(
     plan,
     new AbortController().signal,
     () => {},
-    async (e) => events.push(e),
+    async (e) => {
+      if (e.payload.phase === 'STARTED') {
+        assert.equal(devices.size, 0, 'the previous whole device must close first');
+        devices.add(e.payload.sessionId);
+      } else if (e.payload.phase === 'CLOSED') devices.delete(e.payload.sessionId);
+      events.push(e);
+    },
     async (position) => {
       const a = assignments[position];
       assert.ok(!busy.has(a.sessionId));
@@ -101,7 +108,7 @@ test('two devices each run three apps sequentially and close once, with exact gl
       return true;
     },
   );
-  assert.equal(peak, 2);
+  assert.equal(peak, 1);
   assert.equal(result.successes, 6);
   assert.equal(closed.length, 2);
   assert.equal(events.filter((e) => e.payload.phase === 'STARTED').length, 2);
@@ -153,7 +160,7 @@ test('failure uses next different app, final quota prevents extra launches, all 
       },
     ),
   );
-  assert.equal(cleanup.length, 2);
+  assert.equal(cleanup.length, 1);
 });
 
 test('more than two sessions progress; cleanup failure stops all new admission', async () => {
@@ -194,5 +201,5 @@ test('more than two sessions progress; cleanup failure stops all new admission',
     async () => false,
   );
   assert.equal(dirty.dirty, true);
-  assert.ok(count <= 6);
+  assert.equal(count, 3);
 });

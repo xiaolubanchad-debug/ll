@@ -1,5 +1,7 @@
 # 开发契约
 
+1.15.1 按用户最新要求，每台 EC2 同时仅运行一个模拟器，覆盖旧双路执行要求；见 [单模拟器契约](V1151_SERIAL_DEVICE_CONTRACT.md)。设备内仍可随机测试多个不同 APP。
+
 1.15 多 APP 设备会话、30 款机型档案和十个独立测试客户端遵循 [设备会话契约](V115_DEVICE_SESSIONS_CONTRACT.md)。本次执行规则覆盖每轮仅一个 APP 和整批型号不重复的旧限制；旧不可变配置保持。
 
 1.14 自有测试 APK、测试数据和独立设备档案见 [测试契约](V114_TEST_DATA_CONTRACT.md)；新增客户端仅用于中台控制的模拟器，实际请求 IP 直接随创建回执保存，不另做出口探测。
@@ -32,7 +34,7 @@
 
 1.7 中台结果、中文日志、数据库汇总、历史回填与页面操作遵循 [1.7 契约](V17_CONTRACT.md)，操作见 [使用说明](V17_SETUP.md)。兼容 Agent 0.6.0，不改变注册提交及未知结果规则。
 
-版本 1.15.0，日期 2026 年 10 月 31 日。MUST 表示发布必须满足，SHOULD 表示偏离时必须记录原因，MAY 表示可选。P2 行为由 [P2_CONTRACT.md](P2_CONTRACT.md) 细化；P3 以 [P3_CONTRACT.md](P3_CONTRACT.md) 为增量权威，分别记录自动化测试、真实 Android 与产品注册验证。网页手机屏幕和触控遵循 [移动端屏幕契约 1.4.1](MOBILE_SCREEN_CONTRACT.md)。P4 的契约不表示已完成能力。
+版本 1.15.1，日期 2026 年 10 月 31 日。MUST 表示发布必须满足，SHOULD 表示偏离时必须记录原因，MAY 表示可选。P2 行为由 [P2_CONTRACT.md](P2_CONTRACT.md) 细化；P3 以 [P3_CONTRACT.md](P3_CONTRACT.md) 为增量权威，分别记录自动化测试、真实 Android 与产品注册验证。网页手机屏幕和触控遵循 [移动端屏幕契约 1.4.1](MOBILE_SCREEN_CONTRACT.md)。P4 的契约不表示已完成能力。
 
 ## 契约权威与变更
 

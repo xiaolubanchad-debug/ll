@@ -1,5 +1,7 @@
 # HTTP 接口契约
 
+1.15.1 按用户最新要求，每台 EC2 同时仅运行一个模拟器，覆盖旧双路执行要求；见 [单模拟器契约](../docs/V1151_SERIAL_DEVICE_CONTRACT.md)。设备内仍可随机测试多个不同 APP。
+
 1.15 多 APP 设备会话、30 款机型档案和十个独立测试客户端遵循 [设备会话契约](../docs/V115_DEVICE_SESSIONS_CONTRACT.md)。本次执行规则覆盖每轮仅一个 APP 和整批型号不重复的旧限制；旧不可变配置保持。
 
 1.14 自有测试 APK、测试数据和独立设备档案见 [测试契约](../docs/V114_TEST_DATA_CONTRACT.md)；新增客户端仅用于中台控制的模拟器，实际请求 IP 直接随创建回执保存，不另做出口探测。
@@ -32,7 +34,7 @@
 
 1.7 中台结果、中文日志、数据库汇总、历史回填与页面操作遵循 [1.7 契约](../docs/V17_CONTRACT.md)，操作见 [使用说明](../docs/V17_SETUP.md)。兼容 Agent 0.6.0，不改变注册提交及未知结果规则。
 
-版本 1.15.0，前缀 /api/v1。已实现路由由 p0.http.json 至 v18.http.json 以及 v114.http.json 合并生成 openapi.json，CI 比较 Controller、清单和 OpenAPI。下表保留后续阶段设计，以机器清单判定实现范围。
+版本 1.15.1，前缀 /api/v1。已实现路由由 p0.http.json 至 v18.http.json 以及 v114.http.json 合并生成 openapi.json，CI 比较 Controller、清单和 OpenAPI。下表保留后续阶段设计，以机器清单判定实现范围。
 
 1.6 增加可选 execution.autoRegistration、DISCOVERING 阶段和任务 recognition 摘要，见 [自动识别契约](../docs/V16_CONTRACT.md)。不增加任意截图识别、代码执行或公开 Appium 接口。自动模式仍只允许一次提交，未知结果暂停；启用配置要求新的 AUTO_REGISTRATION_V1 签名发布。
 

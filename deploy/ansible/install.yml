@@ -347,9 +347,20 @@
         ANDROID_HOME: '{{ sdk_root }}'
         DEVICE_SESSIONS: "{{ '1' if device_sessions_enabled | default(false) else '0' }}"
       changed_when: false
+    - name: Revalidate sealed model boot receipts and every image digest
+      when: device_sessions_enabled | default(false)
+      ansible.builtin.command:
+        argv: ['{{ runtime_root }}/node/bin/node', '{{ release_root }}/identity-images.js', --check]
+      environment:
+        ANDROID_HOME: '{{ sdk_root }}'
+      register: identity_cache_check
+      changed_when: false
+      failed_when: false
     - name: Verify each private QA model by actual boot
       register: phone_boot_receipt
-      when: identity_enabled | default(false)
+      when:
+        - identity_enabled | default(false)
+        - not (device_sessions_enabled | default(false)) or identity_cache_check.rc != 0
       become_user: apk-runner
       ansible.builtin.command:
         argv:
@@ -364,14 +375,18 @@
         JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
       changed_when: false
     - name: Persist actual per-model boot receipts
-      when: device_sessions_enabled | default(false)
+      when:
+        - device_sessions_enabled | default(false)
+        - identity_cache_check.rc != 0
       ansible.builtin.copy:
         dest: '{{ sdk_root }}/phone-boot-proof.json'
         content: '{{ phone_boot_receipt.stdout }}'
         owner: root
         mode: '0600'
     - name: Seal verified QA model registry
-      when: identity_enabled | default(false)
+      when:
+        - identity_enabled | default(false)
+        - not (device_sessions_enabled | default(false)) or identity_cache_check.rc != 0
       ansible.builtin.command:
         argv: ['{{ runtime_root }}/node/bin/node', '{{ release_root }}/identity-images.js', --seal]
       environment:

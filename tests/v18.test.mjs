@@ -638,7 +638,8 @@ test('1.8 managed tasks: real PostgreSQL, persistent orchestration and browser c
         await page.getByRole('button', { name: '下一步', exact: true }).click();
         await page.getByLabel('执行服务器', { exact: true }).selectOption(node.id);
         await page.getByLabel('APP 网络代理', { exact: true }).selectOption(proxy.id);
-        await page.getByLabel('同时执行轮数', { exact: true }).selectOption('2');
+        await expect(page.getByLabel('同时执行轮数', { exact: true })).toBeDisabled();
+        await expect(page.getByLabel('同时执行轮数', { exact: true })).toHaveValue('1');
         await page.getByRole('button', { name: '下一步', exact: true }).click();
         await page.getByLabel('所有 APK 合计完成轮数', { exact: true }).fill('5');
         await page.getByLabel('总尝试上限', { exact: true }).fill('15');
@@ -677,7 +678,7 @@ test('1.8 managed tasks: real PostgreSQL, persistent orchestration and browser c
         const browserConfig = await db.configVersion.findUniqueOrThrow({
           where: { id: browserTask.currentVersionId },
         });
-        assert.deepEqual(browserConfig.body.execution.appOpen, { dwellMs: 10000, concurrency: 2 });
+        assert.deepEqual(browserConfig.body.execution.appOpen, { dwellMs: 10000, concurrency: 1 });
         assert.equal(browserConfig.body.execution.autoRegistration, undefined);
         assert.deepEqual(browserConfig.body.registrationFlows, []);
         const freeVersion = await saveConfiguration(

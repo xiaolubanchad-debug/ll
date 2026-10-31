@@ -21,7 +21,7 @@ export interface AppOpenHooks extends AndroidOptions {
     sleep(ms: number, signal: AbortSignal): Promise<void>;
   };
 }
-// This path never reads APP content or calls UI automation. The owned client may report its own account.
+// Device sessions use bounded native controls for startup barriers; raw APP content is never returned.
 export async function openApk(
   config: TestConfiguration,
   target: Target,
