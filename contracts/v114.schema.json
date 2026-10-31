@@ -457,7 +457,7 @@
                 "pattern": "^[a-f0-9]{64}$"
               },
               "version": {
-                "const": "1.1.0"
+                "enum": ["1.1.0", "1.1.1"]
               },
               "filename": {
                 "type": "string",

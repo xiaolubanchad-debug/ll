@@ -107,7 +107,7 @@ export interface TestClientSuite {
     number: number;
     packageName: string;
     sha256: string;
-    version: '1.1.0';
+    version: '1.1.0' | '1.1.1';
     filename: string;
   }[];
 }

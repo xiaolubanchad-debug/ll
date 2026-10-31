@@ -13,9 +13,58 @@ import {
   runEvents,
   runTimeline,
   openAdmissionDeadline,
+  testClientInfo,
+  testClientSuite,
+  testClientArtifact,
 } from '@apk/platform';
 import { readFile } from 'node:fs/promises';
 import { beijingDay } from '../packages/platform/dist/daily-plan.js';
+
+test('published current ten-app suite is discoverable and rejects an unsupported release', async () => {
+  const root = await mkdtemp(resolve('.tmp/current-owned-suite-'));
+  const previous = process.env.TEST_CLIENT_ROOT;
+  process.env.TEST_CLIENT_ROOT = root;
+  try {
+    const apps = [];
+    for (let i = 0; i <= 10; i++) {
+      const bytes = randomBytes(256),
+        sha256 = digest(bytes),
+        packageName = 'com.apkplatform.testclient' + (i ? '.app' + i : '');
+      await writeFile(join(root, sha256 + '.apk'), bytes);
+      if (i) apps.push({ number: i, packageName, sha256, version: '1.1.1', filename: i + '.apk' });
+      else
+        await writeFile(
+          join(root, 'current.json'),
+          JSON.stringify({ sha256, version: '1.1.1', packageName }),
+        );
+    }
+    const publish = () => writeFile(join(root, 'suite.json'), JSON.stringify({ version: 1, apps }));
+    await publish();
+    const info = await testClientInfo();
+    assert.equal(info.ready, true);
+    assert.equal(info.suiteReady, true);
+    assert.equal(info.suiteCount, 10);
+    assert.equal(info.version, '1.1.1');
+    const suite = await testClientSuite();
+    assert.equal(suite.length, 10);
+    for (const app of apps) {
+      const artifact = await testClientArtifact(app.sha256);
+      assert.equal(artifact.version, '1.1.1');
+      assert.equal(artifact.packageName, app.packageName);
+    }
+    apps[0].version = '1.1.2';
+    await publish();
+    await assert.rejects(testClientSuite());
+    assert.equal((await testClientInfo()).suiteReady, false);
+    for (const app of apps) app.version = '1.1.0';
+    await publish();
+    assert.equal((await testClientInfo()).suiteReady, true);
+  } finally {
+    if (previous === undefined) delete process.env.TEST_CLIENT_ROOT;
+    else process.env.TEST_CLIENT_ROOT = previous;
+    await rm(root, { recursive: true, force: true });
+  }
+});
 
 test('owned APP accounts bind one installation, retain first request IP and remain separate from APP_OPEN proofs', async () => {
   const db = new PrismaClient(),
