@@ -1,5 +1,5 @@
 {
-  "version": "1.15.0",
+  "version": "1.15.4",
   "routes": [
     {
       "method": "get",
@@ -46,6 +46,15 @@
       "operationId": "testClientBootstrap",
       "request": "TestBootstrapInput",
       "response": "TestBootstrap",
+      "node": true,
+      "status": 200
+    },
+    {
+      "method": "post",
+      "path": "/agent/tasks/{taskId}/test-receipt",
+      "operationId": "testClientReceipt",
+      "request": "TestBootstrapInput",
+      "response": "TestClientReceipt",
       "node": true,
       "status": 200
     },

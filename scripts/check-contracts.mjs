@@ -1049,13 +1049,19 @@ test('1.14.1 accepts only pinned public artifact queries', () => {
     assert.ok(schemaIssues('TestClientQuery', x).length);
 });
 const enrollFixture = read('contracts/fixtures/test-enroll.valid.json');
+test('1.15.4 receipt contains only a committed-record indicator', () => {
+  assert.deepEqual(schemaIssues('TestClientReceipt', { received: true }), []);
+  assert.deepEqual(schemaIssues('TestClientReceipt', { received: false }), []);
+  assert.ok(schemaIssues('TestClientReceipt', { received: 'yes' }).length);
+  assert.ok(schemaIssues('TestClientReceipt', { received: true, password: 'forbidden' }).length);
+});
 const currentSuite = {
   version: 1,
   apps: Array.from({ length: 10 }, (_, i) => ({
     number: i + 1,
     packageName: 'com.apkplatform.testclient.app' + (i + 1),
     sha256: (i + 1).toString(16).padStart(64, '0'),
-    version: '1.1.1',
+    version: '1.1.2',
     filename: i + 1 + '.apk',
   })),
 };
@@ -1063,7 +1069,7 @@ test('1.15.3 current ten-app publication manifest', () =>
   assert.deepEqual(schemaIssues('TestClientSuite', currentSuite), []));
 test('1.15.3 publication rejects an unsupported client version', () => {
   const invalid = structuredClone(currentSuite);
-  invalid.apps[0].version = '1.1.2';
+  invalid.apps[0].version = '1.1.3';
   assert.ok(schemaIssues('TestClientSuite', invalid).length);
 });
 test('1.14 own client request', () =>
@@ -1072,13 +1078,13 @@ test('1.15.3 accepts current owned client with an explicit package', () =>
   assert.deepEqual(
     schemaIssues('TestEnrollInput', {
       ...enrollFixture,
-      appVersion: '1.1.1',
+      appVersion: '1.1.2',
       packageName: 'com.apkplatform.testclient.app10',
     }),
     [],
   ));
 test('1.15.3 rejects a current client without its package', () =>
-  assert.ok(schemaIssues('TestEnrollInput', { ...enrollFixture, appVersion: '1.1.1' }).length));
+  assert.ok(schemaIssues('TestEnrollInput', { ...enrollFixture, appVersion: '1.1.2' }).length));
 for (const patch of [
   { sourceIp: '198.51.100.1' },
   { androidId: 'not-hex' },

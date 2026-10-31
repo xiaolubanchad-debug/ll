@@ -93,6 +93,24 @@ test('open-only completion follows measured foreground dwell and cleanup, withou
           order.push('bootstrap');
           return { token: 'x'.repeat(43) };
         },
+        ...('receipt' in variant ||
+        variant.receiptThrows ||
+        variant.receiptHangs ||
+        variant.stopInReceipt
+          ? {
+              testReceipt: async () => {
+                assert.equal(closed, true, 'query only after APP cleanup');
+                assert.equal(now, 10000, 'query cannot extend foreground dwell');
+                order.push('receipt');
+                if (variant.stopInReceipt) abort.abort();
+                if (variant.receiptThrows) throw Error('private transport detail');
+                if (variant.receiptHangs) return new Promise(() => {});
+                return typeof variant.receipt === 'object'
+                  ? variant.receipt
+                  : { received: variant.receipt };
+              },
+            }
+          : {}),
         androidFactory: async (_profile, _signal, options) => {
           assert.equal(options.controlMode, 'LAUNCH_ONLY');
           assert.equal(options.ownedTestClient, variant.owned === true);
@@ -183,6 +201,45 @@ test('open-only completion follows measured foreground dwell and cleanup, withou
     assert.deepEqual(owned.order, ['install', 'bootstrap', 'provision', 'launch']);
     assert.deepEqual(owned.logs, [message]);
   }
+  const confirmed = await run({ owned: true, report: 'NETWORK_TIMEOUT', receipt: true });
+  assert.deepEqual(confirmed.logs, [
+    '自有测试 APK：网络响应尚未确认',
+    '自有测试 APK：中台已确认收到（APP响应未确认）',
+  ]);
+  assert.deepEqual(confirmed.order, ['install', 'bootstrap', 'provision', 'launch', 'receipt']);
+  assert.equal(confirmed.result.status, 'SUCCEEDED');
+  for (const variant of [
+    { receipt: false },
+    { receipt: { received: true, password: 'forbidden' } },
+    { receiptThrows: true },
+  ]) {
+    const pending = await run({ owned: true, report: 'NETWORK_TIMEOUT', ...variant });
+    assert.deepEqual(pending.logs, ['自有测试 APK：网络响应尚未确认']);
+    assert.equal(pending.result.proof, 'APP_OPEN');
+  }
+  for (const variant of [
+    { report: 'HTTP_200' },
+    { report: 'HTTP_403' },
+    { report: 'NETWORK_TIMEOUT', dirty: true },
+    { report: 'NETWORK_TIMEOUT', stopInCleanup: true },
+  ]) {
+    const skipped = await run({ owned: true, receipt: true, ...variant });
+    assert.equal(skipped.order.includes('receipt'), false);
+  }
+  const began = Date.now();
+  const timed = await run({ owned: true, report: 'NETWORK_TIMEOUT', receiptHangs: true });
+  assert.equal(timed.now, 10000);
+  assert.ok(Date.now() - began < 3500, 'unresponsive receipt query must be bounded');
+  assert.deepEqual(timed.logs, ['自有测试 APK：网络响应尚未确认']);
+  const stoppedReceipt = await run({
+    owned: true,
+    report: 'NETWORK_TIMEOUT',
+    receipt: true,
+    stopInReceipt: true,
+  });
+  assert.equal(stoppedReceipt.result.status, 'CANCELLED');
+  assert.deepEqual(stoppedReceipt.logs, ['自有测试 APK：网络响应尚未确认']);
+  assert.equal((await run({ receipt: true })).order.includes('receipt'), false);
   const { cleanupComplete, ...payload } = result;
   assert.equal(cleanupComplete, true);
   const envelope = {

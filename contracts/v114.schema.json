@@ -2,6 +2,12 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.apk-platform.example/v1/v114.schema.json",
   "$defs": {
+    "TestClientReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["received"],
+      "properties": { "received": { "type": "boolean" } }
+    },
     "TestEnrollInput": {
       "type": "object",
       "additionalProperties": false,
@@ -51,7 +57,7 @@
           "pattern": "^[ -~]+$"
         },
         "appVersion": {
-          "enum": ["1.0.0", "1.0.1", "1.1.0", "1.1.1"]
+          "enum": ["1.0.0", "1.0.1", "1.1.0", "1.1.1", "1.1.2"]
         },
         "appliedWebViewUa": {
           "type": "string",
@@ -82,7 +88,7 @@
           "if": {
             "properties": {
               "appVersion": {
-                "enum": ["1.1.0", "1.1.1"]
+                "enum": ["1.1.0", "1.1.1", "1.1.2"]
               }
             },
             "required": ["appVersion"]
@@ -457,7 +463,7 @@
                 "pattern": "^[a-f0-9]{64}$"
               },
               "version": {
-                "enum": ["1.1.0", "1.1.1"]
+                "enum": ["1.1.0", "1.1.1", "1.1.2"]
               },
               "filename": {
                 "type": "string",

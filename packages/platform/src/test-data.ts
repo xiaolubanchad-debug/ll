@@ -12,6 +12,7 @@ import type {
   TestDataQuery,
   TestDataCredentials,
   TestClientInfo,
+  TestClientReceipt,
   TestConfiguration,
 } from '@apk/contracts';
 import { isOwnedTestPackage } from '@apk/contracts';
@@ -198,6 +199,54 @@ export async function issueTestBootstrap(
       userAgent: enrollment.expectedUa,
       expiresAt: enrollment.expiresAt.toISOString(),
     });
+  });
+}
+export async function testClientReceipt(
+  db: PrismaClient,
+  token: string,
+  taskId: string,
+  body: unknown,
+): Promise<TestClientReceipt> {
+  const input = checked<TestBootstrapInput>('TestBootstrapInput', body);
+  return db.$transaction(async (tx) => {
+    const d = await boundDelivery(tx, token, input.nodeId, input.deliveryId, input.fence);
+    const task = await tx.task.findUnique({ where: { id: taskId } });
+    const version = d.run.configVersionId
+      ? await tx.configVersion.findUnique({ where: { id: d.run.configVersionId } })
+      : null;
+    const config = version?.body as unknown as TestConfiguration | undefined;
+    const slot = await tx.nodeSlot.findUnique({ where: { nodeId: input.nodeId } });
+    if (
+      !slot ||
+      slot.quarantined ||
+      slot.runId !== d.runId ||
+      slot.fence !== d.fence ||
+      d.run.purpose !== 'REGISTER' ||
+      !d.acceptedAt ||
+      d.leaseExpiresAt.getTime() <= Date.now() ||
+      !ACTIVE_RUNS.includes(d.run.status as (typeof ACTIVE_RUNS)[number]) ||
+      d.run.stopRequested ||
+      !task ||
+      task.runId !== d.runId ||
+      task.status !== 'HOLDING' ||
+      task.submittedAt ||
+      !config?.execution.appOpen?.ownedTestClient ||
+      !isOwnedTestPackage((task.apk as { packageName?: string } | null)?.packageName ?? '')
+    )
+      fault('TEST_CLIENT_SCOPE', '当前任务不允许核对测试回执', 409);
+    const enrollment = await tx.testEnrollment.findUnique({
+      where: { taskId },
+      include: { record: { select: { id: true } } },
+    });
+    if (
+      enrollment &&
+      (enrollment.nodeId !== input.nodeId ||
+        enrollment.deliveryId !== d.id ||
+        enrollment.fence !== d.fence ||
+        enrollment.expiresAt.getTime() <= Date.now())
+    )
+      fault('TEST_CLIENT_SCOPE', '测试回执归属或期限不符', 409);
+    return checked<TestClientReceipt>('TestClientReceipt', { received: !!enrollment?.record });
   });
 }
 export async function enrollTestClient(

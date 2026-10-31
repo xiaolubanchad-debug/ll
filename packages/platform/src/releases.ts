@@ -17,7 +17,7 @@ export function validManifest(body: unknown): ReleaseInput {
   const m = checked<ReleaseInput>('ReleaseInput', body);
   if (
     m.features?.includes('DEVICE_SESSIONS_V1') &&
-    (!['0.13.0', '0.13.1', '0.13.2'].includes(m.agentVersion) ||
+    (!['0.13.0', '0.13.1', '0.13.2', '0.13.3'].includes(m.agentVersion) ||
       [
         'DEVICE_VARIANTS_V1',
         'APP_OPEN_V1',

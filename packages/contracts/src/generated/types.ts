@@ -1,4 +1,8 @@
 // Generated. Run npm run generate:contracts.
+export interface TestClientReceipt {
+  received: boolean;
+}
+
 export interface TestEnrollInput {
   installationId: string;
   requestKey: string;
@@ -9,7 +13,7 @@ export interface TestEnrollInput {
   locale: string;
   declaredUserAgent: string;
   defaultWebViewUa: string;
-  appVersion: '1.0.0' | '1.0.1' | '1.1.0' | '1.1.1';
+  appVersion: '1.0.0' | '1.0.1' | '1.1.0' | '1.1.1' | '1.1.2';
   appliedWebViewUa: string;
   packageName?: string;
 }
@@ -107,7 +111,7 @@ export interface TestClientSuite {
     number: number;
     packageName: string;
     sha256: string;
-    version: '1.1.0' | '1.1.1';
+    version: '1.1.0' | '1.1.1' | '1.1.2';
     filename: string;
   }[];
 }

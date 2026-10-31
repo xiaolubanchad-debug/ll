@@ -1,5 +1,7 @@
 # HTTP 接口契约
 
+1.15.4 新增自有账户只读回执端点和固定确认日志，见 [回执契约](../docs/V1154_RECEIPT_CONTRACT.md)。
+
 1.15.3 兼容自有客户端 1.1.1；回传总预算、幂等和持续验收规则见 [回传契约](../docs/V1153_REPORTING_CONTRACT.md)。接口路径及 Agent 协议不变。
 
 1.15.2 的稳定依赖选择和启动退出处理见 [运行环境契约](../docs/V1152_RUNTIME_CONTRACT.md)。

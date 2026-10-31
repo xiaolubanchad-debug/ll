@@ -20,7 +20,16 @@ test('signed 0.12 releases retain all managed-task gates, while missing features
     [identitySupported, 'DEVICE_VARIANTS_V1'],
   ];
   for (const [supported, feature] of gates) {
-    for (const version of ['0.12.0', '0.12.1', '0.12.2', '0.12.3']) {
+    for (const version of [
+      '0.12.0',
+      '0.12.1',
+      '0.12.2',
+      '0.12.3',
+      '0.13.0',
+      '0.13.1',
+      '0.13.2',
+      '0.13.3',
+    ]) {
       assert.equal(supported([feature], version), true, feature + ':' + version);
       assert.equal(supported([], version), false);
     }

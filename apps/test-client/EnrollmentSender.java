@@ -31,7 +31,7 @@ public final class EnrollmentSender {
   private volatile Thread worker;
   private volatile ScheduledExecutorService deadlines;
 
-  public EnrollmentSender() { this(9000, 2500, 4, 150); }
+  public EnrollmentSender() { this(10000, 3500, 4, 150); }
   // Package-private, shorter budgets exercise real stalled sockets in JVM boundary tests.
   EnrollmentSender(long totalMs, long attemptMs, int attempts, long retryMs) {
     if (totalMs < 1 || attemptMs < 1 || attempts < 1 || retryMs < 0)

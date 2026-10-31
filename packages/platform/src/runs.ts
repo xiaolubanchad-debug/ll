@@ -748,7 +748,9 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
       fault('EVENT_CONFLICT', '日志与执行阶段不一致');
     if (
       native &&
-      p.message === '自有测试 APK：账户已上报' &&
+      ['自有测试 APK：账户已上报', '自有测试 APK：中台已确认收到（APP响应未确认）'].includes(
+        String(p.message),
+      ) &&
       !(await tx.testRecord.count({
         where: { enrollment: { taskId: task.id } },
       }))

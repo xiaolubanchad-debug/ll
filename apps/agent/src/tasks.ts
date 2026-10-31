@@ -466,6 +466,24 @@ export class TaskEngine {
                           throw new RegistrationError('TEST_BOOTSTRAP_FAILED');
                         return value as unknown as TestBootstrap;
                       },
+                      testReceipt: async (receiptSignal) => {
+                        await this.flush(d);
+                        beforeAction();
+                        receiptSignal.throwIfAborted();
+                        const value = await this.hub(
+                          'tasks/' + target.taskId + '/test-receipt',
+                          {
+                            protocolVersion: '1.0',
+                            nodeId: this.nodeId,
+                            deliveryId: d.deliveryId,
+                            fence: d.fence,
+                          },
+                          receiptSignal,
+                        );
+                        if (schemaIssues('TestClientReceipt', value).length)
+                          throw new RegistrationError('TEST_RECEIPT_UNCONFIRMED');
+                        return value as unknown as import('@apk/contracts').TestClientReceipt;
+                      },
                       beforeAction,
                       resources: async (record) => {
                         this.store.androidSlot(d.deliveryId, target.taskId, record);

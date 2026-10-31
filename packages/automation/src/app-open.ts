@@ -1,4 +1,4 @@
-import { isOwnedTestPackage, deviceVariant } from '@apk/contracts';
+import { isOwnedTestPackage, deviceVariant, schemaIssues } from '@apk/contracts';
 import { appObstructions } from './app-readiness.js';
 import { loadIdentityImage } from './identity-images.js';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -15,6 +15,7 @@ import type { RegistrationCompletion } from './registration.js';
 
 export interface AppOpenHooks extends AndroidOptions {
   testBootstrap?: () => Promise<import('@apk/contracts').TestBootstrap>;
+  testReceipt?: (signal: AbortSignal) => Promise<import('@apk/contracts').TestClientReceipt>;
   androidFactory?: typeof startAndroid;
   clock?: {
     now(): number;
@@ -33,7 +34,8 @@ export async function openApk(
   hooks: AppOpenHooks,
 ): Promise<RegistrationCompletion> {
   let session: AndroidSession | undefined,
-    cleanupComplete = true;
+    cleanupComplete = true,
+    reportUnconfirmed = false;
   let result: TaskCompletion = {
     status: 'FAILED',
     proof: 'NONE',
@@ -188,6 +190,8 @@ export async function openApk(
       const status =
         (await session.testClientStatus?.(apk.packageName).catch(() => 'UNCONFIRMED')) ??
         'UNCONFIRMED';
+      reportUnconfirmed =
+        status.startsWith('NETWORK_') || !/^(?:HTTP_[1-4][0-9]{2}|CONFIG_ERROR)$/.test(status);
       const message =
         status === 'HTTP_200'
           ? '自有测试 APK：账户已上报'
@@ -220,6 +224,36 @@ export async function openApk(
   } finally {
     if (session)
       cleanupComplete = await timer.measure('CLEANUP', () => session!.close()).catch(() => false);
+  }
+  if (cleanupComplete && !signal.aborted && reportUnconfirmed && hooks.testReceipt) {
+    const deadline = new AbortController();
+    const timeout = setTimeout(() => deadline.abort(), 2000);
+    const receiptSignal = AbortSignal.any([signal, deadline.signal]);
+    let onAbort: (() => void) | undefined;
+    try {
+      action();
+      receiptSignal.throwIfAborted();
+      const aborted = new Promise<never>((_resolve, reject) => {
+        onAbort = () => reject(new RegistrationError('TEST_RECEIPT_UNCONFIRMED'));
+        receiptSignal.addEventListener('abort', onAbort, { once: true });
+      });
+      const receipt = await Promise.race([hooks.testReceipt(receiptSignal), aborted]);
+      action();
+      if (!schemaIssues('TestClientReceipt', receipt).length && receipt.received)
+        await emit({
+          type: 'LOG',
+          taskId: target.taskId,
+          payload: {
+            level: 'INFO',
+            message: '自有测试 APK：中台已确认收到（APP响应未确认）',
+          },
+        });
+    } catch {
+      // Preserve the original native result; a failed read never creates or retries an account.
+    } finally {
+      clearTimeout(timeout);
+      if (onAbort) receiptSignal.removeEventListener('abort', onAbort);
+    }
   }
   // Never publish a completion before cleanup; a stop received during cleanup wins.
   if (!cleanupComplete)

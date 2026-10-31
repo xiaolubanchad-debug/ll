@@ -16,6 +16,7 @@ import {
   testClientInfo,
   testClientSuite,
   testClientArtifact,
+  testClientReceipt,
 } from '@apk/platform';
 import { readFile } from 'node:fs/promises';
 import { beijingDay } from '../packages/platform/dist/daily-plan.js';
@@ -31,11 +32,11 @@ test('published current ten-app suite is discoverable and rejects an unsupported
         sha256 = digest(bytes),
         packageName = 'com.apkplatform.testclient' + (i ? '.app' + i : '');
       await writeFile(join(root, sha256 + '.apk'), bytes);
-      if (i) apps.push({ number: i, packageName, sha256, version: '1.1.1', filename: i + '.apk' });
+      if (i) apps.push({ number: i, packageName, sha256, version: '1.1.2', filename: i + '.apk' });
       else
         await writeFile(
           join(root, 'current.json'),
-          JSON.stringify({ sha256, version: '1.1.1', packageName }),
+          JSON.stringify({ sha256, version: '1.1.2', packageName }),
         );
     }
     const publish = () => writeFile(join(root, 'suite.json'), JSON.stringify({ version: 1, apps }));
@@ -44,15 +45,15 @@ test('published current ten-app suite is discoverable and rejects an unsupported
     assert.equal(info.ready, true);
     assert.equal(info.suiteReady, true);
     assert.equal(info.suiteCount, 10);
-    assert.equal(info.version, '1.1.1');
+    assert.equal(info.version, '1.1.2');
     const suite = await testClientSuite();
     assert.equal(suite.length, 10);
     for (const app of apps) {
       const artifact = await testClientArtifact(app.sha256);
-      assert.equal(artifact.version, '1.1.1');
+      assert.equal(artifact.version, '1.1.2');
       assert.equal(artifact.packageName, app.packageName);
     }
-    apps[0].version = '1.1.2';
+    apps[0].version = '1.1.3';
     await publish();
     await assert.rejects(testClientSuite());
     assert.equal((await testClientInfo()).suiteReady, false);
@@ -204,8 +205,9 @@ test('owned APP accounts bind one installation, retain first request IP and rema
     const boot = await issueTestBootstrap(db, token, taskId, input),
       again = await issueTestBootstrap(db, token, taskId, input);
     assert.deepEqual(again, boot);
-    const log = (message) =>
-      runEvents(db, token, {
+    let sequence = 0;
+    const log = async (message) => {
+      await runEvents(db, token, {
         kind: 'events',
         protocolVersion: '1.0',
         nodeId,
@@ -216,16 +218,35 @@ test('owned APP accounts bind one installation, retain first request IP and rema
             eventId: randomUUID(),
             runId,
             taskId,
-            sequence: 1,
+            sequence: sequence + 1,
             occurredAt: new Date().toISOString(),
             type: 'LOG',
             payload: { level: 'INFO', message },
           },
         ],
       });
+      sequence++;
+    };
     await assert.rejects(log('自有测试 APK：账户已上报'), (e) => e.code === 'EVENT_CONFLICT');
     await db.task.update({ where: { id: taskId }, data: { status: 'HOLDING' } });
     await assert.rejects(log('自有测试 APK：账户已上报'), (e) => e.code === 'EVENT_CONFLICT');
+    await assert.rejects(
+      log('自有测试 APK：中台已确认收到（APP响应未确认）'),
+      (e) => e.code === 'EVENT_CONFLICT',
+    );
+    const receiptContext = { protocolVersion: '1.0', nodeId, deliveryId, fence: 1 };
+    assert.deepEqual(await testClientReceipt(db, token, taskId, receiptContext), {
+      received: false,
+    });
+    assert.equal(await db.testRecord.count({ where: { enrollment: { taskId } } }), 0);
+    await db.nodeSlot.update({ where: { nodeId }, data: { fence: 2 } });
+    await assert.rejects(testClientReceipt(db, token, taskId, receiptContext));
+    await db.nodeSlot.update({ where: { nodeId }, data: { fence: 1 } });
+    await assert.rejects(testClientReceipt(db, token, secondTask, receiptContext));
+    await assert.rejects(testClientReceipt(db, token, taskId, { ...receiptContext, fence: 2 }));
+    await assert.rejects(
+      testClientReceipt(db, token, taskId, { ...receiptContext, nodeId: randomUUID() }),
+    );
     const body = {
       installationId: randomUUID(),
       requestKey: randomUUID(),
@@ -237,7 +258,7 @@ test('owned APP accounts bind one installation, retain first request IP and rema
       declaredUserAgent: boot.userAgent,
       appliedWebViewUa: 'NOT_COLLECTED',
       defaultWebViewUa: 'NOT_COLLECTED',
-      appVersion: '1.1.1',
+      appVersion: '1.1.2',
       packageName: 'com.apkplatform.testclient',
     };
     await assert.rejects(
@@ -282,10 +303,24 @@ test('owned APP accounts bind one installation, retain first request IP and rema
     ]);
     assert.deepEqual(one, two);
     assert.deepEqual(one, created);
+    await assert.rejects(testClientReceipt(db, token, taskId, receiptContext));
     await db.task.update({ where: { id: taskId }, data: { status: 'HOLDING' } });
-    await log('自有测试 APK：账户已上报');
+    const receiptResponse = await fetch(base + '/agent/tasks/' + taskId + '/test-receipt', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify(receiptContext),
+    });
+    assert.equal(receiptResponse.status, 200);
+    assert.deepEqual(await receiptResponse.json(), { received: true });
+    assert.equal(await db.testRecord.count({ where: { enrollment: { taskId } } }), 1);
+    await log('自有测试 APK：中台已确认收到（APP响应未确认）');
     assert.equal(
       (await runTimeline(db, runId, { limit: '100' })).items[0].title,
+      '自有测试 APK：中台已确认收到（APP响应未确认）',
+    );
+    await log('自有测试 APK：账户已上报');
+    assert.equal(
+      (await runTimeline(db, runId, { limit: '100' })).items.at(-1).title,
       '自有测试 APK：账户已上报',
     );
     await assert.rejects(
@@ -300,7 +335,7 @@ test('owned APP accounts bind one installation, retain first request IP and rema
             eventId: randomUUID(),
             runId,
             taskId,
-            sequence: 2,
+            sequence: sequence + 1,
             occurredAt: new Date().toISOString(),
             type: 'LOG',
             payload: { level: 'INFO', message: '下载入口：已操作配置控件' },
@@ -363,6 +398,7 @@ test('owned APP accounts bind one installation, retain first request IP and rema
       where: { id: runId },
       data: { stopRequested: true, status: 'STOP_REQUESTED' },
     });
+    await assert.rejects(testClientReceipt(db, token, taskId, receiptContext));
     assert.deepEqual(
       await enrollTestClient(db, boot.token, body, '198.51.100.13', boot.userAgent),
       one,

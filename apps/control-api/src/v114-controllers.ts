@@ -7,6 +7,7 @@ import {
   testClientSuite,
   testClientArtifact,
   issueTestBootstrap,
+  testClientReceipt,
   enrollTestClient,
   checked,
 } from '@apk/platform';
@@ -78,6 +79,13 @@ export class V114Controller {
   @HttpCode(200)
   bootstrap(@Param('taskId') id: string, @Body() body: unknown, @Req() req: AuthedRequest) {
     return issueTestBootstrap(this.db, req.nodeToken!, uuid(id), body);
+  }
+  @NodeRoute() @Post('agent/tasks/:taskId/test-receipt') @HttpCode(200) receipt(
+    @Param('taskId') id: string,
+    @Body() body: unknown,
+    @Req() req: AuthedRequest,
+  ) {
+    return testClientReceipt(this.db, req.nodeToken!, uuid(id), body);
   }
   @TestAppRoute() @Post('test-data/enroll') @HttpCode(200) enroll(
     @Body() body: unknown,
