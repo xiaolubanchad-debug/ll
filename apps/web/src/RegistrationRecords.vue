@@ -127,9 +127,9 @@ onUnmounted(() => {
     <section class="surface">
       <div class="section-heading">
         <div>
-          <h2>注册记录</h2>
+          <h2>历史账户记录</h2>
           <p class="muted">
-            每个已进入执行的轮次一条记录。尚未执行的配额不计入尝试；人工决议与自动结果分开展示。
+            保留旧账户流程及人工核验记录。当前 APP 打开结果见执行历史，自有客户端上报见测试数据。
           </p>
         </div>
         <el-button
@@ -216,10 +216,8 @@ onUnmounted(() => {
       </div>
       <div v-if="!items.length && !busy" class="empty-state">
         <h3>当前筛选下暂无注册记录</h3>
-        <p>
-          仅部署、检查代理或下载 APK 不会生成产品注册记录。请调整日期，或在执行任务中建立注册批次。
-        </p>
-        <a :href="href('runs')">前往执行任务 →</a>
+        <p>当前使用 APP 打开测试，此处仅显示旧账户流程历史。可调整日期查阅。</p>
+        <a :href="href('runs')">查看执行历史 →</a>
       </div>
       <el-button v-if="cursor" :disabled="busy" @click="load(true)">加载更多注册记录</el-button>
     </section>

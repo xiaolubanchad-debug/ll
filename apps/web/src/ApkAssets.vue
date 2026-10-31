@@ -46,7 +46,7 @@ onMounted(() => void load());
   <section class="surface">
     <h2>APK 校验记录</h2>
     <p class="muted">
-      按下载日期查看已取得的包信息。历史记录不代表文件仍保留在节点；注册前执行端会再次核验缓存。
+      按下载日期查看已取得的包信息。历史记录不代表文件仍保留在节点；安装前执行端会再次核验缓存。
     </p>
     <form class="toolbar" @submit.prevent="navigate('assets', '', { day, q })">
       <label>下载日期<input v-model="day" type="date" /></label

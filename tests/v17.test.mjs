@@ -619,11 +619,18 @@ test('1.7 console acceptance: real database, long timelines and browser navigati
         await page.goto(process.env.APP_ORIGIN + '/#/overview');
         await page.getByLabel('统计日期（北京时间）').fill(day);
         await page.getByLabel('统计日期（北京时间）').dispatchEvent('change');
+        await page.getByText('历史账户流程统计', { exact: true }).click();
         await expect(
-          page.locator('.metric-card').filter({ hasText: '注册成功' }).locator('strong'),
+          page
+            .locator('.legacy-summary .metric-card')
+            .filter({ hasText: '注册成功' })
+            .locator('strong'),
         ).toHaveText('134');
         await expect(
-          page.locator('.metric-card').filter({ hasText: '待核验' }).locator('strong'),
+          page
+            .locator('.legacy-summary .metric-card')
+            .filter({ hasText: '待核验' })
+            .locator('strong'),
         ).toHaveText('1');
         await page.screenshot({
           path: join(process.env.P1_TEST_DIR, 'v17-overview.png'),

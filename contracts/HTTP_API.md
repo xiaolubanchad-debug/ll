@@ -1,5 +1,7 @@
 # HTTP 接口契约
 
+1.16 将日常配置、部署、开始、停止及日志集中到服务器页，当前流程统一为 APP 打开停留，历史账户流程保留查询，见 [服务器工作台契约](../docs/V116_SERVER_CONSOLE_CONTRACT.md)。
+
 1.15.4 新增自有账户只读回执端点和固定确认日志，见 [回执契约](../docs/V1154_RECEIPT_CONTRACT.md)。
 
 1.15.3 兼容自有客户端 1.1.1；回传总预算、幂等和持续验收规则见 [回传契约](../docs/V1153_REPORTING_CONTRACT.md)。接口路径及 Agent 协议不变。
@@ -40,7 +42,7 @@
 
 1.7 中台结果、中文日志、数据库汇总、历史回填与页面操作遵循 [1.7 契约](../docs/V17_CONTRACT.md)，操作见 [使用说明](../docs/V17_SETUP.md)。兼容 Agent 0.6.0，不改变注册提交及未知结果规则。
 
-版本 1.15.1，前缀 /api/v1。已实现路由由 p0.http.json 至 v18.http.json 以及 v114.http.json 合并生成 openapi.json，CI 比较 Controller、清单和 OpenAPI。下表保留后续阶段设计，以机器清单判定实现范围。
+版本 1.16.0，前缀 /api/v1。已实现路由由 p0.http.json 至 v18.http.json 以及 v114.http.json 合并生成 openapi.json，CI 比较 Controller、清单和 OpenAPI。下表保留后续阶段设计，以机器清单判定实现范围。
 
 1.6 增加可选 execution.autoRegistration、DISCOVERING 阶段和任务 recognition 摘要，见 [自动识别契约](../docs/V16_CONTRACT.md)。不增加任意截图识别、代码执行或公开 Appium 接口。自动模式仍只允许一次提交，未知结果暂停；启用配置要求新的 AUTO_REGISTRATION_V1 签名发布。
 

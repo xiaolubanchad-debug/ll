@@ -1,9 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from 'vue';
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
 import { configurationIssues, schemaIssues } from '@apk/contracts';
 import { api, mutation } from './api';
-import RegistrationFlowEditor from './RegistrationFlowEditor.vue';
-import AutomaticRegistrationEditor from './AutomaticRegistrationEditor.vue';
 import MaintenanceManager from './MaintenanceManager.vue';
 const props = defineProps<{ draftText: string }>();
 const emit = defineEmits<{ load: [value: string] }>();
@@ -33,26 +31,23 @@ const proxyHost = ref(''),
   proxyUser = ref(''),
   proxyPassword = ref(''),
   proxyId = ref('');
-const automatic = ref(false),
-  proxyApplied = ref(false);
-function toggleAutomatic() {
+const legacy = computed(() => {
+  try {
+    const v = JSON.parse(props.draftText);
+    return v.execution?.mode === 'FULL' && !v.execution.appOpen;
+  } catch {
+    return false;
+  }
+});
+function convert() {
   void action(async () => {
-    const value = JSON.parse(props.draftText);
-    if (automatic.value) {
-      if (value.execution.mode !== 'FULL' || !value.execution.proxySecretVersionId)
-        throw Error('请先应用已保存的代理');
-      value.execution.autoRegistration = {
-        enabled: true,
-        screenshotFallback: true,
-        maxNavigationSteps: 8,
-        timeoutMs: 60000,
-        successTimeoutMs: 60000,
-        ...value.execution.autoRegistration,
-      };
-      value.execution.autoRegistration.enabled = true;
-    } else delete value.execution.autoRegistration;
-    emit('load', JSON.stringify(value, null, 2));
-    notice.value = '注册方式已应用到草稿，保存新版本后在下一次执行生效。';
+    const v = JSON.parse(props.draftText);
+    v.execution.appOpen = { dwellMs: 10000, concurrency: 1 };
+    v.execution.contentIsolation = true;
+    delete v.execution.autoRegistration;
+    v.registrationFlows = [];
+    emit('load', JSON.stringify(v, null, 2));
+    notice.value = '已转换当前草稿。保存为新版本后生效，历史记录保留。';
   });
 }
 const proxies = ref<{ id: string; createdAt: string; name?: string | null }[]>([]);
@@ -97,14 +92,21 @@ function applyProxy() {
       body.execution.mode = 'DOWNLOAD_ONLY';
       delete body.execution.proxySecretVersionId;
       delete body.execution.autoRegistration;
+      delete body.execution.appOpen;
+      body.registrationFlows = [];
       emit('load', JSON.stringify(body, null, 2));
       notice.value = '已移除代理，草稿切换为仅下载模式。';
       return;
     }
+    if (legacy.value) throw Error('请先明确转换历史流程，再修改代理');
     body.execution.mode = 'FULL';
+    body.execution.appOpen ??= { dwellMs: 10000, concurrency: 1 };
+    body.execution.contentIsolation = true;
+    delete body.execution.autoRegistration;
+    body.registrationFlows = [];
     body.execution.proxySecretVersionId = proxyId.value;
     emit('load', JSON.stringify(body, null, 2));
-    notice.value = '已将代理应用到完整注册草稿，请选择自动识别或手工流程，再保存新版本。';
+    notice.value = '已将代理应用到 APP 打开测试草稿。保存新版本后生效。';
   });
 }
 async function action(work: () => Promise<void>) {
@@ -158,6 +160,7 @@ async function save() {
     } catch {
       throw Error('配置 JSON 格式无效');
     }
+    if (legacy.value) throw Error('请先将历史流程转换为 APP 打开测试，再保存新版本');
     if (configurationIssues(body).length) throw Error('请先修正配置校验问题');
     await mutation('/configs/' + selected.value!.id + '/versions', body, {
       'If-Match': String(selected.value!.version),
@@ -195,8 +198,6 @@ watch(
     try {
       const value = JSON.parse(props.draftText);
       proxyId.value = value.execution?.proxySecretVersionId ?? '';
-      proxyApplied.value = value.execution?.mode === 'FULL' && !!proxyId.value;
-      automatic.value = value.execution?.autoRegistration?.enabled === true;
     } catch {
       /* Keep the current selection while editing JSON. */
     }
@@ -206,11 +207,10 @@ watch(
 </script>
 <template>
   <div class="version-manager">
-    <h2>代理、注册方式与方案版本</h2>
+    <h2>代理与配置版本</h2>
     <p class="muted">内容隔离默认开启，旧配置同样生效。仅保存受限功能证据，不展示原始 APP 内容。</p>
     <p class="muted">
-      保存产生新版本，运行中的任务继续使用原版本。手工流程优先；开启自动识别后，其余 APK
-      自动寻找入口，无法识别时待适配。
+      保存产生新版本，运行中的任务继续使用原版本。当前流程为安装、打开、停留 10 秒和清理。
     </p>
     <el-alert v-if="error" :title="error" type="error" :closable="false" /><el-alert
       v-if="notice"
@@ -218,7 +218,7 @@ watch(
       type="success"
       :closable="false"
     />
-    <label for="scheme-proxy">注册所用代理</label
+    <label for="scheme-proxy">APP 网络代理</label
     ><select id="scheme-proxy" v-model="proxyId" @change="applyProxy">
       <option value="">请选择已保存代理</option>
       <option v-for="p in proxies" :key="p.id" :value="p.id">
@@ -229,15 +229,10 @@ watch(
       <el-button :disabled="busy || !proxyId" @click="applyProxy">应用所选代理到草稿</el-button
       ><a href="#/proxies">管理和检查代理 →</a>
     </div>
-    <label class="inline-check"
-      ><input
-        v-model="automatic"
-        type="checkbox"
-        :disabled="!proxyApplied"
-        @change="toggleAutomatic"
-      />自动寻找各 APP 的注册入口</label
-    >
-    <p v-if="!proxyApplied" class="muted">先选择并应用代理，再开启自动注册入口识别。</p>
+    <div v-if="legacy" class="confirmation-box" role="alert">
+      <p>载入了历史账户流程。旧版本保持原样；转换草稿后可另存为 APP 打开测试。</p>
+      <el-button :disabled="busy" @click="convert">转换为 APP 打开测试</el-button>
+    </div>
     <details>
       <summary>快速新增代理（可选）</summary>
       <label for="proxy-host">代理地址</label
@@ -276,11 +271,9 @@ watch(
       </select>
       <el-button :disabled="busy || !proxyId" @click="applyProxy">将代理应用到当前草稿</el-button>
       <p class="muted">
-        凭据不会写入配置 JSON。轮询代理的探测 IP 只代表探测当时，不保证注册请求使用相同出口。
+        凭据不会写入配置 JSON。轮询代理的探测 IP 只代表探测当时，不保证 APP 请求使用相同出口。
       </p>
     </details>
-    <RegistrationFlowEditor :draft-text="draftText" @load="(value) => emit('load', value)" />
-    <AutomaticRegistrationEditor :draft-text="draftText" @load="(value) => emit('load', value)" />
     <label for="config-name">配置名称</label
     ><el-input id="config-name" v-model="name" maxlength="100" />
     <div class="form-actions">

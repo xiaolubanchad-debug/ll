@@ -38,6 +38,14 @@ export function ifMatch(value: string | undefined) {
 export async function nodeView(db: PrismaClient, id: string) {
   const node = await db.node.findUnique({ where: { id }, include: { slot: true } });
   if (!node || node.archivedAt) fault('NOT_FOUND', '服务器不存在', 404);
+  const active = node.slot?.operationId
+    ? await db.deployment.findUnique({
+        where: { id: node.slot.operationId },
+        select: { stopRequested: true },
+      })
+    : node.slot?.runId
+      ? await db.run.findUnique({ where: { id: node.slot.runId }, select: { stopRequested: true } })
+      : null;
   return {
     id: node.id,
     name: node.name,
@@ -56,6 +64,9 @@ export async function nodeView(db: PrismaClient, id: string) {
       : node.slot?.operationId || node.slot?.runId
         ? 'BUSY'
         : 'IDLE',
+    activeRunId: node.slot?.runId ?? null,
+    activeOperationId: node.slot?.operationId ?? null,
+    activeStopRequested: active?.stopRequested ?? false,
     downloadProtocol: node.downloadProtocol,
     registrationProtocol: node.registrationProtocol,
     lastSeenAt: node.lastSeenAt,

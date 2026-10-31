@@ -1028,6 +1028,128 @@ label > select {
   display: grid;
   gap: 8px;
 }
+.server-console-table {
+  min-width: 1100px;
+  font-size: 13px;
+}
+.server-console-table thead {
+  background: #eff4f8;
+  color: #65748a;
+}
+.server-console-table th {
+  white-space: nowrap;
+  font-weight: 600;
+}
+.server-console-table td {
+  vertical-align: middle;
+}
+.server-console-table small {
+  display: block;
+  margin-top: 6px;
+  color: #78849a;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.server-task-cell {
+  min-width: 220px;
+  max-width: 300px;
+}
+.server-manager .server-task-cell select {
+  width: 100%;
+  min-height: 36px;
+  margin: 0;
+  padding: 6px 8px;
+}
+.server-status {
+  display: inline-block;
+  border-radius: 5px;
+  background: #eef2f6;
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+.server-status.ready {
+  color: #26734f;
+  background: #e8f4ec;
+}
+.server-status.attention {
+  color: #995a12;
+  background: #fff3dc;
+}
+.server-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 320px;
+}
+.server-row-actions .el-button + .el-button {
+  margin-left: 0;
+}
+.server-row-actions .el-button {
+  padding: 8px 10px;
+}
+.server-task-editor {
+  scroll-margin-top: 20px;
+}
+.server-task-editor .task-wizard {
+  max-width: 100%;
+}
+.server-inline-log {
+  min-width: 0;
+}
+.legacy-summary {
+  color: #65748a;
+}
+.legacy-summary > summary {
+  cursor: pointer;
+}
+.legacy-summary .metric-grid {
+  margin-top: 16px;
+}
+@media (max-width: 640px) {
+  .server-manager .server-console-table {
+    display: block;
+    min-width: 0;
+  }
+  .server-console-table thead {
+    display: none;
+  }
+  .server-console-table tbody {
+    display: block;
+  }
+  .server-console-table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 12px;
+    padding: 16px 0;
+    border-bottom: 1px solid #e6edf4;
+  }
+  .server-console-table td {
+    display: block;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+  }
+  .server-console-table td::before {
+    content: attr(data-label);
+    display: block;
+    color: #78849a;
+    font-size: 11px;
+    margin-bottom: 6px;
+  }
+  .server-console-table td:first-child,
+  .server-console-table td:nth-child(4),
+  .server-console-table td:last-child {
+    grid-column: 1 / -1;
+  }
+  .server-task-cell {
+    max-width: none;
+    min-width: 0;
+  }
+  .server-row-actions {
+    min-width: 0;
+  }
+}
 @media (max-width: 640px) {
   .console-table {
     min-width: 540px;

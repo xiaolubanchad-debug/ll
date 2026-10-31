@@ -428,6 +428,15 @@ export async function consoleOverview(db: PrismaClient, query: unknown): Promise
         registrationStartedAt: dates,
         ...(q.nodeId ? { run: { nodeId: q.nodeId } } : {}),
       };
+      const openScope: Prisma.TaskWhereInput = {
+        attemptStarted: true,
+        run: {
+          purpose: 'REGISTER',
+          cacheDay: day,
+          executionPlan: { path: ['openPolicy'], not: Prisma.AnyNull },
+          ...(q.nodeId ? { nodeId: q.nodeId } : {}),
+        },
+      };
       const [
         total,
         online,
@@ -438,6 +447,8 @@ export async function consoleOverview(db: PrismaClient, query: unknown): Promise
         registrations,
         reviewedUnknown,
         active,
+        openCounts,
+        testReports,
       ] = await Promise.all([
         tx.node.count({ where: { archivedAt: null } }),
         tx.node.count({
@@ -489,7 +500,20 @@ export async function consoleOverview(db: PrismaClient, query: unknown): Promise
           orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
           take: 10,
         }),
+        tx.task.groupBy({
+          by: ['status', 'proof'],
+          where: openScope,
+          _count: true,
+        }),
+        tx.testRecord.count({ where: { enrollment: { task: openScope } } }),
       ]);
+      const countOpen = (statuses: string[], proof?: string) =>
+        openCounts.reduce(
+          (sum, row) =>
+            sum +
+            (statuses.includes(row.status) && (!proof || row.proof === proof) ? row._count : 0),
+          0,
+        );
       return output('OverviewView', {
         day,
         generatedAt: new Date().toISOString(),
@@ -498,6 +522,18 @@ export async function consoleOverview(db: PrismaClient, query: unknown): Promise
         registrations,
         reviewedUnknown,
         activeRuns: active.map(runView),
+        appOpens: {
+          attempts: openCounts.reduce((sum, row) => sum + row._count, 0),
+          completed: countOpen(['SUCCEEDED'], 'APP_OPEN'),
+          failed: countOpen(['FAILED']),
+          pending: openCounts.reduce(
+            (sum, row) => sum + (!terminal.includes(row.status) ? row._count : 0),
+            0,
+          ),
+          stopped: countOpen(['CANCELLED']),
+          needsReview: countOpen(['UNKNOWN']),
+          testReports,
+        },
       });
     },
     { isolationLevel: 'RepeatableRead' },

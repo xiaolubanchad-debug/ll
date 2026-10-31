@@ -128,7 +128,7 @@ onUnmounted(() => {
       >加载更早日志</el-button
     >
     <p v-if="!items.length && !busy" class="empty-state">
-      节点尚未上报执行日志。任务未开始时不会生成注册结果。
+      节点尚未上报执行日志。任务未开始时不会生成执行结果。
     </p>
     <label v-if="sessions.length"
       >设备会话

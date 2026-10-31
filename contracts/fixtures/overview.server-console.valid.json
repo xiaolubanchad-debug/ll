@@ -1,0 +1,35 @@
+{
+  "day": "2026-10-20",
+  "generatedAt": "2026-10-20T00:05:00.000Z",
+  "servers": {
+    "total": 1,
+    "online": 1,
+    "busy": 0,
+    "quarantined": 0
+  },
+  "downloads": {
+    "validated": 10,
+    "failed": 0
+  },
+  "registrations": {
+    "SUCCESS": 0,
+    "REJECTED": 0,
+    "ERROR": 0,
+    "ADAPTATION": 0,
+    "UNKNOWN": 0,
+    "SKIPPED": 0,
+    "STOPPED": 0,
+    "PENDING": 0
+  },
+  "reviewedUnknown": 0,
+  "activeRuns": [],
+  "appOpens": {
+    "completed": 20,
+    "failed": 0,
+    "attempts": 20,
+    "pending": 0,
+    "stopped": 0,
+    "needsReview": 0,
+    "testReports": 19
+  }
+}

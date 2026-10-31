@@ -124,7 +124,7 @@ onUnmounted(() => {
 <template>
   <div class="console-stack">
     <div class="toolbar">
-      <a v-if="route.id" :href="href('tasks')">← 返回任务中心</a
+      <a v-if="route.id" :href="href('tasks')">← 返回任务配置</a
       ><el-button v-if="!editor" type="primary" @click="navigate('tasks', '', { new: 'true' })"
         >新建任务</el-button
       ><el-button @click="refresh()">刷新</el-button
@@ -153,7 +153,7 @@ onUnmounted(() => {
       </p>
       <section v-if="!items.length && !detail" class="surface empty-state">
         <h2>创建第一个任务</h2>
-        <p>填写网站和 XPath，选择服务器、代理及成功目标。版本与下载批次由系统管理。</p>
+        <p>填写网站和 XPath，选择服务器、代理及 APP 打开次数。版本与下载批次由系统管理。</p>
         <el-button type="primary" @click="navigate('tasks', '', { new: 'true' })"
           >创建任务</el-button
         >
@@ -187,7 +187,7 @@ onUnmounted(() => {
           >
         </div>
         <p v-if="task.executionKind === 'APP_OPEN'" class="muted">
-          并发 {{ task.concurrency ?? 1 }} 路 · 每台服务器共享额度：今日已用
+          单模拟器执行 · 每台服务器每日额度：今日已用
           {{ task.dailyUsage?.used ?? 0 }} / {{ task.dailyUsage?.limit ?? 800 }}，剩余
           {{ task.dailyUsage?.remaining ?? 800 }} 轮尝试。
         </p>

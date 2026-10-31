@@ -6,7 +6,7 @@ import { href, route, navigate } from './navigation';
 import { today, when, stateLabels } from './console-format';
 import { purposeLabels, reasonLabels } from './result-labels';
 import DailySchedulePanel from './DailySchedulePanel.vue';
-const tab = ref(route.value.query.get('tab') ?? 'create'),
+const tab = ref(route.value.query.get('tab') ?? 'history'),
   nodes = ref<NodeView[]>([]),
   configs = ref<{ id: string; name: string }[]>([]),
   versions = ref<{ id: string; version: number }[]>([]),
@@ -24,6 +24,9 @@ const nodeId = ref(''),
   body = ref<TestConfiguration | null>(null),
   busy = ref(false),
   error = ref('');
+const legacyTools = ref(['create', 'plans'].includes(route.value.query.get('tab') ?? ''));
+const listKind = ref(route.value.query.get('executionKind') ?? ''),
+  listDay = ref(route.value.query.get('day') ?? '');
 const listPurpose = ref(route.value.query.get('purpose') ?? ''),
   listStatus = ref(route.value.query.get('status') ?? '');
 const node = computed(() => nodes.value.find((n) => n.id === nodeId.value)),
@@ -67,6 +70,8 @@ async function work(fn: () => Promise<void>) {
 async function loadRuns(append = false) {
   const query = new URLSearchParams({
     limit: '30',
+    ...(listKind.value ? { executionKind: listKind.value } : {}),
+    ...(listDay.value ? { cacheDay: listDay.value } : {}),
     ...(listPurpose.value ? { purpose: listPurpose.value } : {}),
     ...(listStatus.value ? { status: listStatus.value } : {}),
     ...(append && cursor.value ? { cursor: cursor.value } : {}),
@@ -153,6 +158,8 @@ watch(
   () => route.value.key,
   () => {
     tab.value = route.value.query.get('tab') ?? 'create';
+    listKind.value = route.value.query.get('executionKind') ?? '';
+    listDay.value = route.value.query.get('day') ?? '';
     listPurpose.value = route.value.query.get('purpose') ?? '';
     listStatus.value = route.value.query.get('status') ?? '';
     void work(() => loadRuns());
@@ -182,7 +189,11 @@ onUnmounted(() => clearInterval(timer));
 </script>
 <template>
   <div class="console-stack">
-    <div class="section-tabs" role="tablist" aria-label="执行任务分区">
+    <div class="toolbar">
+      <a :href="href('nodes')">← 返回服务器工作台</a
+      ><el-button text @click="legacyTools = !legacyTools">历史兼容工具</el-button>
+    </div>
+    <div v-if="legacyTools" class="section-tabs" role="tablist" aria-label="执行任务分区">
       <button
         :class="{ active: tab === 'create' }"
         role="tab"
@@ -210,7 +221,10 @@ onUnmounted(() => clearInterval(timer));
     <section v-if="tab !== 'history'" class="surface config-form">
       <span class="phase-tag">{{ tab === 'plans' ? '计划绑定信息' : '执行准备' }}</span>
       <h2>{{ tab === 'plans' ? '选择计划的服务器与方案' : '开始测试任务' }}</h2>
-      <p class="muted">保存方案 → 下载当天 APK → 开始注册。服务器同一时刻只执行一批任务。</p>
+      <p class="muted">
+        旧版兼容工具。日常下载与 APP
+        打开测试请在服务器列表开始，历史批次和未知结果保留原有处理规则。
+      </p>
       <div class="filter-grid">
         <label for="run-node"
           >执行服务器<select
@@ -250,8 +264,13 @@ onUnmounted(() => clearInterval(timer));
       <div v-if="node && versionId" class="selection-summary">
         绑定服务器：{{ node.name }} · 方案：{{ configs.find((c) => c.id === configId)?.name }} ·
         版本 {{ versions.find((v) => v.id === versionId)?.version }} ·
-        {{ body?.execution.mode === 'FULL' ? '下载并注册' : '仅下载'
-        }}<small v-if="body?.execution.mode === 'FULL'"
+        {{
+          body?.execution.appOpen
+            ? '下载并打开 APP'
+            : body?.execution.mode === 'FULL'
+              ? '历史账户流程'
+              : '仅下载'
+        }}<small v-if="body?.execution.mode === 'FULL' && !body.execution.appOpen"
           >注册方式：{{
             body.execution.autoRegistration?.enabled
               ? '自动寻找入口，手工流程优先'
@@ -263,7 +282,9 @@ onUnmounted(() => clearInterval(timer));
         ><label for="run-purpose"
           >执行内容<select id="run-purpose" aria-label="执行内容" v-model="purpose">
             <option value="DOWNLOAD">仅下载当天 APK（每天一次）</option>
-            <option value="REGISTER">复用当天 APK 循环注册</option>
+            <option value="REGISTER">
+              {{ body?.execution.appOpen ? '复用当天 APK 打开测试' : '旧版账户流程' }}
+            </option>
             <option value="LEGACY">旧版单次流程</option>
           </select></label
         >
@@ -303,11 +324,13 @@ onUnmounted(() => clearInterval(timer));
         </div>
         <p v-if="unavailable" class="readiness-hint">{{ unavailable }}</p>
         <el-button type="primary" :disabled="busy || !!unavailable" @click="start">{{
-          purpose === 'REGISTER'
-            ? '开始循环注册'
-            : purpose === 'LEGACY' && body?.execution.mode === 'FULL'
-              ? '开始安装注册'
-              : '开始下载'
+          body?.execution.appOpen
+            ? '开始 APP 测试'
+            : purpose === 'REGISTER'
+              ? '开始循环注册'
+              : purpose === 'LEGACY' && body?.execution.mode === 'FULL'
+                ? '开始安装注册'
+                : '开始下载'
         }}</el-button></template
       >
     </section>
@@ -327,14 +350,29 @@ onUnmounted(() => clearInterval(timer));
       <form
         class="toolbar"
         @submit.prevent="
-          navigate('runs', '', { tab: 'history', purpose: listPurpose, status: listStatus })
+          navigate('runs', '', {
+            tab: 'history',
+            purpose: listPurpose,
+            status: listStatus,
+            executionKind: listKind,
+            day: listDay,
+          })
         "
       >
+        <label
+          >流程<select v-model="listKind">
+            <option value="">全部流程</option>
+            <option value="APP_OPEN">APP 打开测试</option>
+            <option value="DOWNLOAD_ONLY">APK 下载</option>
+            <option value="REGISTRATION">历史账户流程</option>
+          </select></label
+        >
+        <label>APK 业务日期<input v-model="listDay" type="date" /></label>
         <label
           >执行类型<select v-model="listPurpose">
             <option value="">全部类型</option>
             <option v-for="(label, key) in purposeLabels" :key="key" :value="key">
-              {{ label }}
+              {{ key === 'REGISTER' ? 'APP 执行（含历史流程）' : label }}
             </option>
           </select></label
         ><label

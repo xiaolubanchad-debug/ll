@@ -1208,6 +1208,49 @@
               "errorCode"
             ]
           }
+        },
+        "appOpens": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "completed",
+            "failed",
+            "attempts",
+            "pending",
+            "stopped",
+            "needsReview",
+            "testReports"
+          ],
+          "properties": {
+            "completed": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "failed": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "attempts": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "pending": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "stopped": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "needsReview": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "testReports": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
         }
       },
       "required": [

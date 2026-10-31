@@ -45,30 +45,31 @@ sample.source.url = '';
 sample.execution.mode = 'DOWNLOAD_ONLY';
 Reflect.deleteProperty(sample.execution, 'proxySecretVersionId');
 sample.registrationFlows = [];
+Reflect.set(sample.execution, 'contentIsolation', true);
 const draftText = ref(JSON.stringify(sample, null, 2));
 const labels: Record<Section, string> = {
   'test-data': '测试数据',
   overview: '工作台',
-  tasks: '任务中心',
+  tasks: '任务配置',
   config: '任务方案',
-  runs: '执行任务',
-  results: '注册记录',
+  runs: '执行历史',
+  results: '历史账户记录',
   assets: 'APK 资源',
   proxies: '代理管理',
   nodes: '服务器',
   security: '系统设置',
 };
 const mainSections = [
-  'overview',
+  'nodes',
   'tasks',
-  'results',
+  'runs',
+  'overview',
   'test-data',
   'assets',
   'proxies',
-  'nodes',
   'security',
 ] as const;
-const advancedSections = ['config', 'runs'] as const;
+const advancedSections = ['config', 'results'] as const;
 function message(e: unknown) {
   return e instanceof Error ? e.message : '操作失败，请稍后重试';
 }
@@ -152,6 +153,12 @@ function syncMode() {
   try {
     const value = JSON.parse(draftText.value);
     value.execution.mode = executionMode.value;
+    value.execution.contentIsolation = true;
+    delete value.execution.autoRegistration;
+    value.registrationFlows = [];
+    if (executionMode.value === 'FULL')
+      value.execution.appOpen ??= { dwellMs: 10000, concurrency: 1 };
+    else delete value.execution.appOpen;
     if (executionMode.value === 'DOWNLOAD_ONLY') {
       delete value.execution.proxySecretVersionId;
       delete value.execution.autoRegistration;
@@ -333,7 +340,7 @@ onMounted(async () => {
         </button>
       </nav>
       <details class="advanced-navigation" :open="advancedSections.some((key) => key === section)">
-        <summary>高级操作</summary>
+        <summary>历史与高级设置</summary>
         <nav aria-label="高级导航">
           <button
             v-for="key in advancedSections"
@@ -347,7 +354,7 @@ onMounted(async () => {
       </details>
       <div class="sidebar-bottom">
         <span class="status-dot"></span> 执行记录统一管理
-        <p>1.8 · 任务与执行管理</p>
+        <p>1.16 · 服务器工作台</p>
       </div>
     </aside>
     <div class="main-area">
@@ -367,16 +374,18 @@ onMounted(async () => {
             <p class="muted">
               {{
                 section === 'overview'
-                  ? '查看注册结果、下载进度及需要处理的问题。'
-                  : section === 'tasks'
-                    ? '配置一次，直接开始、停止与查看结果。'
-                    : section === 'config'
-                      ? '设置网站、下载规则与注册方式，保存后在新执行中生效。'
-                      : '所有记录来自当前中台数据库。'
+                  ? '查看 APP 打开结果、下载进度与自有测试上报。'
+                  : section === 'nodes'
+                    ? '选择配置，直接部署、开始、停止和查看日志。'
+                    : section === 'tasks'
+                      ? '配置一次，直接开始、停止与查看结果。'
+                      : section === 'config'
+                        ? '维护下载与 APP 打开配置版本，运行中的任务保持原快照。'
+                        : '所有记录来自当前中台数据库。'
               }}
             </p>
           </div>
-          <span class="phase-tag">1.8 管理控制台</span>
+          <span class="phase-tag">1.16 管理控制台</span>
         </div>
         <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon />
         <el-alert v-if="notice" :title="notice" type="success" :closable="false" show-icon />
@@ -391,15 +400,14 @@ onMounted(async () => {
         <ExecutionCenter v-else-if="section === 'runs'" />
         <section v-else-if="section === 'config'" class="surface config-form">
           <h2>任务方案设置</h2>
-          <p class="muted">仅执行格式校验，不访问网站、不下载或注册。</p>
+          <p class="muted">维护可复用的配置版本。日常执行请在服务器列表操作。</p>
           <p class="muted">
-            网页与落地页使用手机竖屏和触屏。网页 UA 留空时使用默认 Android 手机浏览器。 Agent 0.6.0
-            支持入口自动识别、本地图片入口识别及循环注册；APP 画像和 UA 的采集情况不影响注册验收。
+            网页与落地页使用 Android 手机模式。APP 通过代理打开，前台停留 10 秒后关闭并清理。
           </p>
           <label for="scheme-mode">执行模式</label
           ><select id="scheme-mode" v-model="executionMode" @change="syncMode">
             <option value="DOWNLOAD_ONLY">只下载 APK</option>
-            <option value="FULL">下载并注册（需要代理）</option>
+            <option value="FULL">下载并打开 APP（需要代理）</option>
           </select>
           <label for="source-url">网站 URL</label
           ><el-input

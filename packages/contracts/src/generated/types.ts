@@ -862,6 +862,15 @@ export interface OverviewView {
     errorCode: string | null;
     executionKind?: 'APP_OPEN' | 'REGISTRATION' | 'DOWNLOAD_ONLY';
   }[];
+  appOpens?: {
+    completed: number;
+    failed: number;
+    attempts: number;
+    pending: number;
+    stopped: number;
+    needsReview: number;
+    testReports: number;
+  };
 }
 
 export interface RunSummaryView {
@@ -1460,6 +1469,9 @@ export interface NodeView {
   createdAt: string;
   downloadProtocol?: '1.0' | null;
   registrationProtocol?: string | null;
+  activeRunId?: string | null;
+  activeOperationId?: string | null;
+  activeStopRequested?: boolean;
 }
 
 export interface ExecutionOS {
@@ -1745,6 +1757,9 @@ export interface NodeList {
     createdAt: string;
     downloadProtocol?: '1.0' | null;
     registrationProtocol?: string | null;
+    activeRunId?: string | null;
+    activeOperationId?: string | null;
+    activeStopRequested?: boolean;
   }[];
   nextCursor: string | null;
 }

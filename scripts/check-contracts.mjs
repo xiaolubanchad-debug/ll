@@ -1132,6 +1132,18 @@ test('1.15 self client suite query', () =>
   assert.deepEqual(schemaIssues('TestClientQuery', { suite: '1' }), []));
 test('1.15 suite cannot choose arbitrary URL', () =>
   assert.ok(schemaIssues('TestClientQuery', { suite: '1', url: 'https://example.com/' }).length));
+const serverOverview = read('contracts/fixtures/overview.server-console.valid.json');
+test('1.16 daily open counters and reports remain independent', () =>
+  assert.deepEqual(schemaIssues('OverviewView', serverOverview), []));
+for (const patch of [{ completed: -1 }, { attempts: '20' }, { testReports: -1 }, { cpuPercent: 0 }])
+  test('1.16 rejects malformed open statistics ' + JSON.stringify(patch), () =>
+    assert.ok(
+      schemaIssues('OverviewView', {
+        ...serverOverview,
+        appOpens: { ...serverOverview.appOpens, ...patch },
+      }).length,
+    ),
+  );
 process.stdout.write(
   `${passed} contract checks passed${process.exitCode ? '; failures present' : ''}.\n`,
 );

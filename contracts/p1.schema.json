@@ -608,6 +608,17 @@
         },
         "registrationProtocol": {
           "type": ["string", "null"]
+        },
+        "activeRunId": {
+          "type": ["string", "null"],
+          "format": "uuid"
+        },
+        "activeOperationId": {
+          "type": ["string", "null"],
+          "format": "uuid"
+        },
+        "activeStopRequested": {
+          "type": "boolean"
         }
       }
     },

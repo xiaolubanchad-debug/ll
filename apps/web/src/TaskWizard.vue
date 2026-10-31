@@ -14,20 +14,23 @@ const props = defineProps<{
     initial?: TaskPlanDetail;
     initialStep?: number;
     ownedTest?: boolean;
+    compact?: boolean;
+    fixedNodeId?: string;
+    copyConfigId?: string;
   }>(),
   emit = defineEmits<{ saved: [id: string]; cancel: [] }>();
 const step = ref(props.initialStep ?? 1),
   busy = ref(false),
   error = ref(''),
   name = ref(props.initial?.task.name ?? ''),
-  nodeId = ref(props.initial?.task.nodeId ?? ''),
+  nodeId = ref(props.fixedNodeId ?? props.initial?.task.nodeId ?? ''),
   proxyId = ref(props.initial?.configuration.execution.proxySecretVersionId ?? ''),
   automatic = ref(props.initial?.task.automatic ?? false),
   time = ref(props.initial?.task.time ?? '00:05'),
   concurrency = ref<1>(1),
   target = ref(props.initial?.task.successTarget ?? 10),
   limit = ref(props.initial?.task.attemptLimit ?? 30),
-  importId = ref(props.initial?.task.configId ?? '');
+  importId = ref(props.copyConfigId ?? props.initial?.task.configId ?? '');
 const source = ref(props.initial?.configuration.source.url ?? ''),
   xpath = ref(props.initial?.configuration.source.xpath ?? example.source.xpath),
   mode = ref<'FULL' | 'DOWNLOAD_ONLY'>(props.initial?.configuration.execution.mode ?? 'FULL');
@@ -44,6 +47,12 @@ const randomDeviceProfile = ref(
   ownedTestClient = ref(
     props.initial?.configuration.execution.appOpen?.ownedTestClient ?? props.ownedTest ?? false,
   );
+const legacyLoaded = ref(
+    !!props.initial &&
+      props.initial.configuration.execution.mode === 'FULL' &&
+      !props.initial.configuration.execution.appOpen,
+  ),
+  conversionAccepted = ref(false);
 const base = ref<TestConfiguration>(
   props.initial?.configuration ??
     ({
@@ -151,12 +160,25 @@ async function choices() {
     (n) => n.connection === 'ONLINE' && n.deploymentStatus === 'INSTALLED',
   );
   if (!nodeId.value && online.length === 1) nodeId.value = online[0].id;
+  if (
+    props.fixedNodeId &&
+    !props.initial &&
+    ['0.13.0', '0.13.1', '0.13.2', '0.13.3'].includes(
+      nodes.value.find((n) => n.id === nodeId.value)?.agentVersion ?? '',
+    )
+  ) {
+    multiApp.value = true;
+    randomDeviceProfile.value = true;
+  }
   if (!proxyId.value && proxies.value.length === 1) proxyId.value = proxies.value[0].id;
+  if (props.copyConfigId && !props.initial) await importConfig();
 }
 function apply(value: string) {
   try {
     const c = JSON.parse(value) as TestConfiguration;
     if (configurationIssues(c).length) throw Error('高级配置有误，请检查后应用');
+    legacyLoaded.value = c.execution.mode === 'FULL' && !c.execution.appOpen;
+    conversionAccepted.value = false;
     base.value = c;
     source.value = c.source.url;
     xpath.value = c.source.xpath;
@@ -233,6 +255,8 @@ function next() {
 }
 async function save() {
   await work(async () => {
+    if (legacyLoaded.value && !conversionAccepted.value)
+      throw Error('请先确认将历史流程另存为 APP 打开测试');
     const c = JSON.parse(draft.value) as TestConfiguration;
     const issues = configurationIssues(c);
     if (issues.length)
@@ -248,7 +272,7 @@ async function save() {
     const input: TaskPlanInput = {
       name: name.value.trim(),
       nodeId: nodeId.value,
-      ...(importId.value ? { configId: importId.value } : {}),
+      ...(importId.value && !props.compact ? { configId: importId.value } : {}),
       configuration: c,
       automatic: automatic.value,
       time: time.value,
@@ -274,12 +298,12 @@ onUnmounted(() => {
   <section class="surface task-wizard">
     <div class="section-heading">
       <div>
-        <span class="phase-tag">第 {{ step }} / 3 步</span>
+        <span class="phase-tag">{{ compact ? '服务器任务配置' : '第 ' + step + ' / 3 步' }}</span>
         <h2>{{ initial ? '编辑任务' : '新建任务' }}</h2>
       </div>
       <el-button :disabled="busy" @click="emit('cancel')">取消</el-button>
     </div>
-    <ol class="wizard-progress">
+    <ol v-if="!compact" class="wizard-progress">
       <li :class="{ active: step === 1 }">1 网站来源</li>
       <li :class="{ active: step === 2 }">2 执行环境</li>
       <li :class="{ active: step === 3 }">3 执行目标</li>
@@ -287,9 +311,13 @@ onUnmounted(() => {
     <el-alert v-if="error" :title="error" type="error" :closable="false" />
     <fieldset :disabled="busy" class="wizard-fields">
       <p class="muted">内容隔离默认开启：保留真实功能操作，仅展示功能记录，不回传原始 APP 画面。</p>
-      <template v-if="step === 1">
+      <div v-if="legacyLoaded" class="confirmation-box">
+        <p>此配置使用历史账户流程。保存将创建 APP 打开测试新版本，旧结果与运行快照保留。</p>
+        <label><input v-model="conversionAccepted" type="checkbox" />确认转换为 APP 打开测试</label>
+      </div>
+      <template v-if="compact || step === 1">
         <details v-if="!initial">
-          <summary>从已有方案接入（可选）</summary>
+          <summary>{{ compact ? '复制已有配置（可选）' : '从已有方案接入（可选）' }}</summary>
           <label for="task-import">已有方案</label
           ><select id="task-import" v-model="importId" @change="importConfig">
             <option value="">新建独立任务</option>
@@ -297,7 +325,13 @@ onUnmounted(() => {
               {{ c.name }}
             </option>
           </select>
-          <p class="muted">接入保留原历史，不会启动旧计划。</p>
+          <p class="muted">
+            {{
+              compact
+                ? '复制为该服务器的独立任务，原服务器配置及任务保持原样。'
+                : '接入保留原历史，不会启动旧计划。'
+            }}
+          </p>
         </details>
         <label for="task-name">任务名称</label
         ><input
@@ -314,9 +348,9 @@ onUnmounted(() => {
           执行时依次处理匹配的全部图标，支持直接下载、落地页下载及自动下载。保存不会访问网站。
         </p>
       </template>
-      <template v-else-if="step === 2">
+      <template v-if="compact || step === 2">
         <label for="task-node">执行服务器</label
-        ><select id="task-node" v-model="nodeId">
+        ><select id="task-node" v-model="nodeId" :disabled="!!fixedNodeId">
           <option value="">请选择服务器</option>
           <option v-for="n in nodes" :key="n.id" :value="n.id">
             {{ n.name }} · {{ n.connection === 'ONLINE' ? '在线' : '离线' }}
@@ -358,7 +392,7 @@ onUnmounted(() => {
               multiApp
                 ? '每台设备启动一次新模拟器，依次安装不同 APP；每个 APP 停留 10 秒后关闭并卸载，全部结束后关闭模拟器。'
                 : '每轮使用独立模拟器及代理，启动 APP 后停留 10 秒再退出清理。'
-            }}无需配置注册入口。
+            }}
           </p>
           <label class="inline-check"
             ><input v-model="randomDeviceProfile" type="checkbox" />随机机型档案（多 APP
@@ -393,7 +427,7 @@ onUnmounted(() => {
           </p></template
         >
       </template>
-      <template v-else>
+      <template v-if="compact || step === 3">
         <div v-if="mode === 'FULL'" class="filter-grid">
           <label for="task-target"
             >所有 APK 合计完成轮数<input
@@ -411,7 +445,7 @@ onUnmounted(() => {
               max="800"
           /></label>
         </div>
-        <p v-if="mode === 'DOWNLOAD_ONLY'" class="muted">本任务只下载 APK，不创建注册账户。</p>
+        <p v-if="mode === 'DOWNLOAD_ONLY'" class="muted">本任务只下载 APK，不打开 APP。</p>
         <label class="inline-check"
           ><input v-model="automatic" type="checkbox" />开始后每天自动执行</label
         ><label v-if="automatic" for="task-time"
@@ -437,9 +471,8 @@ onUnmounted(() => {
                   appsMax +
                   ' 个不同 APP，逐个卸载后再关闭整机；'
                 : '停留完成后关闭模拟器并清理；'
-            }}APK 保留复用。最多同时运行
-            {{ concurrency }} 台模拟器，完成目标由所有路共享。每台服务器每日最多尝试 800 次
-            APP，23:55 停止新增。保存后请点击开始。</small
+            }}APK 保留复用。最多同时运行 {{ concurrency }} 台模拟器，完成次数按所有 APP
+            合计。每台服务器每日最多尝试 800 次 APP，23:55 停止新增。保存后请点击开始。</small
           >
         </div>
         <details class="advanced-settings" :open="initialStep === 3">
@@ -451,14 +484,17 @@ onUnmounted(() => {
           >
         </details>
         <p v-if="initial" class="muted">
-          保存不影响正在执行的批次。旧注册任务保存后切换到启动停留模式，请停止并确认清理后新增一轮；下载规则修改次日生效。
+          保存不影响正在执行的批次。下载规则修改次日生效；当前任务需先停止并确认清理后再调整。
         </p>
       </template>
     </fieldset>
     <div class="form-actions">
-      <el-button v-if="step > 1" :disabled="busy" @click="step--">上一步</el-button
-      ><el-button v-if="step < 3" type="primary" :disabled="busy" @click="next">下一步</el-button
-      ><el-button v-else type="primary" :loading="busy" @click="save">保存任务</el-button>
+      <el-button v-if="!compact && step > 1" :disabled="busy" @click="step--">上一步</el-button
+      ><el-button v-if="!compact && step < 3" type="primary" :disabled="busy" @click="next"
+        >下一步</el-button
+      ><el-button v-else type="primary" :loading="busy" @click="save">{{
+        compact ? '保存配置' : '保存任务'
+      }}</el-button>
     </div>
   </section>
 </template>

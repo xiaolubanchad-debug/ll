@@ -197,6 +197,7 @@ try {
   await run(['--test', '--test-concurrency=1', 'tests/concurrent-open-api.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/p3.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/v17.test.mjs'], env);
+  await run(['--test', '--test-concurrency=1', 'tests/server-console-api.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/v18.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/v181.test.mjs'], env);
   const { initializeAdmin } = await import('../apps/control-api/dist/admin.js');
@@ -236,6 +237,7 @@ try {
   await run(['--test', 'tests/open-performance-web.test.mjs'], env);
   await run(['--test', 'tests/test-data-web.test.mjs'], env);
   await run(['--test', 'tests/device-sessions-web.test.mjs'], env);
+  await run(['--test', 'tests/server-console-web.test.mjs'], { ...env, P0_SCREENSHOT_DIR: dir });
   console.log(
     'P0–P3 integration and browser tests passed (real PostgreSQL, SQLite and Chromium; EC2 installer and Appium boundary simulated here, real Android verified separately).',
   );
