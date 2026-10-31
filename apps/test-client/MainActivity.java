@@ -1,6 +1,8 @@
 package com.apkplatform.testclient;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.widget.Button;
 import android.os.Bundle;
 import android.os.Build;
 import android.provider.Settings;
@@ -25,6 +27,13 @@ public final class MainActivity extends Activity {
     state=new TextView(this); state.setText("正在读取本轮测试配置"); state.setTextSize(18); root.addView(state);
     details=new TextView(this); root.addView(details); setContentView(root);
     report("PREPARING");
+    if (getPackageName().contains(".app")) {
+      state.setText("测试开屏广告（不含业务内容）");
+      Button skip=new Button(this); skip.setText("跳过广告"); root.addView(skip);
+      skip.setOnClickListener(v -> { root.removeView(skip); new AlertDialog.Builder(this).setTitle("测试公告").setMessage("此公告用于验证关闭流程").setCancelable(false).setPositiveButton("关闭",(dialog,which)->initializeClient()).show(); });
+    } else initializeClient();
+  }
+  private void initializeClient() {
     prefs=getSharedPreferences("owned_test",MODE_PRIVATE);
     if(prefs.contains("accountId")) { report("HTTP_200"); state.setText("测试账户已上报"); details.setText("用户名："+prefs.getString("username","")+"\n同一安装复用原账户"); return; }
     try {
@@ -44,7 +53,7 @@ public final class MainActivity extends Activity {
         body.put("androidId",deviceId); body.put("model",Build.MODEL); body.put("manufacturer",Build.MANUFACTURER);
         body.put("apiLevel",Build.VERSION.SDK_INT); body.put("locale",Locale.getDefault().toLanguageTag());
         body.put("declaredUserAgent",ua); body.put("appliedWebViewUa","NOT_COLLECTED");
-        body.put("defaultWebViewUa","NOT_COLLECTED"); body.put("appVersion","1.0.1");
+        body.put("defaultWebViewUa","NOT_COLLECTED"); body.put("appVersion","1.1.0"); body.put("packageName",getPackageName());
         payload=body.toString();
         if(!prefs.edit().putString("pendingBody",payload).commit()) throw new IOException("JOURNAL_FAILED");
       }

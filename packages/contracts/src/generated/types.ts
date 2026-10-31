@@ -9,8 +9,9 @@ export interface TestEnrollInput {
   locale: string;
   declaredUserAgent: string;
   defaultWebViewUa: string;
-  appVersion: '1.0.0' | '1.0.1';
+  appVersion: '1.0.0' | '1.0.1' | '1.1.0';
   appliedWebViewUa: string;
+  packageName?: string;
 }
 
 export interface TestEnrollResult {
@@ -67,6 +68,8 @@ export interface TestDataPage {
     uaMatched: boolean;
     modelMatched: boolean;
     createdAt: string;
+    packageName?: string;
+    deviceSessionId?: string | null;
   }[];
   nextCursor: string | null;
 }
@@ -84,10 +87,29 @@ export interface TestClientInfo {
   version: string | null;
   downloadUrl: string;
   sourcePageUrl: string;
+  suiteReady?: boolean;
+  suiteCount?: number;
+  suiteSourcePageUrl?: string;
 }
 
 export interface TestClientQuery {
   sha256?: string;
+  suite?: '1';
+}
+
+export interface TestClientSuite {
+  version: 1;
+  /**
+   * @minItems 10
+   * @maxItems 10
+   */
+  apps: {
+    number: number;
+    packageName: string;
+    sha256: string;
+    version: '1.1.0';
+    filename: string;
+  }[];
 }
 
 export interface TaskPlanInput {
@@ -164,6 +186,10 @@ export interface APKTestConfigurationVersion10 {
       concurrency?: 1 | 2;
       randomDeviceProfile?: true;
       ownedTestClient?: true;
+      appsPerDevice?: {
+        min: number;
+        max: number;
+      };
     };
   };
   /**
@@ -412,6 +438,10 @@ export interface APKTestConfigurationVersion10 {
       concurrency?: 1 | 2;
       randomDeviceProfile?: true;
       ownedTestClient?: true;
+      appsPerDevice?: {
+        min: number;
+        max: number;
+      };
     };
   };
   /**
@@ -881,6 +911,12 @@ export interface RunSummaryView {
     stage: string;
     packageName: string | null;
   }[];
+  deviceSessions?: {
+    started: number;
+    closed: number;
+    failed: number;
+    active: number;
+  };
 }
 
 export interface TimelinePage {
@@ -900,7 +936,7 @@ export interface TimelinePage {
       version: 1;
       totalMs: number;
       /**
-       * @maxItems 10
+       * @maxItems 12
        */
       steps: {
         name:
@@ -913,12 +949,18 @@ export interface TimelinePage {
           | 'APP_LAUNCH'
           | 'FOREGROUND_CHECK'
           | 'FOREGROUND_DWELL'
-          | 'CLEANUP';
+          | 'CLEANUP'
+          | 'STARTUP_ADS'
+          | 'APPIUM_PREPARE'
+          | 'IDENTITY_IMAGE_CHECK';
         startedMs: number;
         elapsedMs: number;
         outcome: 'SUCCEEDED' | 'FAILED' | 'CANCELLED';
       }[];
     };
+    deviceSessionId?: string;
+    appIndex?: number;
+    packageName?: string;
   }[];
   hasEarlier: boolean;
   hasLater: boolean;
@@ -976,7 +1018,7 @@ export interface AppOpenTimings {
   version: 1;
   totalMs: number;
   /**
-   * @maxItems 10
+   * @maxItems 12
    */
   steps: {
     name:
@@ -989,7 +1031,10 @@ export interface AppOpenTimings {
       | 'APP_LAUNCH'
       | 'FOREGROUND_CHECK'
       | 'FOREGROUND_DWELL'
-      | 'CLEANUP';
+      | 'CLEANUP'
+      | 'STARTUP_ADS'
+      | 'APPIUM_PREPARE'
+      | 'IDENTITY_IMAGE_CHECK';
     startedMs: number;
     elapsedMs: number;
     outcome: 'SUCCEEDED' | 'FAILED' | 'CANCELLED';
@@ -1060,6 +1105,10 @@ export interface TestConfiguration {
       concurrency?: 1 | 2;
       randomDeviceProfile?: true;
       ownedTestClient?: true;
+      appsPerDevice?: {
+        min: number;
+        max: number;
+      };
     };
   };
   /**
@@ -1149,6 +1198,8 @@ export type AgentMessage =
           playwright?: string;
           systemImage?: string;
           identityModels?: string;
+          identityCatalog?: string;
+          identityAbis?: string;
         };
         /**
          * @maxItems 20
@@ -1219,7 +1270,8 @@ export type AgentMessage =
           | 'LOG'
           | 'PROXY_CHECKED'
           | 'BROWSER_ENVIRONMENT'
-          | 'APP_OBSTRUCTION';
+          | 'APP_OBSTRUCTION'
+          | 'DEVICE_SESSION';
         payload: {
           [k: string]: unknown;
         };
@@ -1317,6 +1369,17 @@ export interface ReleaseInput {
       revision: string;
     }[];
     npmLockSha256: string;
+    /**
+     * @minItems 5
+     * @maxItems 5
+     */
+    extraSystemImages?: {
+      role: 'systemImage';
+      url: string;
+      checksum: string;
+      revision: string;
+      apiLevel: 29 | 31 | 33 | 34 | 36;
+    }[];
   };
   /**
    * @maxItems 16
@@ -1332,6 +1395,7 @@ export interface ReleaseInput {
     | 'APP_OPEN_PARALLEL_V1'
     | 'DEVICE_VARIANTS_V1'
     | 'OWNED_TEST_CLIENT_V1'
+    | 'DEVICE_SESSIONS_V1'
   )[];
 }
 
@@ -1353,6 +1417,8 @@ export interface HealthReport {
     playwright?: string;
     systemImage?: string;
     identityModels?: string;
+    identityCatalog?: string;
+    identityAbis?: string;
   };
   /**
    * @maxItems 20
@@ -1459,6 +1525,7 @@ export interface ApkMetadata {
   size: number;
   apkSha256: string;
   cacheDay: string;
+  minSdkVersion?: number;
 }
 
 export interface ArtifactInput {
@@ -1553,6 +1620,7 @@ export interface DailyExecutionPlan {
       size: number;
       apkSha256: string;
       cacheDay: string;
+      minSdkVersion?: number;
     };
     entryId?: string;
   }[];
@@ -1565,6 +1633,24 @@ export interface DailyExecutionPlan {
      * @maxItems 10
      */
     variantIds?: string[];
+    /**
+     * @minItems 1
+     * @maxItems 800
+     */
+    sessions?: {
+      id: string;
+      variantId?: string;
+      /**
+       * @minItems 1
+       * @maxItems 10
+       */
+      assetIndexes: number[];
+      /**
+       * @minItems 1
+       * @maxItems 8
+       */
+      supportedAbis?: string[];
+    }[];
   };
 }
 

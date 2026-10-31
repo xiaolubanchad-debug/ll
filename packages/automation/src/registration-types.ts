@@ -29,6 +29,8 @@ export interface DeviceObservation {
   proxyObservedAt?: string;
   proxyIpScope: 'PROBE_ONLY' | 'NOT_CHECKED';
   variantId?: string;
+  deviceSessionId?: string;
+  appIndex?: number;
   systemImageSha256?: string;
   appUserAgent: 'UNVERIFIED';
   identitySource: 'EMULATOR_NOT_REAL_DEVICE';
@@ -56,14 +58,21 @@ export interface TaskCompletion {
     samples: number;
     scope: 'FOREGROUND_POLL_ONLY';
     cleanupComplete: true;
+    cleanupScope?: 'APP_UNINSTALLED';
+    deviceSessionId?: string;
+    appIndex?: number;
   };
 }
 export interface AndroidSession {
   observation: DeviceObservation;
   supportedAbis: string[];
   install(file: string): Promise<void>;
-  provisionTestClient?(bootstrap: import('@apk/contracts').TestBootstrap): Promise<void>;
-  testClientStatus?(): Promise<string>;
+  finishApplication?(packageName: string): Promise<boolean>;
+  provisionTestClient?(
+    bootstrap: import('@apk/contracts').TestBootstrap,
+    packageName?: string,
+  ): Promise<void>;
+  testClientStatus?(packageName?: string): Promise<string>;
   launch(packageName: string, activity: string): Promise<void>;
   foreground?(packageName: string): Promise<boolean>;
   find(locator: Locator, timeout: number, signal?: AbortSignal): Promise<string>;

@@ -1,3 +1,5 @@
+import { isOwnedTestPackage, deviceVariant } from '@apk/contracts';
+import { appObstructions } from './app-readiness.js';
 import { loadIdentityImage } from './identity-images.js';
 import { setTimeout as delay } from 'node:timers/promises';
 import type { ApkMetadata, TestConfiguration } from '@apk/contracts';
@@ -14,7 +16,10 @@ import type { RegistrationCompletion } from './registration.js';
 export interface AppOpenHooks extends AndroidOptions {
   testBootstrap?: () => Promise<import('@apk/contracts').TestBootstrap>;
   androidFactory?: typeof startAndroid;
-  clock?: { now(): number; sleep(ms: number, signal: AbortSignal): Promise<void> };
+  clock?: {
+    now(): number;
+    sleep(ms: number, signal: AbortSignal): Promise<void>;
+  };
 }
 // This path never reads APP content or calls UI automation. The owned client may report its own account.
 export async function openApk(
@@ -36,7 +41,11 @@ export async function openApk(
     errorCode: 'APP_OPEN_FAILED',
   };
   const stage = (name: string, extra: Record<string, unknown> = {}) =>
-    emit({ type: 'TASK_STAGE', taskId: target.taskId, payload: { stage: name, ...extra } });
+    emit({
+      type: 'TASK_STAGE',
+      taskId: target.taskId,
+      payload: { stage: name, ...extra },
+    });
   const action = () => {
     if (signal.aborted) throw new RegistrationError('CANCELLED');
     hooks.beforeAction();
@@ -53,14 +62,26 @@ export async function openApk(
     if (config.execution.appOpen?.dwellMs !== 10000)
       throw new RegistrationError('APP_OPEN_CONFIG_INVALID');
     await stage('PREPARING');
-    const profile = config.execution.deviceProfiles[index % config.execution.deviceProfiles.length];
+    const baseProfile =
+      config.execution.deviceProfiles[index % config.execution.deviceProfiles.length];
+    const variant = deviceVariant(target.variantId ?? '');
+    const profile = variant
+      ? {
+          ...baseProfile,
+          systemImage: 'system-images;android-' + variant.apiLevel + ';google_apis;x86_64',
+        }
+      : baseProfile;
     session = await (hooks.androidFactory ?? startAndroid)(profile, signal, {
       ...hooks,
       ownedTestClient: config.execution.appOpen.ownedTestClient === true,
       ...(config.execution.appOpen.randomDeviceProfile
-        ? { identityImage: await loadIdentityImage(hooks.sdkRoot, target.variantId ?? '') }
+        ? {
+            identityImage: await timer.measure('IDENTITY_IMAGE_CHECK', () =>
+              loadIdentityImage(hooks.sdkRoot, target.variantId ?? ''),
+            ),
+          }
         : {}),
-      controlMode: 'LAUNCH_ONLY',
+      controlMode: config.execution.appOpen.appsPerDevice ? 'DEVICE_SESSION' : 'LAUNCH_ONLY',
       measure: timer.measure,
     });
     action();
@@ -69,23 +90,51 @@ export async function openApk(
     await timer.measure('APK_VERIFY', () =>
       verifyApkIntegrity(file, apk, config.download.maxApkBytes ?? 268435456, signal),
     );
-    await stage('INSTALLING', { observation: session.observation });
+    await stage('INSTALLING', {
+      observation: {
+        ...session.observation,
+        ...(target.deviceSessionId
+          ? {
+              deviceSessionId: target.deviceSessionId,
+              appIndex: target.appIndex,
+            }
+          : {}),
+      },
+    });
     await timer.measure('APK_INSTALL', () => session!.install(file));
     if (config.execution.appOpen.ownedTestClient) {
       if (
-        apk.packageName !== 'com.apkplatform.testclient' ||
+        !isOwnedTestPackage(apk.packageName) ||
         !hooks.testBootstrap ||
         !session.provisionTestClient
       )
         throw new RegistrationError('TEST_BOOTSTRAP_REQUIRED');
       const bootstrap = await hooks.testBootstrap();
       action();
-      await session.provisionTestClient(bootstrap);
+      await session.provisionTestClient(bootstrap, apk.packageName);
     }
     action();
     await stage('LAUNCHING');
     await timer.measure('APP_LAUNCH', () => session!.launch(apk.packageName, '@launcher'));
     action();
+    if (config.execution.appOpen.appsPerDevice) {
+      await timer.measure('STARTUP_ADS', () =>
+        appObstructions(
+          session!,
+          apk.packageName,
+          hooks.beforeAction,
+          async (note) => {
+            await emit({
+              type: 'APP_OBSTRUCTION',
+              taskId: target.taskId,
+              payload: { ...note },
+            });
+          },
+          false,
+          { totalTimeoutMs: 30000, maxActions: 8 },
+        ).clear(signal),
+      );
+    }
     await timer.measure('FOREGROUND_CHECK', async () => {
       const deadline = clock.now() + 30000;
       if (!session!.foreground) throw new RegistrationError('APP_NOT_FOREGROUND');
@@ -121,6 +170,13 @@ export async function openApk(
               samples,
               scope: 'FOREGROUND_POLL_ONLY',
               cleanupComplete: true,
+              ...(target.deviceSessionId
+                ? {
+                    cleanupScope: 'APP_UNINSTALLED' as const,
+                    deviceSessionId: target.deviceSessionId,
+                    appIndex: target.appIndex,
+                  }
+                : {}),
             },
           };
           break;
@@ -130,7 +186,8 @@ export async function openApk(
     if (config.execution.appOpen.ownedTestClient) {
       action();
       const status =
-        (await session.testClientStatus?.().catch(() => 'UNCONFIRMED')) ?? 'UNCONFIRMED';
+        (await session.testClientStatus?.(apk.packageName).catch(() => 'UNCONFIRMED')) ??
+        'UNCONFIRMED';
       const message =
         status === 'HTTP_200'
           ? '自有测试 APK：账户已上报'
@@ -141,7 +198,11 @@ export async function openApk(
               : status.startsWith('NETWORK_')
                 ? '自有测试 APK：网络响应尚未确认'
                 : '自有测试 APK：上报结果尚未确认';
-      await emit({ type: 'LOG', taskId: target.taskId, payload: { level: 'INFO', message } });
+      await emit({
+        type: 'LOG',
+        taskId: target.taskId,
+        payload: { level: 'INFO', message },
+      });
     }
   } catch (error) {
     result = {
@@ -162,8 +223,18 @@ export async function openApk(
   }
   // Never publish a completion before cleanup; a stop received during cleanup wins.
   if (!cleanupComplete)
-    result = { status: 'FAILED', proof: 'NONE', artifactIds: [], errorCode: 'CLEANUP_INCOMPLETE' };
+    result = {
+      status: 'FAILED',
+      proof: 'NONE',
+      artifactIds: [],
+      errorCode: 'CLEANUP_INCOMPLETE',
+    };
   else if (signal.aborted)
-    result = { status: 'CANCELLED', proof: 'NONE', artifactIds: [], errorCode: 'CANCELLED' };
+    result = {
+      status: 'CANCELLED',
+      proof: 'NONE',
+      artifactIds: [],
+      errorCode: 'CANCELLED',
+    };
   return { ...result, openTimings: timer.finish(), cleanupComplete };
 }

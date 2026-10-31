@@ -14,6 +14,7 @@ import type {
   TestClientInfo,
   TestConfiguration,
 } from '@apk/contracts';
+import { isOwnedTestPackage } from '@apk/contracts';
 import { checked } from './secrets.js';
 import { digest, canonical, masterKey, encrypt, decrypt } from './security.js';
 import { boundDelivery, ACTIVE_RUNS } from './runs.js';
@@ -47,6 +48,34 @@ function result(row: TestRecord): TestEnrollResult {
     createdAt: row.createdAt.toISOString(),
   });
 }
+export async function testClientSuite() {
+  const root = resolve(process.env.TEST_CLIENT_ROOT ?? '/var/lib/apk-hub/test-client');
+  const path = join(root, 'suite.json'),
+    info = await lstat(path);
+  if (!info.isFile() || info.isSymbolicLink() || info.size > 16384)
+    fault('TEST_CLIENT_UNAVAILABLE', '测试套件未通过校验', 503);
+  const suite = checked<{
+    version: 1;
+    apps: {
+      number: number;
+      packageName: string;
+      sha256: string;
+      version: string;
+      filename: string;
+    }[];
+  }>('TestClientSuite', JSON.parse(await readFile(path, 'utf8')));
+  if (
+    new Set(suite.apps.map((a) => a.sha256)).size !== 10 ||
+    suite.apps.some(
+      (a, i) =>
+        a.number !== i + 1 ||
+        a.packageName !== TEST_CLIENT_PACKAGE + '.app' + (i + 1) ||
+        a.filename !== i + 1 + '.apk',
+    )
+  )
+    fault('TEST_CLIENT_UNAVAILABLE', '测试套件编号无效', 503);
+  return suite.apps;
+}
 export async function testClientArtifact(sha?: string) {
   const root = resolve(process.env.TEST_CLIENT_ROOT ?? '/var/lib/apk-hub/test-client');
   const current = JSON.parse(await readFile(join(root, 'current.json'), 'utf8')) as {
@@ -62,7 +91,14 @@ export async function testClientArtifact(sha?: string) {
     fault('TEST_CLIENT_UNAVAILABLE', '测试 APK 未通过校验', 503);
   const bytes = await readFile(file);
   if (digest(bytes) !== key) fault('TEST_CLIENT_UNAVAILABLE', '测试 APK 未通过校验', 503);
-  return { bytes, sha256: key, version: current.version ?? '1.0.0' };
+  const app = (await testClientSuite().catch(() => [])).find((a) => a.sha256 === key);
+  return {
+    bytes,
+    sha256: key,
+    version: app?.version ?? current.version ?? '1.0.0',
+    packageName: app?.packageName ?? TEST_CLIENT_PACKAGE,
+    filename: app?.filename ?? 'apk-platform-test.apk',
+  };
 }
 export async function testClientInfo(): Promise<TestClientInfo> {
   const origin = apiOrigin(),
@@ -73,16 +109,26 @@ export async function testClientInfo(): Promise<TestClientInfo> {
     };
   try {
     const a = await testClientArtifact();
+    const suite = await testClientSuite().catch(() => []);
+    for (const app of suite) await testClientArtifact(app.sha256);
     return checked('TestClientInfo', {
       ...base,
       ready: true,
+      suiteReady: suite.length === 10,
+      suiteCount: suite.length,
+      suiteSourcePageUrl: origin + '/api/v1/test-client?suite=1',
       downloadUrl: base.downloadUrl + '?sha256=' + a.sha256,
       sourcePageUrl: base.sourcePageUrl + '?sha256=' + a.sha256,
       sha256: a.sha256,
       version: a.version,
     });
   } catch {
-    return checked('TestClientInfo', { ...base, ready: false, sha256: null, version: null });
+    return checked('TestClientInfo', {
+      ...base,
+      ready: false,
+      sha256: null,
+      version: null,
+    });
   }
 }
 export async function issueTestBootstrap(
@@ -96,7 +142,9 @@ export async function issueTestBootstrap(
     const d = await boundDelivery(tx, token, input.nodeId, input.deliveryId, input.fence);
     const task = await tx.task.findUnique({ where: { id: taskId } });
     const config = d.run.configVersionId
-      ? await tx.configVersion.findUnique({ where: { id: d.run.configVersionId } })
+      ? await tx.configVersion.findUnique({
+          where: { id: d.run.configVersionId },
+        })
       : null;
     const c = config?.body as unknown as TestConfiguration | undefined;
     if (
@@ -111,9 +159,11 @@ export async function issueTestBootstrap(
     )
       fault('TEST_CLIENT_SCOPE', '本轮不允许初始化测试客户端', 409);
     const apk = task.apk as { packageName?: string; apkSha256?: string } | null;
-    if (apk?.packageName !== TEST_CLIENT_PACKAGE || !apk.apkSha256)
+    if (!apk?.packageName || !isOwnedTestPackage(apk.packageName) || !apk.apkSha256)
       fault('TEST_CLIENT_SCOPE', '只允许已发布的自有测试 APK', 422);
-    await testClientArtifact(apk.apkSha256);
+    const published = await testClientArtifact(apk.apkSha256);
+    if (published.packageName !== apk.packageName)
+      fault('TEST_CLIENT_SCOPE', '测试包名与发布摘要不符', 422);
     const observation = task.observation as {
       model?: string;
       profileId?: string;
@@ -166,7 +216,9 @@ export async function enrollTestClient(
     !/^[ -~]{1,512}$/.test(userAgent)
   )
     fault('TEST_REQUEST_INVALID', '测试请求无效', 422);
-  const auth = await db.testEnrollment.findUnique({ where: { tokenHash: digest(token) } });
+  const auth = await db.testEnrollment.findUnique({
+    where: { tokenHash: digest(token) },
+  });
   if (!auth) fault('TEST_TOKEN_INVALID', '测试凭据无效', 401);
   return db.$transaction(async (tx) => {
     await lockNode(tx, auth.nodeId);
@@ -189,7 +241,9 @@ export async function enrollTestClient(
         fault('TEST_IDEMPOTENCY_CONFLICT', '测试凭据已绑定其他安装或内容', 409);
       return result(e.record);
     }
-    const delivery = await tx.delivery.findUnique({ where: { id: e.deliveryId } });
+    const delivery = await tx.delivery.findUnique({
+      where: { id: e.deliveryId },
+    });
     const slot = await tx.nodeSlot.findUnique({ where: { nodeId: e.nodeId } });
     if (
       !slot ||
@@ -204,6 +258,11 @@ export async function enrollTestClient(
       !['LAUNCHING', 'HOLDING'].includes(e.task.status)
     )
       fault('TEST_RUN_STOPPED', '本轮已停止或执行权已失效', 409);
+    if (
+      input.packageName !== undefined &&
+      input.packageName !== (e.task.apk as { packageName?: string } | null)?.packageName
+    )
+      fault('TEST_CLIENT_SCOPE', '测试回执包名不符', 422);
     const id = randomUUID(),
       seed = createHmac('sha256', masterKey())
         .update('test-username-v1\0' + ip + '\0' + input.androidId + '\0' + input.installationId)
@@ -217,7 +276,11 @@ export async function enrollTestClient(
       const j = randomInt(i + 1);
       [chars[i], chars[j]] = [chars[j], chars[i]];
     }
-    const account = { username, password: chars.join(''), androidId: input.androidId };
+    const account = {
+      username,
+      password: chars.join(''),
+      androidId: input.androidId,
+    };
     const row = await tx.testRecord.create({
       data: {
         id,
@@ -249,7 +312,9 @@ export async function testDataPage(db: PrismaClient, query: unknown): Promise<Te
     ...(q.runId ? { task: { runId: q.runId } } : {}),
   };
   const cursor = q.cursor
-    ? await db.testRecord.findFirst({ where: { id: q.cursor, enrollment: scope } })
+    ? await db.testRecord.findFirst({
+        where: { id: q.cursor, enrollment: scope },
+      })
     : null;
   if (q.cursor && !cursor) fault('STALE_CURSOR', '分页已失效，请刷新', 409);
   const rows = await db.testRecord.findMany({
@@ -265,7 +330,9 @@ export async function testDataPage(db: PrismaClient, query: unknown): Promise<Te
         : {}),
     },
     include: {
-      enrollment: { include: { task: { include: { run: { include: { node: true } } } } } },
+      enrollment: {
+        include: { task: { include: { run: { include: { node: true } } } } },
+      },
     },
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     take: limit + 1,
@@ -278,6 +345,12 @@ export async function testDataPage(db: PrismaClient, query: unknown): Promise<Te
       runId: r.enrollment.task.runId,
       taskId: r.enrollment.taskId,
       position: r.enrollment.task.position + 1,
+      packageName:
+        (r.enrollment.task.apk as { packageName?: string } | null)?.packageName ??
+        TEST_CLIENT_PACKAGE,
+      deviceSessionId:
+        (r.enrollment.task.observation as { deviceSessionId?: string } | null)?.deviceSessionId ??
+        null,
       username: r.username,
       sourceIp: r.sourceIp,
       androidIdHash: r.androidIdHash,

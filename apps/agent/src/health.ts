@@ -4,7 +4,7 @@ import { arch, totalmem } from 'node:os';
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
 import { executionOSSupported } from '@apk/contracts';
-import { identityManifest } from '@apk/automation';
+import { identityManifest, phoneManifest } from '@apk/automation';
 export interface AgentHealth {
   ubuntu: string;
   arch: string;
@@ -28,7 +28,11 @@ export async function execute(
   return new Promise((resolve) => {
     let text = '';
     let done = false;
-    const child = spawn(file, args, { env, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
+    const child = spawn(file, args, {
+      env,
+      windowsHide: true,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
     const finish = (code: number) => {
       if (done) return;
       done = true;
@@ -70,11 +74,17 @@ export async function collectHealth(
     node: process.versions.node,
     systemImage: 'system-images;android-35;google_apis;x86_64',
   };
+  const phones = await phoneManifest(sdkRoot).catch(() => []);
+  versions.identityCatalog = JSON.stringify(phones.map((p) => p.id));
+  versions.identityAbis = JSON.stringify(
+    Object.fromEntries(phones.map((p) => [p.id, p.supportedAbis])),
+  );
   versions.identityModels = String(
-    await identityManifest(sdkRoot).then(
-      (x) => x.length,
-      () => 0,
-    ),
+    phones.length ||
+      (await identityManifest(sdkRoot).then(
+        (x) => x.length,
+        () => 0,
+      )),
   );
   const env = {
     ...process.env,

@@ -155,7 +155,10 @@ export function configurationIssues(value: unknown): Issue[] {
       message: '网页 UA 必须为安卓手机 Chrome，或留空使用默认值',
     });
   if (config.execution.autoRegistration?.enabled && config.execution.mode !== 'FULL')
-    issues.push({ path: '/execution/autoRegistration', message: '自动识别注册需要完整模式和代理' });
+    issues.push({
+      path: '/execution/autoRegistration',
+      message: '自动识别注册需要完整模式和代理',
+    });
   if (
     (config.execution.appOpen?.randomDeviceProfile || config.execution.appOpen?.ownedTestClient) &&
     config.execution.appOpen.concurrency === undefined
@@ -166,6 +169,7 @@ export function configurationIssues(value: unknown): Issue[] {
     });
   if (
     config.execution.appOpen?.randomDeviceProfile &&
+    !config.execution.appOpen.appsPerDevice &&
     config.execution.deviceProfiles.some(
       (p) =>
         p.systemImage !== 'system-images;android-35;google_apis;x86_64' || p.locale !== 'en-US',
@@ -174,6 +178,15 @@ export function configurationIssues(value: unknown): Issue[] {
     issues.push({
       path: '/execution/deviceProfiles',
       message: '当前测试型号档案只支持 API 35 x86_64 / en-US',
+    });
+  const perDevice = config.execution.appOpen?.appsPerDevice;
+  if (
+    perDevice &&
+    (perDevice.min > perDevice.max || config.execution.appOpen?.concurrency === undefined)
+  )
+    issues.push({
+      path: '/execution/appOpen/appsPerDevice',
+      message: '每台设备安装数量范围无效，且需要明确并发数',
     });
   let url: URL;
   try {
@@ -185,16 +198,25 @@ export function configurationIssues(value: unknown): Issue[] {
     issues.push({ path: '/source/url', message: '网址不能包含登录凭据' });
   const profiles = config.execution.deviceProfiles.map((p) => p.id);
   if (new Set(profiles).size !== profiles.length)
-    issues.push({ path: '/execution/deviceProfiles', message: '设备配置编号不能重复' });
+    issues.push({
+      path: '/execution/deviceProfiles',
+      message: '设备配置编号不能重复',
+    });
   const packages = config.registrationFlows.map((f) =>
     f.entryId ? 'entry:' + f.entryId : 'package:' + f.packageName,
   );
   if (new Set(packages).size !== packages.length)
-    issues.push({ path: '/registrationFlows', message: '同一个入口或包名只能配置一个流程' });
+    issues.push({
+      path: '/registrationFlows',
+      message: '同一个入口或包名只能配置一个流程',
+    });
   for (const [i, flow] of config.registrationFlows.entries()) {
     const index = flow.steps.findIndex((s) => s.action === 'submit');
     if (flow.steps.slice(index + 1).some((s) => s.action !== 'wait'))
-      issues.push({ path: `/registrationFlows/${i}/steps`, message: '提交后只允许只读等待' });
+      issues.push({
+        path: `/registrationFlows/${i}/steps`,
+        message: '提交后只允许只读等待',
+      });
     for (const locator of [
       ...flow.steps.map((s) => s.locator),
       flow.success.locator,
@@ -321,7 +343,19 @@ export type {
   MaintenanceResult,
 } from './generated/types.js';
 
+export {
+  DEVICE_CATALOG,
+  deviceVariant,
+  TEST_CLIENT_PACKAGES,
+  isOwnedTestPackage,
+} from './device-catalog.js';
 export const IDENTITY_MODELS = ['qa-model-01', 'qa-model-02', 'qa-model-03'] as const;
+export function deviceSessionsSupported(
+  features: readonly string[] | undefined,
+  version: string | null | undefined,
+) {
+  return knownAgentAtLeast(version, '0.13.0') && features?.includes('DEVICE_SESSIONS_V1') === true;
+}
 export function identitySupported(
   features: readonly string[] | undefined,
   version: string | null | undefined,
@@ -364,6 +398,7 @@ const knownAgentVersions: readonly string[] = [
   '0.12.1',
   '0.12.2',
   '0.12.3',
+  '0.13.0',
 ];
 function knownAgentAtLeast(version: string | null | undefined, minimum: string): boolean {
   const index = knownAgentVersions.indexOf(version ?? '');
@@ -378,7 +413,10 @@ export function agentProtocolsForVersion(version: string | null | undefined) {
 
 export function requiredAgentProtocolsReady(
   features: readonly string[] | undefined,
-  report: { downloadProtocol?: string | null; registrationProtocol?: string | null },
+  report: {
+    downloadProtocol?: string | null;
+    registrationProtocol?: string | null;
+  },
 ): boolean {
   return (
     (!features?.includes('DOWNLOAD_V1') || report.downloadProtocol === '1.0') &&
@@ -399,3 +437,5 @@ export function autoRegistrationSupported(
 ): boolean {
   return knownAgentAtLeast(version, '0.6.0') && features?.includes('AUTO_REGISTRATION_V1') === true;
 }
+
+export { deviceAssignments, devicePlanIssues } from './session-plan.js';

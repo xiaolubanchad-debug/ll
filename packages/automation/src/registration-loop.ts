@@ -25,9 +25,21 @@ export async function runCachedRegistrations(
     index: number,
     signal: AbortSignal,
   ) => Promise<RegistrationCompletion>,
+  closeDeviceSession?: (id: string) => Promise<boolean>,
 ) {
   if (config.execution.appOpen && plan.openPolicy)
-    return runCachedAppOpens(config, plan, nodeId, root, signal, emit, beforeAction, register);
+    return runCachedAppOpens(
+      config,
+      plan,
+      nodeId,
+      root,
+      signal,
+      emit,
+      beforeAction,
+      register,
+      Date.now,
+      closeDeviceSession,
+    );
   const targets: Target[] = plan.assets.length
     ? Array.from({ length: plan.attemptLimit }, (_, position) => {
         const asset = plan.assets[position % plan.assets.length];
@@ -81,7 +93,11 @@ export async function runCachedRegistrations(
       beforeAction();
       if (signal.aborted) throw new DownloadError('CANCELLED');
       const asset = plan.assets[index % plan.assets.length];
-      await emit({ type: 'TASK_STAGE', taskId: target.taskId, payload: { stage: 'DOWNLOADING' } });
+      await emit({
+        type: 'TASK_STAGE',
+        taskId: target.taskId,
+        payload: { stage: 'DOWNLOADING' },
+      });
       const found = await cache.get(
         nodeId,
         plan.cacheDay,
@@ -186,11 +202,19 @@ export async function runProxyCheck(
   url?: string,
 ) {
   let bridge: Awaited<ReturnType<typeof startProxyBridge>> | undefined;
-  let observation: Record<string, unknown> = { status: 'FAILED', errorCode: 'PROXY_CHECK_FAILED' };
+  let observation: Record<string, unknown> = {
+    status: 'FAILED',
+    errorCode: 'PROXY_CHECK_FAILED',
+  };
   try {
     bridge = await startProxyBridge(credential, policy);
     const observed = await proxyObservation(bridge.port, signal, url);
-    observation = { status: 'SUCCEEDED', ip: observed.ip, at: observed.at, scope: 'PROBE_ONLY' };
+    observation = {
+      status: 'SUCCEEDED',
+      ip: observed.ip,
+      at: observed.at,
+      scope: 'PROBE_ONLY',
+    };
   } catch {
     if (signal.aborted) throw new DownloadError('CANCELLED');
   } finally {

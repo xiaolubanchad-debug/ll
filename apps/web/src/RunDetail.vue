@@ -205,7 +205,8 @@ onUnmounted(() => {
         {{ reasonLabels[summary.run.errorCode] ?? summary.run.errorCode }}
       </p>
       <p v-if="summary.executionKind === 'APP_OPEN'" class="muted">
-        最多同时 {{ summary.concurrency ?? 1 }} 轮，完成目标和尝试上限由所有路共享。
+        最多同时 {{ summary.concurrency ?? 1 }} {{ summary.deviceSessions ? '台设备' : '轮' }}，APP
+        完成目标和尝试上限由所有路共享。
       </p>
       <div v-if="summary.run.purpose === 'REGISTER'" class="quota-strip">
         <strong
@@ -213,6 +214,12 @@ onUnmounted(() => {
           {{ summary.run.successes }} / {{ summary.run.successTarget }}</strong
         ><span>已尝试 {{ summary.run.attemptsStarted }} / {{ summary.run.attemptLimit }}</span
         ><small>所有 APK 合计；未执行配额不计尝试。</small>
+      </div>
+      <div v-if="summary.deviceSessions" class="status-strip" aria-label="设备会话统计">
+        <span>设备会话已开始 {{ summary.deviceSessions.started }}</span
+        ><span>运行中 {{ summary.deviceSessions.active }}</span
+        ><span>整机清理完成 {{ summary.deviceSessions.closed }}</span
+        ><span>清理异常 {{ summary.deviceSessions.failed }}</span>
       </div>
       <div class="status-strip">
         <span v-if="summary.run.purpose === 'REGISTER' && summary.executionKind !== 'APP_OPEN'"

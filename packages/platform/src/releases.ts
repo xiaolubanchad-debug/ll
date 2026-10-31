@@ -16,6 +16,23 @@ export function releasePayload(manifest: ReleaseInput) {
 export function validManifest(body: unknown): ReleaseInput {
   const m = checked<ReleaseInput>('ReleaseInput', body);
   if (
+    m.features?.includes('DEVICE_SESSIONS_V1') &&
+    (m.agentVersion !== '0.13.0' ||
+      [
+        'DEVICE_VARIANTS_V1',
+        'APP_OPEN_V1',
+        'APP_OPEN_PARALLEL_V1',
+        'REGISTRATION_V1',
+        'CONTENT_ISOLATION_V1',
+        'APP_READINESS_V1',
+      ].some(
+        (feature) => !m.features?.includes(feature as NonNullable<typeof m.features>[number]),
+      ) ||
+      !m.toolchain.extraSystemImages ||
+      new Set(m.toolchain.extraSystemImages.map((a) => a.apiLevel)).size !== 5)
+  )
+    fault('RELEASE_INVALID', '多 APP 发布必须包含固定多版本系统镜像', 422);
+  if (
     m.artifactName !== `agent-${m.sha256}.tgz` ||
     new Set(m.toolchain.archives.map((a) => a.role)).size !== 4
   )
@@ -104,7 +121,11 @@ export async function registerRelease(
 ) {
   const m = await verifyRelease(body);
   return db.$transaction(async (tx) => {
-    if (await tx.release.findFirst({ where: { OR: [{ id: m.id }, { sha256: m.sha256 }] } }))
+    if (
+      await tx.release.findFirst({
+        where: { OR: [{ id: m.id }, { sha256: m.sha256 }] },
+      })
+    )
       fault('RELEASE_EXISTS', '该发布已登记');
     const result = await tx.release.create({
       data: {
@@ -114,7 +135,9 @@ export async function registerRelease(
         manifest: m as unknown as Prisma.InputJsonValue,
       },
     });
-    await tx.auditEvent.create({ data: { adminId, action: 'RELEASE_REGISTERED', requestId } });
+    await tx.auditEvent.create({
+      data: { adminId, action: 'RELEASE_REGISTERED', requestId },
+    });
     return { id: result.id, createdAt: result.createdAt, manifest: m };
   });
 }

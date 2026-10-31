@@ -9,6 +9,10 @@ import type {
 } from '@apk/contracts';
 import {
   agentIssues,
+  deviceAssignments,
+  deviceVariant,
+  isOwnedTestPackage,
+  devicePlanIssues,
   dailySupported,
   autoRegistrationSupported,
   schemaIssues,
@@ -59,7 +63,10 @@ export async function reviewRun(tx: Tx, run: Run, code: string) {
 export async function expireNodeRun(tx: Tx, nodeId: string) {
   const slot = await tx.nodeSlot.findUnique({ where: { nodeId } });
   if (!slot?.runId) return;
-  const run = await tx.run.findUnique({ where: { id: slot.runId }, include: { delivery: true } });
+  const run = await tx.run.findUnique({
+    where: { id: slot.runId },
+    include: { delivery: true },
+  });
   if (!run || !ACTIVE_RUNS.includes(run.status as (typeof ACTIVE_RUNS)[number])) return;
   const d = run.delivery;
   if (
@@ -112,7 +119,12 @@ export async function downloadRetryParent(
       422,
     );
   const latest = await tx.run.findFirst({
-    where: { nodeId, purpose: 'DOWNLOAD', cacheDay: day, configVersion: { configId } },
+    where: {
+      nodeId,
+      purpose: 'DOWNLOAD',
+      cacheDay: day,
+      configVersion: { configId },
+    },
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
   });
   if (latest?.id !== id) fault('DOWNLOAD_RETRY_INVALID', '已有更新的下载批次，请刷新', 422);
@@ -147,7 +159,12 @@ export async function createRun(
   return idempotent(db, actor, 'POST:/runs', key, input, async (tx) => {
     await lockLibrary(tx);
     const node = await lockNode(tx, input.nodeId);
-    if (!cycleId && (await tx.managedTask.count({ where: { nodeId: node.id, enabled: true } })))
+    if (
+      !cycleId &&
+      (await tx.managedTask.count({
+        where: { nodeId: node.id, enabled: true },
+      }))
+    )
       fault('NODE_BUSY', '此服务器由任务中心管理，请先停止对应任务');
     if (cycleId) {
       const cycle = await tx.managedCycle.findUnique({
@@ -171,19 +188,33 @@ export async function createRun(
       )
         fault('VALIDATION_FAILED', '任务快照不一致', 422);
       const active = await tx.run.findFirst({
-        where: { taskCycleId: cycleId, status: { notIn: RUN_END as Run['status'][] } },
+        where: {
+          taskCycleId: cycleId,
+          status: { notIn: RUN_END as Run['status'][] },
+        },
       });
-      if (active) return { operationId: active.id, resourceId: active.id, status: active.status };
+      if (active)
+        return {
+          operationId: active.id,
+          resourceId: active.id,
+          status: active.status,
+        };
     }
     if (scheduleId) {
-      const schedule = await tx.dailySchedule.findUnique({ where: { id: scheduleId } });
+      const schedule = await tx.dailySchedule.findUnique({
+        where: { id: scheduleId },
+      });
       if (!schedule?.enabled || schedule.nodeId !== node.id)
         fault('SCHEDULE_DISABLED', '每日计划已关闭');
     }
     await expireNodeRun(tx, node.id);
-    const config = await tx.configVersion.findUnique({ where: { id: input.configVersionId } });
+    const config = await tx.configVersion.findUnique({
+      where: { id: input.configVersionId },
+    });
     if (!config) fault('NOT_FOUND', '配置版本不存在', 404);
-    const container = await tx.configuration.findUniqueOrThrow({ where: { id: config.configId } });
+    const container = await tx.configuration.findUniqueOrThrow({
+      where: { id: config.configId },
+    });
     if (config.archivedAt || container.archivedAt)
       fault('VERSION_ARCHIVED', '配置已归档，请恢复后使用');
     const dailyKey =
@@ -215,7 +246,11 @@ export async function createRun(
             where: { id: cycleId },
             data: { downloadRunId: existing.id, status: 'DOWNLOADING' },
           });
-        return { operationId: existing.id, resourceId: existing.id, status: existing.status };
+        return {
+          operationId: existing.id,
+          resourceId: existing.id,
+          status: existing.status,
+        };
       }
     }
     if (input.purpose === 'DOWNLOAD' && input.supersedesRunId)
@@ -231,11 +266,17 @@ export async function createRun(
       fault('NODE_OFFLINE', '节点尚未在线');
     if (node.agentReleaseId !== input.releaseId || node.deploymentStatus !== 'INSTALLED')
       fault('NODE_NOT_READY', '节点发布版本不匹配');
-    const release = await tx.release.findUnique({ where: { id: input.releaseId } });
+    const release = await tx.release.findUnique({
+      where: { id: input.releaseId },
+    });
     const manifest = release?.manifest as
       | { features?: string[]; toolchain?: { systemImage?: string } }
       | undefined;
-    const health = node.health as { download?: boolean; android?: boolean; kvm?: boolean } | null;
+    const health = node.health as {
+      download?: boolean;
+      android?: boolean;
+      kvm?: boolean;
+    } | null;
     if (
       !manifest?.features?.includes('DOWNLOAD_V1') ||
       node.downloadProtocol !== '1.0' ||
@@ -300,7 +341,9 @@ export async function createRun(
         fault('DEVICE_PROFILE_UNSUPPORTED', '设备镜像必须与签名工具链一致', 422);
     }
     if (input.supersedesRunId) {
-      const old = await tx.run.findUnique({ where: { id: input.supersedesRunId } });
+      const old = await tx.run.findUnique({
+        where: { id: input.supersedesRunId },
+      });
       if (!old || !RUN_END.includes(old.status) || old.nodeId !== node.id)
         fault('VALIDATION_FAILED', '关联批次无效', 422);
     }
@@ -311,7 +354,10 @@ export async function createRun(
         configHash: config.configHash,
         createdBy: actor,
         ...(plan
-          ? { executionPlan: plan as unknown as Prisma.InputJsonValue, cacheDay: plan.cacheDay }
+          ? {
+              executionPlan: plan as unknown as Prisma.InputJsonValue,
+              cacheDay: plan.cacheDay,
+            }
           : {}),
         ...(dailyKey ? { dailyKey } : {}),
       },
@@ -330,7 +376,9 @@ export async function createRun(
       where: { nodeId: node.id },
       data: { runId: run.id, fence: { increment: 1 } },
     });
-    await tx.auditEvent.create({ data: { adminId: actor, action: 'RUN_CREATED', requestId } });
+    await tx.auditEvent.create({
+      data: { adminId: actor, action: 'RUN_CREATED', requestId },
+    });
     return { operationId: run.id, resourceId: run.id, status: run.status };
   });
 }
@@ -391,7 +439,10 @@ export async function claimRun(db: PrismaClient, token: string, body: unknown) {
         leaseExpiresAt: new Date(Date.now() + 120000),
       },
     });
-    await tx.run.update({ where: { id: run.id }, data: { status: 'ASSIGNED' } });
+    await tx.run.update({
+      where: { id: run.id },
+      data: { status: 'ASSIGNED' },
+    });
     return deliveryView(run, d);
   });
 }
@@ -406,7 +457,10 @@ export async function boundDelivery(
   await lockNode(tx, nodeId);
   await nodeAuth(tx, token, nodeId, bootId);
   await expireNodeRun(tx, nodeId);
-  const d = await tx.delivery.findUnique({ where: { id }, include: { run: true } });
+  const d = await tx.delivery.findUnique({
+    where: { id },
+    include: { run: true },
+  });
   if (!d || d.run.nodeId !== nodeId || d.fence !== fence || (bootId && d.bootId !== bootId))
     fault('STALE_FENCE', '任务分配不匹配');
   return d;
@@ -473,9 +527,15 @@ export async function acceptRun(db: PrismaClient, token: string, id: string, bod
     await assertIsolatedRun(tx, d.run);
     if (!d.acceptedAt) {
       if (d.ackDeadline.getTime() <= Date.now()) fault('LEASE_EXPIRED', '接收期限已过');
-      await tx.delivery.update({ where: { id }, data: { acceptedAt: new Date() } });
+      await tx.delivery.update({
+        where: { id },
+        data: { acceptedAt: new Date() },
+      });
       if (d.run.status === 'ASSIGNED')
-        await tx.run.update({ where: { id: d.runId }, data: { status: 'RUNNING' } });
+        await tx.run.update({
+          where: { id: d.runId },
+          data: { status: 'RUNNING' },
+        });
     }
     return {
       deliveryId: id,
@@ -486,17 +546,21 @@ export async function acceptRun(db: PrismaClient, token: string, id: string, bod
   });
 }
 export async function deliveryConfig(db: PrismaClient, token: string, id: string, body: unknown) {
-  const input = checked<{ nodeId: string; bootId: string; deliveryId: string; fence: number }>(
-    'DeliveryConfigInput',
-    body,
-  );
+  const input = checked<{
+    nodeId: string;
+    bootId: string;
+    deliveryId: string;
+    fence: number;
+  }>('DeliveryConfigInput', body);
   if (input.deliveryId !== id) fault('STALE_FENCE', '分配编号不一致');
   return db.$transaction(async (tx) => {
     const d = await bound(tx, token, input.nodeId, id, input.fence, input.bootId);
     authorized(d);
     await assertIsolatedRun(tx, d.run);
     if (!d.acceptedAt || d.run.stopRequested) fault('NODE_NOT_READY', '任务尚未接收或已请求停止');
-    const v = await tx.configVersion.findUniqueOrThrow({ where: { id: d.run.configVersionId! } });
+    const v = await tx.configVersion.findUniqueOrThrow({
+      where: { id: d.run.configVersionId! },
+    });
     const config = v.body as unknown as TestConfiguration;
     await configSecrets(tx, config);
     const proxyId =
@@ -533,7 +597,11 @@ export async function closeRun(
 ) {
   await tx.run.update({
     where: { id: run.id },
-    data: { status, finishedAt: new Date(), ...(errorCode ? { errorCode } : {}) },
+    data: {
+      status,
+      finishedAt: new Date(),
+      ...(errorCode ? { errorCode } : {}),
+    },
   });
   await tx.nodeSlot.updateMany({
     where: { nodeId: run.nodeId, runId: run.id },
@@ -548,7 +616,10 @@ export async function requestRunStop(tx: Tx, id: string) {
   const run = await tx.run.findUniqueOrThrow({ where: { id } });
   if (run.status === 'QUEUED') await closeRun(tx, run, 'CANCELLED');
   else if (!RUN_END.includes(run.status))
-    await tx.run.update({ where: { id }, data: { status: 'STOP_REQUESTED', stopRequested: true } });
+    await tx.run.update({
+      where: { id },
+      data: { status: 'STOP_REQUESTED', stopRequested: true },
+    });
   return {
     operationId: id,
     resourceId: id,
@@ -588,6 +659,74 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
   const openOnly = full && config?.execution.appOpen !== undefined;
   const plan = run.executionPlan as unknown as DailyExecutionPlan | null;
   const p = event.payload as Record<string, unknown>;
+  const assignments = deviceAssignments(plan);
+  const sessionEvents = async () => {
+    const rows = await tx.runEvent.findMany({
+      where: {
+        delivery: { runId },
+        sequence: { lt: event.sequence },
+        recordedForReview: false,
+        body: { path: ['type'], equals: 'DEVICE_SESSION' },
+      },
+      orderBy: { sequence: 'asc' },
+    });
+    const states = new Map<string, { phase: string }>();
+    for (const row of rows) {
+      const b = row.body as { payload: { sessionId: string; phase: string } };
+      states.set(b.payload.sessionId, b.payload);
+    }
+    return states;
+  };
+  if (plan && config && devicePlanIssues(config, plan).length)
+    fault('EVENT_CONFLICT', '设备会话计划无效');
+  if (
+    (event.type === 'RUN_FINISHED' || event.type === 'STOP_ACK') &&
+    assignments &&
+    p.errorCode !== 'CLEANUP_INCOMPLETE' &&
+    p.cleanupComplete !== false
+  ) {
+    const states = await sessionEvents();
+    if (Array.from(states.values()).some((s) => s.phase !== 'CLOSED'))
+      fault('EVENT_CONFLICT', '必须等待所有设备会话清理');
+  }
+  if (event.type === 'DEVICE_SESSION') {
+    const group = plan?.openPolicy?.sessions?.find((s) => s.id === p.sessionId);
+    if (!openOnly || !group || !assignments) fault('EVENT_CONFLICT', '设备会话不属于本批次');
+    const states = await sessionEvents(),
+      prior = states.get(group.id);
+    const active = Array.from(states.entries()).filter(([, s]) => s.phase === 'STARTED');
+    if (p.phase === 'STARTED') {
+      if (
+        prior ||
+        p.cleanupComplete !== false ||
+        p.elapsedMs !== 0 ||
+        active.length >= plan!.openPolicy!.concurrency ||
+        active.some(
+          ([id]) =>
+            plan!.openPolicy!.sessions!.find((s) => s.id === id)?.variantId === group.variantId &&
+            group.variantId,
+        )
+      )
+        fault('EVENT_CONFLICT', '设备会话重复或并发超限');
+    } else {
+      const positions = assignments.flatMap((a, i) => (a.sessionId === group.id ? [i] : []));
+      const busy = await tx.task.count({
+        where: {
+          runId,
+          position: { in: positions },
+          attemptStarted: true,
+          status: { notIn: ['SUCCEEDED', 'FAILED', 'CANCELLED', 'SKIPPED'] },
+        },
+      });
+      if (
+        prior?.phase !== 'STARTED' ||
+        busy ||
+        (p.phase === 'CLOSED') !== (p.cleanupComplete === true)
+      )
+        fault('EVENT_CONFLICT', '设备会话尚未结束或清理不完整');
+    }
+    return;
+  }
   if (event.type === 'LOG') {
     const task = await tx.task.findUnique({ where: { id: event.taskId } });
     const native = String(p.message).startsWith('自有测试 APK：');
@@ -600,8 +739,7 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
             openOnly &&
             config.execution.appOpen?.ownedTestClient &&
             task.status === 'HOLDING' &&
-            (task.apk as { packageName?: string } | null)?.packageName ===
-              'com.apkplatform.testclient'
+            isOwnedTestPackage((task.apk as { packageName?: string } | null)?.packageName ?? '')
           )
         : task.status !== 'DOWNLOADING')
     )
@@ -609,13 +747,18 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
     if (
       native &&
       p.message === '自有测试 APK：账户已上报' &&
-      !(await tx.testRecord.count({ where: { enrollment: { taskId: task.id } } }))
+      !(await tx.testRecord.count({
+        where: { enrollment: { taskId: task.id } },
+      }))
     )
       fault('EVENT_CONFLICT', '尚无本轮账户上报记录');
     return;
   }
   if (event.type === 'BROWSER_ENVIRONMENT' || event.type === 'APP_OBSTRUCTION') {
-    if (run.purpose === 'PROXY_CHECK' || (openOnly && event.type === 'APP_OBSTRUCTION'))
+    if (
+      run.purpose === 'PROXY_CHECK' ||
+      (openOnly && !config.execution.appOpen?.appsPerDevice && event.type === 'APP_OBSTRUCTION')
+    )
       fault('EVENT_CONFLICT', '当前任务不接受页面事件');
     if (event.type === 'APP_OBSTRUCTION' || event.taskId) {
       const task = await tx.task.findUnique({ where: { id: event.taskId } });
@@ -652,8 +795,12 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
                 AND: [
                   { body: { path: ['taskId'], equals: event.taskId } },
                   { body: { path: ['type'], equals: 'APP_OBSTRUCTION' } },
-                  { body: { path: ['payload', 'action'], equals: 'RETRY_LOAD' } },
-                  { body: { path: ['payload', 'phase'], equals: 'ACTION_SENT' } },
+                  {
+                    body: { path: ['payload', 'action'], equals: 'RETRY_LOAD' },
+                  },
+                  {
+                    body: { path: ['payload', 'phase'], equals: 'ACTION_SENT' },
+                  },
                 ],
               },
               select: { id: true },
@@ -731,7 +878,10 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
       fault('EVENT_CONFLICT', '目标数量或编号冲突');
     for (const [offset, t] of targets.entries()) {
       if (run.purpose === 'REGISTER') {
-        const asset = plan?.assets[(start + offset) % plan.assets.length];
+        const asset =
+          plan?.assets[
+            assignments?.[start + offset]?.assetIndex ?? (start + offset) % plan.assets.length
+          ];
         if (
           !asset ||
           t.targetKey !== dailyTargetKey(asset.targetKey, start + offset) ||
@@ -852,21 +1002,45 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
         if (
           task.status !== 'QUEUED' ||
           task.attemptStarted ||
-          task.position !== run.attemptsStarted ||
+          (!assignments && task.position !== run.attemptsStarted) ||
           active >= (openOnly ? (plan?.openPolicy?.concurrency ?? 1) : 1) ||
           (openOnly && run.successes + active >= run.successTarget) ||
           run.attemptsStarted >= run.attemptLimit ||
           run.successes >= run.successTarget
         )
           fault('EVENT_CONFLICT', '上一轮尚未结束或已达到注册配额');
+        if (assignments) {
+          const assignment = assignments[task.position];
+          if (!assignment || (await sessionEvents()).get(assignment.sessionId)?.phase !== 'STARTED')
+            fault('EVENT_CONFLICT', '设备会话尚未开始');
+          const priorPositions = assignments.flatMap((a, i) =>
+            a.sessionId === assignment.sessionId && a.appIndex < assignment.appIndex ? [i] : [],
+          );
+          const unfinished = await tx.task.count({
+            where: {
+              runId,
+              position: { in: priorPositions },
+              status: {
+                notIn: ['SUCCEEDED', 'FAILED', 'CANCELLED', 'SKIPPED'],
+              },
+            },
+          });
+          if (unfinished) fault('EVENT_CONFLICT', '同设备必须按抽取顺序串行执行');
+        }
         if (openOnly) {
           if (plan?.openPolicy && Date.now() >= Date.parse(plan.openPolicy.admissionDeadline))
             fault('DAY_CUTOFF', '今日停止新增轮次');
           if ((await dailyOpenUsage(tx, run.nodeId)).remaining < 1)
             fault('DAILY_OPEN_LIMIT', '已用完今日额度');
         }
-        await tx.run.update({ where: { id: runId }, data: { attemptsStarted: { increment: 1 } } });
-        await tx.task.update({ where: { id: task.id }, data: { attemptStarted: true } });
+        await tx.run.update({
+          where: { id: runId },
+          data: { attemptsStarted: { increment: 1 } },
+        });
+        await tx.task.update({
+          where: { id: task.id },
+          data: { attemptStarted: true },
+        });
       }
       const androidStages = [
         'DOWNLOADED',
@@ -890,7 +1064,10 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
       if (stage === 'DOWNLOADED' && schemaIssues('ApkMetadata', p.apk).length)
         fault('EVENT_CONFLICT', '缺少 APK 校验元数据');
       if (stage === 'DOWNLOADED' && run.purpose === 'REGISTER') {
-        const expected = plan?.assets[task.position % plan.assets.length]?.apk;
+        const expected =
+          plan?.assets[
+            assignments?.[task.position]?.assetIndex ?? task.position % plan.assets.length
+          ]?.apk;
         if (!expected || canonical(expected) !== canonical(p.apk))
           fault('EVENT_CONFLICT', '缓存资产元数据被修改');
       }
@@ -903,6 +1080,9 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
               variantId?: string;
               model?: string;
               systemImageSha256?: string;
+              deviceSessionId?: string;
+              appIndex?: number;
+              apiLevel?: number;
             }
           | undefined;
         if (
@@ -912,12 +1092,58 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
             !isIP(observation.proxyObservedIp ?? ''))
         )
           fault('EVENT_CONFLICT', '缺少设备及代理配置证据');
+        if (assignments) {
+          const current = assignments[task.position];
+          const positions = assignments.flatMap((a, i) =>
+            a.sessionId === current.sessionId ? [i] : [],
+          );
+          const prior = await tx.task.findMany({
+            where: {
+              runId,
+              position: { in: positions, not: task.position },
+              observation: { not: Prisma.DbNull },
+            },
+            select: { observation: true },
+          });
+          const actual = observation as Record<string, unknown>;
+          if (
+            prior.some((t) =>
+              ['avdName', 'model', 'apiLevel', 'shellAndroidIdHash'].some(
+                (key) => (t.observation as Record<string, unknown>)[key] !== actual[key],
+              ),
+            )
+          )
+            fault('EVENT_CONFLICT', '同设备内系统身份发生变化');
+          const avd = actual.avdName;
+          if (
+            typeof avd !== 'string' ||
+            (await tx.task.count({
+              where: {
+                runId,
+                position: { notIn: positions },
+                observation: { path: ['avdName'], equals: avd },
+              },
+            }))
+          )
+            fault('EVENT_CONFLICT', '不同设备会话不能复用同一模拟器');
+        }
+        if (
+          assignments &&
+          (observation.deviceSessionId !== assignments[task.position].sessionId ||
+            observation.appIndex !== assignments[task.position].appIndex)
+        )
+          fault('EVENT_CONFLICT', 'APP 与设备会话不符');
         if (config.execution.appOpen?.randomDeviceProfile) {
-          const variantId = plan?.openPolicy?.variantIds?.[task.position];
+          const variantId =
+            assignments?.[task.position]?.variantId ??
+            plan?.openPolicy?.variantIds?.[task.position];
           if (
             !variantId ||
             observation.variantId !== variantId ||
-            observation.model !== 'QA-Mobile-000' + Number(variantId.slice(-2)) ||
+            observation.model !==
+              (deviceVariant(variantId)?.model ?? 'QA-Mobile-000' + Number(variantId.slice(-2))) ||
+            (deviceVariant(variantId) &&
+              observation.apiLevel !== deviceVariant(variantId)?.apiLevel) ||
             !/^[a-f0-9]{64}$/.test(observation.systemImageSha256 ?? '')
           )
             fault('EVENT_CONFLICT', '型号档案与本轮分配不一致');
@@ -939,7 +1165,10 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
             ? { registrationStartedAt: new Date() }
             : {}),
           ...(stage === 'DOWNLOADED'
-            ? { apk: p.apk as Prisma.InputJsonValue, cacheHit: p.cacheHit === true }
+            ? {
+                apk: p.apk as Prisma.InputJsonValue,
+                cacheHit: p.cacheHit === true,
+              }
             : {}),
           ...(p.observation ? { observation: p.observation as Prisma.InputJsonValue } : {}),
           ...(p.recognition ? { recognition: p.recognition as Prisma.InputJsonValue } : {}),
@@ -969,6 +1198,21 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
       (p.artifactIds as string[]).length === 0;
     if (!full && status === 'SKIPPED' && !navigationSkip)
       fault('EVENT_CONFLICT', '下载跳过必须是未下载的导航站');
+    if (p.proof === 'APP_OPEN' && assignments) {
+      const o = p.openObservation as {
+        deviceSessionId?: string;
+        appIndex?: number;
+        cleanupScope?: string;
+      };
+      const a = assignments[task.position];
+      if (
+        !o ||
+        o.deviceSessionId !== a.sessionId ||
+        o.appIndex !== a.appIndex ||
+        o.cleanupScope !== 'APP_UNINSTALLED'
+      )
+        fault('EVENT_CONFLICT', '缺少应用卸载及会话回执');
+    }
     if (p.proof === 'APP_OPEN' && !openOnly) fault('EVENT_CONFLICT', '启动停留证明与配置不符');
     if (p.openTimings && !openOnly) fault('EVENT_CONFLICT', '步骤耗时仅用于启动停留');
     if (openOnly) {
@@ -994,7 +1238,9 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
     }
     if (full && !openOnly) {
       const account = p.accountRef
-        ? await tx.accountResult.findUnique({ where: { accountRef: String(p.accountRef) } })
+        ? await tx.accountResult.findUnique({
+            where: { accountRef: String(p.accountRef) },
+          })
         : null;
       if (p.accountRef && (!account || account.taskId !== task.id))
         fault('EVENT_CONFLICT', '账户不属于本任务');
@@ -1080,7 +1326,10 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
       },
     });
     if (run.purpose === 'REGISTER' && status === 'SUCCEEDED')
-      await tx.run.update({ where: { id: runId }, data: { successes: { increment: 1 } } });
+      await tx.run.update({
+        where: { id: runId },
+        data: { successes: { increment: 1 } },
+      });
     return;
   }
   if (event.type === 'STOP_ACK') {
@@ -1094,7 +1343,10 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
         runId,
         OR: [
           { status: 'UNKNOWN' },
-          { submissionId: { not: null }, status: { notIn: ['SUCCEEDED', 'FAILED'] } },
+          {
+            submissionId: { not: null },
+            status: { notIn: ['SUCCEEDED', 'FAILED'] },
+          },
         ],
       },
     });
@@ -1113,7 +1365,9 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
     await tx.task.updateMany({
       where: {
         runId,
-        status: { notIn: ['SUCCEEDED', 'FAILED', 'SKIPPED', 'CANCELLED', 'UNKNOWN'] },
+        status: {
+          notIn: ['SUCCEEDED', 'FAILED', 'SKIPPED', 'CANCELLED', 'UNKNOWN'],
+        },
       },
       data: { status: 'CANCELLED' },
     });
@@ -1214,7 +1468,10 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
         fault('EVENT_CONFLICT', '配额结果或原因不一致');
       await tx.task.updateMany({
         where: { runId, status: 'QUEUED', attemptStarted: false },
-        data: { status: 'SKIPPED', errorCode: reached ? 'QUOTA_NOT_USED' : 'BATCH_ENDED' },
+        data: {
+          status: 'SKIPPED',
+          errorCode: reached ? 'QUOTA_NOT_USED' : 'BATCH_ENDED',
+        },
       });
       await closeRun(tx, run, expected, code);
       return;
@@ -1274,13 +1531,16 @@ export async function runEvents(db: PrismaClient, token: string, body: unknown) 
             'PROXY_CHECKED',
             'BROWSER_ENVIRONMENT',
             'APP_OBSTRUCTION',
+            'DEVICE_SESSION',
             'LOG',
           ].includes(event.type)
         )
           fault('FEATURE_UNAVAILABLE', 'P2 不接受此事件', 422);
         const hash = digest(canonical(event));
         const existing = await tx.runEvent.findFirst({
-          where: { OR: [{ id: event.eventId }, { deliveryId: d.id, sequence: event.sequence }] },
+          where: {
+            OR: [{ id: event.eventId }, { deliveryId: d.id, sequence: event.sequence }],
+          },
         });
         if (existing) {
           if (
@@ -1306,10 +1566,14 @@ export async function runEvents(db: PrismaClient, token: string, body: unknown) 
       if (!late) {
         while (true) {
           const next = await tx.runEvent.findUnique({
-            where: { deliveryId_sequence: { deliveryId: d.id, sequence: applied + 1 } },
+            where: {
+              deliveryId_sequence: { deliveryId: d.id, sequence: applied + 1 },
+            },
           });
           if (!next || next.recordedForReview) break;
-          const current = await tx.run.findUniqueOrThrow({ where: { id: d.runId } });
+          const current = await tx.run.findUniqueOrThrow({
+            where: { id: d.runId },
+          });
           if (RUN_END.includes(current.status)) break;
           await applyEvent(tx, d.runId, next.body as unknown as Event);
           applied++;
@@ -1319,7 +1583,9 @@ export async function runEvents(db: PrismaClient, token: string, body: unknown) 
           data: { appliedThroughSequence: applied },
         });
       }
-      const current = await tx.run.findUniqueOrThrow({ where: { id: d.runId } });
+      const current = await tx.run.findUniqueOrThrow({
+        where: { id: d.runId },
+      });
       return {
         ackedEventIds: input.events.map((e) => e.eventId),
         appliedThroughSequence: applied,
@@ -1337,9 +1603,14 @@ export async function reconcileAgent(db: PrismaClient, token: string, body: unkn
   return db.$transaction(async (tx) => {
     await lockNode(tx, input.nodeId);
     await nodeAuth(tx, token, input.nodeId);
-    const slot = await tx.nodeSlot.findUnique({ where: { nodeId: input.nodeId } });
+    const slot = await tx.nodeSlot.findUnique({
+      where: { nodeId: input.nodeId },
+    });
     if (!input.cleanupComplete && !slot?.runId)
-      await tx.nodeSlot.update({ where: { nodeId: input.nodeId }, data: { quarantined: true } });
+      await tx.nodeSlot.update({
+        where: { nodeId: input.nodeId },
+        data: { quarantined: true },
+      });
     if (slot?.runId) {
       const run = await tx.run.findUniqueOrThrow({
         where: { id: slot.runId },
@@ -1356,7 +1627,9 @@ export async function reconcileAgent(db: PrismaClient, token: string, body: unkn
         const clean =
           input.cleanupComplete && (local?.cleanupComplete ?? input.deliveries.length === 0);
         for (const submission of local?.submissions ?? []) {
-          const task = await tx.task.findUnique({ where: { id: submission.taskId } });
+          const task = await tx.task.findUnique({
+            where: { id: submission.taskId },
+          });
           const account = await tx.accountResult.findUnique({
             where: { accountRef: submission.accountRef },
           });
@@ -1420,7 +1693,9 @@ export async function reconcileRun(
     const run = await tx.run.findUnique({ where: { id } });
     if (!run) fault('NOT_FOUND', '批次不存在', 404);
     const node = await lockNode(tx, run.nodeId);
-    const auth = await tx.agentCredential.findUnique({ where: { nodeId: node.id } });
+    const auth = await tx.agentCredential.findUnique({
+      where: { nodeId: node.id },
+    });
     const slot = await tx.nodeSlot.findUnique({ where: { nodeId: node.id } });
     if (
       await tx.task.count({
@@ -1456,7 +1731,9 @@ export async function reconcileRun(
       where: { nodeId: node.id },
       data: { runId: null, quarantined: false },
     });
-    await tx.auditEvent.create({ data: { adminId: actor, action: 'RUN_RECONCILED', requestId } });
+    await tx.auditEvent.create({
+      data: { adminId: actor, action: 'RUN_RECONCILED', requestId },
+    });
     return { id, reconciled: true };
   });
 }

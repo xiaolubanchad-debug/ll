@@ -1,5 +1,7 @@
+import { scheduleDeviceSessions } from './device-sessions.js';
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
+import { devicePlanIssues } from '@apk/contracts';
 import type { DailyExecutionPlan, TestConfiguration } from '@apk/contracts';
 import type { Target, AutomationEvent } from './download.js';
 import type { RegistrationCompletion } from './registration.js';
@@ -24,7 +26,9 @@ export async function runCachedAppOpens(
   beforeAction: () => void,
   execute: CachedOpenAction,
   now: () => number = Date.now,
+  closeDeviceSession?: (id: string) => Promise<boolean>,
 ) {
+  if (devicePlanIssues(config, plan).length) throw new DownloadError('DEVICE_SESSION_PLAN_INVALID');
   const policy = plan.openPolicy;
   if (
     !policy ||
@@ -34,6 +38,7 @@ export async function runCachedAppOpens(
     throw new DownloadError('OPEN_POLICY_INVALID');
   if (
     config.execution.appOpen.randomDeviceProfile &&
+    !policy.sessions &&
     (!policy.variantIds ||
       policy.variantIds.length !== plan.attemptLimit ||
       new Set(policy.variantIds).size !== plan.attemptLimit)
@@ -42,11 +47,27 @@ export async function runCachedAppOpens(
   const deadline = Date.parse(policy.admissionDeadline);
   if (!Number.isFinite(deadline) || policy.dailyLimit !== 800 || plan.attemptLimit > 800)
     throw new DownloadError('OPEN_POLICY_INVALID');
+  const assignments = policy.sessions?.flatMap((s) =>
+    s.assetIndexes.map((assetIndex, appIndex) => ({
+      assetIndex,
+      appIndex,
+      deviceSessionId: s.id,
+      variantId: s.variantId,
+    })),
+  );
   const targets: Target[] = plan.assets.length
     ? Array.from({ length: plan.attemptLimit }, (_, position) => {
-        const asset = plan.assets[position % plan.assets.length];
+        const assignment = assignments?.[position];
+        const asset = plan.assets[assignment?.assetIndex ?? position % plan.assets.length];
         return {
           taskId: randomUUID(),
+          ...(assignment
+            ? {
+                deviceSessionId: assignment.deviceSessionId,
+                appIndex: assignment.appIndex,
+                variantId: assignment.variantId,
+              }
+            : {}),
           ...(policy.variantIds ? { variantId: policy.variantIds[position] } : {}),
           targetKey: sha(canonical([asset.targetKey, position])),
           label: asset.label.slice(0, 180) + ' · ' + (position + 1),
@@ -85,7 +106,7 @@ export async function runCachedAppOpens(
   const cache = await ApkCache.open(join(root, 'cache'));
   const drain = new AbortController(),
     attemptSignal = AbortSignal.any([signal, drain.signal]);
-  const running = new Map<number, Promise<void>>();
+  const running = new Map<number, Promise<unknown>>();
   let next = 0,
     successes = 0,
     missing = false,
@@ -96,8 +117,12 @@ export async function runCachedAppOpens(
     beforeAction();
     attemptSignal.throwIfAborted();
     const target = targets[index],
-      asset = plan.assets[index % plan.assets.length];
-    await emit({ type: 'TASK_STAGE', taskId: target.taskId, payload: { stage: 'DOWNLOADING' } });
+      asset = plan.assets[assignments?.[index].assetIndex ?? index % plan.assets.length];
+    await emit({
+      type: 'TASK_STAGE',
+      taskId: target.taskId,
+      payload: { stage: 'DOWNLOADING' },
+    });
     const found = await cache.get(
       nodeId,
       plan.cacheDay,
@@ -150,36 +175,58 @@ export async function runCachedAppOpens(
     await emit({ type: 'TASK_FINISHED', taskId: target.taskId, payload });
     if (completion.status === 'SUCCEEDED') successes++;
     if (!cleanupComplete) drain.abort();
+    return {
+      success: completion.status === 'SUCCEEDED',
+      clean: cleanupComplete,
+      missing: completion.errorCode === 'CACHE_MISSING',
+    };
   };
   try {
-    while (true) {
-      beforeAction();
-      if (signal.aborted) throw new DownloadError('CANCELLED');
-      if (now() >= deadline) cutoff = true;
-      while (
-        !fatal &&
-        !dirty &&
-        !missing &&
-        !cutoff &&
-        next < targets.length &&
-        running.size < policy.concurrency &&
-        successes + running.size < plan.successTarget
-      ) {
-        const index = next++;
-        const job = round(index)
-          .catch((error: unknown) => {
-            if (!dirty) fatal ??= error;
-            drain.abort();
-          })
-          .finally(() => {
-            running.delete(index);
-          });
-        running.set(index, job);
+    if (policy.sessions) {
+      if (!closeDeviceSession) throw new DownloadError('DEVICE_SESSION_PLAN_INVALID');
+      const result = await scheduleDeviceSessions(
+        plan,
+        signal,
+        beforeAction,
+        emit,
+        round,
+        closeDeviceSession,
+        now,
+        () => drain.abort(),
+      );
+      successes = result.successes;
+      dirty = result.dirty;
+      missing = result.missing;
+      cutoff = result.cutoff;
+    } else
+      while (true) {
+        beforeAction();
+        if (signal.aborted) throw new DownloadError('CANCELLED');
+        if (now() >= deadline) cutoff = true;
+        while (
+          !fatal &&
+          !dirty &&
+          !missing &&
+          !cutoff &&
+          next < targets.length &&
+          running.size < policy.concurrency &&
+          successes + running.size < plan.successTarget
+        ) {
+          const index = next++;
+          const job = round(index)
+            .catch((error: unknown) => {
+              if (!dirty) fatal ??= error;
+              drain.abort();
+            })
+            .finally(() => {
+              running.delete(index);
+            });
+          running.set(index, job);
+        }
+        if (!running.size) break;
+        await Promise.race(running.values());
+        if (fatal) break;
       }
-      if (!running.size) break;
-      await Promise.race(running.values());
-      if (fatal) break;
-    }
   } catch (error) {
     fatal ??= error;
     drain.abort();

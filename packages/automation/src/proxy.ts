@@ -33,7 +33,8 @@ export async function startProxyBridge(
   const authorization =
     'Basic ' + Buffer.from(credential.username + ':' + credential.password).toString('base64');
   const sockets = new Set<Socket>();
-  let closed = false;
+  let closed = false,
+    generation = 0;
   let failure: string | undefined;
   const failedConnect = (error: NodeJS.ErrnoException) => {
     if (['ECONNREFUSED', 'ENETUNREACH', 'EHOSTUNREACH', 'ETIMEDOUT'].includes(error.code ?? ''))
@@ -47,9 +48,10 @@ export async function startProxyBridge(
     if (sockets.size > 128) socket.destroy();
   };
   const server = createServer((req, res) => {
+    const epoch = generation;
     void (async () => {
       const target = await policy.endpoint(req.url ?? '');
-      if (closed || target.url.protocol !== 'http:') throw Error();
+      if (closed || epoch !== generation || target.url.protocol !== 'http:') throw Error();
       const url =
         'http://' +
         authority(target.address, target.port) +
@@ -103,9 +105,10 @@ export async function startProxyBridge(
   });
   server.on('connection', track);
   server.on('connect', (req, client, head) => {
+    const epoch = generation;
     void (async () => {
       const target = await policy.endpoint('https://' + req.url);
-      if (closed) throw Error();
+      if (closed || epoch !== generation) throw Error();
       const remote = request({
         host: upstream.address,
         port: upstream.port,
@@ -134,7 +137,7 @@ export async function startProxyBridge(
           client.end('HTTP/1.1 502 Bad Gateway\r\n\r\n');
           return;
         }
-        if (closed) {
+        if (closed || epoch !== generation) {
           socket.destroy();
           client.destroy();
           return;
@@ -173,6 +176,10 @@ export async function startProxyBridge(
       if (failure) throw new RegistrationError(failure);
     },
     url: 'http://127.0.0.1:' + port,
+    resetConnections() {
+      generation++;
+      for (const s of sockets) s.destroy();
+    },
     async close() {
       closed = true;
       for (const s of sockets) s.destroy();

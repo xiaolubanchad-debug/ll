@@ -1460,6 +1460,33 @@
             },
             "required": ["id", "position", "label", "stage", "packageName"]
           }
+        },
+        "deviceSessions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["started", "closed", "failed", "active"],
+          "properties": {
+            "started": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 800
+            },
+            "closed": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 800
+            },
+            "failed": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 800
+            },
+            "active": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 800
+            }
+          }
         }
       },
       "required": [
@@ -1559,7 +1586,7 @@
                   },
                   "steps": {
                     "type": "array",
-                    "maxItems": 10,
+                    "maxItems": 12,
                     "items": {
                       "type": "object",
                       "additionalProperties": false,
@@ -1576,7 +1603,10 @@
                             "APP_LAUNCH",
                             "FOREGROUND_CHECK",
                             "FOREGROUND_DWELL",
-                            "CLEANUP"
+                            "CLEANUP",
+                            "STARTUP_ADS",
+                            "APPIUM_PREPARE",
+                            "IDENTITY_IMAGE_CHECK"
                           ]
                         },
                         "startedMs": {
@@ -1596,6 +1626,19 @@
                     }
                   }
                 }
+              },
+              "deviceSessionId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "appIndex": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9
+              },
+              "packageName": {
+                "type": "string",
+                "maxLength": 256
               }
             },
             "required": [
@@ -1881,7 +1924,7 @@
         },
         "steps": {
           "type": "array",
-          "maxItems": 10,
+          "maxItems": 12,
           "items": {
             "type": "object",
             "additionalProperties": false,
@@ -1898,7 +1941,10 @@
                   "APP_LAUNCH",
                   "FOREGROUND_CHECK",
                   "FOREGROUND_DWELL",
-                  "CLEANUP"
+                  "CLEANUP",
+                  "STARTUP_ADS",
+                  "APPIUM_PREPARE",
+                  "IDENTITY_IMAGE_CHECK"
                 ]
               },
               "startedMs": {

@@ -1,4 +1,12 @@
-import { assertIdentityReady, identityCapacity, allocateIdentityModels } from './identity.js';
+import { randomInt, randomUUID } from 'node:crypto';
+import { isOwnedTestPackage, deviceVariant, devicePlanIssues } from '@apk/contracts';
+import {
+  assertIdentityReady,
+  identityCapacity,
+  allocateIdentityModels,
+  readyDeviceVariants,
+  readyDeviceAbis,
+} from './identity.js';
 import type { Prisma, ConfigVersion } from '@prisma/client';
 import type { DailyExecutionPlan, RunInput, TestConfiguration } from '@apk/contracts';
 import { schemaIssues, registrationAvailable } from '@apk/contracts';
@@ -59,9 +67,13 @@ export async function prepareDailyPlan(
   if (input.purpose === 'PROXY_CHECK') plan.proxySecretVersionId = input.proxySecretVersionId;
   if (input.purpose === 'REGISTER') {
     validateBudget(input.successTarget!, input.attemptLimit!);
-    const identityNode = await tx.node.findUniqueOrThrow({ where: { id: input.nodeId } });
+    const identityNode = await tx.node.findUniqueOrThrow({
+      where: { id: input.nodeId },
+    });
     const identityRelease = identityNode.agentReleaseId
-      ? await tx.release.findUnique({ where: { id: identityNode.agentReleaseId } })
+      ? await tx.release.findUnique({
+          where: { id: identityNode.agentReleaseId },
+        })
       : null;
     assertIdentityReady(
       config,
@@ -82,11 +94,12 @@ export async function prepareDailyPlan(
           concurrency: config.execution.appOpen.concurrency,
           dailyLimit: 800,
           admissionDeadline: deadline,
-          ...(config.execution.appOpen.randomDeviceProfile
+          ...(config.execution.appOpen.randomDeviceProfile &&
+          !config.execution.appOpen.appsPerDevice
             ? {
                 variantIds: allocateIdentityModels(
                   input.attemptLimit!,
-                  identityCapacity(identityNode.health),
+                  Math.min(3, identityCapacity(identityNode.health)),
                 ),
               }
             : {}),
@@ -120,10 +133,7 @@ export async function prepareDailyPlan(
       if (apk.cacheDay !== plan.cacheDay)
         fault('DOWNLOAD_SOURCE_INVALID', '文件日期与当天批次不一致', 422);
       if (!registrationAvailable(config, apk.packageName, task.entryId ?? undefined)) continue;
-      if (
-        config.execution.appOpen?.ownedTestClient &&
-        apk.packageName !== 'com.apkplatform.testclient'
-      )
+      if (config.execution.appOpen?.ownedTestClient && !isOwnedTestPackage(apk.packageName))
         continue;
       plan.assets.push({
         targetKey: task.targetKey,
@@ -134,7 +144,78 @@ export async function prepareDailyPlan(
       });
     }
   }
-  if (schemaIssues('DailyExecutionPlan', plan).length)
+  const groupPolicy = config.execution.appOpen?.appsPerDevice;
+  if (groupPolicy && plan.purpose === 'REGISTER') {
+    plan.assets = plan.assets.filter((a) => a.apk.minSdkVersion !== undefined);
+    const seen = new Set<string>();
+    plan.assets = plan.assets.filter((a) => {
+      if (seen.has(a.apk.packageName)) return false;
+      seen.add(a.apk.packageName);
+      return true;
+    });
+    if (plan.assets.length < groupPolicy.max)
+      fault('APK_POOL_INSUFFICIENT', '不同包名的兼容 APK 数量不足，请降低每台设备安装数量', 422);
+    const node = await tx.node.findUniqueOrThrow({
+      where: { id: input.nodeId },
+    });
+    const variants = readyDeviceVariants(node.health);
+    const abiCatalog = readyDeviceAbis(node.health);
+    if (config.execution.appOpen?.randomDeviceProfile && variants.length < 2)
+      fault('IDENTITY_POOL_EXHAUSTED', '缺少已验证型号档案', 422);
+    const sessions: NonNullable<NonNullable<DailyExecutionPlan['openPolicy']>['sessions']> = [];
+    let left = plan.attemptLimit;
+    let modelBag = variants.slice();
+    while (left > 0) {
+      const compatibleVariants = variants.filter(
+        (id) =>
+          id !== sessions.at(-1)?.variantId &&
+          plan.assets.filter(
+            (a) =>
+              (a.apk.minSdkVersion ?? 1) <= (deviceVariant(id)?.apiLevel ?? 0) &&
+              (!a.apk.abis.length || a.apk.abis.some((abi) => abiCatalog[id]?.includes(abi))),
+          ).length >= groupPolicy.max,
+      );
+      let available = modelBag.filter((id) => compatibleVariants.includes(id));
+      if (!available.length) {
+        modelBag = variants.slice();
+        available = modelBag.filter((id) => compatibleVariants.includes(id));
+      }
+      if (config.execution.appOpen?.randomDeviceProfile && !available.length)
+        fault('APK_POOL_INSUFFICIENT', '所选 APK 与已验证系统档案不兼容', 422);
+      const variantId = config.execution.appOpen?.randomDeviceProfile
+        ? available[randomInt(available.length)]
+        : undefined;
+      modelBag = modelBag.filter((id) => id !== variantId);
+      const api =
+        deviceVariant(variantId ?? '')?.apiLevel ??
+        Number(config.execution.deviceProfiles[0].systemImage.split(';')[1].slice(8));
+      const supportedAbis =
+        abiCatalog[variantId ?? variants.find((id) => deviceVariant(id)?.apiLevel === api) ?? ''] ??
+        [];
+      const indexes = plan.assets.flatMap((a, i) =>
+        (a.apk.minSdkVersion ?? 1) <= api &&
+        (!a.apk.abis.length || a.apk.abis.some((abi) => supportedAbis.includes(abi)))
+          ? [i]
+          : [],
+      );
+      if (indexes.length < groupPolicy.max)
+        fault('APK_POOL_INSUFFICIENT', '兼容 APK 数量不足', 422);
+      const count = Math.min(left, randomInt(groupPolicy.min, groupPolicy.max + 1));
+      for (let i = indexes.length - 1; i > 0; i--) {
+        const j = randomInt(i + 1);
+        [indexes[i], indexes[j]] = [indexes[j], indexes[i]];
+      }
+      sessions.push({
+        id: randomUUID(),
+        assetIndexes: indexes.slice(0, count),
+        ...(supportedAbis.length ? { supportedAbis } : {}),
+        ...(config.execution.appOpen?.randomDeviceProfile ? { variantId } : {}),
+      });
+      left -= count;
+    }
+    plan.openPolicy!.sessions = sessions;
+  }
+  if (schemaIssues('DailyExecutionPlan', plan).length || devicePlanIssues(config, plan).length)
     fault('VALIDATION_FAILED', '执行计划无效', 422);
   return plan;
 }

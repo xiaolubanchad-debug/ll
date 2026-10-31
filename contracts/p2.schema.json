@@ -5,9 +5,7 @@
     "ConfigInput": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "name"
-      ],
+      "required": ["name"],
       "properties": {
         "name": {
           "type": "string",
@@ -19,11 +17,7 @@
     "RunInput": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "nodeId",
-        "configVersionId",
-        "releaseId"
-      ],
+      "required": ["nodeId", "configVersionId", "releaseId"],
       "properties": {
         "nodeId": {
           "type": "string",
@@ -42,11 +36,7 @@
           "format": "uuid"
         },
         "purpose": {
-          "enum": [
-            "DOWNLOAD",
-            "REGISTER",
-            "PROXY_CHECK"
-          ]
+          "enum": ["DOWNLOAD", "REGISTER", "PROXY_CHECK"]
         },
         "sourceDownloadId": {
           "type": "string",
@@ -75,16 +65,10 @@
                 "const": "REGISTER"
               }
             },
-            "required": [
-              "purpose"
-            ]
+            "required": ["purpose"]
           },
           "then": {
-            "required": [
-              "sourceDownloadId",
-              "successTarget",
-              "attemptLimit"
-            ]
+            "required": ["sourceDownloadId", "successTarget", "attemptLimit"]
           }
         },
         {
@@ -94,14 +78,10 @@
                 "const": "PROXY_CHECK"
               }
             },
-            "required": [
-              "purpose"
-            ]
+            "required": ["purpose"]
           },
           "then": {
-            "required": [
-              "proxySecretVersionId"
-            ]
+            "required": ["proxySecretVersionId"]
           }
         }
       ]
@@ -109,9 +89,7 @@
     "RunReconcileInput": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "reason"
-      ],
+      "required": ["reason"],
       "properties": {
         "reason": {
           "type": "string",
@@ -123,13 +101,7 @@
     "AgentReconcileInput": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "protocolVersion",
-        "nodeId",
-        "bootId",
-        "deliveries",
-        "cleanupComplete"
-      ],
+      "required": ["protocolVersion", "nodeId", "bootId", "deliveries", "cleanupComplete"],
       "properties": {
         "protocolVersion": {
           "const": "1.0"
@@ -148,11 +120,7 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": [
-              "deliveryId",
-              "fence",
-              "cleanupComplete"
-            ],
+            "required": ["deliveryId", "fence", "cleanupComplete"],
             "properties": {
               "deliveryId": {
                 "type": "string",
@@ -171,11 +139,7 @@
                 "items": {
                   "type": "object",
                   "additionalProperties": false,
-                  "required": [
-                    "taskId",
-                    "submissionId",
-                    "accountRef"
-                  ],
+                  "required": ["taskId", "submissionId", "accountRef"],
                   "properties": {
                     "taskId": {
                       "type": "string",
@@ -203,13 +167,7 @@
     "DeliveryConfigInput": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "protocolVersion",
-        "nodeId",
-        "bootId",
-        "deliveryId",
-        "fence"
-      ],
+      "required": ["protocolVersion", "nodeId", "bootId", "deliveryId", "fence"],
       "properties": {
         "protocolVersion": {
           "const": "1.0"
@@ -251,17 +209,11 @@
           "maxLength": 256
         },
         "versionName": {
-          "type": [
-            "string",
-            "null"
-          ],
+          "type": ["string", "null"],
           "maxLength": 256
         },
         "versionCode": {
-          "type": [
-            "integer",
-            "null"
-          ],
+          "type": ["integer", "null"],
           "minimum": 0
         },
         "abis": {
@@ -285,6 +237,11 @@
         "cacheDay": {
           "type": "string",
           "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        },
+        "minSdkVersion": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
         }
       }
     }

@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from 'vue';
+import { computed, ref, onMounted, onUnmounted, watch } from 'vue';
 import type { TimelinePage } from '@apk/contracts';
 import { api } from './api';
 import { when } from './console-format';
 import { reasonLabels } from './result-labels';
 const props = defineProps<{ runId: string; taskId?: string }>();
 const timingLabels: Record<string, string> = {
+  STARTUP_ADS: '处理开屏广告与公告',
+  APPIUM_PREPARE: '准备 APP 控制服务',
+  IDENTITY_IMAGE_CHECK: '校验设备系统镜像',
   PROXY_CHECK: '代理检查',
   AVD_CREATE: '创建独立模拟器',
   EMULATOR_BOOT: '安卓冷启动',
@@ -18,6 +21,15 @@ const timingLabels: Record<string, string> = {
   CLEANUP: '关闭并清理',
 };
 const seconds = (ms: number) => (ms / 1000).toFixed(2) + ' 秒';
+const selectedSession = ref('');
+const sessions = computed(() => [
+  ...new Set(items.value.map((e) => e.deviceSessionId).filter((id): id is string => !!id)),
+]);
+const shown = computed(() =>
+  selectedSession.value
+    ? items.value.filter((e) => e.deviceSessionId === selectedSession.value || !e.deviceSessionId)
+    : items.value,
+);
 const items = ref<TimelinePage['items']>([]),
   earlier = ref(false),
   later = ref(false),
@@ -118,14 +130,27 @@ onUnmounted(() => {
     <p v-if="!items.length && !busy" class="empty-state">
       节点尚未上报执行日志。任务未开始时不会生成注册结果。
     </p>
+    <label v-if="sessions.length"
+      >设备会话
+      <select v-model="selectedSession" aria-label="筛选设备会话">
+        <option value="">全部设备</option>
+        <option v-for="id in sessions" :key="id" :value="id">设备 {{ id.slice(0, 8) }}</option>
+      </select></label
+    >
     <ol class="timeline-list">
-      <li v-for="event in items" :key="event.id" :class="{ 'event-unapplied': !event.applied }">
+      <li v-for="event in shown" :key="event.id" :class="{ 'event-unapplied': !event.applied }">
         <div class="timeline-meta">
           <time>{{ when(event.occurredAt) }}</time
           ><span>#{{ event.sequence }}</span
           ><span v-if="event.recordedForReview" class="result-badge tone-warning">迟到证据</span
           ><span v-else-if="!event.applied" class="result-badge tone-warning">等待按序应用</span>
         </div>
+        <p v-if="event.deviceSessionId" class="muted">
+          设备 {{ event.deviceSessionId.slice(0, 8)
+          }}<template v-if="event.appIndex !== undefined">
+            · APP {{ event.appIndex + 1 }} · {{ event.packageName }}</template
+          >
+        </p>
         <strong>{{ event.title }}</strong>
         <p v-if="event.errorCode" class="muted">
           {{ reasonLabels[event.errorCode] ?? event.errorCode }}

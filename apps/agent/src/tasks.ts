@@ -15,6 +15,7 @@ import {
   removeOwned,
   registerApk,
   openApk,
+  startAndroid,
   RegistrationError,
   runCachedRegistrations,
   runProxyCheck,
@@ -299,7 +300,10 @@ export class TaskEngine {
     });
     this.observe(accept);
     if (signal.aborted) {
-      this.store.append(d, { type: 'STOP_ACK', payload: { cleanupComplete: true } });
+      this.store.append(d, {
+        type: 'STOP_ACK',
+        payload: { cleanupComplete: true },
+      });
       await this.flush(d);
       this.store.status(d.deliveryId, 'DONE', true);
       return;
@@ -353,11 +357,18 @@ export class TaskEngine {
         versions.length !== 1
       )
         throw Error('PROXY_CONFIG_INVALID');
-      const secret = versions[0] as { id?: unknown; type?: unknown; secretValue?: unknown };
+      const secret = versions[0] as {
+        id?: unknown;
+        type?: unknown;
+        secretValue?: unknown;
+      };
       if (
         secret.id !== (plan?.proxySecretVersionId ?? config.execution.proxySecretVersionId) ||
         secret.type !== 'HTTP_PROXY' ||
-        schemaIssues('SecretInput', { type: 'HTTP_PROXY', secretValue: secret.secretValue }).length
+        schemaIssues('SecretInput', {
+          type: 'HTTP_PROXY',
+          secretValue: secret.secretValue,
+        }).length
       )
         throw Error('PROXY_CONFIG_INVALID');
       proxy = secret.secretValue as ProxyCredential;
@@ -386,6 +397,16 @@ export class TaskEngine {
       }
       this.options.beforeAction?.();
     };
+    const deviceOwners = new Map<string, string>();
+    const deviceSessions = new Map<string, Awaited<ReturnType<typeof startAndroid>>>();
+    const closeDeviceSession = async (id: string) => {
+      const session = deviceSessions.get(id);
+      if (!session)
+        return !this.store.androidSlots(d.deliveryId).some((r) => r.slot === deviceOwners.get(id));
+      const clean = await session.close().catch(() => false);
+      if (clean) deviceSessions.delete(id);
+      return clean;
+    };
     try {
       const runOptions: DownloadOptions = {
         ...this.options,
@@ -405,7 +426,29 @@ export class TaskEngine {
                       proxy: proxy!,
                       policy: this.options.policy,
                       proxyCheckUrl: this.options.proxyCheckUrl,
-                      androidFactory: this.options.androidFactory,
+                      androidFactory: target.deviceSessionId
+                        ? async (profile, s, hooks) => {
+                            const id = target.deviceSessionId!;
+                            let session = deviceSessions.get(id);
+                            if (!session) {
+                              deviceOwners.set(id, target.taskId);
+                              session = await (this.options.androidFactory ?? startAndroid)(
+                                profile,
+                                s,
+                                hooks,
+                              );
+                              deviceSessions.set(id, session);
+                            }
+                            const shared = session;
+                            return {
+                              ...shared,
+                              close: async () => {
+                                if (!shared.finishApplication) return false;
+                                return shared.finishApplication(apk.packageName).catch(() => false);
+                              },
+                            };
+                          }
+                        : this.options.androidFactory,
                       testBootstrap: async () => {
                         await this.flush(d);
                         beforeAction();
@@ -488,13 +531,19 @@ export class TaskEngine {
           emit,
           beforeAction,
           runOptions.afterDownload!,
+          closeDeviceSession,
         );
       else if (plan?.purpose === 'PROXY_CHECK') {
         beforeAction();
         await runProxyCheck(proxy!, signal, emit, this.options.policy, this.options.proxyCheckUrl);
       } else
         await runDownload(
-          plan ? { ...config, execution: { ...config.execution, mode: 'DOWNLOAD_ONLY' } } : config,
+          plan
+            ? {
+                ...config,
+                execution: { ...config.execution, mode: 'DOWNLOAD_ONLY' },
+              }
+            : config,
           this.nodeId,
           join(this.store.root, 'downloads'),
           this.toolsRoot,
@@ -518,7 +567,10 @@ export class TaskEngine {
     } catch (error) {
       const row = this.store.deliveries().find((r) => r.id === d.deliveryId)!;
       if (signal.aborted && this.control === 'STOP') {
-        this.store.append(d, { type: 'STOP_ACK', payload: { cleanupComplete: row.clean } });
+        this.store.append(d, {
+          type: 'STOP_ACK',
+          payload: { cleanupComplete: row.clean },
+        });
         await this.flush(d);
         this.store.status(d.deliveryId, row.clean ? 'DONE' : 'REVIEW', row.clean);
       } else {

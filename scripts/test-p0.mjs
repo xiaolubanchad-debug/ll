@@ -157,14 +157,17 @@ try {
     ],
     env,
   );
-  db = new PrismaClient({ datasources: { db: { url: env.DATABASE_URL } }, log: [] });
+  db = new PrismaClient({
+    datasources: { db: { url: env.DATABASE_URL } },
+    log: [],
+  });
   const version = await db.$queryRawUnsafe('SHOW server_version');
   console.log('Real PostgreSQL version:', version[0].server_version);
   await run(['--test', '--test-concurrency=1', 'tests/agent-compatibility.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/agent-startup.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/api.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/p1.test.mjs'], env);
-  await run(['--test', '--test-concurrency=1', 'tests/p2.test.mjs'], env);
+  await run(['--test', '--test-reporter=tap', '--test-concurrency=1', 'tests/p2.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/mobile-download.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/download-discovery.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/v15-download.test.mjs'], env);
@@ -183,6 +186,8 @@ try {
   await run(['--test', '--test-concurrency=1', 'tests/open-performance.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/test-data.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/app-open-api.test.mjs'], env);
+  await run(['--test', '--test-concurrency=1', 'tests/device-sessions.test.mjs'], env);
+  await run(['--test', '--test-concurrency=1', 'tests/device-sessions-api.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/concurrent-open.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/concurrent-open-api.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/p3.test.mjs'], env);
@@ -215,10 +220,17 @@ try {
     { ...env, API_PROXY_URL: `http://127.0.0.1:${env.PORT}` },
   );
   await waitFor(env.APP_ORIGIN, ui);
-  await run(['--test', 'tests/web.test.mjs'], { ...env, P0_SCREENSHOT_DIR: dir });
-  await run(['--test', 'tests/v110-web.test.mjs'], { ...env, P0_SCREENSHOT_DIR: dir });
+  await run(['--test', 'tests/web.test.mjs'], {
+    ...env,
+    P0_SCREENSHOT_DIR: dir,
+  });
+  await run(['--test', 'tests/v110-web.test.mjs'], {
+    ...env,
+    P0_SCREENSHOT_DIR: dir,
+  });
   await run(['--test', 'tests/open-performance-web.test.mjs'], env);
   await run(['--test', 'tests/test-data-web.test.mjs'], env);
+  await run(['--test', 'tests/device-sessions-web.test.mjs'], env);
   console.log(
     'P0–P3 integration and browser tests passed (real PostgreSQL, SQLite and Chromium; EC2 installer and Appium boundary simulated here, real Android verified separately).',
   );

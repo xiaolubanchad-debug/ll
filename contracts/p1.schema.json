@@ -363,6 +363,38 @@
             "npmLockSha256": {
               "type": "string",
               "pattern": "^[a-f0-9]{64}$"
+            },
+            "extraSystemImages": {
+              "type": "array",
+              "minItems": 5,
+              "maxItems": 5,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["role", "url", "checksum", "revision", "apiLevel"],
+                "properties": {
+                  "role": {
+                    "const": "systemImage"
+                  },
+                  "url": {
+                    "type": "string",
+                    "pattern": "^https://dl\\.google\\.com/android/repository/[A-Za-z0-9_./-]+\\.zip$",
+                    "maxLength": 600
+                  },
+                  "checksum": {
+                    "type": "string",
+                    "pattern": "^(sha256:[a-f0-9]{64}|sha1:[a-f0-9]{40})$"
+                  },
+                  "revision": {
+                    "type": "string",
+                    "maxLength": 64,
+                    "minLength": 1
+                  },
+                  "apiLevel": {
+                    "enum": [29, 31, 33, 34, 36]
+                  }
+                }
+              }
             }
           }
         },
@@ -381,7 +413,8 @@
               "APP_OPEN_V1",
               "APP_OPEN_PARALLEL_V1",
               "DEVICE_VARIANTS_V1",
-              "OWNED_TEST_CLIENT_V1"
+              "OWNED_TEST_CLIENT_V1",
+              "DEVICE_SESSIONS_V1"
             ]
           }
         }
@@ -465,7 +498,15 @@
             },
             "identityModels": {
               "type": "string",
-              "pattern": "^[0-3]$"
+              "pattern": "^([0-9]|[12][0-9]|30)$"
+            },
+            "identityCatalog": {
+              "type": "string",
+              "maxLength": 2000
+            },
+            "identityAbis": {
+              "type": "string",
+              "maxLength": 4000
             }
           }
         },

@@ -1,4 +1,5 @@
 import type { IdentityImage } from './identity-images.js';
+import { isOwnedTestPackage, deviceVariant } from '@apk/contracts';
 import { spawn } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
 import { createServer } from 'node:net';
@@ -29,7 +30,7 @@ export interface AndroidOptions {
   policy?: NetworkPolicy;
   proxyCheckUrl?: string;
   ownedTestClient?: boolean;
-  controlMode?: 'LAUNCH_ONLY';
+  controlMode?: 'LAUNCH_ONLY' | 'DEVICE_SESSION';
   measure?: MeasureOpenStep;
   beforeAction: () => void;
   resources: (record: AndroidRecord | null) => Promise<void>;
@@ -218,7 +219,11 @@ export async function startAndroid(
   await mkdir(base, { recursive: true, mode: 0o700 });
   const workspace = await mkdtemp(join(base, 'android-')),
     avdName = 'p3_' + randomUUID().replaceAll('-', '');
-  const record: AndroidRecord = { workspace, avdName, appiumTmp: join(workspace, 'appium-tmp') };
+  const record: AndroidRecord = {
+    workspace,
+    avdName,
+    appiumTmp: join(workspace, 'appium-tmp'),
+  };
   let bridge: Awaited<ReturnType<typeof startProxyBridge>> | undefined,
     client: AppiumClient | undefined;
   const children: ChildProcess[] = [];
@@ -243,7 +248,8 @@ export async function startAndroid(
     code = 'ANDROID_NOT_READY',
     interrupt = true,
   ) => androidCommand(file, args, env, interrupt ? signal : undefined, timeout, code, workspace);
-  let closed = false;
+  let closed = false,
+    installUnconfirmed = false;
   const close = async () => {
     if (closed) return true;
     await client?.close();
@@ -319,6 +325,25 @@ export async function startAndroid(
           ),
         );
       }
+      const variant = deviceVariant(options.identityImage?.id ?? '');
+      if (variant) {
+        const ini = join(env.ANDROID_AVD_HOME, avdName + '.avd', 'config.ini');
+        const baseIni = (await readFile(ini, 'utf8')).replace(
+          /^hw\.lcd\.(width|height|density)=.*$/gm,
+          '',
+        );
+        await writeFile(
+          ini,
+          baseIni +
+            '\nhw.lcd.width=' +
+            variant.width +
+            '\nhw.lcd.height=' +
+            variant.height +
+            '\nhw.lcd.density=' +
+            variant.density +
+            '\n',
+        );
+      }
       await measure('EMULATOR_BOOT', async () => {
         const port = await emulatorPort();
         record.serial = 'emulator-' + port;
@@ -345,7 +370,14 @@ export async function startAndroid(
             '-http-proxy',
             bridge!.url,
           ],
-          { env, cwd: workspace, stdio: 'ignore', detached: true, windowsHide: true, shell: false },
+          {
+            env,
+            cwd: workspace,
+            stdio: 'ignore',
+            detached: true,
+            windowsHide: true,
+            shell: false,
+          },
         );
         children.push(emulator);
         emulator.on('error', () => {});
@@ -390,7 +422,7 @@ export async function startAndroid(
     const checkProxy = (s: AbortSignal) =>
       measure('PROXY_CHECK', () => proxyObservation(bridge!.port, s, options.proxyCheckUrl));
     const observed =
-      options.controlMode === 'LAUNCH_ONLY'
+      options.controlMode !== undefined
         ? await (async () => {
             await bootDevice(signal);
             return undefined;
@@ -402,70 +434,79 @@ export async function startAndroid(
           })();
     options.beforeAction();
     if (options.controlMode !== 'LAUNCH_ONLY') {
-      const appiumPort = await availablePort();
-      record.systemPort = await availablePort();
-      await options.resources(record);
-      await mkdir(record.appiumTmp, { recursive: true, mode: 0o700 });
-      const appium = spawn(
-        process.execPath,
-        [
-          join(options.toolsRoot, 'node_modules/appium/build/lib/main.js'),
-          '--address',
-          '127.0.0.1',
-          '--port',
-          String(appiumPort),
-          '--base-path',
-          '/',
-          '--tmp',
-          record.appiumTmp,
-          '--log-level',
-          'error',
-          '--log-no-colors',
-        ],
-        { env, cwd: workspace, stdio: 'ignore', detached: true, windowsHide: true, shell: false },
-      );
-      children.push(appium);
-      appium.on('error', () => {});
-      record.appiumPid = appium.pid;
-      await options.resources(record);
-      client = new AppiumClient(appiumPort, signal);
-      let ready = false;
-      for (let i = 0; i < 100; i++) {
-        options.beforeAction();
-        if (appium.exitCode !== null) throw new RegistrationError('APPIUM_FAILED');
-        try {
-          await client.command('GET', '/status', undefined, 1000);
-          ready = true;
-          break;
-        } catch {
-          /* Wait for this job's server only. */
+      await measure('APPIUM_PREPARE', async () => {
+        const appiumPort = await availablePort();
+        record.systemPort = await availablePort();
+        await options.resources(record);
+        await mkdir(record.appiumTmp, { recursive: true, mode: 0o700 });
+        const appium = spawn(
+          process.execPath,
+          [
+            join(options.toolsRoot, 'node_modules/appium/build/lib/main.js'),
+            '--address',
+            '127.0.0.1',
+            '--port',
+            String(appiumPort),
+            '--base-path',
+            '/',
+            '--tmp',
+            record.appiumTmp,
+            '--log-level',
+            'error',
+            '--log-no-colors',
+          ],
+          {
+            env,
+            cwd: workspace,
+            stdio: 'ignore',
+            detached: true,
+            windowsHide: true,
+            shell: false,
+          },
+        );
+        children.push(appium);
+        appium.on('error', () => {});
+        record.appiumPid = appium.pid;
+        await options.resources(record);
+        client = new AppiumClient(appiumPort, signal);
+        let ready = false;
+        for (let i = 0; i < 100; i++) {
+          options.beforeAction();
+          if (appium.exitCode !== null) throw new RegistrationError('APPIUM_FAILED');
+          try {
+            await client.command('GET', '/status', undefined, 1000);
+            ready = true;
+            break;
+          } catch {
+            /* Wait for this job's server only. */
+          }
+          await new Promise((r) => setTimeout(r, 200));
         }
-        await new Promise((r) => setTimeout(r, 200));
-      }
-      if (!ready) throw new RegistrationError('APPIUM_FAILED');
-      await client.start({
-        platformName: 'Android',
-        'appium:automationName': 'UiAutomator2',
-        'appium:udid': record.serial,
-        'appium:systemPort': record.systemPort,
-        'appium:noReset': true,
-        'appium:autoLaunch': false,
-        'appium:skipLogcatCapture': true,
-        'appium:printPageSourceOnFindFailure': false,
-        'appium:clearSystemFiles': true,
-        'appium:newCommandTimeout': 120,
-        'appium:language': profile.locale.split('-')[0],
-        'appium:locale': profile.locale.split('-')[1],
-      });
-      await client.command('POST', client.path('/timeouts'), { implicit: 0 });
-      await client.command('POST', client.path('/appium/settings'), {
-        settings: {
-          waitForIdleTimeout: 0,
-          waitForSelectorTimeout: 1000,
-          snapshotMaxDepth: 25,
-          ignoreUnimportantViews: true,
-          simpleBoundsCalculation: true,
-        },
+        if (!ready) throw new RegistrationError('APPIUM_FAILED');
+        await client.start({
+          platformName: 'Android',
+          'appium:automationName': 'UiAutomator2',
+          'appium:udid': record.serial,
+          'appium:systemPort': record.systemPort,
+          'appium:noReset': true,
+          'appium:autoLaunch': false,
+          'appium:skipLogcatCapture': true,
+          'appium:printPageSourceOnFindFailure': false,
+          'appium:clearSystemFiles': true,
+          'appium:newCommandTimeout': 120,
+          'appium:language': profile.locale.split('-')[0],
+          'appium:locale': profile.locale.split('-')[1],
+        });
+        await client.command('POST', client.path('/timeouts'), { implicit: 0 });
+        await client.command('POST', client.path('/appium/settings'), {
+          settings: {
+            waitForIdleTimeout: 0,
+            waitForSelectorTimeout: 1000,
+            snapshotMaxDepth: 25,
+            ignoreUnimportantViews: true,
+            simpleBoundsCalculation: true,
+          },
+        });
       });
     }
     const get = async (args: string[]) =>
@@ -473,7 +514,7 @@ export async function startAndroid(
     const { api, model, androidId, locale, supportedAbis } = await measure(
       'DEVICE_CHECK',
       async () => {
-        if (options.controlMode === 'LAUNCH_ONLY') {
+        if (options.controlMode !== undefined) {
           const [text, androidId] = await Promise.all([
             androidCommand(
               adb,
@@ -512,7 +553,11 @@ export async function startAndroid(
     );
     if (!validShellAndroidId(androidId) || !Number.isInteger(api) || locale !== profile.locale)
       throw new RegistrationError('DEVICE_PROFILE_UNSUPPORTED');
-    if (options.identityImage && model !== options.identityImage.model)
+    if (
+      options.identityImage &&
+      (model !== options.identityImage.model ||
+        (options.identityImage.apiLevel !== undefined && api !== options.identityImage.apiLevel))
+    )
       throw new RegistrationError('IDENTITY_MODEL_MISMATCH');
     const rpc = () => {
       if (!client) throw new RegistrationError('ANDROID_CONTROL_DISABLED');
@@ -523,7 +568,10 @@ export async function startAndroid(
       observation: {
         profileId: profile.id,
         ...(options.identityImage
-          ? { variantId: options.identityImage.id, systemImageSha256: options.identityImage.sha256 }
+          ? {
+              variantId: options.identityImage.id,
+              systemImageSha256: options.identityImage.sha256,
+            }
           : {}),
         avdName,
         apiLevel: api,
@@ -538,27 +586,62 @@ export async function startAndroid(
       },
       async install(file) {
         options.beforeAction();
+        installUnconfirmed = true;
         const value = await command(
           adb,
           ['-s', record.serial!, 'install', '--no-incremental', file],
           120000,
           'APK_INSTALL_FAILED',
         );
+        installUnconfirmed = false;
         if (!/^Success\s*$/m.test(value)) throw new RegistrationError('APK_INSTALL_FAILED');
       },
-      async testClientStatus() {
+      async finishApplication(pkg) {
+        if (installUnconfirmed) return false;
+        if (!/^[A-Za-z][A-Za-z0-9_.]{1,255}$/.test(pkg))
+          throw new RegistrationError('CLEANUP_INCOMPLETE');
+        const initial = await command(
+          adb,
+          ['-s', record.serial!, 'shell', 'pm', 'list', 'packages', pkg],
+          10000,
+          'CLEANUP_INCOMPLETE',
+          false,
+        );
+        if (!initial.split(/\r?\n/).some((line) => line.trim() === 'package:' + pkg)) {
+          bridge?.resetConnections();
+          return true;
+        }
+        await command(
+          adb,
+          ['-s', record.serial!, 'shell', 'am', 'force-stop', pkg],
+          10000,
+          'CLEANUP_INCOMPLETE',
+          false,
+        );
+        const removed = await command(
+          adb,
+          ['-s', record.serial!, 'uninstall', pkg],
+          30000,
+          'CLEANUP_INCOMPLETE',
+          false,
+        );
+        if (!/^Success\s*$/m.test(removed)) return false;
+        const listed = await command(
+          adb,
+          ['-s', record.serial!, 'shell', 'pm', 'list', 'packages', pkg],
+          10000,
+          'CLEANUP_INCOMPLETE',
+          false,
+        );
+        bridge?.resetConnections();
+        return !listed.split(/\r?\n/).some((line) => line.trim() === 'package:' + pkg);
+      },
+      async testClientStatus(pkg = 'com.apkplatform.testclient') {
+        if (!isOwnedTestPackage(pkg)) throw new RegistrationError('TEST_CLIENT_SCOPE');
         options.beforeAction();
         const value = await command(
           adb,
-          [
-            '-s',
-            record.serial!,
-            'shell',
-            'run-as',
-            'com.apkplatform.testclient',
-            'cat',
-            'files/report-status',
-          ],
+          ['-s', record.serial!, 'shell', 'run-as', pkg, 'cat', 'files/report-status'],
           2000,
           'TEST_CLIENT_STATUS_READ',
         ).catch(() => 'UNCONFIRMED');
@@ -568,20 +651,12 @@ export async function startAndroid(
           ? value.trim()
           : 'UNCONFIRMED';
       },
-      async provisionTestClient(bootstrap) {
+      async provisionTestClient(bootstrap, pkg = 'com.apkplatform.testclient') {
+        if (!isOwnedTestPackage(pkg)) throw new RegistrationError('TEST_CLIENT_SCOPE');
         options.beforeAction();
         await command(
           adb,
-          [
-            '-s',
-            record.serial!,
-            'shell',
-            'run-as',
-            'com.apkplatform.testclient',
-            'mkdir',
-            '-p',
-            'files',
-          ],
+          ['-s', record.serial!, 'shell', 'run-as', pkg, 'mkdir', '-p', 'files'],
           10000,
           'TEST_BOOTSTRAP_FAILED',
         );
@@ -593,7 +668,7 @@ export async function startAndroid(
             'shell',
             '-T',
             'run-as',
-            'com.apkplatform.testclient',
+            pkg,
             'sh',
             '-c',
             "'cat > files/bootstrap.json'",

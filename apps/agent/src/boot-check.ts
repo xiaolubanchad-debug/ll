@@ -4,6 +4,7 @@ import { createServer } from 'node:net';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { execute } from './health.js';
+import { deviceVariant } from '@apk/contracts';
 import type { IdentityImage } from '@apk/automation';
 export async function bootCheck(
   sdk: string,
@@ -13,7 +14,12 @@ export async function bootCheck(
   await mkdir(base, { recursive: true });
   const dir = await mkdtemp(join(base, 'check-'));
   const name = 'p1_' + randomUUID().replaceAll('-', '');
-  const env = { ...process.env, ANDROID_HOME: sdk, ANDROID_SDK_ROOT: sdk, ANDROID_AVD_HOME: dir };
+  const env = {
+    ...process.env,
+    ANDROID_HOME: sdk,
+    ANDROID_SDK_ROOT: sdk,
+    ANDROID_AVD_HOME: dir,
+  };
   let child: ReturnType<typeof spawn> | undefined;
   try {
     if ((await execute(join(sdk, 'emulator/emulator'), ['-accel-check'], 30000, env)).code)
@@ -26,7 +32,7 @@ export async function bootCheck(
         '--name',
         name,
         '--package',
-        'system-images;android-35;google_apis;x86_64',
+        'system-images;android-' + (image?.apiLevel ?? 35) + ';google_apis;x86_64',
         '--device',
         'pixel_6',
       ],
@@ -102,8 +108,49 @@ export async function bootCheck(
           );
           if (actual.code || actual.text.trim() !== image.model)
             throw Error('IDENTITY_MODEL_MISMATCH');
+          const variant = deviceVariant(image.id);
+          if (variant) {
+            const api = await execute(
+              join(sdk, 'platform-tools/adb'),
+              ['-s', `emulator-${port}`, 'shell', 'getprop', 'ro.build.version.sdk'],
+              5000,
+              env,
+            );
+            const manufacturer = await execute(
+              join(sdk, 'platform-tools/adb'),
+              ['-s', `emulator-${port}`, 'shell', 'getprop', 'ro.product.manufacturer'],
+              5000,
+              env,
+            );
+            if (
+              api.code ||
+              Number(api.text.trim()) !== variant.apiLevel ||
+              manufacturer.code ||
+              manufacturer.text.trim() !== variant.manufacturer
+            )
+              throw Error('IDENTITY_MODEL_MISMATCH');
+          }
         }
-        return true;
+        const abi = await execute(
+          join(sdk, 'platform-tools/adb'),
+          ['-s', `emulator-${port}`, 'shell', 'getprop', 'ro.product.cpu.abilist'],
+          5000,
+          env,
+        );
+        const supportedAbis = abi.text.trim().split(',').filter(Boolean);
+        if (
+          abi.code ||
+          !supportedAbis.length ||
+          supportedAbis.some((a) => !/^[A-Za-z0-9_-]{1,40}$/.test(a))
+        )
+          throw Error('ANDROID_NOT_READY');
+        return {
+          id: image?.id ?? 'base-35',
+          model: image?.model,
+          apiLevel: image?.apiLevel ?? 35,
+          sha256: image?.sha256,
+          supportedAbis,
+        };
       }
       await new Promise((r) => setTimeout(r, 2000));
     }

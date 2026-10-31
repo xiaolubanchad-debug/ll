@@ -14,7 +14,11 @@ import {
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const read = (name) => JSON.parse(fs.readFileSync(path.join(root, name), 'utf8'));
-const ajv = new Ajv2020({ allErrors: true, strict: true, strictRequired: false });
+const ajv = new Ajv2020({
+  allErrors: true,
+  strict: true,
+  strictRequired: false,
+});
 // Conditional required fields are declared in their enclosing object schemas.
 addFormats(ajv);
 const configCheck = ajv.compile(read('contracts/config.schema.json'));
@@ -85,8 +89,10 @@ for (const userAgent of [
 ])
   test('1.9 rejects non-Android browser ' + JSON.stringify(userAgent), () =>
     assert.ok(
-      configurationIssues({ ...config, source: { ...config.source, browserUserAgent: userAgent } })
-        .length,
+      configurationIssues({
+        ...config,
+        source: { ...config.source, browserUserAgent: userAgent },
+      }).length,
     ),
   );
 const browserEvent = {
@@ -119,14 +125,24 @@ test('1.9 desktop client hint rejected', () =>
   assert.ok(
     agentIssues({
       ...notes,
-      events: [{ ...browserEvent, payload: { ...browserEvent.payload, mobile: false } }],
+      events: [
+        {
+          ...browserEvent,
+          payload: { ...browserEvent.payload, mobile: false },
+        },
+      ],
     }).length,
   ));
 test('1.9 raw browser cookie rejected', () =>
   assert.ok(
     agentIssues({
       ...notes,
-      events: [{ ...browserEvent, payload: { ...browserEvent.payload, cookie: 'forbidden' } }],
+      events: [
+        {
+          ...browserEvent,
+          payload: { ...browserEvent.payload, cookie: 'forbidden' },
+        },
+      ],
     }).length,
   ));
 const obstruction = {
@@ -176,14 +192,22 @@ test('1.11 countdown cannot claim cleared', () =>
       events: [
         {
           ...obstruction,
-          payload: { ...obstruction.payload, action: 'WAIT_SPLASH', phase: 'CLEARED' },
+          payload: {
+            ...obstruction.payload,
+            action: 'WAIT_SPLASH',
+            phase: 'CLEARED',
+          },
         },
       ],
     }).length,
   ));
 for (const value of [
   {},
-  { confirmationTimeoutMs: 3000, splashTimeoutMs: 15000, iconRecognition: true },
+  {
+    confirmationTimeoutMs: 3000,
+    splashTimeoutMs: 15000,
+    iconRecognition: true,
+  },
 ])
   test('1.11 startup policy accepts bounded defaults', () =>
     assert.deepEqual(schemaIssues('StartupPolicy', value), []));
@@ -235,12 +259,17 @@ test('1.6 embedded recognition settings match the versioned schema', () =>
   ));
 test('1.6 excessive navigation is rejected', () =>
   assert.ok(
-    schemaIssues('AutoRegistration', { ...v16Examples.AutoRegistration, maxNavigationSteps: 13 })
-      .length,
+    schemaIssues('AutoRegistration', {
+      ...v16Examples.AutoRegistration,
+      maxNavigationSteps: 13,
+    }).length,
   ));
 test('1.6 unbounded discovery time is rejected', () =>
   assert.ok(
-    schemaIssues('AutoRegistration', { ...v16Examples.AutoRegistration, timeoutMs: 90001 }).length,
+    schemaIssues('AutoRegistration', {
+      ...v16Examples.AutoRegistration,
+      timeoutMs: 90001,
+    }).length,
   ));
 test('1.6 arbitrary visual service endpoint is rejected', () =>
   assert.ok(
@@ -260,7 +289,12 @@ test('1.6 learned recipes cannot contain execution commands', () =>
   assert.ok(
     schemaIssues('LearnedRegistrationTemplate', {
       ...v16Examples.LearnedRegistrationTemplate,
-      navigation: [{ ...v16Examples.LearnedRegistrationTemplate.navigation[0], role: 'EXEC' }],
+      navigation: [
+        {
+          ...v16Examples.LearnedRegistrationTemplate.navigation[0],
+          role: 'EXEC',
+        },
+      ],
     }).length,
   ));
 test('1.6 automatic recognition requires full mode', () => {
@@ -322,20 +356,32 @@ test('1.5 capability list accepts three declared capabilities', () => {
   assert.equal(validate(['DOWNLOAD_V1', 'ARBITRARY_CODE']), false);
 });
 test('1.5 invalid local time rejected', () =>
-  assert.ok(schemaIssues('ScheduleInput', { ...v15Examples.ScheduleInput, time: '24:05' }).length));
+  assert.ok(
+    schemaIssues('ScheduleInput', {
+      ...v15Examples.ScheduleInput,
+      time: '24:05',
+    }).length,
+  ));
 test('1.5 zero attempt limit rejected', () =>
   assert.ok(
-    schemaIssues('ScheduleInput', { ...v15Examples.ScheduleInput, attemptLimit: 0 }).length,
+    schemaIssues('ScheduleInput', {
+      ...v15Examples.ScheduleInput,
+      attemptLimit: 0,
+    }).length,
   ));
 test('1.5 plaintext schedule secret rejected', () =>
   assert.ok(
-    schemaIssues('ScheduleInput', { ...v15Examples.ScheduleInput, proxyPassword: 'forbidden' })
-      .length,
+    schemaIssues('ScheduleInput', {
+      ...v15Examples.ScheduleInput,
+      proxyPassword: 'forbidden',
+    }).length,
   ));
 test('1.5 arbitrary execution purpose rejected', () =>
   assert.ok(
-    schemaIssues('DailyExecutionPlan', { ...v15Examples.DailyExecutionPlan, purpose: 'EXEC_SHELL' })
-      .length,
+    schemaIssues('DailyExecutionPlan', {
+      ...v15Examples.DailyExecutionPlan,
+      purpose: 'EXEC_SHELL',
+    }).length,
   ));
 
 function semanticConfig(value) {
@@ -794,7 +840,11 @@ configReject('UiAutomator cannot perform hidden clicks', (v) => {
   };
 });
 configReject('P3 back after submit is not read-only', (v) => {
-  v.registrationFlows[0].steps.push({ action: 'back', timeoutMs: 1000, optional: false });
+  v.registrationFlows[0].steps.push({
+    action: 'back',
+    timeoutMs: 1000,
+    optional: false,
+  });
 });
 test('P3 immutable UiSelector accepted', () => {
   const value = structuredClone(config);
@@ -841,7 +891,14 @@ for (const errorCode of ['NAVIGATION_SITE', 'APP_NAVIGATION_ONLY', 'APP_AUTO_IDE
       agentIssues({
         ...notes,
         events: [
-          { ...event, payload: { ...payload, status: 'SUCCEEDED', proof: 'FILE_VALIDATION' } },
+          {
+            ...event,
+            payload: {
+              ...payload,
+              status: 'SUCCEEDED',
+              proof: 'FILE_VALIDATION',
+            },
+          },
         ],
       }).length,
     ),
@@ -851,7 +908,13 @@ for (const errorCode of ['NAVIGATION_SITE', 'APP_NAVIGATION_ONLY', 'APP_AUTO_IDE
       agentIssues({
         ...notes,
         events: [
-          { ...event, payload: { ...payload, accountRef: '55555555-5555-4555-8555-555555555555' } },
+          {
+            ...event,
+            payload: {
+              ...payload,
+              accountRef: '55555555-5555-4555-8555-555555555555',
+            },
+          },
         ],
       }).length,
     ),
@@ -866,8 +929,10 @@ for (const isolation of [undefined, true])
   });
 test('1.10 cannot disable isolation', () =>
   assert.ok(
-    configurationIssues({ ...config, execution: { ...config.execution, contentIsolation: false } })
-      .length,
+    configurationIssues({
+      ...config,
+      execution: { ...config.execution, contentIsolation: false },
+    }).length,
   ));
 for (const patch of [
   { image: 'data:image/png;base64,abc' },
@@ -875,7 +940,12 @@ for (const patch of [
   { controls: [{ role: 'BODY', rect: { x: 0, y: 0, width: 10, height: 10 } }] },
 ])
   test('1.10 rejects raw or misleading functional evidence ' + JSON.stringify(patch), () =>
-    assert.ok(schemaIssues('FunctionalEvidence', { ...p3.FunctionalEvidence, ...patch }).length),
+    assert.ok(
+      schemaIssues('FunctionalEvidence', {
+        ...p3.FunctionalEvidence,
+        ...patch,
+      }).length,
+    ),
   );
 test('1.10 legacy image upload disabled', () =>
   assert.ok(
@@ -920,7 +990,12 @@ for (const phase of ['ACTION_SENT', 'CLEARED', 'UNCHANGED', undefined])
   );
 test('1.11.1 native notice Back is phase-bound', () =>
   assert.deepEqual(
-    overlayIssues({ action: 'CLOSE_POPUP', method: 'BACK', index: 1, phase: 'DETECTED' }),
+    overlayIssues({
+      action: 'CLOSE_POPUP',
+      method: 'BACK',
+      index: 1,
+      phase: 'DETECTED',
+    }),
     [],
   ));
 for (const payload of [
@@ -932,7 +1007,12 @@ for (const payload of [
   );
 test('1.11.1 startup recovery is a phase-bound native control action', () =>
   assert.deepEqual(
-    overlayIssues({ action: 'RETRY_LOAD', method: 'CONTROLS', index: 1, phase: 'ACTION_SENT' }),
+    overlayIssues({
+      action: 'RETRY_LOAD',
+      method: 'CONTROLS',
+      index: 1,
+      phase: 'ACTION_SENT',
+    }),
     [],
   ));
 for (const payload of [
@@ -997,6 +1077,27 @@ for (const change of [
     change(c);
     assert.ok(configurationIssues(c).length);
   });
+
+const groupedConfig = structuredClone(selfConfig);
+groupedConfig.execution.appOpen.appsPerDevice = { min: 3, max: 5 };
+test('1.15 grouped device configuration', () =>
+  assert.deepEqual(configurationIssues(groupedConfig), []));
+for (const range of [
+  { min: 0, max: 3 },
+  { min: 4, max: 3 },
+  { min: 1, max: 11 },
+  { min: 1.5, max: 3 },
+  { min: 1, max: 3, shell: 'forbidden' },
+])
+  test('1.15 rejects invalid app count ' + JSON.stringify(range), () => {
+    const c = structuredClone(groupedConfig);
+    c.execution.appOpen.appsPerDevice = range;
+    assert.ok(configurationIssues(c).length);
+  });
+test('1.15 self client suite query', () =>
+  assert.deepEqual(schemaIssues('TestClientQuery', { suite: '1' }), []));
+test('1.15 suite cannot choose arbitrary URL', () =>
+  assert.ok(schemaIssues('TestClientQuery', { suite: '1', url: 'https://example.com/' }).length));
 process.stdout.write(
   `${passed} contract checks passed${process.exitCode ? '; failures present' : ''}.\n`,
 );

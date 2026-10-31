@@ -106,6 +106,9 @@ onUnmounted(() => {
           >下载测试 APK</a
         >
       </div>
+      <a v-if="info?.suiteReady" :href="info.suiteSourcePageUrl" target="_blank" rel="noopener"
+        >查看 1–10 号独立测试 APK</a
+      >
     </div>
     <div class="form-actions">
       <el-select
@@ -147,6 +150,12 @@ onUnmounted(() => {
             >第 {{ row.position }} 轮 · 查看日志</el-button
           >
         </template></el-table-column
+      >
+      <el-table-column prop="packageName" label="测试 APP 包名" min-width="220" />
+      <el-table-column label="设备会话" min-width="120"
+        ><template #default="{ row }">{{
+          row.deviceSessionId ? row.deviceSessionId.slice(0, 8) : '单 APP'
+        }}</template></el-table-column
       >
       <el-table-column prop="nodeName" label="执行服务器" min-width="110" />
       <el-table-column label="测试账户" min-width="150"

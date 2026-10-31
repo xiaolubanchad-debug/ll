@@ -31,6 +31,13 @@ const step = ref(props.initialStep ?? 1),
 const source = ref(props.initial?.configuration.source.url ?? ''),
   xpath = ref(props.initial?.configuration.source.xpath ?? example.source.xpath),
   mode = ref<'FULL' | 'DOWNLOAD_ONLY'>(props.initial?.configuration.execution.mode ?? 'FULL');
+const multiApp = ref(
+    props.initial
+      ? !!props.initial.configuration.execution.appOpen?.appsPerDevice
+      : (props.ownedTest ?? false),
+  ),
+  appsMin = ref(props.initial?.configuration.execution.appOpen?.appsPerDevice?.min ?? 3),
+  appsMax = ref(props.initial?.configuration.execution.appOpen?.appsPerDevice?.max ?? 5);
 const randomDeviceProfile = ref(
     props.initial?.configuration.execution.appOpen?.randomDeviceProfile ?? props.ownedTest ?? false,
   ),
@@ -39,16 +46,30 @@ const randomDeviceProfile = ref(
   );
 const base = ref<TestConfiguration>(
   props.initial?.configuration ??
-    ({ ...structuredClone(example), registrationFlows: [] } as TestConfiguration),
+    ({
+      ...structuredClone(example),
+      registrationFlows: [],
+    } as TestConfiguration),
 );
 const nodes = ref<NodeView[]>([]),
-  proxies = ref<{ id: string; name: string | null; type: string; revokedAt: string | null }[]>([]),
+  proxies = ref<
+    {
+      id: string;
+      name: string | null;
+      type: string;
+      revokedAt: string | null;
+    }[]
+  >([]),
   configs = ref<{ id: string; name: string }[]>([]);
 const proxyName = ref(''),
   host = ref(''),
   port = ref(10000),
   user = ref(''),
   password = ref('');
+watch(nodeId, (id) => {
+  if (!props.initial && !props.ownedTest)
+    multiApp.value = nodes.value.find((n) => n.id === id)?.agentVersion === '0.13.0';
+});
 watch(target, (value, previous) => {
   if (limit.value === previous * 3) limit.value = Math.min(800, value * 3);
 });
@@ -63,6 +84,11 @@ const draft = computed(() => {
   if (mode.value === 'FULL') {
     v.execution.proxySecretVersionId = proxyId.value;
     v.execution.appOpen = { dwellMs: 10000, concurrency: concurrency.value };
+    if (multiApp.value)
+      v.execution.appOpen.appsPerDevice = {
+        min: appsMin.value,
+        max: appsMax.value,
+      };
     if (randomDeviceProfile.value) v.execution.appOpen.randomDeviceProfile = true;
     if (ownedTestClient.value) v.execution.appOpen.ownedTestClient = true;
   } else {
@@ -87,7 +113,12 @@ async function all<T>(path: string): Promise<T[]> {
 async function choices() {
   [nodes.value, proxies.value, configs.value] = await Promise.all([
     all<NodeView>('/nodes'),
-    all<{ id: string; name: string | null; type: string; revokedAt: string | null }>('/secrets'),
+    all<{
+      id: string;
+      name: string | null;
+      type: string;
+      revokedAt: string | null;
+    }>('/secrets'),
     all<{ id: string; name: string }>('/configs'),
   ]);
   proxies.value = proxies.value.filter((p) => p.type === 'HTTP_PROXY' && !p.revokedAt);
@@ -95,10 +126,14 @@ async function choices() {
     const info = await api<TestClientInfo>('/test-client/info');
     if (!info.ready) throw Error('测试 APK 尚未发布');
     name.value = '自有 APK 设备信息测试';
-    source.value = info.sourcePageUrl;
-    xpath.value = "//a[@id='test-apk']";
-    target.value = 3;
-    limit.value = 3;
+    if (!info.suiteReady) throw Error('十个独立测试 APK 尚未发布');
+    source.value = info.suiteSourcePageUrl!;
+    xpath.value = "//a[@class='test-apk']";
+    target.value = 6;
+    limit.value = 6;
+    appsMin.value = 3;
+    appsMax.value = 3;
+    multiApp.value = true;
     concurrency.value = 2;
     base.value.execution.deviceProfiles = [
       {
@@ -126,6 +161,9 @@ function apply(value: string) {
     proxyId.value = c.execution.proxySecretVersionId ?? '';
     mode.value = c.execution.mode;
     concurrency.value = c.execution.appOpen?.concurrency ?? 1;
+    multiApp.value = !!c.execution.appOpen?.appsPerDevice;
+    appsMin.value = c.execution.appOpen?.appsPerDevice?.min ?? 1;
+    appsMax.value = c.execution.appOpen?.appsPerDevice?.max ?? 1;
     randomDeviceProfile.value = c.execution.appOpen?.randomDeviceProfile ?? false;
     ownedTestClient.value = c.execution.appOpen?.ownedTestClient ?? false;
     error.value = '';
@@ -203,7 +241,7 @@ async function save() {
       limit.value < target.value
     )
       throw Error('尝试上限需不小于成功目标');
-    if (randomDeviceProfile.value && limit.value > 3)
+    if (randomDeviceProfile.value && !multiApp.value && limit.value > 3)
       throw Error('测试型号每批最多 3 轮，请将尝试上限设为 3 或以下');
     const input: TaskPlanInput = {
       name: name.value.trim(),
@@ -253,7 +291,9 @@ onUnmounted(() => {
           <label for="task-import">已有方案</label
           ><select id="task-import" v-model="importId" @change="importConfig">
             <option value="">新建独立任务</option>
-            <option v-for="c in configs" :key="c.id" :value="c.id">{{ c.name }}</option>
+            <option v-for="c in configs" :key="c.id" :value="c.id">
+              {{ c.name }}
+            </option>
           </select>
           <p class="muted">接入保留原历史，不会启动旧计划。</p>
         </details>
@@ -307,7 +347,7 @@ onUnmounted(() => {
             </div>
             <el-button @click="saveProxy">保存代理并选中</el-button>
           </details>
-          <label for="task-concurrency">同时执行轮数</label
+          <label for="task-concurrency">{{ multiApp ? '同时运行模拟器数' : '同时执行轮数' }}</label
           ><select id="task-concurrency" v-model="concurrency">
             <option :value="1">1 路（默认）</option>
             <option :value="2">2 路并发</option>
@@ -316,15 +356,33 @@ onUnmounted(() => {
             每轮使用独立模拟器及代理，启动 APP 后停留 10 秒再退出清理。无需配置注册入口。
           </p>
           <label class="inline-check"
-            ><input
-              v-model="randomDeviceProfile"
-              type="checkbox"
-            />随机测试型号（同批次不重复，受节点档案数限制）</label
+            ><input v-model="randomDeviceProfile" type="checkbox" />随机机型档案（多 APP
+            模式按设备轮换，已验证后启用）</label
           >
           <label class="inline-check"
             ><input v-model="ownedTestClient" type="checkbox" />自有测试 APK
             上报账户与设备信息</label
           >
+          <label class="inline-check"
+            ><input v-model="multiApp" type="checkbox" />每台新模拟器依次测试多个不同 APP</label
+          >
+          <div v-if="multiApp" class="form-actions">
+            <label
+              >每台最少安装
+              <el-input-number v-model="appsMin" :min="1" :max="10" aria-label="每台最少安装数量"
+            /></label>
+            <label
+              >每台最多安装
+              <el-input-number
+                v-model="appsMax"
+                :min="appsMin"
+                :max="10"
+                aria-label="每台最多安装数量"
+            /></label>
+          </div>
+          <p v-if="multiApp" class="muted">
+            在同一台设备内随机选包且不重复。APP 完成目标和尝试上限按应用次数统计；设备内型号不变。
+          </p>
           <p v-if="ownedTestClient" class="muted">
             仅用于“中台测试 APK”；账户创建回执显示在“测试数据”，与启动完成数分开。
           </p></template

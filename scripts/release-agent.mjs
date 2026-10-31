@@ -13,7 +13,10 @@ async function official(url) {
   const parsed = new URL(url);
   if (!['dl.google.com', 'nodejs.org'].includes(parsed.hostname) || parsed.protocol !== 'https:')
     throw Error('OFFICIAL_SOURCE_REQUIRED');
-  const response = await fetch(url, { signal: AbortSignal.timeout(30000), redirect: 'error' });
+  const response = await fetch(url, {
+    signal: AbortSignal.timeout(30000),
+    redirect: 'error',
+  });
   if (!response.ok) throw Error('OFFICIAL_METADATA_UNAVAILABLE');
   const text = await response.text();
   if (text.length > 20 * 1024 * 1024) throw Error('METADATA_TOO_LARGE');
@@ -48,10 +51,20 @@ export function sdkArchive(xml, packagePath, role, base) {
   if (!/^[a-f0-9]{40}$/.test(digest)) throw Error('SDK_CHECKSUM_UNSUPPORTED');
   const version = pkg.revision;
   const revision = [version.major, version.minor ?? 0, version.micro ?? 0].join('.');
-  return { role, url: new URL(complete.url, base).href, checksum: 'sha1:' + digest, revision };
+  return {
+    role,
+    url: new URL(complete.url, base).href,
+    checksum: 'sha1:' + digest,
+    revision,
+  };
 }
 export async function publishAgent() {
-  if (execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim())
+  if (
+    execFileSync('git', ['status', '--porcelain'], {
+      cwd: root,
+      encoding: 'utf8',
+    }).trim()
+  )
     throw Error('RELEASE_SOURCE_DIRTY');
   const gitCommit = execFileSync('git', ['rev-parse', 'HEAD'], {
     cwd: root,
@@ -98,7 +111,7 @@ export async function publishAgent() {
   );
   const xml = await official('https://dl.google.com/android/repository/repository2-1.xml');
   const imageXml = await official(
-    'https://dl.google.com/android/repository/sys-img/google_apis/sys-img2-1.xml',
+    'https://dl.google.com/android/repository/sys-img/google_apis/sys-img2-3.xml',
   );
   const nodeSums = await official('https://nodejs.org/dist/v24.18.0/SHASUMS256.txt');
   const nodeSha256 = nodeSums
@@ -115,6 +128,15 @@ export async function publishAgent() {
     uiautomator2Version: dependencies['appium-uiautomator2-driver'],
     npmLockSha256: hash(await readFile(join(npmDir, 'package-lock.json'))),
     systemImage: 'system-images;android-35;google_apis;x86_64',
+    extraSystemImages: [29, 31, 33, 34, 36].map((apiLevel) => ({
+      ...sdkArchive(
+        imageXml,
+        'system-images;android-' + apiLevel + ';google_apis;x86_64',
+        'systemImage',
+        'https://dl.google.com/android/repository/sys-img/google_apis/',
+      ),
+      apiLevel,
+    })),
     archives: [
       sdkArchive(
         xml,
@@ -178,11 +200,14 @@ export async function publishAgent() {
   const bytes = await readFile(staged),
     sha256 = hash(bytes),
     artifactName = 'agent-' + sha256 + '.tgz';
-  await writeFile(join(releaseDir, artifactName), bytes, { flag: 'wx', mode: 0o600 });
+  await writeFile(join(releaseDir, artifactName), bytes, {
+    flag: 'wx',
+    mode: 0o600,
+  });
   const body = {
     id: randomUUID(),
     gitCommit,
-    agentVersion: '0.12.3',
+    agentVersion: '0.13.0',
     protocolVersion: '1.0',
     features: [
       'DOWNLOAD_V1',
@@ -194,6 +219,7 @@ export async function publishAgent() {
       'APP_OPEN_V1',
       'APP_OPEN_PARALLEL_V1',
       'DEVICE_VARIANTS_V1',
+      'DEVICE_SESSIONS_V1',
       'OWNED_TEST_CLIENT_V1',
     ],
     artifactName,

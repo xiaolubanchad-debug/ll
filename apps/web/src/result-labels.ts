@@ -14,6 +14,11 @@ export const dailyLabels: Record<string, string> = {
   WAITING: '等待条件就绪',
 };
 export const reasonLabels: Record<string, string> = {
+  APK_POOL_INSUFFICIENT: '兼容且包名不同的 APP 数量不足，请降低每台安装数量或更新下载',
+  DEVICE_SESSION_PLAN_INVALID: '设备执行计划不一致，已停止执行',
+  IDENTITY_IMAGE_INVALID: '设备系统镜像校验未通过',
+  IDENTITY_MODEL_MISMATCH: '实际机型与分配档案不一致',
+
   DAY_CUTOFF: '今日已停止新增轮次，等待次日下载与执行',
   DAILY_OPEN_LIMIT: '本服务器今日剩余尝试额度不足',
   APP_OPEN_DAILY_REQUIRED: '请通过任务中心复用当天 APK 执行',

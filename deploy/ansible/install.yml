@@ -57,6 +57,7 @@
             nftables,
             curl,
             unzip,
+            util-linux,
             xz-utils,
             openjdk-17-jre-headless,
             libnss3,
@@ -167,6 +168,26 @@
         content: '{{ item.checksum }}'
         mode: '0644'
       loop: '{{ toolchain.archives }}'
+    - name: Create multi-version system image directories
+      ansible.builtin.file:
+        path: '{{ sdk_root }}/system-images/android-{{ item.apiLevel }}/google_apis'
+        state: directory
+        mode: '0755'
+      loop: '{{ toolchain.extraSystemImages | default([]) }}'
+    - name: Download pinned additional Android versions
+      ansible.builtin.get_url:
+        url: '{{ item.url }}'
+        dest: '{{ tool_root }}/systemImage-{{ item.apiLevel }}.zip'
+        checksum: '{{ item.checksum }}'
+        mode: '0644'
+      loop: '{{ toolchain.extraSystemImages | default([]) }}'
+    - name: Extract pinned additional Android versions
+      ansible.builtin.unarchive:
+        src: '{{ tool_root }}/systemImage-{{ item.apiLevel }}.zip'
+        dest: '{{ sdk_root }}/system-images/android-{{ item.apiLevel }}/google_apis'
+        remote_src: true
+        creates: '{{ sdk_root }}/system-images/android-{{ item.apiLevel }}/google_apis/x86_64/package.xml'
+      loop: '{{ toolchain.extraSystemImages | default([]) }}'
     - name: Place command line tools in canonical SDK layout
       tags: [sdk_layout]
       ansible.builtin.command:
@@ -324,8 +345,10 @@
         argv: ['{{ runtime_root }}/node/bin/node', '{{ release_root }}/identity-images.js']
       environment:
         ANDROID_HOME: '{{ sdk_root }}'
+        DEVICE_SESSIONS: "{{ '1' if device_sessions_enabled | default(false) else '0' }}"
       changed_when: false
     - name: Verify each private QA model by actual boot
+      register: phone_boot_receipt
       when: identity_enabled | default(false)
       become_user: apk-runner
       ansible.builtin.command:
@@ -337,14 +360,23 @@
           ]
       environment:
         ANDROID_HOME: '{{ sdk_root }}'
+        DEVICE_SESSIONS: "{{ '1' if device_sessions_enabled | default(false) else '0' }}"
         JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
       changed_when: false
+    - name: Persist actual per-model boot receipts
+      when: device_sessions_enabled | default(false)
+      ansible.builtin.copy:
+        dest: '{{ sdk_root }}/phone-boot-proof.json'
+        content: '{{ phone_boot_receipt.stdout }}'
+        owner: root
+        mode: '0600'
     - name: Seal verified QA model registry
       when: identity_enabled | default(false)
       ansible.builtin.command:
         argv: ['{{ runtime_root }}/node/bin/node', '{{ release_root }}/identity-images.js', --seal]
       environment:
         ANDROID_HOME: '{{ sdk_root }}'
+        DEVICE_SESSIONS: "{{ '1' if device_sessions_enabled | default(false) else '0' }}"
       changed_when: false
     - name: Record actual Android boot proof
       ansible.builtin.copy:

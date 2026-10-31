@@ -1,3 +1,4 @@
+import { deviceAssignments } from '@apk/contracts';
 import { Prisma } from '@prisma/client';
 import type { PrismaClient } from '@prisma/client';
 import type {
@@ -88,12 +89,19 @@ export function resultWhere(category: ResultCategory): Prisma.TaskWhereInput {
         status: 'FAILED',
         AND: [
           { OR: [{ proof: { not: 'APP_UI' } }, { submissionId: null }] },
-          { OR: [{ errorCode: null }, { errorCode: { not: { startsWith: 'AUTO_' } } }] },
+          {
+            OR: [{ errorCode: null }, { errorCode: { not: { startsWith: 'AUTO_' } } }],
+          },
           {
             OR: [
               { recognition: { equals: Prisma.DbNull } },
               { recognition: { equals: Prisma.JsonNull } },
-              { recognition: { path: ['needsAdaptation'], equals: Prisma.AnyNull } },
+              {
+                recognition: {
+                  path: ['needsAdaptation'],
+                  equals: Prisma.AnyNull,
+                },
+              },
               { recognition: { path: ['needsAdaptation'], equals: false } },
             ],
           },
@@ -159,7 +167,13 @@ const select = {
       createdAt: true,
       finishedAt: true,
       node: { select: { name: true } },
-      configVersion: { select: { body: true, version: true, config: { select: { name: true } } } },
+      configVersion: {
+        select: {
+          body: true,
+          version: true,
+          config: { select: { name: true } },
+        },
+      },
     },
   },
 } satisfies Prisma.TaskSelect;
@@ -226,7 +240,13 @@ function search(q?: string): Prisma.TaskWhereInput {
     ? {
         OR: [
           { label: { contains: q, mode: 'insensitive' } },
-          { apk: { path: ['packageName'], string_contains: q, mode: 'insensitive' } },
+          {
+            apk: {
+              path: ['packageName'],
+              string_contains: q,
+              mode: 'insensitive',
+            },
+          },
         ],
       }
     : {};
@@ -253,7 +273,10 @@ export async function registrationRecords(db: PrismaClient, query: unknown) {
       search(q.q),
       q.category ? resultWhere(q.category) : {},
       q.review
-        ? { status: 'UNKNOWN', reviews: q.review === 'OPEN' ? { none: {} } : { some: {} } }
+        ? {
+            status: 'UNKNOWN',
+            reviews: q.review === 'OPEN' ? { none: {} } : { some: {} },
+          }
         : {},
       after
         ? {
@@ -338,7 +361,9 @@ const runSelect = {
   cacheDay: true,
   configVersionId: true,
   node: { select: { name: true } },
-  configVersion: { select: { body: true, version: true, config: { select: { name: true } } } },
+  configVersion: {
+    select: { body: true, version: true, config: { select: { name: true } } },
+  },
 } satisfies Prisma.RunSelect;
 type RunRow = Prisma.RunGetPayload<{ select: typeof runSelect }>;
 const runView = (r: RunRow) => ({
@@ -372,7 +397,9 @@ export async function consoleRuns(db: PrismaClient, query: unknown): Promise<Con
       AND: [
         filters,
         after
-          ? { OR: [{ createdAt: { lt: after.at } }, { createdAt: after.at, id: { lt: after.id } }] }
+          ? {
+              OR: [{ createdAt: { lt: after.at } }, { createdAt: after.at, id: { lt: after.id } }],
+            }
           : {},
       ],
     },
@@ -414,7 +441,10 @@ export async function consoleOverview(db: PrismaClient, query: unknown): Promise
       ] = await Promise.all([
         tx.node.count({ where: { archivedAt: null } }),
         tx.node.count({
-          where: { archivedAt: null, lastSeenAt: { gte: new Date(Date.now() - 45000) } },
+          where: {
+            archivedAt: null,
+            lastSeenAt: { gte: new Date(Date.now() - 45000) },
+          },
         }),
         tx.nodeSlot.count({
           where: {
@@ -422,24 +452,39 @@ export async function consoleOverview(db: PrismaClient, query: unknown): Promise
             OR: [{ operationId: { not: null } }, { runId: { not: null } }],
           },
         }),
-        tx.nodeSlot.count({ where: { node: { archivedAt: null }, quarantined: true } }),
+        tx.nodeSlot.count({
+          where: { node: { archivedAt: null }, quarantined: true },
+        }),
         tx.task.count({
           where: {
-            run: { purpose: 'DOWNLOAD', cacheDay: day, ...(q.nodeId ? { nodeId: q.nodeId } : {}) },
+            run: {
+              purpose: 'DOWNLOAD',
+              cacheDay: day,
+              ...(q.nodeId ? { nodeId: q.nodeId } : {}),
+            },
             status: 'SUCCEEDED',
             proof: 'FILE_VALIDATION',
           },
         }),
         tx.task.count({
           where: {
-            run: { purpose: 'DOWNLOAD', cacheDay: day, ...(q.nodeId ? { nodeId: q.nodeId } : {}) },
+            run: {
+              purpose: 'DOWNLOAD',
+              cacheDay: day,
+              ...(q.nodeId ? { nodeId: q.nodeId } : {}),
+            },
             status: 'FAILED',
           },
         }),
         categoryCounts(tx, scope),
-        tx.task.count({ where: { ...scope, status: 'UNKNOWN', reviews: { some: {} } } }),
+        tx.task.count({
+          where: { ...scope, status: 'UNKNOWN', reviews: { some: {} } },
+        }),
         tx.run.findMany({
-          where: { status: { in: [...activeStatuses] }, ...(q.nodeId ? { nodeId: q.nodeId } : {}) },
+          where: {
+            status: { in: [...activeStatuses] },
+            ...(q.nodeId ? { nodeId: q.nodeId } : {}),
+          },
           select: runSelect,
           orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
           take: 10,
@@ -470,22 +515,73 @@ export async function runSummary(db: PrismaClient, id: string): Promise<RunSumma
           tx.task.findFirst({
             where: { runId: id, status: { notIn: terminal } },
             orderBy: { position: 'asc' },
-            select: { id: true, position: true, label: true, status: true, apk: true },
+            select: {
+              id: true,
+              position: true,
+              label: true,
+              status: true,
+              apk: true,
+            },
           }),
           tx.task.count({
             where: {
               runId: id,
-              recognition: { path: ['automaticIdentity', 'scope'], equals: 'APP_UI_ONLY' },
+              recognition: {
+                path: ['automaticIdentity', 'scope'],
+                equals: 'APP_UI_ONLY',
+              },
             },
           }),
           tx.task.findMany({
-            where: { runId: id, attemptStarted: true, status: { notIn: terminal } },
+            where: {
+              runId: id,
+              attemptStarted: true,
+              status: { notIn: terminal },
+            },
             orderBy: { position: 'asc' },
             take: 2,
-            select: { id: true, position: true, label: true, status: true, apk: true },
+            select: {
+              id: true,
+              position: true,
+              label: true,
+              status: true,
+              apk: true,
+            },
           }),
         ]);
       const c = row.configVersion?.body as unknown as TestConfiguration | null;
+      let deviceSessions:
+        | { started: number; closed: number; failed: number; active: number }
+        | undefined;
+      if (c?.execution.appOpen?.appsPerDevice && row.purpose === 'REGISTER') {
+        const delivery = await tx.delivery.findUnique({
+          where: { runId: id },
+          select: { id: true, appliedThroughSequence: true },
+        });
+        const events = delivery
+          ? await tx.runEvent.findMany({
+              where: {
+                deliveryId: delivery.id,
+                sequence: { lte: delivery.appliedThroughSequence },
+                recordedForReview: false,
+                body: { path: ['type'], equals: 'DEVICE_SESSION' },
+              },
+              orderBy: { sequence: 'asc' },
+              select: { body: true },
+            })
+          : [];
+        const states = new Map<string, string>();
+        for (const event of events) {
+          const b = event.body as { payload: { sessionId: string; phase: string } };
+          states.set(b.payload.sessionId, b.payload.phase);
+        }
+        deviceSessions = {
+          started: states.size,
+          closed: [...states.values()].filter((v) => v === 'CLOSED').length,
+          failed: [...states.values()].filter((v) => v === 'FAILED').length,
+          active: [...states.values()].filter((v) => v === 'STARTED').length,
+        };
+      }
       const mapActive = (task: NonNullable<typeof activeTask>) => ({
         id: task.id,
         position: task.position + 1,
@@ -494,6 +590,7 @@ export async function runSummary(db: PrismaClient, id: string): Promise<RunSumma
         packageName: apkView(task.apk)?.packageName ?? null,
       });
       return output('RunSummaryView', {
+        ...(deviceSessions ? { deviceSessions } : {}),
         concurrency: c?.execution.appOpen?.concurrency ?? 1,
         activeTasks: activeTasks.map(mapActive),
         executionKind:
@@ -542,6 +639,19 @@ const stageTitles: Record<string, string> = {
   VERIFYING: '核验已提交的注册结果',
 };
 function title(type: string, p: Record<string, unknown>) {
+  if (type === 'DEVICE_SESSION')
+    return (
+      (p.phase === 'STARTED'
+        ? '设备会话开始：准备依次执行随机 APP'
+        : p.phase === 'CLOSED'
+          ? '设备会话已关闭并完成整机清理'
+          : '设备会话清理失败') +
+      ' · ' +
+      String(p.sessionId).slice(0, 8) +
+      ' · ' +
+      (Number(p.elapsedMs) / 1000).toFixed(2) +
+      ' 秒'
+    );
   if (type === 'LOG') {
     const message = String(p.message);
     return [
@@ -598,7 +708,10 @@ function title(type: string, p: Record<string, unknown>) {
         {
           SUCCEEDED:
             p.proof === 'APP_OPEN'
-              ? 'APP 启动停留 10 秒并清理完成'
+              ? (p.openObservation as { cleanupScope?: string } | undefined)?.cleanupScope ===
+                'APP_UNINSTALLED'
+                ? 'APP 启动停留 10 秒，已关闭并卸载'
+                : 'APP 启动停留 10 秒并清理完成'
               : p.proof === 'APP_UI'
                 ? 'APP 已确认注册成功'
                 : 'APK 下载校验成功',
@@ -646,7 +759,10 @@ export async function runTimeline(
   }
   if (
     q.taskId &&
-    !(await db.task.findFirst({ where: { id: q.taskId, runId: id }, select: { id: true } }))
+    !(await db.task.findFirst({
+      where: { id: q.taskId, runId: id },
+      select: { id: true },
+    }))
   )
     fault('NOT_FOUND', '目标不属于此批次', 404);
   const base: Prisma.RunEventWhereInput = {
@@ -665,7 +781,13 @@ export async function runTimeline(
     },
     orderBy: { sequence: forward ? 'asc' : 'desc' },
     take: n,
-    select: { id: true, sequence: true, body: true, createdAt: true, recordedForReview: true },
+    select: {
+      id: true,
+      sequence: true,
+      body: true,
+      createdAt: true,
+      recordedForReview: true,
+    },
   });
   if (!forward) rows.reverse();
   const first = rows[0]?.sequence ?? null,
@@ -674,6 +796,19 @@ export async function runTimeline(
     first === null ? 0 : db.runEvent.count({ where: { ...base, sequence: { lt: first } } }),
     last === null ? 0 : db.runEvent.count({ where: { ...base, sequence: { gt: last } } }),
   ]);
+  const run = await db.run.findUniqueOrThrow({
+    where: { id },
+    select: { executionPlan: true },
+  });
+  const assignments = deviceAssignments(
+    run.executionPlan as unknown as import('@apk/contracts').DailyExecutionPlan,
+  );
+  const taskScope = assignments
+    ? await db.task.findMany({
+        where: { runId: id },
+        select: { id: true, position: true, apk: true },
+      })
+    : [];
   return output('TimelinePage', {
     items: rows.map((r) => {
       const b = r.body as {
@@ -683,7 +818,18 @@ export async function runTimeline(
           payload?: Record<string, unknown>;
         },
         p = b.payload ?? {};
+      const task = taskScope.find((t) => t.id === b.taskId),
+        a = task ? assignments?.[task.position] : undefined;
       return {
+        ...(typeof p.sessionId === 'string'
+          ? { deviceSessionId: p.sessionId }
+          : a
+            ? {
+                deviceSessionId: a.sessionId,
+                appIndex: a.appIndex,
+                packageName: (task?.apk as { packageName?: string } | null)?.packageName ?? '',
+              }
+            : {}),
         id: r.id,
         sequence: r.sequence,
         taskId: b.taskId ?? null,
@@ -723,7 +869,11 @@ export async function apkAssets(db: PrismaClient, query: unknown): Promise<Asset
     where: {
       AND: [
         {
-          run: { purpose: 'DOWNLOAD', cacheDay: day, ...(q.nodeId ? { nodeId: q.nodeId } : {}) },
+          run: {
+            purpose: 'DOWNLOAD',
+            cacheDay: day,
+            ...(q.nodeId ? { nodeId: q.nodeId } : {}),
+          },
           apk: { not: Prisma.DbNull },
         },
         search(q.q),

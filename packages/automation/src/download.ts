@@ -32,11 +32,14 @@ export interface AutomationEvent {
     | 'PROXY_CHECKED'
     | 'BROWSER_ENVIRONMENT'
     | 'APP_OBSTRUCTION'
-    | 'LOG';
+    | 'LOG'
+    | 'DEVICE_SESSION';
   taskId?: string;
   payload: Record<string, unknown>;
 }
 export interface Target {
+  deviceSessionId?: string;
+  appIndex?: number;
   variantId?: string;
   taskId: string;
   targetKey: string;
@@ -168,7 +171,11 @@ async function capture(
   const requested = new Set<string>();
   const linkSnapshots = new WeakMap<Frame, { url: string; at: number; links: string[] }>();
   const log = (message: string) =>
-    emit({ type: 'LOG', taskId: target.taskId, payload: { level: 'INFO', message } });
+    emit({
+      type: 'LOG',
+      taskId: target.taskId,
+      payload: { level: 'INFO', message },
+    });
   const requestListener = (request: import('playwright').Request) => {
     try {
       const url = normalizeUrl(request.url());
@@ -198,7 +205,10 @@ async function capture(
     beforeAction();
     const element = await locate(source, config, target);
     await element
-      .tap({ timeout: Math.min(config.download.timeoutMs, 10000), noWaitAfter: true })
+      .tap({
+        timeout: Math.min(config.download.timeoutMs, 10000),
+        noWaitAfter: true,
+      })
       .catch(() => {});
     await pause(150, signal);
     while (!result && Date.now() < end) {
@@ -271,7 +281,10 @@ async function capture(
             beforeAction();
             if (Date.now() >= end) throw new DownloadError('DOWNLOAD_FAILED');
             await candidate
-              .tap({ timeout: Math.min(2000, Math.max(1, end - Date.now())), noWaitAfter: true })
+              .tap({
+                timeout: Math.min(2000, Math.max(1, end - Date.now())),
+                noWaitAfter: true,
+              })
               .catch(() => {});
             await pause(150, signal);
             return true;
@@ -533,7 +546,11 @@ export async function runDownload(
     for (const [index, target] of targets!.entries()) {
       beforeAction();
       const day = options.fixedCacheDay ?? cacheDay(now());
-      await emit({ type: 'TASK_STAGE', taskId: target.taskId, payload: { stage: 'DOWNLOADING' } });
+      await emit({
+        type: 'TASK_STAGE',
+        taskId: target.taskId,
+        payload: { stage: 'DOWNLOADING' },
+      });
       let apk: ApkMetadata | null = null,
         hit = false,
         errorCode = 'DOWNLOAD_FAILED';
@@ -683,7 +700,9 @@ export async function runDownload(
                 ? 'PARTIAL_FAILED'
                 : 'FAILED',
         ...(review
-          ? { errorCode: cleanupIncomplete ? 'CLEANUP_INCOMPLETE' : 'REGISTRATION_UNKNOWN' }
+          ? {
+              errorCode: cleanupIncomplete ? 'CLEANUP_INCOMPLETE' : 'REGISTRATION_UNKNOWN',
+            }
           : !targets!.length
             ? { errorCode: 'NO_TARGETS' }
             : navigationSkipped === targets!.length

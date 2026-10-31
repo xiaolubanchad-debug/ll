@@ -93,7 +93,9 @@ export class AnsibleRunner implements Runner {
         await writeFile(identity, context.ssh.privateKey, { mode: 0o600 });
         await writeFile(identity + '.pub', hostKeyLine(key.getPublicSSH()) + '\n', { mode: 0o600 });
         target.ansible_ssh_private_key_file = identity;
-        await writeFile(join(dir, 'env', 'ssh_key'), context.ssh.privateKey, { mode: 0o600 });
+        await writeFile(join(dir, 'env', 'ssh_key'), context.ssh.privateKey, {
+          mode: 0o600,
+        });
         if (context.ssh.passphrase)
           await writeFile(join(dir, 'identity_passphrase'), context.ssh.passphrase, {
             mode: 0o600,
@@ -113,6 +115,7 @@ export class AnsibleRunner implements Runner {
         toolchain_hash: toolchainHash,
         deployment_id: context.deploymentId,
         identity_enabled: context.manifest.features?.includes('DEVICE_VARIANTS_V1') ?? false,
+        device_sessions_enabled: context.manifest.features?.includes('DEVICE_SESSIONS_V1') ?? false,
         download_enabled: context.manifest.features?.includes('DOWNLOAD_V1') ?? false,
         agent_config: {
           nodeId: context.node.id,
@@ -127,7 +130,11 @@ export class AnsibleRunner implements Runner {
       await writeFile(join(dir, 'env', 'extravars'), JSON.stringify(variables), { mode: 0o600 });
       await writeFile(
         join(dir, 'env', 'settings'),
-        JSON.stringify({ job_timeout: 3600, idle_timeout: 600, suppress_ansible_output: true }),
+        JSON.stringify({
+          job_timeout: 7200,
+          idle_timeout: 3600,
+          suppress_ansible_output: true,
+        }),
         { mode: 0o600 },
       );
       const code = await new Promise<number>((ok, no) => {
@@ -176,7 +183,7 @@ export class AnsibleRunner implements Runner {
           kill('SIGTERM');
           killTimer = setTimeout(() => kill('SIGKILL'), 5000);
         };
-        const timeout = setTimeout(abort, 3600000);
+        const timeout = setTimeout(abort, 7200000);
         child.stdout.on('data', () => {});
         child.stderr.on('data', () => {});
         child.once('error', () => {

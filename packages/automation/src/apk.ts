@@ -33,7 +33,10 @@ export async function verifyApkIntegrity(
     if (signal.aborted) throw new DownloadError('CANCELLED');
     if (!same(before, await handle.stat({ bigint: true }))) throw new DownloadError('APK_INVALID');
     const hash = createHash('sha256');
-    for await (const bytes of handle.createReadStream({ autoClose: false, signal }))
+    for await (const bytes of handle.createReadStream({
+      autoClose: false,
+      signal,
+    }))
       hash.update(bytes);
     if (signal.aborted) throw new DownloadError('CANCELLED');
     if (
@@ -68,6 +71,8 @@ function manifest(bytes: Buffer) {
   };
   if (u16(0) !== 3 || u32(4) !== bytes.length) fail();
   let strings: string[] = [];
+  let manifestResult: Record<string, string | number> | undefined,
+    minSdkVersion = 1;
   for (let at = u16(2); at < bytes.length; ) {
     const type = u16(at),
       header = u16(at + 2),
@@ -105,7 +110,7 @@ function manifest(bytes: Buffer) {
         }
       }
     }
-    if (type === 0x102 && strings[u32(at + 20)] === 'manifest') {
+    if (type === 0x102 && ['manifest', 'uses-sdk'].includes(strings[u32(at + 20)])) {
       const count = u16(at + 28),
         stride = u16(at + 26),
         start = at + 16 + u16(at + 24);
@@ -117,11 +122,23 @@ function manifest(bytes: Buffer) {
           raw = u32(p + 8),
           kind = bytes[p + 15],
           data = u32(p + 16);
-        if (['package', 'versionName', 'versionCode'].includes(key)) {
+        if (['package', 'versionName', 'versionCode', 'minSdkVersion'].includes(key)) {
           if (raw !== 0xffffffff) result[key] = strings[raw];
           else if (kind === 3) result[key] = strings[data];
           else if (kind === 0x10 || kind === 0x11) result[key] = data;
         }
+      }
+      if (strings[u32(at + 20)] === 'uses-sdk') {
+        if (
+          result.minSdkVersion !== undefined &&
+          (typeof result.minSdkVersion !== 'number' ||
+            result.minSdkVersion < 1 ||
+            result.minSdkVersion > 1000)
+        )
+          fail();
+        minSdkVersion = Number(result.minSdkVersion ?? 1);
+        at = end;
+        continue;
       }
       if (
         typeof result.package !== 'string' ||
@@ -129,16 +146,21 @@ function manifest(bytes: Buffer) {
         result.package.length > 256
       )
         fail();
-      return {
+      manifestResult = {
         packageName: result.package as string,
-        versionName:
-          typeof result.versionName === 'string' ? result.versionName.slice(0, 256) : null,
-        versionCode: typeof result.versionCode === 'number' ? result.versionCode : null,
+        versionName: typeof result.versionName === 'string' ? result.versionName.slice(0, 256) : '',
+        versionCode: typeof result.versionCode === 'number' ? result.versionCode : 0,
       };
     }
     at = end;
   }
-  return fail();
+  if (!manifestResult) return fail();
+  return {
+    packageName: String(manifestResult.packageName),
+    versionName: manifestResult.versionName ? String(manifestResult.versionName) : null,
+    versionCode: manifestResult.versionCode ? Number(manifestResult.versionCode) : null,
+    minSdkVersion,
+  };
 }
 export async function inspectApk(
   file: string,
