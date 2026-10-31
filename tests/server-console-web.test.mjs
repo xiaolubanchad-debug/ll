@@ -408,3 +408,52 @@ test('legacy configuration conversion requires a deliberate choice and creates o
       false,
     );
   }));
+
+test('task details also block new historical account runs while retaining stop and conversion', async () => {
+  const browser = await chromium.launch({ headless: true }),
+    preview = resolve('.tmp/legacy-actions-' + randomUUID() + '.mjs');
+  const task = {
+    id: randomUUID(),
+    version: 1,
+    executionKind: 'REGISTRATION',
+    archivedAt: null,
+    enabled: false,
+    automatic: false,
+    latestCycle: null,
+    readiness: [],
+    successTarget: 1,
+    attemptLimit: 1,
+  };
+  await writeFile(
+    preview,
+    `import{createApp,reactive}from'vue';import{ElAlert,ElButton}from'element-plus';import 'element-plus/dist/index.css';import View from '/src/TaskPlanActions.vue';const task=reactive(${JSON.stringify(task)});window.legacyTask=task;createApp(View,{task,onEdit:()=>{window.convertRequested=true;}}).use(ElAlert).use(ElButton).mount('#app');`,
+  );
+  try {
+    const page = await browser.newPage(),
+      writes = [];
+    await page.route('**/api/v1/task-plans/**/control', (r) => {
+      writes.push(r.request().postDataJSON());
+      return r.fulfill({ json: task });
+    });
+    await page.route('**/__legacy-actions', (r) =>
+      r.fulfill({
+        contentType: 'text/html',
+        body: `<!doctype html><meta charset="utf-8"><div id="app"></div><script type="module" src="/@fs/${preview.replaceAll('\\', '/')}"></script>`,
+      }),
+    );
+    await page.goto(process.env.APP_ORIGIN + '/__legacy-actions');
+    await expect(page.getByRole('button', { name: '历史流程', exact: true })).toBeDisabled();
+    await page.getByRole('button', { name: '转换为 APP 测试', exact: true }).click();
+    assert.equal(await page.evaluate(() => window.convertRequested), true);
+    assert.equal(writes.length, 0);
+    await page.evaluate(() => {
+      window.legacyTask.enabled = true;
+    });
+    await page.getByRole('button', { name: '停止任务', exact: true }).click();
+    await expect.poll(() => writes.length).toBe(1);
+    assert.deepEqual(writes, [{ action: 'STOP' }]);
+  } finally {
+    await browser.close();
+    await rm(preview, { force: true });
+  }
+});

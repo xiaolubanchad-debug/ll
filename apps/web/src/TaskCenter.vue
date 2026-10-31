@@ -204,12 +204,18 @@ onUnmounted(() => {
           ><span>当天 APK {{ task.latestCycle.apkCount }} 个</span
           ><span>{{ task.latestCycle.day }} · 第 {{ task.latestCycle.round }} 轮</span>
         </div>
+        <p v-else-if="task.executionKind === 'DOWNLOAD_ONLY'" class="muted">
+          只下载 APK，不打开 APP。每天复用已校验文件。
+        </p>
         <p v-else class="muted">
           {{ task.executionKind === 'APP_OPEN' ? '完成轮数目标' : '成功目标' }}
           {{ task.successTarget }}，最多尝试 {{ task.attemptLimit }} 次，所有 APK 合计。
         </p>
         <p v-if="task.latestCycle?.errorCode" class="result-explanation">
           {{ reasonLabels[task.latestCycle.errorCode] ?? task.latestCycle.errorCode }}
+        </p>
+        <p v-if="task.executionKind === 'REGISTRATION'" class="result-explanation">
+          此为历史账户流程。可继续查询记录；编辑并确认转换后，另存为 APP 打开测试。
         </p>
         <p v-if="task.latestCycle?.deferredDownloadRules" class="result-explanation">
           当天复用原来源 APK；已修改的下载规则次日生效。
@@ -232,7 +238,7 @@ onUnmounted(() => {
             :href="href('runs', logId(task.latestCycle)!, { view: 'targets' })"
             >查看失败详情与功能记录</a
           ><el-button @click="navigate('tasks', task.id, { edit: 'true', step: '3' })"
-            >补充注册规则</el-button
+            >转换为 APP 打开测试</el-button
           >
         </div>
         <TaskPlanActions

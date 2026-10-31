@@ -162,7 +162,7 @@ onUnmounted(() => {
 <template>
   <div class="console-stack">
     <div class="toolbar">
-      <a :href="href('runs')">← 返回执行任务</a><span class="fingerprint">批次 {{ runId }}</span
+      <a :href="href('runs')">← 返回执行历史</a><span class="fingerprint">批次 {{ runId }}</span
       ><el-button :disabled="refreshing" @click="refresh">刷新详情</el-button>
     </div>
     <el-alert v-if="error" :title="error" type="error" :closable="false" /><el-alert
