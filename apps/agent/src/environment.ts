@@ -8,6 +8,7 @@ import type {
   EnvironmentReceipt,
   EnvironmentHealth,
 } from '@apk/contracts';
+import { identityImageRoot, phoneImageRoot } from '@apk/automation';
 
 const hash = (value: string | Buffer) => createHash('sha256').update(value).digest('hex');
 export function environmentChecked<T>(name: string, value: unknown): T {
@@ -35,12 +36,17 @@ export function environmentPaths(input: EnvironmentInput): EnvironmentPaths {
       join(input.toolsRoot, 'node_modules'),
       join(input.toolsRoot, 'browsers'),
       '/usr/lib/jvm/java-17-openjdk-amd64',
+      identityImageRoot(input.sdkRoot),
+      phoneImageRoot(input.sdkRoot),
     ],
     controls: [
       '/var/lib/dpkg/status',
       join(input.toolsRoot, 'package.json'),
       join(input.toolsRoot, 'package-lock.json'),
       join(input.toolsRoot, 'appium-home/node_modules/.cache/appium/extensions.yaml'),
+      join(identityImageRoot(input.sdkRoot), 'manifest.json'),
+      join(phoneImageRoot(input.sdkRoot), 'manifest.json'),
+      join(input.sdkRoot, 'phone-boot-proof.json'),
     ],
     requireRoot: true,
   };

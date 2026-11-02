@@ -65,7 +65,7 @@ export function planChanges(files) {
     } else if (/^(apps\/agent\/|packages\/automation\/)/.test(f)) {
       modules.add('agent');
       modules.add('tools');
-      if (/^apps\/agent\/src\/health\.ts$/.test(f)) {
+      if (/^apps\/agent\/src\/(health|environment|environment-entry)\.ts$/.test(f)) {
         ['incremental-release', 'agent-startup', 'agent-compatibility', 'p1'].forEach((x) =>
           tests.add(x),
         );

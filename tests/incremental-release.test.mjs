@@ -10,9 +10,23 @@ import {
   planEnvironment,
   captureEnvironment,
   reuseEnvironment,
+  environmentPaths,
 } from '../apps/agent/dist/environment.js';
 import { planChanges } from '../scripts/release-plan.mjs';
 import { validateHubConfig, moduleOverrides } from '../scripts/hub-release-config.mjs';
+import { identityImageRoot, phoneImageRoot } from '@apk/automation';
+
+test('baseline inventory includes both sealed private image pools outside the SDK', () => {
+  const input = {
+    sdkRoot: '/opt/apk-platform/toolchains/' + 'a'.repeat(64) + '/android',
+    toolsRoot: '/opt/apk-platform/toolchains/' + 'a'.repeat(64) + '/tools',
+  };
+  const paths = environmentPaths(input);
+  assert.ok(paths.roots.includes(identityImageRoot(input.sdkRoot)));
+  assert.ok(paths.roots.includes(phoneImageRoot(input.sdkRoot)));
+  assert.ok(!phoneImageRoot(input.sdkRoot).startsWith(input.sdkRoot + '/'));
+  assert.ok(paths.controls.includes(join(phoneImageRoot(input.sdkRoot), 'manifest.json')));
+});
 
 test('profile omission fails before activation; selected builds preserve unrelated services', () => {
   const args = {
