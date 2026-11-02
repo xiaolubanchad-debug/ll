@@ -16,7 +16,7 @@ import type {
 } from 'playwright';
 import type { TestConfiguration, ApkMetadata } from '@apk/contracts';
 import { ApkCache, removeOwned } from './cache.js';
-import { inspectApk } from './apk.js';
+import { inspectApk, ApkValidationError } from './apk.js';
 import { NetworkPolicy, startEgress } from './network.js';
 import { sha, canonical, normalizeUrl, cacheDay, DownloadError } from './common.js';
 import type { RegistrationCompletion } from './registration.js';
@@ -204,12 +204,17 @@ async function capture(
   try {
     beforeAction();
     const element = await locate(source, config, target);
-    await element
-      .tap({
+    await log('下载入口：准备操作网站图标');
+    beforeAction();
+    try {
+      await element.tap({
         timeout: Math.min(config.download.timeoutMs, 10000),
         noWaitAfter: true,
-      })
-      .catch(() => {});
+      });
+    } catch {
+      signal.throwIfAborted();
+      if (!result) throw new DownloadError('DOWNLOAD_SOURCE_UNCONFIRMED');
+    }
     await pause(150, signal);
     while (!result && Date.now() < end) {
       for (const page of pages) {
@@ -276,16 +281,21 @@ async function capture(
             beforeAction();
             clicks.set(page, (clicks.get(page) ?? 0) + 1);
             landingClicks++;
-            acted.add(page);
-            await log(message);
+            await log('下载入口：准备操作下载控件');
             beforeAction();
-            if (Date.now() >= end) throw new DownloadError('DOWNLOAD_FAILED');
-            await candidate
-              .tap({
+            if (Date.now() >= end) throw new DownloadError('DOWNLOAD_NO_FILE');
+            try {
+              await candidate.tap({
                 timeout: Math.min(2000, Math.max(1, end - Date.now())),
                 noWaitAfter: true,
-              })
-              .catch(() => {});
+              });
+            } catch {
+              signal.throwIfAborted();
+              if (!result) throw new DownloadError('DOWNLOAD_CONTROL_UNCONFIRMED');
+              return true;
+            }
+            acted.add(page);
+            await log(message);
             await pause(150, signal);
             return true;
           };
@@ -380,7 +390,7 @@ async function capture(
     }
     if (!result) {
       await log('下载等待结束：未收到浏览器下载文件');
-      throw new DownloadError('DOWNLOAD_FAILED');
+      throw new DownloadError('DOWNLOAD_NO_FILE');
     }
     await log('下载传输：已收到浏览器文件，等待保存与 APK 校验');
     return result;
@@ -587,10 +597,17 @@ export async function runDownload(
                 emit,
               );
               const file = join(work, 'payload.apk');
-              const timeout = setTimeout(() => void download?.cancel(), config.download.timeoutMs);
+              let transferTimeout = false,
+                saved = false;
+              const transferAbort = new AbortController();
+              const timeout = setTimeout(() => {
+                transferTimeout = true;
+                transferAbort.abort();
+                void download?.cancel().catch(() => {});
+              }, config.download.timeoutMs);
               try {
                 const stream = await download.createReadStream();
-                if (!stream) throw new DownloadError('DOWNLOAD_FAILED');
+                if (!stream) throw new DownloadError('DOWNLOAD_TRANSFER_FAILED');
                 let size = 0;
                 await pipeline(
                   stream,
@@ -601,12 +618,26 @@ export async function runDownload(
                     },
                   }),
                   createWriteStream(file, { flags: 'wx', mode: 0o600 }),
-                  { signal },
+                  { signal: AbortSignal.any([signal, transferAbort.signal]) },
                 );
+                saved = true;
+                clearTimeout(timeout);
+                await emit({
+                  type: 'LOG',
+                  taskId: target.taskId,
+                  payload: { level: 'INFO', message: '下载传输：文件已保存，开始 APK 校验' },
+                });
+                beforeAction();
                 const inspected = await inspectApk(file, max, day, signal);
                 await cache.put(nodeId, day, target.targetKey, file, inspected);
                 apk = inspected;
                 break;
+              } catch (error) {
+                if (signal.aborted) throw error;
+                if (transferTimeout) throw new DownloadError('DOWNLOAD_TRANSFER_TIMEOUT');
+                if (!saved && !(error instanceof DownloadError))
+                  throw new DownloadError('DOWNLOAD_TRANSFER_FAILED');
+                throw error;
               } finally {
                 clearTimeout(timeout);
                 await download.cancel().catch(() => {});
@@ -615,11 +646,17 @@ export async function runDownload(
               if (signal.aborted) throw error;
               errorCode = limit
                 ? 'APK_TOO_LARGE'
-                : error instanceof DownloadError && error.code !== 'DOWNLOAD_FAILED'
-                  ? error.code
-                  : egress.wasBlocked()
+                : error instanceof ApkValidationError
+                  ? 'APK_INVALID_' + error.reason
+                  : error instanceof DownloadError &&
+                      error.code === 'DOWNLOAD_NO_FILE' &&
+                      egress.wasBlocked()
                     ? 'NETWORK_BLOCKED'
-                    : 'DOWNLOAD_FAILED';
+                    : error instanceof DownloadError && error.code !== 'DOWNLOAD_FAILED'
+                      ? error.code
+                      : egress.wasBlocked()
+                        ? 'NETWORK_BLOCKED'
+                        : 'DOWNLOAD_FAILED';
               if (errorCode === 'NAVIGATION_SITE') break;
               if (attempt < config.download.retries) await pause(250 * 2 ** attempt, signal);
             } finally {

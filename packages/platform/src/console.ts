@@ -691,6 +691,9 @@ function title(type: string, p: Record<string, unknown>) {
   if (type === 'LOG') {
     const message = String(p.message);
     return [
+      '下载入口：准备操作网站图标',
+      '下载入口：准备操作下载控件',
+      '下载传输：文件已保存，开始 APK 校验',
       '下载入口：已操作配置控件',
       '下载入口：已操作明确下载文字',
       '下载入口：正在访问源码中的唯一 APK 地址',

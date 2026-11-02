@@ -320,7 +320,11 @@ onUnmounted(() => {
                 <el-button v-if="t.registrationStartedAt" text @click="selectTask(t.id)"
                   >查看证据与账户</el-button
                 ><span v-else class="muted">{{
-                  summary?.executionKind === 'APP_OPEN' ? '详情见执行日志' : '尚未进入注册'
+                  summary?.run.purpose === 'DOWNLOAD'
+                    ? '下载阶段'
+                    : summary?.executionKind === 'APP_OPEN'
+                      ? '详情见执行日志'
+                      : '尚未进入注册'
                 }}</span>
               </td>
             </tr>

@@ -58,6 +58,7 @@ test('0.14 signed capacity manifests require complete device toolchain', () => {
     },
   };
   assert.equal(validManifest(m).agentVersion, '0.14.0');
+  assert.equal(validManifest({ ...m, agentVersion: '0.14.1' }).agentVersion, '0.14.1');
   for (const patch of [
     { agentVersion: '0.13.3' },
     { features: m.features.filter((f) => f !== 'DEVICE_SESSIONS_V1') },

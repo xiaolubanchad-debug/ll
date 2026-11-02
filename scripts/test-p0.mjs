@@ -174,6 +174,8 @@ try {
   await run(['--test', '--test-reporter=tap', '--test-concurrency=1', 'tests/p2.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/mobile-download.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/download-discovery.test.mjs'], env);
+  await run(['--test', '--test-concurrency=1', 'tests/apk-validation.test.mjs'], env);
+  await run(['--test', '--test-concurrency=1', 'tests/download-diagnostics.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/v15-download.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/v15-entry.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/proxy-probe.test.mjs'], env);
@@ -237,6 +239,7 @@ try {
     P0_SCREENSHOT_DIR: dir,
   });
   await run(['--test', 'tests/open-performance-web.test.mjs'], env);
+  await run(['--test', 'tests/download-labels-web.test.mjs'], env);
   await run(['--test', 'tests/test-data-web.test.mjs'], env);
   await run(['--test', 'tests/device-sessions-web.test.mjs'], env);
   await run(['--test', 'tests/capacity-web.test.mjs'], {...env, P0_SCREENSHOT_DIR: dir});

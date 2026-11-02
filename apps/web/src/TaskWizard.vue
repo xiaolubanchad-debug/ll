@@ -81,7 +81,7 @@ const proxyName = ref(''),
   password = ref('');
 watch(nodeId, (id) => {
   if (!props.initial && !props.ownedTest)
-    multiApp.value = ['0.13.0', '0.13.1', '0.13.2', '0.13.3', '0.14.0'].includes(
+    multiApp.value = ['0.13.0', '0.13.1', '0.13.2', '0.13.3', '0.14.0', '0.14.1'].includes(
       nodes.value.find((n) => n.id === id)?.agentVersion ?? '',
     );
 });
@@ -169,7 +169,7 @@ async function choices() {
   if (
     props.fixedNodeId &&
     !props.initial &&
-    ['0.13.0', '0.13.1', '0.13.2', '0.13.3', '0.14.0'].includes(
+    ['0.13.0', '0.13.1', '0.13.2', '0.13.3', '0.14.0', '0.14.1'].includes(
       nodes.value.find((n) => n.id === nodeId.value)?.agentVersion ?? '',
     )
   ) {

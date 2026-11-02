@@ -316,6 +316,12 @@ test('P2 acceptance with real PostgreSQL, SQLite, Chromium and owned fixture sit
           ).length,
           3,
         );
+        assert.equal(
+          timeline.items.filter(
+            (item) => item.type === 'LOG' && item.title === '下载传输：文件已保存，开始 APK 校验',
+          ).length,
+          3,
+        );
       },
     );
     await t.test(
@@ -372,7 +378,10 @@ test('P2 acceptance with real PostgreSQL, SQLite, Chromium and owned fixture sit
         await save(await body('/invalid'));
         let id = await begin();
         assert.equal((await endRun(id)).status, 'FAILED');
-        assert.equal((await req('/runs/' + id + '/tasks')).data.items[0].errorCode, 'APK_INVALID');
+        assert.equal(
+          (await req('/runs/' + id + '/tasks')).data.items[0].errorCode,
+          'APK_INVALID_TOO_SMALL',
+        );
         const c = await body();
         c.download.maxTargets = 1;
         await save(c);

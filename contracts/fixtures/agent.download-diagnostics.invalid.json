@@ -1,0 +1,21 @@
+{
+  "kind": "events",
+  "protocolVersion": "1.0",
+  "nodeId": "22222222-2222-4222-8222-222222222222",
+  "deliveryId": "44444444-4444-4444-8444-444444444444",
+  "fence": 1,
+  "events": [
+    {
+      "eventId": "99999999-9999-4999-8999-999999999999",
+      "runId": "33333333-3333-4333-8333-333333333333",
+      "sequence": 1,
+      "occurredAt": "2026-10-27T09:00:31Z",
+      "type": "LOG",
+      "payload": {
+        "level": "INFO",
+        "message": "private raw failure https://example.test/?secret=forbidden"
+      },
+      "taskId": "00000000-0000-4000-8000-000000000001"
+    }
+  ]
+}

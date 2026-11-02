@@ -6,6 +6,21 @@ import type { Entry, ZipFile } from 'yauzl';
 import type { ApkMetadata } from '@apk/contracts';
 import { DownloadError } from './common.js';
 
+export type ApkInvalidReason =
+  | 'TOO_SMALL'
+  | 'NOT_ZIP'
+  | 'ZIP_STRUCTURE'
+  | 'ZIP_POLICY'
+  | 'CRC'
+  | 'MANIFEST_MISSING'
+  | 'MANIFEST_FORMAT'
+  | 'MANIFEST_METADATA';
+export class ApkValidationError extends DownloadError {
+  constructor(public reason: ApkInvalidReason) {
+    super('APK_INVALID');
+  }
+}
+
 // Identical bytes retain the structure/CRC/manifest validation already performed
 // by inspectApk. Still hash the actual installation file immediately beforehand.
 export async function verifyApkIntegrity(
@@ -58,8 +73,8 @@ function crc(data: Buffer, current = 0xffffffff) {
   return current >>> 0;
 }
 function manifest(bytes: Buffer) {
-  const fail = () => {
-    throw new DownloadError('APK_INVALID');
+  const fail = (reason: ApkInvalidReason = 'MANIFEST_FORMAT') => {
+    throw new ApkValidationError(reason);
   };
   const u16 = (p: number) => {
     if (p < 0 || p + 2 > bytes.length) return fail();
@@ -123,9 +138,9 @@ function manifest(bytes: Buffer) {
           kind = bytes[p + 15],
           data = u32(p + 16);
         if (['package', 'versionName', 'versionCode', 'minSdkVersion'].includes(key)) {
-          if (raw !== 0xffffffff) result[key] = strings[raw];
+          if (kind === 0x10 || kind === 0x11) result[key] = data;
           else if (kind === 3) result[key] = strings[data];
-          else if (kind === 0x10 || kind === 0x11) result[key] = data;
+          else if (raw !== 0xffffffff) result[key] = strings[raw];
         }
       }
       if (strings[u32(at + 20)] === 'uses-sdk') {
@@ -135,7 +150,7 @@ function manifest(bytes: Buffer) {
             result.minSdkVersion < 1 ||
             result.minSdkVersion > 1000)
         )
-          fail();
+          fail('MANIFEST_METADATA');
         minSdkVersion = Number(result.minSdkVersion ?? 1);
         at = end;
         continue;
@@ -145,7 +160,7 @@ function manifest(bytes: Buffer) {
         !/^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)+$/.test(result.package) ||
         result.package.length > 256
       )
-        fail();
+        fail('MANIFEST_METADATA');
       manifestResult = {
         packageName: result.package as string,
         versionName: typeof result.versionName === 'string' ? result.versionName.slice(0, 256) : '',
@@ -170,14 +185,30 @@ export async function inspectApk(
 ): Promise<ApkMetadata> {
   const info = await stat(file);
   if (!info.isFile() || info.size < 32 || info.size > maxBytes)
-    throw new DownloadError(info.size > maxBytes ? 'APK_TOO_LARGE' : 'APK_INVALID');
+    throw info.size > maxBytes
+      ? new DownloadError('APK_TOO_LARGE')
+      : new ApkValidationError('TOO_SMALL');
+  const head = Buffer.alloc(4),
+    handle = await open(file, constants.O_RDONLY);
+  try {
+    await handle.read(head, 0, 4, 0);
+  } finally {
+    await handle.close();
+  }
   const hash = createHash('sha256');
   for await (const bytes of createReadStream(file, { signal })) hash.update(bytes);
   const zip = await new Promise<ZipFile>((ok, no) =>
     yauzl.open(
       file,
       { lazyEntries: true, validateEntrySizes: true, strictFileNames: true },
-      (error, zip) => (error || !zip ? no(new DownloadError('APK_INVALID')) : ok(zip)),
+      (error, zip) =>
+        error || !zip
+          ? no(
+              new ApkValidationError(
+                head.readUInt32LE(0) === 0x04034b50 ? 'ZIP_STRUCTURE' : 'NOT_ZIP',
+              ),
+            )
+          : ok(zip),
     ),
   );
   try {
@@ -187,14 +218,14 @@ export async function inspectApk(
         axml: Buffer | undefined;
       const names = new Set<string>(),
         abis = new Set<string>();
-      const fail = () => {
+      const fail = (reason: ApkInvalidReason = 'ZIP_STRUCTURE') => {
         zip.close();
-        no(new DownloadError(signal.aborted ? 'CANCELLED' : 'APK_INVALID'));
+        no(signal.aborted ? new DownloadError('CANCELLED') : new ApkValidationError(reason));
       };
       const abort = () => fail();
       signal.addEventListener('abort', abort, { once: true });
       zip.once('close', () => signal.removeEventListener('abort', abort));
-      zip.once('error', fail);
+      zip.once('error', () => fail());
       zip.on('entry', (entry: Entry) => {
         count++;
         total += entry.uncompressedSize;
@@ -209,7 +240,7 @@ export async function inspectApk(
           entry.generalPurposeBitFlag & 1 ||
           ((entry.externalFileAttributes >>> 16) & 0xf000) === 0xa000
         ) {
-          fail();
+          fail('ZIP_POLICY');
           return;
         }
         names.add(name);
@@ -220,7 +251,7 @@ export async function inspectApk(
           return;
         }
         if (name === 'AndroidManifest.xml' && entry.uncompressedSize > 4 * 1024 * 1024) {
-          fail();
+          fail('MANIFEST_FORMAT');
           return;
         }
         zip.openReadStream(entry, (error, stream) => {
@@ -238,10 +269,10 @@ export async function inspectApk(
               fail();
             }
           });
-          stream.once('error', fail);
+          stream.once('error', () => fail());
           stream.once('end', () => {
             if ((sum ^ 0xffffffff) >>> 0 !== entry.crc32) {
-              fail();
+              fail('CRC');
               return;
             }
             if (name === 'AndroidManifest.xml') axml = Buffer.concat(chunks);
@@ -251,7 +282,7 @@ export async function inspectApk(
       });
       zip.once('end', () => {
         try {
-          if (!axml) throw new DownloadError('APK_INVALID');
+          if (!axml) throw new ApkValidationError('MANIFEST_MISSING');
           ok({
             ...manifest(axml),
             abis: [...abis].sort(),
@@ -259,8 +290,8 @@ export async function inspectApk(
             apkSha256: hash.digest('hex'),
             cacheDay: day,
           });
-        } catch {
-          fail();
+        } catch (error) {
+          fail(error instanceof ApkValidationError ? error.reason : 'MANIFEST_FORMAT');
         }
       });
       if (signal.aborted) fail();

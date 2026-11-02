@@ -1166,6 +1166,16 @@ for (const value of ['0', '1001', '1.5', '8;id'])
   test('1.17 invalid capacity query ' + value, () =>
     assert.ok(schemaIssues('NodeCapacityQuery', { appsPerDeviceMin: value }).length),
   );
+test('1.17.1 fixed download diagnostic event', () =>
+  assert.deepEqual(
+    schemaIssues('AgentMessage', read('contracts/fixtures/agent.download-diagnostics.valid.json')),
+    [],
+  ));
+test('1.17.1 raw download diagnostic rejected', () =>
+  assert.ok(
+    schemaIssues('AgentMessage', read('contracts/fixtures/agent.download-diagnostics.invalid.json'))
+      .length,
+  ));
 process.stdout.write(
   `${passed} contract checks passed${process.exitCode ? '; failures present' : ''}.\n`,
 );

@@ -17,12 +17,12 @@ export function validManifest(body: unknown): ReleaseInput {
   const m = checked<ReleaseInput>('ReleaseInput', body);
   if (
     m.features?.includes('EXECUTION_CAPACITY_V1') &&
-    (m.agentVersion !== '0.14.0' || !m.features.includes('DEVICE_SESSIONS_V1'))
+    (!['0.14.0', '0.14.1'].includes(m.agentVersion) || !m.features.includes('DEVICE_SESSIONS_V1'))
   )
     fault('RELEASE_INVALID', '容量扩展需要 Agent 0.14.0 和设备会话能力', 422);
   if (
     m.features?.includes('DEVICE_SESSIONS_V1') &&
-    (!['0.13.0', '0.13.1', '0.13.2', '0.13.3', '0.14.0'].includes(m.agentVersion) ||
+    (!['0.13.0', '0.13.1', '0.13.2', '0.13.3', '0.14.0', '0.14.1'].includes(m.agentVersion) ||
       [
         'DEVICE_VARIANTS_V1',
         'APP_OPEN_V1',

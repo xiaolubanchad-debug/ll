@@ -354,7 +354,7 @@ onMounted(async () => {
       </details>
       <div class="sidebar-bottom">
         <span class="status-dot"></span> 执行记录统一管理
-        <p>1.17 · 容量与服务器工作台</p>
+        <p>1.17.1 · 容量与服务器工作台</p>
       </div>
     </aside>
     <div class="main-area">
@@ -385,7 +385,7 @@ onMounted(async () => {
               }}
             </p>
           </div>
-          <span class="phase-tag">1.17 管理控制台</span>
+          <span class="phase-tag">1.17.1 管理控制台</span>
         </div>
         <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon />
         <el-alert v-if="notice" :title="notice" type="success" :closable="false" show-icon />
