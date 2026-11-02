@@ -178,6 +178,10 @@ try {
   });
   const version = await db.$queryRawUnsafe('SHOW server_version');
   console.log('Real PostgreSQL version:', version[0].server_version);
+  if (selectedTests && !selectedTests.has('api')) {
+    const { initializeAdmin } = await import('../apps/control-api/dist/admin.js');
+    await initializeAdmin(db, 'p0admin', env.P0_TEST_PASSWORD);
+  }
   await run(['--test', '--test-concurrency=1', 'tests/incremental-release.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/agent-compatibility.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/agent-startup.test.mjs'], env);

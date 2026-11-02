@@ -53,6 +53,20 @@ test('module dependency expansion and conservative fallback', () => {
   assert.equal(planChanges(['apps/control-api/prisma/migrations/x/migration.sql']).migrate, true);
   assert.deepEqual(planChanges(['docs/example.md', 'README.md']).modules, []);
   assert.deepEqual(planChanges(['unmapped-runtime-file']).tests, ['ALL']);
+  assert.deepEqual(planChanges(['apps/control-api/src/p1-controllers.ts']).modules, [
+    'api',
+    'tools',
+  ]);
+  assert.deepEqual(planChanges(['apps/control-api/src/p1-controllers.ts']).tests, [
+    'p1',
+    'server-console-api',
+  ]);
+  assert.ok(!planChanges(['packages/platform/src/capacity.ts']).tests.includes('ALL'));
+  assert.deepEqual(planChanges(['packages/platform/src/security.ts']).tests, ['ALL']);
+  assert.deepEqual(planChanges(['scripts/release-plan.mjs', 'apps/agent/src/health.ts']).modules, [
+    'agent',
+    'tools',
+  ]);
 });
 test('new deploy and environment contract rejects unsafe mode, unknown fields and invalid fingerprint', () => {
   const input = { nodeId: randomUUID(), releaseId: randomUUID(), licenseAccepted: true };

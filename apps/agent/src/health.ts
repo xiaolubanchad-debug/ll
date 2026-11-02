@@ -132,6 +132,7 @@ export async function collectHealth(
       versions.environmentValidation = proof.mode!;
       versions.environmentFullRelease = proof.fullReleaseId!;
       versions.environmentFullVerifiedAt = proof.fullVerifiedAt!;
+      versions.environmentBaselineVersion = '1';
     }
   }
   const android =
