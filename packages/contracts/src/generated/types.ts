@@ -1678,7 +1678,7 @@ export interface ReleaseInput {
     }[];
   };
   /**
-   * @maxItems 16
+   * @maxItems 17
    */
   features?: (
     | 'DOWNLOAD_V1'

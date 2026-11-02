@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import Ajv2020 from 'ajv/dist/2020.js';
 import {
   dailySupported,
   autoRegistrationSupported,
@@ -9,6 +11,19 @@ import {
   identitySupported,
   requiredAgentProtocolsReady,
 } from '@apk/contracts';
+
+test('the actual publisher capability list fits the signed manifest schema while unknown and duplicate capabilities fail', async () => {
+  const schema = JSON.parse(await readFile('contracts/p1.schema.json', 'utf8'));
+  const publisher = await readFile('scripts/release-agent.mjs', 'utf8');
+  const body = publisher.match(/features:\s*\[([\s\S]*?)\]/)[1];
+  const features = [...body.matchAll(/'([A-Z_0-9]+)'/g)].map((m) => m[1]);
+  const validate = new Ajv2020().compile(schema.$defs.ReleaseInput.properties.features);
+  assert.equal(features.length, 17);
+  assert.ok(features.includes('XPATH_OBSERVATION_V1'));
+  assert.equal(validate(features), true, JSON.stringify(validate.errors));
+  assert.equal(validate([...features, 'UNRECOGNIZED_FEATURE']), false);
+  assert.equal(validate([...features.slice(0, -1), features[0]]), false);
+});
 
 test('signed 0.12 releases retain all managed-task gates, while missing features and unknown versions fail closed', () => {
   const gates = [

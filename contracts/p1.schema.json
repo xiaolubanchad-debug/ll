@@ -491,7 +491,7 @@
         },
         "features": {
           "type": "array",
-          "maxItems": 16,
+          "maxItems": 17,
           "uniqueItems": true,
           "items": {
             "enum": [
