@@ -44,7 +44,17 @@ const v114 = await json('contracts/v114.schema.json'),
   v114Http = await json('contracts/v114.http.json');
 manifest.routes.push(...v114Http.routes);
 manifest.version = v114Http.version;
+const v119 = await json('contracts/v119.schema.json');
+const v119Http = await json('contracts/v119.http.json');
+manifest.routes.push(...v119Http.routes);
+manifest.version = v119Http.version;
 const schemas = {
+  ...Object.fromEntries(
+    Object.entries(v119.$defs).map(([name, value]) => [
+      name,
+      { ...value, $id: v119.$id + '/' + name },
+    ]),
+  ),
   ...Object.fromEntries(
     Object.entries(v114.$defs).map(([name, value]) => [
       name,
@@ -291,6 +301,11 @@ for (const route of manifest.routes) {
       content: {
         'application/json': { schema: { $ref: `#/components/schemas/${route.request}` } },
       },
+    };
+  if (route.binary)
+    operation.requestBody = {
+      required: true,
+      content: { 'application/octet-stream': { schema: { type: 'string', format: 'binary' } } },
     };
   if (['post', 'put', 'patch', 'delete'].includes(route.method) && !route.node && !route.app)
     operation.parameters = [

@@ -218,6 +218,7 @@ try {
   await run(['--test', '--test-concurrency=1', 'tests/concurrent-open.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/concurrent-open-api.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/p3.test.mjs'], env);
+  await run(['--test', '--test-concurrency=1', 'tests/manual-apk.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/v17.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/server-console-api.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/capacity.test.mjs'], env);

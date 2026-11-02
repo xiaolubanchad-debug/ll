@@ -27,6 +27,7 @@ import { lockLibrary } from './library-lock.js';
 import { lockNode, idle } from './nodes.js';
 import { fault, PlatformError } from './errors.js';
 import { dailyOpenUsage } from './open-budget.js';
+import { manualAssetsForRun, assertNoPendingManualApks } from './manual-apks.js';
 import { beijingDay, validateBudget } from './daily-plan.js';
 import { createRun, stopRun, requestRunStop, downloadRetryParent, RUN_END } from './runs.js';
 type Tx = Prisma.TransactionClient;
@@ -78,7 +79,8 @@ async function cycleView(db: PrismaClient, c: CycleRow): Promise<TaskCycleView> 
     registerRunIds: c.runs.filter((r) => r.purpose === 'REGISTER').map((r) => r.id),
     deferredDownloadRules: c.deferredDownloadRules,
     downloadRetryOf: c.downloadRetryOf,
-    apkCount,
+    apkCount:
+      apkCount + (c.downloadRunId ? (await manualAssetsForRun(db, c.downloadRunId)).length : 0),
   };
 }
 async function readiness(db: PrismaClient, p: PlanRow) {
@@ -479,6 +481,7 @@ export async function controlTaskPlan(
         if (selected.archivedAt || selected.config.archivedAt)
           fault('VERSION_ARCHIVED', '当前配置已归档，请恢复后开始');
         const settings = selected.body as unknown as TestConfiguration;
+        await assertNoPendingManualApks(tx, p.nodeId, p.configId);
         if (
           settings.execution.mode === 'FULL' &&
           !settings.execution.appOpen &&
@@ -707,11 +710,20 @@ async function advance(db: PrismaClient, p: ManagedTask, c: CycleRow, now: Date)
   }
   const downloaded = await db.run.findUniqueOrThrow({ where: { id: c.downloadRunId } });
   if (!RUN_END.includes(downloaded.status)) return;
-  if (c.runs.some((r) => RUN_END.includes(r.status) && r.errorCode === 'NO_REGISTERABLE_APK')) {
+  const manual = await manualAssetsForRun(db, downloaded.id);
+  const latestImport = Math.max(0, ...manual.map((m) => m.updatedAt.getTime()));
+  if (
+    c.runs.some(
+      (r) =>
+        RUN_END.includes(r.status) &&
+        r.errorCode === 'NO_REGISTERABLE_APK' &&
+        r.createdAt.getTime() >= latestImport,
+    )
+  ) {
     await updateCycle(db, c, 'DONE', 'NO_REGISTERABLE_APK');
     return;
   }
-  if (!['SUCCEEDED', 'PARTIAL_FAILED'].includes(downloaded.status)) {
+  if (!['SUCCEEDED', 'PARTIAL_FAILED'].includes(downloaded.status) && !manual.length) {
     await updateCycle(
       db,
       c,

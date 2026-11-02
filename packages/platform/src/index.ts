@@ -21,3 +21,4 @@ export * from './test-data.js';
 export * from './identity.js';
 
 export * from './capacity.js';
+export * from './manual-apks.js';

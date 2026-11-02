@@ -1,4 +1,78 @@
 // Generated. Run npm run generate:contracts.
+export interface ManualApkCreateInput {}
+
+export interface ManualApkView {
+  id: string;
+  status:
+    | 'UPLOADING'
+    | 'RECEIVING'
+    | 'QUEUED'
+    | 'IMPORTING'
+    | 'APPLIED'
+    | 'FAILED'
+    | 'CANCELLED'
+    | 'EXPIRED'
+    | 'NEEDS_REVIEW';
+  apk: {
+    packageName: string;
+    versionName: string | null;
+    versionCode: number | null;
+    /**
+     * @maxItems 20
+     */
+    abis: string[];
+    size: number;
+    apkSha256: string;
+    cacheDay: string;
+    minSdkVersion?: number;
+  } | null;
+  errorCode: string | null;
+  operationId: string | null;
+  maxBytes: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ManualApkImportInput {
+  id: string;
+  nodeId: string;
+  cacheDay: string;
+  targetKey: string;
+  apk: {
+    packageName: string;
+    versionName: string | null;
+    versionCode: number | null;
+    /**
+     * @maxItems 20
+     */
+    abis: string[];
+    size: number;
+    apkSha256: string;
+    cacheDay: string;
+    minSdkVersion?: number;
+  };
+  maxBytes: number;
+}
+
+export interface ManualApkImportReceipt {
+  id: string;
+  status: 'CACHED';
+  cacheKey: string;
+  apk: {
+    packageName: string;
+    versionName: string | null;
+    versionCode: number | null;
+    /**
+     * @maxItems 20
+     */
+    abis: string[];
+    size: number;
+    apkSha256: string;
+    cacheDay: string;
+    minSdkVersion?: number;
+  };
+}
+
 export interface TestClientReceipt {
   received: boolean;
 }
@@ -683,6 +757,7 @@ export interface AssetQuery {
   q?: string;
   cursor?: string;
   limit?: string;
+  status?: 'ALL' | 'SUCCESS' | 'FAILED' | 'PENDING' | 'MANUAL';
 }
 
 export interface RegistrationRecordView {
@@ -715,6 +790,7 @@ export interface RegistrationRecordView {
     size: number;
     apkSha256: string;
     cacheDay: string;
+    minSdkVersion?: number;
   } | null;
   hasAccount: boolean;
   reviewOutcome: ('SUCCEEDED' | 'FAILED') | null;
@@ -752,6 +828,7 @@ export interface RegistrationListView {
       size: number;
       apkSha256: string;
       cacheDay: string;
+      minSdkVersion?: number;
     } | null;
     hasAccount: boolean;
     reviewOutcome: ('SUCCEEDED' | 'FAILED') | null;
@@ -791,6 +868,7 @@ export interface RegistrationDetailView {
       size: number;
       apkSha256: string;
       cacheDay: string;
+      minSdkVersion?: number;
     } | null;
     hasAccount: boolean;
     reviewOutcome: ('SUCCEEDED' | 'FAILED') | null;
@@ -1004,6 +1082,41 @@ export interface AssetListView {
       size: number;
       apkSha256: string;
       cacheDay: string;
+      minSdkVersion?: number;
+    } | null;
+    cacheDay?: string;
+    canUpload?: boolean;
+    uploadBlockedReason?: string | null;
+    manualUpload?: {
+      id: string;
+      status:
+        | 'UPLOADING'
+        | 'RECEIVING'
+        | 'QUEUED'
+        | 'IMPORTING'
+        | 'APPLIED'
+        | 'FAILED'
+        | 'CANCELLED'
+        | 'EXPIRED'
+        | 'NEEDS_REVIEW';
+      apk: {
+        packageName: string;
+        versionName: string | null;
+        versionCode: number | null;
+        /**
+         * @maxItems 20
+         */
+        abis: string[];
+        size: number;
+        apkSha256: string;
+        cacheDay: string;
+        minSdkVersion?: number;
+      } | null;
+      errorCode: string | null;
+      operationId: string | null;
+      maxBytes: number;
+      createdAt: string;
+      updatedAt: string;
     } | null;
   }[];
   nextCursor: string | null;
@@ -1418,6 +1531,7 @@ export interface ReleaseInput {
     | 'DEVICE_SESSIONS_V1'
     | 'EXECUTION_CAPACITY_V1'
     | 'INCREMENTAL_DEPLOY_V1'
+    | 'MANUAL_APK_IMPORT_V1'
   )[];
   environment?: {
     version: 1;

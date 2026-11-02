@@ -217,6 +217,7 @@ export async function publishAgent(options = {}) {
     ['egress-entry', 'egress'],
     ['ocr-entry', 'ocr-worker'],
     ['environment-entry', 'environment-check'],
+    ['apk-import-entry', 'apk-import'],
   ])
     await build({
       entryPoints: [
@@ -248,6 +249,7 @@ export async function publishAgent(options = {}) {
     'egress.js',
     'ocr-worker.js',
     'environment-check.js',
+    'apk-import.js',
     'npm/package.json',
     'npm/package-lock.json',
   ]);
@@ -277,6 +279,7 @@ export async function publishAgent(options = {}) {
       'EXECUTION_CAPACITY_V1',
       'OWNED_TEST_CLIENT_V1',
       'INCREMENTAL_DEPLOY_V1',
+      'MANUAL_APK_IMPORT_V1',
     ],
     artifactName,
     sha256,

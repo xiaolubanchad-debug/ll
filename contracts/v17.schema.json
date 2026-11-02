@@ -27,7 +27,12 @@
           "format": "uuid"
         },
         "purpose": {
-          "enum": ["DOWNLOAD", "REGISTER", "LEGACY", "PROXY_CHECK"]
+          "enum": [
+            "DOWNLOAD",
+            "REGISTER",
+            "LEGACY",
+            "PROXY_CHECK"
+          ]
         },
         "status": {
           "enum": [
@@ -55,7 +60,11 @@
           "pattern": "^(?:[1-9]|[1-9][0-9]|100)$"
         },
         "executionKind": {
-          "enum": ["APP_OPEN", "REGISTRATION", "DOWNLOAD_ONLY"]
+          "enum": [
+            "APP_OPEN",
+            "REGISTRATION",
+            "DOWNLOAD_ONLY"
+          ]
         }
       },
       "required": []
@@ -146,7 +155,11 @@
                 ]
               },
               "executionKind": {
-                "enum": ["APP_OPEN", "REGISTRATION", "DOWNLOAD_ONLY"]
+                "enum": [
+                  "APP_OPEN",
+                  "REGISTRATION",
+                  "DOWNLOAD_ONLY"
+                ]
               }
             },
             "required": [
@@ -179,7 +192,10 @@
           ]
         }
       },
-      "required": ["items", "nextCursor"]
+      "required": [
+        "items",
+        "nextCursor"
+      ]
     },
     "ResultsQuery": {
       "type": "object",
@@ -219,7 +235,10 @@
           ]
         },
         "review": {
-          "enum": ["OPEN", "RESOLVED"]
+          "enum": [
+            "OPEN",
+            "RESOLVED"
+          ]
         },
         "cursor": {
           "type": "string",
@@ -270,7 +289,10 @@
       },
       "required": [],
       "not": {
-        "required": ["afterSequence", "beforeSequence"]
+        "required": [
+          "afterSequence",
+          "beforeSequence"
+        ]
       }
     },
     "AssetQuery": {
@@ -297,6 +319,15 @@
         "limit": {
           "type": "string",
           "pattern": "^(?:[1-9]|[1-9][0-9]|100)$"
+        },
+        "status": {
+          "enum": [
+            "ALL",
+            "SUCCESS",
+            "FAILED",
+            "PENDING",
+            "MANUAL"
+          ]
         }
       },
       "required": []
@@ -425,11 +456,17 @@
                   "maxLength": 256
                 },
                 "versionName": {
-                  "type": ["string", "null"],
+                  "type": [
+                    "string",
+                    "null"
+                  ],
                   "maxLength": 256
                 },
                 "versionCode": {
-                  "type": ["integer", "null"],
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
                   "minimum": 0
                 },
                 "abis": {
@@ -453,6 +490,11 @@
                 "cacheDay": {
                   "type": "string",
                   "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+                },
+                "minSdkVersion": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000
                 }
               }
             },
@@ -467,7 +509,10 @@
         "reviewOutcome": {
           "anyOf": [
             {
-              "enum": ["SUCCEEDED", "FAILED"]
+              "enum": [
+                "SUCCEEDED",
+                "FAILED"
+              ]
             },
             {
               "type": "null"
@@ -475,7 +520,11 @@
           ]
         },
         "executionKind": {
-          "enum": ["APP_OPEN", "REGISTRATION", "DOWNLOAD_ONLY"]
+          "enum": [
+            "APP_OPEN",
+            "REGISTRATION",
+            "DOWNLOAD_ONLY"
+          ]
         }
       },
       "required": [
@@ -632,11 +681,17 @@
                         "maxLength": 256
                       },
                       "versionName": {
-                        "type": ["string", "null"],
+                        "type": [
+                          "string",
+                          "null"
+                        ],
                         "maxLength": 256
                       },
                       "versionCode": {
-                        "type": ["integer", "null"],
+                        "type": [
+                          "integer",
+                          "null"
+                        ],
                         "minimum": 0
                       },
                       "abis": {
@@ -660,6 +715,11 @@
                       "cacheDay": {
                         "type": "string",
                         "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+                      },
+                      "minSdkVersion": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 1000
                       }
                     }
                   },
@@ -674,7 +734,10 @@
               "reviewOutcome": {
                 "anyOf": [
                   {
-                    "enum": ["SUCCEEDED", "FAILED"]
+                    "enum": [
+                      "SUCCEEDED",
+                      "FAILED"
+                    ]
                   },
                   {
                     "type": "null"
@@ -682,7 +745,11 @@
                 ]
               },
               "executionKind": {
-                "enum": ["APP_OPEN", "REGISTRATION", "DOWNLOAD_ONLY"]
+                "enum": [
+                  "APP_OPEN",
+                  "REGISTRATION",
+                  "DOWNLOAD_ONLY"
+                ]
               }
             },
             "required": [
@@ -721,7 +788,10 @@
           ]
         }
       },
-      "required": ["items", "nextCursor"]
+      "required": [
+        "items",
+        "nextCursor"
+      ]
     },
     "RegistrationDetailView": {
       "type": "object",
@@ -851,11 +921,17 @@
                       "maxLength": 256
                     },
                     "versionName": {
-                      "type": ["string", "null"],
+                      "type": [
+                        "string",
+                        "null"
+                      ],
                       "maxLength": 256
                     },
                     "versionCode": {
-                      "type": ["integer", "null"],
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
                       "minimum": 0
                     },
                     "abis": {
@@ -879,6 +955,11 @@
                     "cacheDay": {
                       "type": "string",
                       "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+                    },
+                    "minSdkVersion": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 1000
                     }
                   }
                 },
@@ -893,7 +974,10 @@
             "reviewOutcome": {
               "anyOf": [
                 {
-                  "enum": ["SUCCEEDED", "FAILED"]
+                  "enum": [
+                    "SUCCEEDED",
+                    "FAILED"
+                  ]
                 },
                 {
                   "type": "null"
@@ -901,7 +985,11 @@
               ]
             },
             "executionKind": {
-              "enum": ["APP_OPEN", "REGISTRATION", "DOWNLOAD_ONLY"]
+              "enum": [
+                "APP_OPEN",
+                "REGISTRATION",
+                "DOWNLOAD_ONLY"
+              ]
             }
           },
           "required": [
@@ -951,10 +1039,17 @@
                   "format": "date-time"
                 },
                 "proxyIpScope": {
-                  "enum": ["PROBE_ONLY", "NOT_CHECKED"]
+                  "enum": [
+                    "PROBE_ONLY",
+                    "NOT_CHECKED"
+                  ]
                 }
               },
-              "required": ["model", "locale", "shellAndroidIdHash"]
+              "required": [
+                "model",
+                "locale",
+                "shellAndroidIdHash"
+              ]
             },
             {
               "type": "null"
@@ -966,10 +1061,20 @@
             {
               "type": "object",
               "additionalProperties": false,
-              "required": ["source", "navigationSteps", "cache", "learned", "needsAdaptation"],
+              "required": [
+                "source",
+                "navigationSteps",
+                "cache",
+                "learned",
+                "needsAdaptation"
+              ],
               "properties": {
                 "source": {
-                  "enum": ["CONTROLS", "OCR", "LEARNED"]
+                  "enum": [
+                    "CONTROLS",
+                    "OCR",
+                    "LEARNED"
+                  ]
                 },
                 "navigationSteps": {
                   "type": "integer",
@@ -977,7 +1082,11 @@
                   "maximum": 12
                 },
                 "cache": {
-                  "enum": ["MISS", "HIT", "INVALIDATED"]
+                  "enum": [
+                    "MISS",
+                    "HIT",
+                    "INVALIDATED"
+                  ]
                 },
                 "learned": {
                   "type": "boolean"
@@ -992,10 +1101,17 @@
                 "automaticIdentity": {
                   "type": "object",
                   "additionalProperties": false,
-                  "required": ["kind", "identifierHash", "scope"],
+                  "required": [
+                    "kind",
+                    "identifierHash",
+                    "scope"
+                  ],
                   "properties": {
                     "kind": {
-                      "enum": ["GUEST", "APP_ASSIGNED"]
+                      "enum": [
+                        "GUEST",
+                        "APP_ASSIGNED"
+                      ]
                     },
                     "identifierHash": {
                       "type": "string",
@@ -1020,7 +1136,10 @@
             "additionalProperties": false,
             "properties": {
               "outcome": {
-                "enum": ["SUCCEEDED", "FAILED"]
+                "enum": [
+                  "SUCCEEDED",
+                  "FAILED"
+                ]
               },
               "reason": {
                 "type": "string"
@@ -1030,11 +1149,20 @@
                 "format": "date-time"
               }
             },
-            "required": ["outcome", "reason", "createdAt"]
+            "required": [
+              "outcome",
+              "reason",
+              "createdAt"
+            ]
           }
         }
       },
-      "required": ["record", "observation", "recognition", "reviews"]
+      "required": [
+        "record",
+        "observation",
+        "recognition",
+        "reviews"
+      ]
     },
     "OverviewView": {
       "type": "object",
@@ -1069,7 +1197,12 @@
               "minimum": 0
             }
           },
-          "required": ["total", "online", "busy", "quarantined"]
+          "required": [
+            "total",
+            "online",
+            "busy",
+            "quarantined"
+          ]
         },
         "downloads": {
           "type": "object",
@@ -1084,7 +1217,10 @@
               "minimum": 0
             }
           },
-          "required": ["validated", "failed"]
+          "required": [
+            "validated",
+            "failed"
+          ]
         },
         "registrations": {
           "type": "object",
@@ -1191,7 +1327,11 @@
                 ]
               },
               "executionKind": {
-                "enum": ["APP_OPEN", "REGISTRATION", "DOWNLOAD_ONLY"]
+                "enum": [
+                  "APP_OPEN",
+                  "REGISTRATION",
+                  "DOWNLOAD_ONLY"
+                ]
               }
             },
             "required": [
@@ -1318,7 +1458,11 @@
               ]
             },
             "executionKind": {
-              "enum": ["APP_OPEN", "REGISTRATION", "DOWNLOAD_ONLY"]
+              "enum": [
+                "APP_OPEN",
+                "REGISTRATION",
+                "DOWNLOAD_ONLY"
+              ]
             }
           },
           "required": [
@@ -1418,7 +1562,11 @@
           "minimum": 0
         },
         "cleanup": {
-          "enum": ["CONFIRMED", "PENDING", "NEEDS_REVIEW"]
+          "enum": [
+            "CONFIRMED",
+            "PENDING",
+            "NEEDS_REVIEW"
+          ]
         },
         "activeTask": {
           "anyOf": [
@@ -1451,7 +1599,13 @@
                   ]
                 }
               },
-              "required": ["id", "position", "label", "stage", "packageName"]
+              "required": [
+                "id",
+                "position",
+                "label",
+                "stage",
+                "packageName"
+              ]
             },
             {
               "type": "null"
@@ -1463,11 +1617,18 @@
           "minimum": 0
         },
         "executionKind": {
-          "enum": ["APP_OPEN", "REGISTRATION", "DOWNLOAD_ONLY"]
+          "enum": [
+            "APP_OPEN",
+            "REGISTRATION",
+            "DOWNLOAD_ONLY"
+          ]
         },
         "concurrency": {
           "type": "integer",
-          "enum": [1, 2]
+          "enum": [
+            1,
+            2
+          ]
         },
         "activeTasks": {
           "type": "array",
@@ -1501,13 +1662,24 @@
                 ]
               }
             },
-            "required": ["id", "position", "label", "stage", "packageName"]
+            "required": [
+              "id",
+              "position",
+              "label",
+              "stage",
+              "packageName"
+            ]
           }
         },
         "deviceSessions": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["started", "closed", "failed", "active"],
+          "required": [
+            "started",
+            "closed",
+            "failed",
+            "active"
+          ],
           "properties": {
             "started": {
               "type": "integer",
@@ -1617,7 +1789,11 @@
               "openTimings": {
                 "type": "object",
                 "additionalProperties": false,
-                "required": ["version", "totalMs", "steps"],
+                "required": [
+                  "version",
+                  "totalMs",
+                  "steps"
+                ],
                 "properties": {
                   "version": {
                     "const": 1
@@ -1633,7 +1809,12 @@
                     "items": {
                       "type": "object",
                       "additionalProperties": false,
-                      "required": ["name", "startedMs", "elapsedMs", "outcome"],
+                      "required": [
+                        "name",
+                        "startedMs",
+                        "elapsedMs",
+                        "outcome"
+                      ],
                       "properties": {
                         "name": {
                           "enum": [
@@ -1663,7 +1844,11 @@
                           "maximum": 3600000
                         },
                         "outcome": {
-                          "enum": ["SUCCEEDED", "FAILED", "CANCELLED"]
+                          "enum": [
+                            "SUCCEEDED",
+                            "FAILED",
+                            "CANCELLED"
+                          ]
                         }
                       }
                     }
@@ -1728,7 +1913,13 @@
           ]
         }
       },
-      "required": ["items", "hasEarlier", "hasLater", "firstSequence", "lastSequence"]
+      "required": [
+        "items",
+        "hasEarlier",
+        "hasLater",
+        "firstSequence",
+        "lastSequence"
+      ]
     },
     "AssetListView": {
       "type": "object",
@@ -1809,11 +2000,17 @@
                         "maxLength": 256
                       },
                       "versionName": {
-                        "type": ["string", "null"],
+                        "type": [
+                          "string",
+                          "null"
+                        ],
                         "maxLength": 256
                       },
                       "versionCode": {
-                        "type": ["integer", "null"],
+                        "type": [
+                          "integer",
+                          "null"
+                        ],
                         "minimum": 0
                       },
                       "abis": {
@@ -1837,8 +2034,174 @@
                       "cacheDay": {
                         "type": "string",
                         "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+                      },
+                      "minSdkVersion": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 1000
                       }
                     }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "cacheDay": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "canUpload": {
+                "type": "boolean"
+              },
+              "uploadBlockedReason": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "manualUpload": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "status": {
+                        "enum": [
+                          "UPLOADING",
+                          "RECEIVING",
+                          "QUEUED",
+                          "IMPORTING",
+                          "APPLIED",
+                          "FAILED",
+                          "CANCELLED",
+                          "EXPIRED",
+                          "NEEDS_REVIEW"
+                        ]
+                      },
+                      "apk": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "packageName",
+                              "versionName",
+                              "versionCode",
+                              "abis",
+                              "size",
+                              "apkSha256",
+                              "cacheDay"
+                            ],
+                            "properties": {
+                              "packageName": {
+                                "type": "string",
+                                "pattern": "^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)+$",
+                                "maxLength": 256
+                              },
+                              "versionName": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ],
+                                "maxLength": 256
+                              },
+                              "versionCode": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ],
+                                "minimum": 0
+                              },
+                              "abis": {
+                                "type": "array",
+                                "uniqueItems": true,
+                                "maxItems": 20,
+                                "items": {
+                                  "type": "string",
+                                  "pattern": "^[A-Za-z0-9_-]{1,40}$"
+                                }
+                              },
+                              "size": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 536870912
+                              },
+                              "apkSha256": {
+                                "type": "string",
+                                "pattern": "^[a-f0-9]{64}$"
+                              },
+                              "cacheDay": {
+                                "type": "string",
+                                "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+                              },
+                              "minSdkVersion": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 1000
+                              }
+                            }
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "errorCode": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "maxLength": 100
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "operationId": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "maxBytes": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 536870912
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "updatedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "status",
+                      "apk",
+                      "errorCode",
+                      "operationId",
+                      "maxBytes",
+                      "createdAt",
+                      "updatedAt"
+                    ]
                   },
                   {
                     "type": "null"
@@ -1872,7 +2235,10 @@
           ]
         }
       },
-      "required": ["items", "nextCursor"]
+      "required": [
+        "items",
+        "nextCursor"
+      ]
     },
     "ValidationListView": {
       "type": "object",
@@ -1924,7 +2290,12 @@
                       "minimum": 0
                     }
                   },
-                  "required": ["name", "status", "proof", "requests"]
+                  "required": [
+                    "name",
+                    "status",
+                    "proof",
+                    "requests"
+                  ]
                 }
               }
             },
@@ -1950,12 +2321,19 @@
           ]
         }
       },
-      "required": ["items", "nextCursor"]
+      "required": [
+        "items",
+        "nextCursor"
+      ]
     },
     "AppOpenTimings": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["version", "totalMs", "steps"],
+      "required": [
+        "version",
+        "totalMs",
+        "steps"
+      ],
       "properties": {
         "version": {
           "const": 1
@@ -1971,7 +2349,12 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["name", "startedMs", "elapsedMs", "outcome"],
+            "required": [
+              "name",
+              "startedMs",
+              "elapsedMs",
+              "outcome"
+            ],
             "properties": {
               "name": {
                 "enum": [
@@ -2001,7 +2384,11 @@
                 "maximum": 3600000
               },
               "outcome": {
-                "enum": ["SUCCEEDED", "FAILED", "CANCELLED"]
+                "enum": [
+                  "SUCCEEDED",
+                  "FAILED",
+                  "CANCELLED"
+                ]
               }
             }
           }

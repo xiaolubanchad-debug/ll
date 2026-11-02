@@ -1,9 +1,14 @@
 import { spawn, execFileSync } from 'node:child_process';
-import { readFile, writeFile, mkdir, rename, rm } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, rename, rm, lstat, chown, chmod } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { resolve, join } from 'node:path';
 import { releasePlan } from './release-plan.mjs';
-import { validateHubConfig, moduleOverrides } from './hub-release-config.mjs';
+import {
+  validateHubConfig,
+  moduleOverrides,
+  manualUploadOverrides,
+  manualUploadNginx,
+} from './hub-release-config.mjs';
 
 // This is a root-operated host CLI. Containers never receive the Docker socket.
 if (
@@ -42,6 +47,7 @@ let guard,
   switched = false,
   migrationStarted = false;
 let override, previousOverride, snapshot;
+let nginxBefore;
 const state = {
   version: 1,
   status: 'IN_PROGRESS',
@@ -126,11 +132,28 @@ try {
   await saveState();
   override = previousOverride ? JSON.parse(previousOverride) : { services: {} };
   // Freeze previous live image tags for rollback, including first adoption from the shared runtime image.
-  const rollback = { services: {} };
+  const rollback = structuredClone(override);
   for (const service of ['api', 'worker', 'web', 'tools'])
-    rollback.services[service] = { image: config.services[service].image };
+    rollback.services[service] = {
+      ...rollback.services[service],
+      image: config.services[service].image,
+    };
   await writeFile(join(snapshot, 'rollback.json'), JSON.stringify(rollback), { mode: 0o600 });
   override = moduleOverrides(config, selected, sha, source, override);
+  if (plan.files.some((f) => f === 'contracts/v119.http.json')) {
+    const uploadDir = '/opt/apk-hub/state/apk-uploads';
+    await mkdir(uploadDir, { recursive: true, mode: 0o700 });
+    const info = await lstat(uploadDir);
+    if (!info.isDirectory() || info.isSymbolicLink()) throw Error('UPLOAD_DIR_INVALID');
+    await chown(uploadDir, 1000, 1000);
+    await chmod(uploadDir, 0o700);
+    override = manualUploadOverrides(config, override);
+    nginxBefore = await readFile(join(ops, 'nginx.conf'), 'utf8');
+    await writeFile(join(snapshot, 'nginx.conf'), nginxBefore, { mode: 0o600 });
+    // Write in place: the live nginx container mounts this file's inode.
+    await writeFile(join(ops, 'nginx.conf'), manualUploadNginx(nginxBefore), { mode: 0o600 });
+    await compose(['exec', '-T', 'web', 'nginx', '-t']);
+  }
   const pending = join(ops, 'compose.pending.json');
   await writeFile(pending, JSON.stringify(override, null, 2), { mode: 0o600 });
   const withPending = ['-f', 'compose.yml', '-f', 'compose.pending.json'];
@@ -192,6 +215,8 @@ try {
     }),
   );
 } catch (error) {
+  if (nginxBefore !== undefined)
+    await writeFile(join(ops, 'nginx.conf'), nginxBefore, { mode: 0o600 });
   state.status = 'NEEDS_REVIEW';
   if (!switched && !migrationStarted) state.status = 'ROLLED_BACK';
   else if (locked && !migrationStarted) {

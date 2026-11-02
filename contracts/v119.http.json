@@ -1,0 +1,44 @@
+{
+  "version": "1.19.0",
+  "routes": [
+    {
+      "method": "post",
+      "path": "/apk-assets/{id}/uploads",
+      "operationId": "manualApkCreate",
+      "request": "ManualApkCreateInput",
+      "response": "ManualApkView",
+      "status": 201
+    },
+    {
+      "method": "get",
+      "path": "/apk-uploads/{id}",
+      "operationId": "manualApkStatus",
+      "response": "ManualApkView",
+      "status": 200
+    },
+    {
+      "method": "put",
+      "path": "/apk-uploads/{id}/file",
+      "operationId": "manualApkFile",
+      "response": "ManualApkView",
+      "status": 200,
+      "binary": true
+    },
+    {
+      "method": "post",
+      "path": "/apk-uploads/{id}/retry",
+      "operationId": "manualApkRetry",
+      "request": "ManualApkCreateInput",
+      "response": "ManualApkView",
+      "status": 200
+    },
+    {
+      "method": "post",
+      "path": "/apk-uploads/{id}/cancel",
+      "operationId": "manualApkCancel",
+      "request": "ManualApkCreateInput",
+      "response": "ManualApkView",
+      "status": 200
+    }
+  ]
+}

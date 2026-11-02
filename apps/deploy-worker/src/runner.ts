@@ -5,7 +5,12 @@ import { fileURLToPath } from 'node:url';
 import { join, resolve, sep } from 'node:path';
 import type { Node } from '@prisma/client';
 import { schemaIssues } from '@apk/contracts';
-import type { ReleaseInput, DeploymentOutcome } from '@apk/contracts';
+import type {
+  ReleaseInput,
+  DeploymentOutcome,
+  ManualApkImportInput,
+  ManualApkImportReceipt,
+} from '@apk/contracts';
 import { PlatformError, artifactPath, playbookDigest, hostKeyLine } from '@apk/platform';
 import ssh2 from 'ssh2';
 export interface InstallContext {
@@ -20,6 +25,12 @@ export interface InstallContext {
 export interface Runner {
   install(context: InstallContext, signal: AbortSignal): Promise<void | DeploymentOutcome>;
   activate(context: InstallContext, bootstrapToken: string, signal: AbortSignal): Promise<void>;
+  importApk?(
+    context: InstallContext,
+    input: ManualApkImportInput,
+    file: string,
+    signal: AbortSignal,
+  ): Promise<ManualApkImportReceipt>;
 }
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 export function renderInventory(target: Record<string, string | number | boolean>) {
@@ -50,6 +61,7 @@ export class AnsibleRunner implements Runner {
     playbook: string,
     bootstrapToken: string | undefined,
     signal: AbortSignal,
+    upload?: { input: ManualApkImportInput; file: string },
   ) {
     if ((await playbookDigest(this.playbooks)) !== context.manifest.playbookSha256)
       throw new PlatformError(409, 'TOOLCHAIN_MISMATCH', '部署脚本与签名版本不一致');
@@ -111,6 +123,7 @@ export class AnsibleRunner implements Runner {
         (await import('@apk/platform')).canonical(context.manifest.toolchain),
       );
       const variables = {
+        ...(upload ? { apk_source: upload.file } : {}),
         release_id: context.manifest.id,
         artifact_sha256: context.manifest.sha256,
         toolchain: context.manifest.toolchain,
@@ -144,6 +157,10 @@ export class AnsibleRunner implements Runner {
           ...(bootstrapToken ? { bootstrapToken } : {}),
         },
       };
+      if (upload)
+        await writeFile(join(dir, 'project', 'import-input.json'), JSON.stringify(upload.input), {
+          mode: 0o600,
+        });
       await writeFile(join(dir, 'env', 'extravars'), JSON.stringify(variables), { mode: 0o600 });
       await writeFile(
         join(dir, 'env', 'settings'),
@@ -246,7 +263,7 @@ export class AnsibleRunner implements Runner {
           '部署步骤未完成，请查看步骤状态',
         );
       }
-      if (playbook === 'update.yml') {
+      if (playbook === 'update.yml' || playbook === 'import-apk.yml') {
         const receipts: unknown[] = [];
         const events = join(dir, 'artifacts');
         for (const artifact of await readdir(events))
@@ -256,26 +273,41 @@ export class AnsibleRunner implements Runner {
             );
             if (
               event.event === 'runner_on_ok' &&
-              event.event_data?.task === 'Report deployment strategy'
+              event.event_data?.task ===
+                (upload ? 'Report APK import receipt' : 'Report deployment strategy')
             )
               receipts.push(event.event_data?.res?.msg);
           }
-        if (receipts.length !== 1 || schemaIssues('DeploymentOutcome', receipts[0]).length)
+        if (
+          receipts.length !== 1 ||
+          schemaIssues(upload ? 'ManualApkImportReceipt' : 'DeploymentOutcome', receipts[0]).length
+        )
           throw new PlatformError(409, 'ANSIBLE_FAILED', '缺少有效的节点部署回执');
-        return receipts[0] as DeploymentOutcome;
+        return receipts[0] as DeploymentOutcome | ManualApkImportReceipt;
       }
     } finally {
       const target = resolve(dir);
       if (target.startsWith(base + sep)) await rm(target, { recursive: true, force: true });
     }
   }
-  install(context: InstallContext, signal: AbortSignal) {
-    return this.run(
+  async install(context: InstallContext, signal: AbortSignal) {
+    return (await this.run(
       context,
       context.manifest.features?.includes('INCREMENTAL_DEPLOY_V1') ? 'update.yml' : 'install.yml',
       undefined,
       signal,
-    );
+    )) as DeploymentOutcome | undefined;
+  }
+  async importApk(
+    context: InstallContext,
+    input: ManualApkImportInput,
+    file: string,
+    signal: AbortSignal,
+  ) {
+    return (await this.run(context, 'import-apk.yml', undefined, signal, {
+      input,
+      file,
+    })) as ManualApkImportReceipt;
   }
   async activate(context: InstallContext, token: string, signal: AbortSignal) {
     await this.run(context, 'activate.yml', token, signal);

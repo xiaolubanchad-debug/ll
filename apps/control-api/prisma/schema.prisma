@@ -52,31 +52,32 @@ model LoginBucket {
 }
 
 model Node {
-  dailyOpenLimitOverride Int?
+  manualApks              ManualApkUpload[]
+  dailyOpenLimitOverride  Int?
   managedTasks            ManagedTask[]
-  id                      String           @id @default(uuid()) @db.Uuid
-  name                    String           @db.VarChar(100)
-  host                    String           @db.VarChar(253)
-  createdAt               DateTime         @default(now()) @db.Timestamptz(3)
+  id                      String            @id @default(uuid()) @db.Uuid
+  name                    String            @db.VarChar(100)
+  host                    String            @db.VarChar(253)
+  createdAt               DateTime          @default(now()) @db.Timestamptz(3)
   runs                    Run[]
-  port                    Int              @default(22)
-  username                String           @default("ubuntu") @db.VarChar(64)
-  credentialVersionId     String?          @db.Uuid
-  credential              SecretVersion?   @relation("sshCredential", fields: [credentialVersionId], references: [id], onDelete: Restrict)
-  sudoCredentialVersionId String?          @db.Uuid
-  sudoCredential          SecretVersion?   @relation("sudoCredential", fields: [sudoCredentialVersionId], references: [id], onDelete: Restrict)
-  version                 Int              @default(1)
-  archivedAt              DateTime?        @db.Timestamptz(3)
-  expectedFingerprint     String?          @db.VarChar(100)
+  port                    Int               @default(22)
+  username                String            @default("ubuntu") @db.VarChar(64)
+  credentialVersionId     String?           @db.Uuid
+  credential              SecretVersion?    @relation("sshCredential", fields: [credentialVersionId], references: [id], onDelete: Restrict)
+  sudoCredentialVersionId String?           @db.Uuid
+  sudoCredential          SecretVersion?    @relation("sudoCredential", fields: [sudoCredentialVersionId], references: [id], onDelete: Restrict)
+  version                 Int               @default(1)
+  archivedAt              DateTime?         @db.Timestamptz(3)
+  expectedFingerprint     String?           @db.VarChar(100)
   hostKey                 String?
-  deploymentStatus        String           @default("NOT_INSTALLED") @db.VarChar(32)
-  lastSeenAt              DateTime?        @db.Timestamptz(3)
+  deploymentStatus        String            @default("NOT_INSTALLED") @db.VarChar(32)
+  lastSeenAt              DateTime?         @db.Timestamptz(3)
   health                  Json?
-  agentVersion            String?          @db.VarChar(32)
-  agentReleaseId          String?          @db.Uuid
-  downloadProtocol        String?          @db.VarChar(16)
-  registrationProtocol    String?          @db.VarChar(16)
-  currentDeliveryId       String?          @db.Uuid
+  agentVersion            String?           @db.VarChar(32)
+  agentReleaseId          String?           @db.Uuid
+  downloadProtocol        String?           @db.VarChar(16)
+  registrationProtocol    String?           @db.VarChar(16)
+  currentDeliveryId       String?           @db.Uuid
   slot                    NodeSlot?
   operations              Deployment[]
   enrollments             Enrollment[]
@@ -118,7 +119,9 @@ model NodeSlot {
 }
 
 model Deployment {
-  mode String @default("AUTO") @db.VarChar(8)
+  manualApkId       String?           @db.Uuid
+  manualApk         ManualApkUpload?  @relation(fields: [manualApkId], references: [id], onDelete: Restrict)
+  mode              String            @default("AUTO") @db.VarChar(8)
   id                String            @id @default(uuid()) @db.Uuid
   nodeId            String            @db.Uuid
   node              Node              @relation(fields: [nodeId], references: [id], onDelete: Restrict)
@@ -275,30 +278,31 @@ model Delivery {
 }
 
 model Task {
+  manualApk             ManualApkUpload?
   testEnrollment        TestEnrollment?
-  id                    String         @id @db.Uuid
-  startedAt             DateTime?      @db.Timestamptz(3)
-  registrationStartedAt DateTime?      @db.Timestamptz(3)
-  finishedAt            DateTime?      @db.Timestamptz(3)
-  lastStage             String         @default("QUEUED") @db.VarChar(32)
-  runId                 String         @db.Uuid
-  run                   Run            @relation(fields: [runId], references: [id], onDelete: Restrict)
-  targetKey             String         @db.Char(64)
-  entryId               String?        @db.VarChar(100)
-  label                 String         @db.VarChar(200)
-  sourceUrl             String         @db.VarChar(4096)
+  id                    String           @id @db.Uuid
+  startedAt             DateTime?        @db.Timestamptz(3)
+  registrationStartedAt DateTime?        @db.Timestamptz(3)
+  finishedAt            DateTime?        @db.Timestamptz(3)
+  lastStage             String           @default("QUEUED") @db.VarChar(32)
+  runId                 String           @db.Uuid
+  run                   Run              @relation(fields: [runId], references: [id], onDelete: Restrict)
+  targetKey             String           @db.Char(64)
+  entryId               String?          @db.VarChar(100)
+  label                 String           @db.VarChar(200)
+  sourceUrl             String           @db.VarChar(4096)
   position              Int
-  status                String         @default("QUEUED") @db.VarChar(32)
+  status                String           @default("QUEUED") @db.VarChar(32)
   apk                   Json?
-  cacheHit              Boolean        @default(false)
-  proof                 String         @default("NONE") @db.VarChar(32)
-  errorCode             String?        @db.VarChar(100)
+  cacheHit              Boolean          @default(false)
+  proof                 String           @default("NONE") @db.VarChar(32)
+  errorCode             String?          @db.VarChar(100)
   observation           Json?
   recognition           Json?
-  accountRef            String?        @db.Uuid
-  submissionId          String?        @unique @db.Uuid
-  submittedAt           DateTime?      @db.Timestamptz(3)
-  attemptStarted        Boolean        @default(false)
+  accountRef            String?          @db.Uuid
+  submissionId          String?          @unique @db.Uuid
+  submittedAt           DateTime?        @db.Timestamptz(3)
+  attemptStarted        Boolean          @default(false)
   account               AccountResult?
   artifacts             Artifact[]
   reviews               TaskReview[]
@@ -309,19 +313,19 @@ model Task {
 }
 
 model TestEnrollment {
-  id          String      @id @default(uuid()) @db.Uuid
-  taskId      String      @unique @db.Uuid
-  task        Task        @relation(fields: [taskId], references: [id], onDelete: Restrict)
-  nodeId      String      @db.Uuid
-  deliveryId  String      @db.Uuid
-  fence       Int
-  tokenHash   String      @unique @db.Char(64)
-  expectedUa  String      @db.VarChar(512)
-  model       String      @db.VarChar(100)
-  profileId   String      @db.VarChar(64)
-  expiresAt   DateTime    @db.Timestamptz(3)
-  createdAt   DateTime    @default(now()) @db.Timestamptz(3)
-  record      TestRecord?
+  id         String      @id @default(uuid()) @db.Uuid
+  taskId     String      @unique @db.Uuid
+  task       Task        @relation(fields: [taskId], references: [id], onDelete: Restrict)
+  nodeId     String      @db.Uuid
+  deliveryId String      @db.Uuid
+  fence      Int
+  tokenHash  String      @unique @db.Char(64)
+  expectedUa String      @db.VarChar(512)
+  model      String      @db.VarChar(100)
+  profileId  String      @db.VarChar(64)
+  expiresAt  DateTime    @db.Timestamptz(3)
+  createdAt  DateTime    @default(now()) @db.Timestamptz(3)
+  record     TestRecord?
 
   @@index([nodeId, createdAt])
 }
@@ -340,7 +344,7 @@ model TestRecord {
   manufacturer     String         @db.VarChar(100)
   apiLevel         Int
   userAgent        String         @db.VarChar(512)
-  defaultWebViewUa  String         @db.VarChar(1024)
+  defaultWebViewUa String         @db.VarChar(1024)
   uaMatched        Boolean
   modelMatched     Boolean
   encrypted        Json
@@ -491,5 +495,30 @@ model ManagedCycle {
   runs                  Run[]
 
   @@unique([taskId, day, round])
+  @@index([status, createdAt])
+}
+
+model ManualApkUpload {
+  id           String       @id @default(uuid()) @db.Uuid
+  taskId       String       @unique @db.Uuid
+  task         Task         @relation(fields: [taskId], references: [id], onDelete: Restrict)
+  nodeId       String       @db.Uuid
+  node         Node         @relation(fields: [nodeId], references: [id], onDelete: Restrict)
+  nodeVersion  Int
+  cacheDay     String       @db.VarChar(10)
+  targetKey    String       @db.Char(64)
+  status       String       @default("UPLOADING") @db.VarChar(20)
+  maxBytes     Int
+  apk          Json?
+  storageSha   String?      @db.Char(64)
+  errorCode    String?      @db.VarChar(100)
+  receiveOwner String?      @db.Uuid
+  receiveUntil DateTime?    @db.Timestamptz(3)
+  operationId  String?      @db.Uuid
+  createdBy    String       @db.Uuid
+  createdAt    DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime     @updatedAt @db.Timestamptz(3)
+  jobs         Deployment[]
+
   @@index([status, createdAt])
 }

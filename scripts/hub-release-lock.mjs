@@ -25,7 +25,11 @@ try {
           },
         }),
       ]);
-      if (tasks || runs || jobs || slots) throw Error('HUB_NOT_IDLE');
+      const [table] = await db.$queryRaw`SELECT to_regclass('"ManualApkUpload"')::text AS name`;
+      const uploads = table?.name
+        ? await db.$queryRaw`SELECT count(*)::int AS n FROM "ManualApkUpload" WHERE "status" IN ('UPLOADING','RECEIVING','QUEUED','IMPORTING','NEEDS_REVIEW')`
+        : [{ n: 0 }];
+      if (tasks || runs || jobs || slots || uploads[0]?.n) throw Error('HUB_NOT_IDLE');
       console.log('RELEASE_LOCK_READY');
       await new Promise((resolve, reject) => {
         process.stdin.setEncoding('utf8');

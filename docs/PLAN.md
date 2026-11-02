@@ -1,5 +1,7 @@
 # APK 测试部署中台实施方案
 
+1.19 APK 下载结果与手动补包遵循 [资产契约](V119_APK_ASSETS_CONTRACT.md)，普通开始与手动重下规则保持。
+
 1.18 模块增量发布、可信环境基线及完整校验规则见 [发布契约](V118_INCREMENTAL_RELEASE_CONTRACT.md)，对应 Agent 0.15.0。
 
 1.18 已完成代码发布与现场增量验收，范围及耗时见 [交付记录](V118_DELIVERY.md)，日常操作见 [发布说明](INCREMENTAL_RELEASE_RUNBOOK.md)。

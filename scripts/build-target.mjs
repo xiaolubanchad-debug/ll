@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 const groups = {
-  api: ['contracts', 'platform', 'control-api'],
-  worker: ['contracts', 'platform', 'deploy-worker'],
+  api: ['contracts', 'automation', 'platform', 'control-api'],
+  worker: ['contracts', 'automation', 'platform', 'deploy-worker'],
   web: ['contracts', 'web'],
   agent: ['contracts', 'automation', 'agent'],
   tools: ['contracts', 'platform', 'automation', 'control-api', 'deploy-worker', 'agent'],
@@ -12,8 +12,8 @@ if (!targets.length || targets.some((x) => !groups[x]) || !process.env.npm_execp
 const needed = new Set(targets.flatMap((x) => groups[x]));
 const selected = [
   'contracts',
-  'platform',
   'automation',
+  'platform',
   'control-api',
   'deploy-worker',
   'agent',

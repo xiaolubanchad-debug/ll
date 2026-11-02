@@ -22,6 +22,7 @@ import type { AppOpenTimings } from '@apk/contracts';
 import { checked } from './secrets.js';
 import { fault } from './errors.js';
 import { canonical, digest } from './security.js';
+import { manualApkView, uploadEligibility } from './manual-apks.js';
 
 export const resultCategories: ResultCategory[] = [
   'SUCCESS',
@@ -245,6 +246,11 @@ function search(q?: string): Prisma.TaskWhereInput {
               path: ['packageName'],
               string_contains: q,
               mode: 'insensitive',
+            },
+          },
+          {
+            manualApk: {
+              is: { apk: { path: ['packageName'], string_contains: q, mode: 'insensitive' } },
             },
           },
         ],
@@ -914,9 +920,17 @@ export async function apkAssets(db: PrismaClient, query: unknown): Promise<Asset
             cacheDay: day,
             ...(q.nodeId ? { nodeId: q.nodeId } : {}),
           },
-          apk: { not: Prisma.DbNull },
         },
         search(q.q),
+        q.status === 'SUCCESS'
+          ? { status: 'SUCCEEDED' }
+          : q.status === 'FAILED'
+            ? { status: { in: ['FAILED', 'CANCELLED'] } }
+            : q.status === 'PENDING'
+              ? { status: { notIn: ['SUCCEEDED', 'FAILED', 'CANCELLED', 'SKIPPED'] } }
+              : q.status === 'MANUAL'
+                ? { manualApk: { isNot: null } }
+                : {},
         after
           ? {
               OR: [
@@ -931,20 +945,33 @@ export async function apkAssets(db: PrismaClient, query: unknown): Promise<Asset
     orderBy: [{ run: { createdAt: 'desc' } }, { id: 'desc' }],
     take: n + 1,
   });
+  const mapped = await Promise.all(
+    rows.slice(0, n).map(async (r) => {
+      const manual = await db.manualApkUpload.findUnique({ where: { taskId: r.id } });
+      const eligible = await uploadEligibility(db, r.id);
+      return {
+        id: r.id,
+        runId: r.runId,
+        nodeId: r.run.nodeId,
+        nodeName: r.run.node.name,
+        configName: r.run.configVersion?.config.name ?? '历史配置',
+        label: r.label,
+        entryId: r.entryId,
+        status: r.status,
+        errorCode: r.errorCode,
+        createdAt: r.run.createdAt.toISOString(),
+        cacheDay: day,
+        apk: apkView(r.apk),
+        canUpload:
+          !eligible.reason &&
+          (!manual || ['UPLOADING', 'FAILED', 'CANCELLED', 'EXPIRED'].includes(manual.status)),
+        uploadBlockedReason: eligible.reason,
+        manualUpload: manual ? manualApkView(manual) : null,
+      };
+    }),
+  );
   return output('AssetListView', {
-    items: rows.slice(0, n).map((r) => ({
-      id: r.id,
-      runId: r.runId,
-      nodeId: r.run.nodeId,
-      nodeName: r.run.node.name,
-      configName: r.run.configVersion?.config.name ?? '历史配置',
-      label: r.label,
-      entryId: r.entryId,
-      status: r.status,
-      errorCode: r.errorCode,
-      createdAt: r.run.createdAt.toISOString(),
-      apk: apkView(r.apk),
-    })),
+    items: mapped,
     nextCursor:
       rows.length > n ? nextCursor(rows[n - 1].run.createdAt, rows[n - 1].id, scope) : null,
   });

@@ -102,6 +102,7 @@ export type {
   DeliveryConfigInput,
   ApkMetadata,
 } from './generated/types.js';
+export type { ManualApkView, ManualApkImportInput, ManualApkImportReceipt } from './generated/types.js';
 export interface Issue {
   path: string;
   message: string;

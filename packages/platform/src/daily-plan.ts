@@ -18,6 +18,7 @@ import type { Prisma, ConfigVersion } from '@prisma/client';
 import type { DailyExecutionPlan, RunInput, TestConfiguration } from '@apk/contracts';
 import { schemaIssues, registrationAvailable } from '@apk/contracts';
 import { digest, canonical } from './security.js';
+import { manualAssetsForRun, assertNoPendingManualApks } from './manual-apks.js';
 import { fault } from './errors.js';
 import { dailyOpenUsage, openAdmissionDeadline } from './open-budget.js';
 
@@ -134,19 +135,24 @@ export async function prepareDailyPlan(
       source.nodeId !== input.nodeId ||
       source.purpose !== 'DOWNLOAD' ||
       source.cacheDay !== plan.cacheDay ||
-      !['SUCCEEDED', 'PARTIAL_FAILED'].includes(source.status) ||
+      !['SUCCEEDED', 'PARTIAL_FAILED', 'FAILED', 'CANCELLED'].includes(source.status) ||
       source.configVersion?.configId !== version.configId
     )
       fault('DOWNLOAD_SOURCE_INVALID', '请选择本服务器、本配置当天已结束的下载批次', 422);
     const original = source.configVersion.body as unknown as TestConfiguration;
+    await assertNoPendingManualApks(tx, input.nodeId, version.configId);
+    const manual = new Map((await manualAssetsForRun(tx, source.id)).map((m) => [m.taskId, m]));
+    if (!['SUCCEEDED', 'PARTIAL_FAILED'].includes(source.status) && !manual.size)
+      fault('DOWNLOAD_SOURCE_INVALID', '下载失败且尚无已确认的补包', 422);
     if (original.source.url !== config.source.url || original.source.xpath !== config.source.xpath)
       fault('DOWNLOAD_SOURCE_INVALID', '来源网站和 XPath 与下载批次不一致', 422);
     plan.successTarget = input.successTarget!;
     plan.attemptLimit = input.attemptLimit!;
     plan.proxySecretVersionId = config.execution.proxySecretVersionId;
     for (const task of source.tasks) {
-      if (task.status !== 'SUCCEEDED' || schemaIssues('ApkMetadata', task.apk).length) continue;
-      const apk = task.apk as unknown as DailyExecutionPlan['assets'][number]['apk'];
+      const candidate = task.status === 'SUCCEEDED' ? task.apk : manual.get(task.id)?.apk;
+      if (schemaIssues('ApkMetadata', candidate).length) continue;
+      const apk = candidate as unknown as DailyExecutionPlan['assets'][number]['apk'];
       if (apk.cacheDay !== plan.cacheDay)
         fault('DOWNLOAD_SOURCE_INVALID', '文件日期与当天批次不一致', 422);
       if (!registrationAvailable(config, apk.packageName, task.entryId ?? undefined)) continue;

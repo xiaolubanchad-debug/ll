@@ -1221,6 +1221,33 @@ test('1.18 deployment receipt requires bound environment and fixed reason', () =
   assert.ok(schemaIssues('DeploymentOutcome', { ...result, reason: 'trust me' }).length);
   assert.ok(schemaIssues('DeploymentOutcome', { ...result, bootSucceeded: true }).length);
 });
+for (const [name, value] of Object.entries(read('contracts/fixtures/v119.valid.json')))
+  test('1.19 ' + name, () => assert.deepEqual(schemaIssues(name, value), []));
+for (const { name, value } of read('contracts/fixtures/v119.invalid.json'))
+  test('1.19 rejects invalid ' + name, () => assert.ok(schemaIssues(name, value).length));
+test('1.19 APK result metadata accepts SDK but rejects secrets', () => {
+  const apk = read('contracts/fixtures/v119.valid.json').ManualApkView.apk;
+  const asset = {
+    id: '11111111-1111-4111-8111-111111111111',
+    runId: '11111111-1111-4111-8111-111111111111',
+    nodeId: '11111111-1111-4111-8111-111111111111',
+    nodeName: 'Owned',
+    configName: 'Owned',
+    label: 'Owned',
+    entryId: null,
+    status: 'SUCCEEDED',
+    errorCode: null,
+    apk,
+    createdAt: '2026-11-02T00:00:00.000Z',
+  };
+  assert.deepEqual(schemaIssues('AssetListView', { items: [asset], nextCursor: null }), []);
+  assert.ok(
+    schemaIssues('AssetListView', {
+      items: [{ ...asset, apk: { ...apk, password: 'forbidden' } }],
+      nextCursor: null,
+    }).length,
+  );
+});
 process.stdout.write(
   `${passed} contract checks passed${process.exitCode ? '; failures present' : ''}.\n`,
 );

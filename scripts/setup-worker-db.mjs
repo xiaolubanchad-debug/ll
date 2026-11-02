@@ -25,6 +25,7 @@ export async function provisionWorkerRole(db, role, password, schema = 'public')
       'DeploymentEvent',
       'Enrollment',
       'AgentCredential',
+      'ManualApkUpload',
     ])
       await tx.$executeRawUnsafe(`GRANT SELECT ON "${schema}"."${table}" TO "${role}"`);
     for (const [table, columns] of [
@@ -35,6 +36,7 @@ export async function provisionWorkerRole(db, role, password, schema = 'public')
         '"status","workerId","fence","leaseExpiresAt","result","errorCode","finishedAt"',
       ],
       ['AgentCredential', '"revokedAt"'],
+      ['ManualApkUpload', '"status","errorCode","updatedAt"'],
     ])
       await tx.$executeRawUnsafe(
         `GRANT UPDATE (${columns}) ON "${schema}"."${table}" TO "${role}"`,

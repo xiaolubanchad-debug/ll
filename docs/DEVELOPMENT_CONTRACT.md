@@ -1,5 +1,7 @@
 # 开发契约
 
+1.19 下载结果与手动补包见 [资产契约](V119_APK_ASSETS_CONTRACT.md)。
+
 1.18 模块增量发布、可信环境基线及完整校验规则见 [发布契约](V118_INCREMENTAL_RELEASE_CONTRACT.md)，对应 Agent 0.15.0。
 
 1.17.1 下载触屏判定、清单整数解析与分层诊断见 [下载修复契约](V1171_DOWNLOAD_CONTRACT.md)，对应 Agent 0.14.1。

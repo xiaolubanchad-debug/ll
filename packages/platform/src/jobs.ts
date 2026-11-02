@@ -7,6 +7,8 @@ import { readSecret } from './secrets.js';
 import { fault } from './errors.js';
 import { TERMINAL } from './types.js';
 import { lockLibrary } from './library-lock.js';
+import { schemaIssues } from '@apk/contracts';
+import type { ManualApkImportReceipt } from '@apk/contracts';
 export function keyRequired(key: string | undefined) {
   if (!key || !/^[A-Za-z0-9._:-]{8,128}$/.test(key))
     fault('VALIDATION_FAILED', '缺少有效的请求幂等编号', 422);
@@ -199,6 +201,37 @@ export async function finishJob(
       where: { nodeId: job.nodeId, operationId: id },
       data: { operationId: null, ...(uncertain ? { quarantined: true } : {}) },
     });
+    if (job.kind === 'APK_IMPORT' && job.manualApkId) {
+      const current = await tx.manualApkUpload.findUnique({ where: { id: job.manualApkId } });
+      if (final === 'SUCCEEDED') {
+        const receipt = result as ManualApkImportReceipt | null;
+        if (
+          !current ||
+          current.operationId !== job.id ||
+          schemaIssues('ManualApkImportReceipt', result).length ||
+          receipt?.id !== current.id ||
+          canonical(receipt.apk) !== canonical(current.apk) ||
+          receipt.cacheKey !==
+            digest(JSON.stringify([current.nodeId, current.cacheDay, current.targetKey]))
+        )
+          fault('APK_UPLOAD_INVALID', '补包缺少有效的节点缓存回执');
+      }
+      if (current?.operationId === job.id)
+        await tx.manualApkUpload.update({
+          where: { id: current.id },
+          data: {
+            status:
+              final === 'SUCCEEDED'
+                ? 'APPLIED'
+                : final === 'NEEDS_REVIEW'
+                  ? 'NEEDS_REVIEW'
+                  : final === 'CANCELLED'
+                    ? 'CANCELLED'
+                    : 'FAILED',
+            errorCode: final === 'SUCCEEDED' ? null : code,
+          },
+        });
+    }
     if (job.kind === 'DEPLOY')
       await tx.node.update({
         where: { id: job.nodeId },
@@ -251,6 +284,11 @@ export async function stopJob(
           data: { operationId: null },
         });
       if (queued) {
+        if (job.kind === 'APK_IMPORT' && job.manualApkId)
+          await tx.manualApkUpload.updateMany({
+            where: { id: job.manualApkId, operationId: job.id },
+            data: { status: 'CANCELLED', errorCode: 'JOB_CANCELLED' },
+          });
         await tx.deploymentEvent.create({
           data: { deploymentId: id, sequence: 2, status: 'CANCELLED', code: 'JOB_CANCELLED' },
         });

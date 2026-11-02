@@ -1,0 +1,87 @@
+---
+- name: Import a validated APK into the idle node daily cache
+  hosts: target
+  gather_facts: false
+  become: true
+  vars:
+    release_root: '/opt/apk-platform/releases/{{ release_id }}'
+    import_root: '/var/lib/apk-platform/manual-import/{{ deployment_id }}'
+  tasks:
+    - name: Acquire remote installation lock
+      ansible.builtin.command:
+        argv: [/usr/bin/mkdir, /var/lib/apk-platform/install.lock.d]
+      changed_when: true
+    - name: Record import owner
+      ansible.builtin.copy:
+        dest: /var/lib/apk-platform/install.lock
+        content: "{{ deployment_id }}\n"
+        owner: root
+        mode: '0600'
+    - name: Create protected release directory
+      ansible.builtin.file:
+        path: '{{ release_root }}'
+        state: directory
+        owner: root
+        mode: '0755'
+    - name: Stage signed import tool
+      ansible.builtin.copy:
+        src: agent.tgz
+        dest: '{{ release_root }}/agent.tgz'
+        owner: root
+        mode: '0644'
+    - name: Hash staged signed archive
+      ansible.builtin.stat:
+        path: '{{ release_root }}/agent.tgz'
+        checksum_algorithm: sha256
+      register: staged_archive
+    - name: Require signed bytes
+      ansible.builtin.assert:
+        that: staged_archive.stat.checksum == artifact_sha256
+        fail_msg: RELEASE_INVALID
+    - name: Extract signed import tool
+      ansible.builtin.unarchive:
+        src: '{{ release_root }}/agent.tgz'
+        dest: '{{ release_root }}'
+        remote_src: true
+    - name: Create protected import parent
+      ansible.builtin.file:
+        path: /var/lib/apk-platform/manual-import
+        state: directory
+        owner: root
+        mode: '0711'
+    - name: Create private import directory
+      ansible.builtin.file:
+        path: '{{ import_root }}'
+        state: directory
+        owner: apk-runner
+        mode: '0700'
+    - name: Copy literal validated input file
+      ansible.builtin.copy:
+        src: import-input.json
+        dest: '{{ import_root }}/input.json'
+        owner: apk-runner
+        mode: '0600'
+    - name: Transfer private APK
+      ansible.builtin.copy:
+        src: '{{ apk_source }}'
+        dest: '{{ import_root }}/payload.apk'
+        owner: apk-runner
+        mode: '0600'
+    - name: Validate and import using signed tooling
+      become_user: apk-runner
+      ansible.builtin.command:
+        argv: [/opt/apk-platform/runtime/node/bin/node, '{{ release_root }}/apk-import.js', '{{ import_root }}/input.json']
+      register: imported_apk
+      changed_when: true
+    - name: Remove private transfer files
+      ansible.builtin.file:
+        path: '{{ import_root }}'
+        state: absent
+    - name: Clear confirmed import marker
+      ansible.builtin.file:
+        path: '{{ item }}'
+        state: absent
+      loop: [/var/lib/apk-platform/install.lock, /var/lib/apk-platform/install.lock.d]
+    - name: Report APK import receipt
+      ansible.builtin.debug:
+        msg: '{{ imported_apk.stdout | from_json }}'

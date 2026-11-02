@@ -109,6 +109,7 @@ export async function verifyRelease(body: unknown) {
     if (manifest.features?.includes('AUTO_REGISTRATION_V1')) expected.add('ocr-worker.js');
     if (manifest.features?.includes('DEVICE_VARIANTS_V1')) expected.add('identity-images.js');
     if (manifest.features?.includes('INCREMENTAL_DEPLOY_V1')) expected.add('environment-check.js');
+    if (manifest.features?.includes('MANUAL_APK_IMPORT_V1')) expected.add('apk-import.js');
     let invalid = false;
     const lockChunks: Buffer[] = [];
     await listArchive({

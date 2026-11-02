@@ -16,9 +16,13 @@ import {
   issueEnrollment,
   PlatformError,
   SAFE_CODES,
+  manualApkPath,
+  canonical,
+  digest,
 } from '@apk/platform';
 import type { HealthReport } from '@apk/platform';
-import { executionOSSupported, requiredAgentProtocolsReady } from '@apk/contracts';
+import { executionOSSupported, requiredAgentProtocolsReady, schemaIssues } from '@apk/contracts';
+import type { ManualApkImportInput } from '@apk/contracts';
 import type { Runner, InstallContext } from './runner.js';
 const scriptPath = fileURLToPath(
   new URL('../../../deploy/ansible/files/inspect.sh', import.meta.url),
@@ -168,6 +172,7 @@ export class Worker {
       const auth = await this.db.agentCredential.findUnique({ where: { nodeId: node.id } });
       const health = node.health as { android?: boolean } | null;
       if (
+        job.kind !== 'APK_IMPORT' &&
         job.mode !== 'FULL' &&
         !manifest.features?.includes('INCREMENTAL_DEPLOY_V1') &&
         auth &&
@@ -223,6 +228,54 @@ export class Worker {
         sudoPassword,
         requestedMode: job.mode === 'FULL' ? 'FULL' : 'AUTO',
       };
+      if (job.kind === 'APK_IMPORT') {
+        const upload = job.manualApkId
+          ? await this.db.manualApkUpload.findUnique({ where: { id: job.manualApkId } })
+          : null;
+        if (
+          !upload ||
+          upload.operationId !== job.id ||
+          upload.status !== 'IMPORTING' ||
+          upload.nodeId !== node.id ||
+          !upload.storageSha ||
+          !manifest.features?.includes('MANUAL_APK_IMPORT_V1') ||
+          !this.runner.importApk
+        )
+          throw new PlatformError(409, 'APK_UPLOAD_INVALID', '补包操作已失效');
+        const input = {
+          id: upload.id,
+          nodeId: node.id,
+          cacheDay: upload.cacheDay,
+          targetKey: upload.targetKey,
+          apk: upload.apk,
+          maxBytes: upload.maxBytes,
+        };
+        if (
+          schemaIssues('ManualApkImportInput', input).length ||
+          (upload.apk as { apkSha256?: string })?.apkSha256 !== upload.storageSha
+        )
+          throw new PlatformError(409, 'APK_UPLOAD_INVALID', '补包元数据无效');
+        await jobPhase(this.db, job.id, this.id, job.fence, 'INSTALLING', 'APK_IMPORT');
+        touched = true;
+        const receipt = await this.runner.importApk(
+          context,
+          input as ManualApkImportInput,
+          manualApkPath(upload.storageSha),
+          abort.signal,
+        );
+        if (
+          schemaIssues('ManualApkImportReceipt', receipt).length ||
+          receipt.id !== upload.id ||
+          canonical(receipt.apk) !== canonical(upload.apk) ||
+          receipt.cacheKey !== digest(JSON.stringify([node.id, upload.cacheDay, upload.targetKey]))
+        )
+          throw new PlatformError(409, 'APK_UPLOAD_INVALID', '节点补包回执不匹配');
+        await renew();
+        if (abort.signal.aborted) throw new PlatformError(409, 'JOB_CANCELLED', '补包已停止');
+        await jobPhase(this.db, job.id, this.id, job.fence, 'VERIFYING', 'APK_CACHED');
+        await finishJob(this.db, job.id, this.id, job.fence, 'SUCCEEDED', 'OK', receipt);
+        return;
+      }
       await jobPhase(this.db, job.id, this.id, job.fence, 'INSTALLING');
       touched = true;
       const outcome = await this.runner.install(context, abort.signal);

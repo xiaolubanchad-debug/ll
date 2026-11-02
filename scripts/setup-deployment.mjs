@@ -48,6 +48,7 @@ const workerFields = [
   'RELEASE_PUBLIC_KEY_FILE',
   'RELEASE_DIR',
   'CONTROL_PLANE_URL',
+  'APK_UPLOAD_DIR',
 ];
 await writeFile(
   join(dir, 'worker.env'),

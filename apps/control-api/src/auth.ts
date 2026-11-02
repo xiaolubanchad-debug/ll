@@ -12,6 +12,7 @@ import { settings } from './settings.js';
 export const COOKIE = 'apk_session';
 export const Public = () => SetMetadata('public', true);
 export const NodeRoute = () => SetMetadata('nodeRoute', true);
+export const BinaryUpload = () => SetMetadata('binaryUpload', true);
 export const TestAppRoute = () => SetMetadata('testAppRoute', true);
 export interface AuthedRequest extends Request {
   requestId: string;
@@ -188,7 +189,21 @@ export class SessionGuard implements CanActivate {
     if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
       if (req.get('origin') !== settings().origin || req.get('sec-fetch-site') === 'cross-site')
         throw new ApiError(403, 'CSRF_REJECTED', '请求来源校验失败');
-      if (!req.is('application/json')) throw new ApiError(400, 'JSON_REQUIRED', '请使用 JSON 请求');
+      const binary = this.reflector.getAllAndOverride<boolean>('binaryUpload', [
+        context.getHandler(),
+        context.getClass(),
+      ]);
+      if (
+        binary
+          ? !req.is('application/octet-stream') &&
+            !req.is('application/vnd.android.package-archive')
+          : !req.is('application/json')
+      )
+        throw new ApiError(
+          400,
+          binary ? 'APK_BINARY_REQUIRED' : 'JSON_REQUIRED',
+          binary ? '请选择 APK 文件上传' : '请使用 JSON 请求',
+        );
     }
     if (
       this.reflector.getAllAndOverride<boolean>('public', [

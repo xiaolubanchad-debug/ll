@@ -16,6 +16,8 @@ import {
   saveSchedule,
   tickSchedules,
   tickTaskPlans,
+  tickManualApks,
+  pruneManualApks,
   expireRuns,
   keyRequired,
   ifMatch,
@@ -87,8 +89,10 @@ export class DailyScheduler implements OnModuleInit, OnModuleDestroy {
     const tick = () => {
       if (!this.running)
         this.running = expireRuns(this.db)
+          .then(() => tickManualApks(this.db))
           .then(() => tickSchedules(this.db))
           .then(() => tickTaskPlans(this.db))
+          .then(() => pruneManualApks(this.db))
           .catch(() => {
             console.error('每日计划检查暂未完成');
           })
