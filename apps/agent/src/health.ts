@@ -61,6 +61,18 @@ const exists = (file: string, mode = constants.F_OK) =>
     () => true,
     () => false,
   );
+type BootProof = { releaseId?: string; bootSucceeded?: boolean } & Partial<EnvironmentHealth>;
+export async function readBootProof(file: string): Promise<BootProof | null> {
+  try {
+    const info = await lstat(file);
+    if (!info.isFile() || info.size > 64 * 1024) return null;
+    const value: unknown = JSON.parse(await readFile(file, 'utf8'));
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    return value as BootProof;
+  } catch {
+    return null;
+  }
+}
 export async function collectHealth(
   sdkRoot: string,
   toolsRoot: string,
@@ -115,9 +127,7 @@ export async function collectHealth(
   if (!appium.code) versions.appium = appium.text.trim().slice(0, 80);
   const browser = await exists(join(toolsRoot, 'browsers'));
   if (browser) versions.playwright = 'installed';
-  const proof = JSON.parse(
-    await readFile('/var/lib/apk-platform/health.json', 'utf8').catch(() => 'null'),
-  ) as ({ releaseId?: string; bootSucceeded?: boolean } & Partial<EnvironmentHealth>) | null;
+  const proof = await readBootProof('/var/lib/apk-platform/health.json');
   let environmentVerified = false;
   if (environmentFingerprint) {
     const info = await lstat('/var/lib/apk-platform/health.json').catch(() => null);

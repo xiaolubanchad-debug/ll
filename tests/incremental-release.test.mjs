@@ -15,6 +15,31 @@ import {
 import { planChanges } from '../scripts/release-plan.mjs';
 import { validateHubConfig, moduleOverrides } from '../scripts/hub-release-config.mjs';
 import { identityImageRoot, phoneImageRoot } from '@apk/automation';
+import { readBootProof } from '../apps/agent/dist/health.js';
+
+test('missing or corrupt boot evidence is not ready, without crashing the Agent heartbeat', async () => {
+  const dir = await mkdtemp(resolve('.tmp/apk-boot-proof-')),
+    file = join(dir, 'health.json');
+  try {
+    assert.equal(await readBootProof(file), null);
+    const proof = {
+      version: 2,
+      releaseId: randomUUID(),
+      mode: 'CODE',
+      environmentFingerprint: 'a'.repeat(64),
+      fullReleaseId: randomUUID(),
+      fullVerifiedAt: new Date().toISOString(),
+    };
+    await writeFile(file, JSON.stringify(proof));
+    assert.deepEqual(await readBootProof(file), proof);
+    for (const value of ['{incomplete', '[]', 'null', ' '.repeat(65537)]) {
+      await writeFile(file, value);
+      assert.equal(await readBootProof(file), null);
+    }
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
 
 test('baseline inventory includes both sealed private image pools outside the SDK', () => {
   const input = {
