@@ -2,6 +2,8 @@
 
 1.18 模块增量发布、可信环境基线及完整校验规则见 [发布契约](docs/V118_INCREMENTAL_RELEASE_CONTRACT.md)，对应 Agent 0.15.0。
 
+已交付 1.18 增量发布，参见 [操作说明](docs/INCREMENTAL_RELEASE_RUNBOOK.md) 与 [验收范围](docs/V118_DELIVERY.md)。
+
 1.17.1 下载触屏判定、清单整数解析与分层诊断见 [下载修复契约](docs/V1171_DOWNLOAD_CONTRACT.md)，对应 Agent 0.14.1。
 
 1.17 取消每设备 10 个 APP 和每日 800 次的固定限制，改为兼容 APK 数量约束、自动估算及手动每日额度，见 [容量契约](docs/V117_CAPACITY_CONTRACT.md)。
