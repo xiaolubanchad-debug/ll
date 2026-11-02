@@ -8,6 +8,7 @@ import type {
   TestClientInfo,
 } from '@apk/contracts';
 import NodeCapacitySettings from './NodeCapacitySettings.vue';
+import SourceChecksEditor from './SourceChecksEditor.vue';
 import type { NodeCapacityView } from '@apk/contracts';
 import { configurationIssues, MAX_DAILY_OPEN_LIMIT, MAX_DEVICE_APPS } from '@apk/contracts';
 import example from '../../../contracts/fixtures/config.valid.json';
@@ -38,6 +39,9 @@ const step = ref(props.initialStep ?? 1),
 const source = ref(props.initial?.configuration.source.url ?? ''),
   xpath = ref(props.initial?.configuration.source.xpath ?? example.source.xpath),
   mode = ref<'FULL' | 'DOWNLOAD_ONLY'>(props.initial?.configuration.execution.mode ?? 'FULL');
+const elementChecks = ref<NonNullable<TestConfiguration['source']['elementChecks']>>(
+  (props.initial?.configuration.source.elementChecks ?? []).map((c) => ({ ...c })),
+);
 const multiApp = ref(
     props.initial
       ? !!props.initial.configuration.execution.appOpen?.appsPerDevice
@@ -89,6 +93,9 @@ watch(nodeId, (id) => {
       '0.14.0',
       '0.14.1',
       '0.15.0',
+      '0.15.1',
+      '0.16.0',
+      '0.17.0',
     ].includes(nodes.value.find((n) => n.id === id)?.agentVersion ?? '');
 });
 watch(target, (value, previous) => {
@@ -98,7 +105,22 @@ watch(target, (value, previous) => {
 const draft = computed(() => {
   const v = JSON.parse(JSON.stringify(base.value)) as TestConfiguration;
   v.name = name.value || 'APK 测试任务';
-  v.source = { ...v.source, url: source.value, xpath: xpath.value };
+  v.source = {
+    ...v.source,
+    url: source.value,
+    xpath: xpath.value,
+    elementChecks: elementChecks.value.map((c) => ({
+      ...c,
+      label: (
+        c.label.trim() ||
+        (c.kind === 'ATTRIBUTE'
+          ? c.attribute + '=' + c.value
+          : c.kind === 'TAG'
+            ? '标签 ' + c.tag
+            : 'XPath 检查')
+      ).slice(0, 100),
+    })),
+  };
   v.download.maxTargets = downloadLimit.value;
   v.execution.mode = mode.value;
   v.execution.contentIsolation = true;
@@ -195,6 +217,7 @@ function apply(value: string) {
     downloadLimit.value = c.download.maxTargets;
     source.value = c.source.url;
     xpath.value = c.source.xpath;
+    elementChecks.value = (c.source.elementChecks ?? []).map((x) => ({ ...x }));
     proxyId.value = c.execution.proxySecretVersionId ?? '';
     mode.value = c.execution.mode;
     concurrency.value = 1;
@@ -369,6 +392,7 @@ onUnmounted(() => {
         ><input id="task-url" v-model="source" placeholder="https://example.com/" />
         <label for="task-xpath">图标 XPath</label
         ><textarea id="task-xpath" v-model="xpath" rows="3" />
+        <SourceChecksEditor v-model="elementChecks" />
         <p class="muted">
           执行时依次处理匹配的全部图标，支持直接下载、落地页下载及自动下载。保存不会访问网站。
         </p>

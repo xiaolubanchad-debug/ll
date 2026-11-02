@@ -9,6 +9,7 @@ import type {
   TaskPlanDetail,
 } from '@apk/contracts';
 import { api, mutation } from './api';
+import { navigate } from './navigation';
 import { when } from './console-format';
 import {
   activeCycle,
@@ -603,6 +604,13 @@ onUnmounted(() => {
                 ><small v-if="taskFor(node)?.latestCycle"
                   >完成 {{ taskFor(node)?.latestCycle?.successes }} /
                   {{ taskFor(node)?.latestCycle?.successTarget }}</small
+                >
+                <el-button
+                  v-if="taskFor(node)?.sourceWarning"
+                  link
+                  type="warning"
+                  @click="navigate('runs', taskFor(node)!.sourceWarning!.runId, { view: 'logs' })"
+                  >XPath 有 {{ taskFor(node)?.sourceWarning?.count }} 条定位提醒 · 查看</el-button
                 >
               </td>
               <td data-label="任务配置" class="server-task-cell">

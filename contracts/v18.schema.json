@@ -52,15 +52,21 @@
       "allOf": [
         {
           "if": {
-            "required": ["configuration"],
+            "required": [
+              "configuration"
+            ],
             "properties": {
               "configuration": {
                 "type": "object",
-                "required": ["execution"],
+                "required": [
+                  "execution"
+                ],
                 "properties": {
                   "execution": {
                     "type": "object",
-                    "required": ["appOpen"]
+                    "required": [
+                      "appOpen"
+                    ]
                   }
                 }
               }
@@ -80,8 +86,14 @@
           },
           "else": {
             "properties": {
-              "successTarget": { "type": "integer", "maximum": 1000 },
-              "attemptLimit": { "type": "integer", "maximum": 1000 }
+              "successTarget": {
+                "type": "integer",
+                "maximum": 1000
+              },
+              "attemptLimit": {
+                "type": "integer",
+                "maximum": 1000
+              }
             }
           }
         }
@@ -103,7 +115,9 @@
           ]
         }
       },
-      "required": ["action"]
+      "required": [
+        "action"
+      ]
     },
     "TaskCycleView": {
       "type": "object",
@@ -124,7 +138,10 @@
           "type": "string"
         },
         "errorCode": {
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "successes": {
           "type": "integer",
@@ -190,11 +207,18 @@
           ]
         },
         "executionKind": {
-          "enum": ["APP_OPEN", "REGISTRATION", "DOWNLOAD_ONLY"]
+          "enum": [
+            "APP_OPEN",
+            "REGISTRATION",
+            "DOWNLOAD_ONLY"
+          ]
         },
         "concurrency": {
           "type": "integer",
-          "enum": [1, 2]
+          "enum": [
+            1,
+            2
+          ]
         }
       },
       "required": [
@@ -263,7 +287,10 @@
           "minimum": 0
         },
         "archivedAt": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "format": "date-time"
         },
         "latestCycle": {
@@ -292,24 +319,43 @@
                 "type": "string"
               }
             },
-            "required": ["code", "message", "section"]
+            "required": [
+              "code",
+              "message",
+              "section"
+            ]
           }
         },
         "nextRunAt": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "format": "date-time"
         },
         "executionKind": {
-          "enum": ["APP_OPEN", "REGISTRATION", "DOWNLOAD_ONLY"]
+          "enum": [
+            "APP_OPEN",
+            "REGISTRATION",
+            "DOWNLOAD_ONLY"
+          ]
         },
         "concurrency": {
           "type": "integer",
-          "enum": [1, 2]
+          "enum": [
+            1,
+            2
+          ]
         },
         "dailyUsage": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["day", "limit", "used", "remaining"],
+          "required": [
+            "day",
+            "limit",
+            "used",
+            "remaining"
+          ],
           "properties": {
             "day": {
               "type": "string",
@@ -328,6 +374,29 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 8640
+            }
+          }
+        },
+        "sourceWarning": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "runId",
+            "day",
+            "count"
+          ],
+          "properties": {
+            "runId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "day": {
+              "type": "string",
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 1
             }
           }
         }
@@ -368,7 +437,11 @@
           }
         }
       },
-      "required": ["task", "configuration", "cycles"]
+      "required": [
+        "task",
+        "configuration",
+        "cycles"
+      ]
     },
     "TaskPlanList": {
       "type": "object",
@@ -392,7 +465,10 @@
           ]
         }
       },
-      "required": ["items", "nextCursor"]
+      "required": [
+        "items",
+        "nextCursor"
+      ]
     },
     "TaskPlanQuery": {
       "type": "object",
@@ -407,7 +483,11 @@
           "pattern": "^(?:[1-9]|[1-9][0-9]|100)$"
         },
         "archived": {
-          "enum": ["ACTIVE", "ARCHIVED", "ALL"]
+          "enum": [
+            "ACTIVE",
+            "ARCHIVED",
+            "ALL"
+          ]
         }
       },
       "required": []
@@ -417,14 +497,22 @@
       "additionalProperties": false,
       "properties": {
         "kind": {
-          "enum": ["CONFIGURATION", "CONFIG_VERSION", "RELEASE"]
+          "enum": [
+            "CONFIGURATION",
+            "CONFIG_VERSION",
+            "RELEASE"
+          ]
         },
         "configId": {
           "type": "string",
           "format": "uuid"
         },
         "archived": {
-          "enum": ["ACTIVE", "ARCHIVED", "ALL"]
+          "enum": [
+            "ACTIVE",
+            "ARCHIVED",
+            "ALL"
+          ]
         },
         "cursor": {
           "type": "string",
@@ -435,7 +523,9 @@
           "pattern": "^(?:[1-9]|[1-9][0-9]|100)$"
         }
       },
-      "required": ["kind"]
+      "required": [
+        "kind"
+      ]
     },
     "MaintenanceItem": {
       "type": "object",
@@ -456,7 +546,10 @@
           "minimum": 0
         },
         "archivedAt": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "format": "date-time"
         },
         "references": {
@@ -473,7 +566,10 @@
                 "minimum": 0
               }
             },
-            "required": ["label", "count"]
+            "required": [
+              "label",
+              "count"
+            ]
           }
         },
         "canDelete": {
@@ -516,14 +612,21 @@
           ]
         }
       },
-      "required": ["items", "nextCursor"]
+      "required": [
+        "items",
+        "nextCursor"
+      ]
     },
     "MaintenanceInput": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "action": {
-          "enum": ["ARCHIVE", "RESTORE", "DELETE"]
+          "enum": [
+            "ARCHIVE",
+            "RESTORE",
+            "DELETE"
+          ]
         },
         "items": {
           "type": "array",
@@ -539,18 +642,29 @@
                 "format": "uuid"
               },
               "kind": {
-                "enum": ["CONFIGURATION", "CONFIG_VERSION", "RELEASE"]
+                "enum": [
+                  "CONFIGURATION",
+                  "CONFIG_VERSION",
+                  "RELEASE"
+                ]
               },
               "revision": {
                 "type": "integer",
                 "minimum": 1
               }
             },
-            "required": ["id", "kind", "revision"]
+            "required": [
+              "id",
+              "kind",
+              "revision"
+            ]
           }
         }
       },
-      "required": ["action", "items"]
+      "required": [
+        "action",
+        "items"
+      ]
     },
     "MaintenanceResult": {
       "type": "object",
@@ -561,7 +675,9 @@
           "minimum": 0
         }
       },
-      "required": ["affected"]
+      "required": [
+        "affected"
+      ]
     }
   }
 }

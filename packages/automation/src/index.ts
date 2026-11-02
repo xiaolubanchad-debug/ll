@@ -24,3 +24,9 @@ export * from './ocr.js';
 export { runCachedRegistrations, runProxyCheck } from './registration-loop.js';
 
 export * from './identity-images.js';
+export {
+  sourceAttributeNames,
+  describeSourceElements,
+  checkConfiguredSourceElements,
+  locateSourceElement,
+} from './source-elements.js';

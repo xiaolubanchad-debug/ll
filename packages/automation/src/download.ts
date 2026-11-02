@@ -14,7 +14,13 @@ import type {
   Frame,
   Locator,
 } from 'playwright';
-import type { TestConfiguration, ApkMetadata } from '@apk/contracts';
+import type { TestConfiguration, ApkMetadata, SourceElement } from '@apk/contracts';
+import {
+  sourceAttributeNames,
+  describeSourceElements,
+  checkConfiguredSourceElements,
+  locateSourceElement,
+} from './source-elements.js';
 import { ApkCache, removeOwned } from './cache.js';
 import { describeApkFile, ApkValidationError } from './apk.js';
 import { NetworkPolicy, startEgress } from './network.js';
@@ -33,11 +39,13 @@ export interface AutomationEvent {
     | 'BROWSER_ENVIRONMENT'
     | 'APP_OBSTRUCTION'
     | 'LOG'
-    | 'DEVICE_SESSION';
+    | 'DEVICE_SESSION'
+    | 'ELEMENT_OBSERVATION';
   taskId?: string;
   payload: Record<string, unknown>;
 }
 export interface Target {
+  sourceElement?: SourceElement;
   deviceSessionId?: string;
   appIndex?: number;
   variantId?: string;
@@ -88,18 +96,29 @@ const pause = (ms: number, signal: AbortSignal) =>
     if (signal.aborted) abort();
   });
 async function discover(page: Page, config: TestConfiguration): Promise<Target[]> {
-  const snapshots = await page.locator('xpath=' + config.source.xpath).evaluateAll((elements) =>
-    elements.map((element, position) => {
-      const anchor = element instanceof HTMLAnchorElement ? element : element.querySelector('a');
-      return {
-        pid: element.getAttribute('pid') ?? element.closest('[pid]')?.getAttribute('pid') ?? '',
-        href: anchor?.href ?? '',
-        label: (element.getAttribute('aria-label') ?? element.textContent ?? '')
-          .trim()
-          .slice(0, 200),
-        position,
-      };
-    }),
+  const snapshots = await page.locator('xpath=' + config.source.xpath).evaluateAll(
+    (elements, attributeNames) =>
+      elements.map((element, position) => {
+        const anchor = element instanceof HTMLAnchorElement ? element : element.querySelector('a');
+        return {
+          tag: element.localName.toLowerCase(),
+          attributes: attributeNames.flatMap((name) => {
+            const value = element.getAttribute(name);
+            return value &&
+              value.length <= 200 &&
+              Array.from(value).every((c) => c.charCodeAt(0) >= 32 && c.charCodeAt(0) !== 127)
+              ? [{ name, value }]
+              : [];
+          }),
+          pid: element.getAttribute('pid') ?? element.closest('[pid]')?.getAttribute('pid') ?? '',
+          href: anchor?.href ?? '',
+          label: (element.getAttribute('aria-label') ?? element.textContent ?? '')
+            .trim()
+            .slice(0, 200),
+          position,
+        };
+      }),
+    sourceAttributeNames(config.source.xpath),
   );
   const seen = new Set<string>(),
     targets: Target[] = [];
@@ -126,9 +145,23 @@ async function discover(page: Page, config: TestConfiguration): Promise<Target[]
     });
   }
   if (targets.length > config.download.maxTargets) throw new DownloadError('TARGET_LIMIT');
+  const descriptions = describeSourceElements(
+    targets as (Target & { tag: string; attributes: { name: string; value: string }[] })[],
+  );
+  targets.forEach((target, i) => (target.sourceElement = descriptions[i]));
   return targets;
 }
 async function locate(page: Page, config: TestConfiguration, target: Target) {
+  if (target.sourceElement) {
+    const candidate = await locateSourceElement(page, config.source.xpath, target.sourceElement);
+    if (target.href) {
+      const href = await candidate.evaluate(
+        (e) => (e instanceof HTMLAnchorElement ? e : e.querySelector('a'))?.href ?? '',
+      );
+      if (normalizeUrl(href) !== target.href) throw new DownloadError('TARGET_CHANGED');
+    }
+    return candidate;
+  }
   const matches = page.locator('xpath=' + config.source.xpath);
   const length = await matches.count();
   for (let i = 0; i < length; i++) {
@@ -203,7 +236,36 @@ async function capture(
   const end = Date.now() + config.download.timeoutMs;
   try {
     beforeAction();
-    const element = await locate(source, config, target);
+    let element: Locator;
+    try {
+      element = await locate(source, config, target);
+    } catch (error) {
+      if (
+        target.sourceElement &&
+        error instanceof DownloadError &&
+        ['TARGET_MISSING', 'TARGET_NOT_VISIBLE', 'TARGET_NOT_UNIQUE', 'TARGET_CHANGED'].includes(
+          error.code,
+        )
+      )
+        await emit({
+          type: 'ELEMENT_OBSERVATION',
+          taskId: target.taskId,
+          payload: {
+            phase: 'ISSUE',
+            scope: 'CLICK',
+            reason: (
+              {
+                TARGET_MISSING: 'NOT_FOUND',
+                TARGET_NOT_VISIBLE: 'NOT_VISIBLE',
+                TARGET_NOT_UNIQUE: 'NOT_UNIQUE',
+                TARGET_CHANGED: 'CHANGED',
+              } as Record<string, string>
+            )[error.code],
+            element: target.sourceElement,
+          },
+        });
+      throw error;
+    }
     await log('下载入口：准备操作网站图标');
     beforeAction();
     try {
@@ -213,7 +275,24 @@ async function capture(
       });
     } catch {
       signal.throwIfAborted();
-      if (!result) throw new DownloadError('DOWNLOAD_SOURCE_UNCONFIRMED');
+      if (!result) {
+        if (target.sourceElement) {
+          const count = await element.count().catch(() => -1),
+            visible = count > 0 ? await element.isVisible().catch(() => false) : false;
+          if (count === 0 || !visible)
+            await emit({
+              type: 'ELEMENT_OBSERVATION',
+              taskId: target.taskId,
+              payload: {
+                phase: 'ISSUE',
+                scope: 'CLICK',
+                reason: count === 0 ? 'NOT_FOUND' : 'NOT_VISIBLE',
+                element: target.sourceElement,
+              },
+            });
+        }
+        throw new DownloadError('DOWNLOAD_SOURCE_UNCONFIRMED');
+      }
     }
     await pause(150, signal);
     while (!result && Date.now() < end) {
@@ -523,10 +602,35 @@ export async function runDownload(
       } catch (error) {
         if (signal.aborted) throw error;
         if (error instanceof DownloadError && error.code === 'TARGET_LIMIT') throw error;
-        if (attempt === 1)
+        if (attempt === 1) {
+          await checkConfiguredSourceElements(
+            source,
+            config.source.elementChecks ?? [],
+            signal,
+            emit,
+            beforeAction,
+            true,
+          );
+          await emit({
+            type: 'ELEMENT_OBSERVATION',
+            payload: { phase: 'ISSUE', scope: 'DISCOVERY', reason: 'READ_FAILED' },
+          });
           throw new DownloadError(egress.wasBlocked() ? 'NETWORK_BLOCKED' : 'DISCOVERY_FAILED');
+        }
       }
     }
+    await checkConfiguredSourceElements(
+      source,
+      config.source.elementChecks ?? [],
+      signal,
+      emit,
+      beforeAction,
+    );
+    if (!targets!.length)
+      await emit({
+        type: 'ELEMENT_OBSERVATION',
+        payload: { phase: 'ISSUE', scope: 'DISCOVERY', reason: 'NO_MATCHES' },
+      });
     if (!targets!.length)
       await emit({
         type: 'TARGETS_DISCOVERED',

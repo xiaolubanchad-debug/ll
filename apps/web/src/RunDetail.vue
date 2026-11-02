@@ -5,9 +5,25 @@ import { api, mutation } from './api';
 import { route, href, navigate } from './navigation';
 import { categoryLabels, stateLabels, when, runStateLabel } from './console-format';
 import { purposeLabels, reasonLabels } from './result-labels';
+import { sourceElementXPath, sourceElementLabel } from '@apk/contracts';
 import TimelineViewer from './TimelineViewer.vue';
 import TaskEvidence from './TaskEvidence.vue';
 const props = defineProps<{ runId: string }>();
+const checkStateLabels: Record<string, string> = {
+  FOUND: '已找到',
+  NOT_FOUND: '未找到，请核对配置',
+  READ_FAILED: '页面或 XPath 未能读取',
+  PENDING: '等待检查',
+};
+const elementReasons: Record<string, string> = {
+  NOT_FOUND: '未找到对应元素',
+  NOT_VISIBLE: '元素存在但不可见',
+  NOT_UNIQUE: '找到多个候选，无法确认目标',
+  CHANGED: '点击目标已变化',
+  NO_MATCHES: 'XPath 未匹配任何元素',
+  READ_FAILED: '网页或定位规则未能读取，无法判断是否缺失',
+  COUNT_DECREASED: '匹配元素数量减少，请核对配置',
+};
 interface TaskRow {
   id: string;
   position: number;
@@ -208,6 +224,83 @@ onUnmounted(() => {
       <p v-if="summary.run.errorCode" class="result-explanation">
         {{ reasonLabels[summary.run.errorCode] ?? summary.run.errorCode }}
       </p>
+      <section
+        v-if="summary.sourceElements"
+        :class="[
+          'source-element-check',
+          summary.sourceElements.totalIssues ? 'source-element-warning' : '',
+        ]"
+        aria-label="XPath 元素检查"
+      >
+        <strong
+          >每日元素检查：{{ summary.sourceElements.checks.length }} 个配置项 ·
+          {{ summary.sourceElements.totalIssues }} 条提醒</strong
+        >
+        <p class="muted">
+          按本批次保存的人工规则检查。未找到或无法读取会提醒，系统不会自动修改你的配置。
+        </p>
+        <p v-if="!summary.sourceElements.checks.length" class="muted">
+          本批次未配置人工检查项；下方仍会记录实际点击时的定位问题。
+        </p>
+        <table v-if="summary.sourceElements.checks.length" class="console-table">
+          <thead>
+            <tr>
+              <th>检查项目</th>
+              <th>结果</th>
+              <th>匹配数量</th>
+              <th>时间</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="check in summary.sourceElements.checks" :key="check.id">
+              <td>
+                {{ check.label }}
+                <details>
+                  <summary>定位 XPath</summary>
+                  <pre>{{ check.xpath }}</pre>
+                </details>
+              </td>
+              <td>{{ checkStateLabels[check.status] }}</td>
+              <td>{{ check.status === 'PENDING' ? '—' : check.matchedCount }}</td>
+              <td>{{ when(check.occurredAt) }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <details>
+          <summary>本次下载使用的 XPath</summary>
+          <pre>{{ summary.sourceElements.xpath }}</pre>
+        </details>
+        <article v-for="(issue, index) in summary.sourceElements.issues" :key="index">
+          <p>
+            <strong>{{ elementReasons[issue.reason] ?? issue.reason }}</strong> ·
+            {{ when(issue.occurredAt) }} · {{ issue.scope === 'CLICK' ? '点击时' : '来源页检查' }}
+          </p>
+          <p v-if="issue.element">
+            {{ sourceElementLabel(issue.element)
+            }}<span v-if="issue.element.label"> · {{ issue.element.label }}</span>
+          </p>
+          <details>
+            <summary>查看本条定位 XPath</summary>
+            <pre>{{
+              issue.element
+                ? sourceElementXPath(summary.sourceElements.xpath, issue.element)
+                : summary.sourceElements.xpath
+            }}</pre>
+          </details>
+        </article>
+        <p
+          v-if="
+            summary.sourceElements.totalIssues >
+            summary.sourceElements.issues.length +
+              summary.sourceElements.checks.filter((c) =>
+                ['NOT_FOUND', 'READ_FAILED'].includes(c.status),
+              ).length
+          "
+          class="muted"
+        >
+          更多点击问题可在执行日志中查看。
+        </p>
+      </section>
       <p v-if="summary.executionKind === 'APP_OPEN'" class="muted">
         最多同时 {{ summary.concurrency ?? 1 }} {{ summary.deviceSessions ? '台设备' : '轮' }}，APP
         完成目标和尝试上限由所有路共享。

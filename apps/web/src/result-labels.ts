@@ -15,6 +15,10 @@ export const dailyLabels: Record<string, string> = {
 };
 export const reasonLabels: Record<string, string> = {
   TARGET_LIMIT: '匹配的下载入口数量超过上限，请检查 XPath 或每日下载入口上限',
+  TARGET_MISSING: '点击时未找到目标元素，请查看 XPath 检查记录',
+  TARGET_NOT_VISIBLE: '点击时目标元素不可见，请查看 XPath 检查记录',
+  TARGET_NOT_UNIQUE: '点击时找到多个候选元素，请核对 XPath',
+  TARGET_CHANGED: '点击目标已变化，请核对 XPath',
   APK_POOL_INSUFFICIENT: '兼容且包名不同的 APP 数量不足，请降低每台安装数量或更新下载',
   DEVICE_SESSION_PLAN_INVALID: '设备执行计划不一致，已停止执行',
   IDENTITY_IMAGE_INVALID: '设备系统镜像校验未通过',

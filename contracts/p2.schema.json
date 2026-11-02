@@ -334,6 +334,756 @@
           }
         }
       ]
+    },
+    "SourceElement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "position",
+        "tag",
+        "scope",
+        "attributes",
+        "label"
+      ],
+      "properties": {
+        "key": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "position": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100000
+        },
+        "tag": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+        },
+        "scope": {
+          "enum": [
+            "ATTRIBUTE",
+            "POSITION"
+          ]
+        },
+        "attributes": {
+          "type": "array",
+          "maxItems": 3,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "value"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]{0,63}$"
+              },
+              "value": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            }
+          }
+        },
+        "label": {
+          "type": "string",
+          "maxLength": 200
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "scope": {
+                "const": "ATTRIBUTE"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "attributes": {
+                "type": "array",
+                "minItems": 1
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "attributes": {
+                "type": "array",
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "SourceElementCheck": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "label",
+            "kind",
+            "attribute",
+            "value"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "kind": {
+              "const": "ATTRIBUTE"
+            },
+            "attribute": {
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]{0,63}$"
+            },
+            "value": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "label",
+            "kind",
+            "tag"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "kind": {
+              "const": "TAG"
+            },
+            "tag": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "label",
+            "kind",
+            "xpath"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "kind": {
+              "const": "XPATH"
+            },
+            "xpath": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 12000
+            }
+          }
+        }
+      ]
+    },
+    "SourceElementIssue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scope",
+        "reason"
+      ],
+      "properties": {
+        "scope": {
+          "enum": [
+            "DISCOVERY",
+            "CLICK"
+          ]
+        },
+        "reason": {
+          "enum": [
+            "NOT_FOUND",
+            "NOT_VISIBLE",
+            "NOT_UNIQUE",
+            "CHANGED",
+            "NO_MATCHES",
+            "READ_FAILED"
+          ]
+        },
+        "element": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "position",
+            "tag",
+            "scope",
+            "attributes",
+            "label"
+          ],
+          "properties": {
+            "key": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "position": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000
+            },
+            "tag": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+            },
+            "scope": {
+              "enum": [
+                "ATTRIBUTE",
+                "POSITION"
+              ]
+            },
+            "attributes": {
+              "type": "array",
+              "maxItems": 3,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name",
+                  "value"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]{0,63}$"
+                  },
+                  "value": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                }
+              }
+            },
+            "label": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "scope": {
+                    "const": "ATTRIBUTE"
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "attributes": {
+                    "type": "array",
+                    "minItems": 1
+                  }
+                }
+              },
+              "else": {
+                "properties": {
+                  "attributes": {
+                    "type": "array",
+                    "maxItems": 0
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "scope": {
+                "const": "CLICK"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "element"
+            ],
+            "properties": {
+              "reason": {
+                "enum": [
+                  "NOT_FOUND",
+                  "NOT_VISIBLE",
+                  "NOT_UNIQUE",
+                  "CHANGED"
+                ]
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "reason": {
+                "enum": [
+                  "NO_MATCHES",
+                  "READ_FAILED"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "SourceElementObservation": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "phase",
+            "ruleId",
+            "status",
+            "matchedCount"
+          ],
+          "properties": {
+            "phase": {
+              "const": "CHECK"
+            },
+            "ruleId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "status": {
+              "enum": [
+                "FOUND",
+                "NOT_FOUND",
+                "READ_FAILED"
+              ]
+            },
+            "matchedCount": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2147483647
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "scope",
+            "reason",
+            "phase"
+          ],
+          "properties": {
+            "scope": {
+              "enum": [
+                "DISCOVERY",
+                "CLICK"
+              ]
+            },
+            "reason": {
+              "enum": [
+                "NOT_FOUND",
+                "NOT_VISIBLE",
+                "NOT_UNIQUE",
+                "CHANGED",
+                "NO_MATCHES",
+                "READ_FAILED"
+              ]
+            },
+            "element": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "key",
+                "position",
+                "tag",
+                "scope",
+                "attributes",
+                "label"
+              ],
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "position": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100000
+                },
+                "tag": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                },
+                "scope": {
+                  "enum": [
+                    "ATTRIBUTE",
+                    "POSITION"
+                  ]
+                },
+                "attributes": {
+                  "type": "array",
+                  "maxItems": 3,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "name",
+                      "value"
+                    ],
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]{0,63}$"
+                      },
+                      "value": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200
+                      }
+                    }
+                  }
+                },
+                "label": {
+                  "type": "string",
+                  "maxLength": 200
+                }
+              },
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "scope": {
+                        "const": "ATTRIBUTE"
+                      }
+                    }
+                  },
+                  "then": {
+                    "properties": {
+                      "attributes": {
+                        "type": "array",
+                        "minItems": 1
+                      }
+                    }
+                  },
+                  "else": {
+                    "properties": {
+                      "attributes": {
+                        "type": "array",
+                        "maxItems": 0
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            "phase": {
+              "const": "ISSUE"
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "scope": {
+                    "const": "CLICK"
+                  }
+                }
+              },
+              "then": {
+                "required": [
+                  "element"
+                ],
+                "properties": {
+                  "reason": {
+                    "enum": [
+                      "NOT_FOUND",
+                      "NOT_VISIBLE",
+                      "NOT_UNIQUE",
+                      "CHANGED"
+                    ]
+                  }
+                }
+              },
+              "else": {
+                "properties": {
+                  "reason": {
+                    "enum": [
+                      "NO_MATCHES",
+                      "READ_FAILED"
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "SourceElementSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "xpath",
+        "checks",
+        "totalIssues",
+        "issues"
+      ],
+      "properties": {
+        "xpath": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 12000
+        },
+        "checks": {
+          "type": "array",
+          "maxItems": 1000,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "label",
+              "xpath",
+              "status",
+              "matchedCount",
+              "occurredAt"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "xpath": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 12000
+              },
+              "status": {
+                "enum": [
+                  "PENDING",
+                  "FOUND",
+                  "NOT_FOUND",
+                  "READ_FAILED"
+                ]
+              },
+              "matchedCount": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2147483647
+              },
+              "occurredAt": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              }
+            }
+          }
+        },
+        "totalIssues": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "issues": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "scope",
+              "reason",
+              "occurredAt"
+            ],
+            "properties": {
+              "scope": {
+                "enum": [
+                  "DISCOVERY",
+                  "CLICK"
+                ]
+              },
+              "reason": {
+                "enum": [
+                  "NOT_FOUND",
+                  "NOT_VISIBLE",
+                  "NOT_UNIQUE",
+                  "CHANGED",
+                  "NO_MATCHES",
+                  "READ_FAILED"
+                ]
+              },
+              "element": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "key",
+                  "position",
+                  "tag",
+                  "scope",
+                  "attributes",
+                  "label"
+                ],
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "position": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100000
+                  },
+                  "tag": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                  },
+                  "scope": {
+                    "enum": [
+                      "ATTRIBUTE",
+                      "POSITION"
+                    ]
+                  },
+                  "attributes": {
+                    "type": "array",
+                    "maxItems": 3,
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "name",
+                        "value"
+                      ],
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z_][A-Za-z0-9_.:-]{0,63}$"
+                        },
+                        "value": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        }
+                      }
+                    }
+                  },
+                  "label": {
+                    "type": "string",
+                    "maxLength": 200
+                  }
+                },
+                "allOf": [
+                  {
+                    "if": {
+                      "properties": {
+                        "scope": {
+                          "const": "ATTRIBUTE"
+                        }
+                      }
+                    },
+                    "then": {
+                      "properties": {
+                        "attributes": {
+                          "type": "array",
+                          "minItems": 1
+                        }
+                      }
+                    },
+                    "else": {
+                      "properties": {
+                        "attributes": {
+                          "type": "array",
+                          "maxItems": 0
+                        }
+                      }
+                    }
+                  }
+                ]
+              },
+              "occurredAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "scope": {
+                      "const": "CLICK"
+                    }
+                  }
+                },
+                "then": {
+                  "required": [
+                    "element"
+                  ],
+                  "properties": {
+                    "reason": {
+                      "enum": [
+                        "NOT_FOUND",
+                        "NOT_VISIBLE",
+                        "NOT_UNIQUE",
+                        "CHANGED"
+                      ]
+                    }
+                  }
+                },
+                "else": {
+                  "properties": {
+                    "reason": {
+                      "enum": [
+                        "NO_MATCHES",
+                        "READ_FAILED"
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
     }
   }
 }

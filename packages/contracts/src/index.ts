@@ -190,6 +190,11 @@ export function configurationIssues(value: unknown): Issue[] {
   const issues = schemaIssues('TestConfiguration', value);
   if (issues.length) return issues;
   const config = value as TestConfiguration;
+  if (
+    new Set((config.source.elementChecks ?? []).map((c) => c.id)).size !==
+    (config.source.elementChecks?.length ?? 0)
+  )
+    issues.push({ path: '/source/elementChecks', message: '检查项目编号不能重复' });
   if (!androidBrowserUa(config.source.browserUserAgent ?? ''))
     issues.push({
       path: '/source/browserUserAgent',
@@ -453,6 +458,7 @@ const knownAgentVersions: readonly string[] = [
   '0.15.0',
   '0.15.1',
   '0.16.0',
+  '0.17.0',
 ];
 function knownAgentAtLeast(version: string | null | undefined, minimum: string): boolean {
   const index = knownAgentVersions.indexOf(version ?? '');
@@ -508,3 +514,24 @@ export function apkFileAssetsSupported(
 ) {
   return knownAgentAtLeast(version, '0.16.0') && features?.includes('APK_FILE_ASSETS_V1') === true;
 }
+export function xpathObservationSupported(
+  features: readonly string[] | undefined,
+  version: string | null | undefined,
+) {
+  return (
+    knownAgentAtLeast(version, '0.17.0') && features?.includes('XPATH_OBSERVATION_V1') === true
+  );
+}
+export type {
+  SourceElement,
+  SourceElementCheck,
+  SourceElementIssue,
+  SourceElementObservation,
+  SourceElementSummary,
+} from './generated/types.js';
+export {
+  sourceElementXPath,
+  sourceElementLabel,
+  sourceCheckXPath,
+  xpathString,
+} from './source-elements.js';

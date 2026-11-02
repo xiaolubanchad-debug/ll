@@ -152,6 +152,10 @@ onUnmounted(() => {
           >
         </p>
         <strong>{{ event.title }}</strong>
+        <details v-if="event.locator">
+          <summary>查看本条定位 XPath</summary>
+          <pre class="source-check-xpath">{{ event.locator }}</pre>
+        </details>
         <p v-if="event.errorCode" class="muted">
           {{ reasonLabels[event.errorCode] ?? event.errorCode }}
         </p>

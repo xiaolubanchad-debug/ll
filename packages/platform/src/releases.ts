@@ -15,16 +15,18 @@ export function releasePayload(manifest: ReleaseInput) {
 }
 export function validManifest(body: unknown): ReleaseInput {
   const m = checked<ReleaseInput>('ReleaseInput', body);
-  if (m.features?.includes('APK_FILE_ASSETS_V1') && m.agentVersion !== '0.16.0')
+  if (m.features?.includes('XPATH_OBSERVATION_V1') && m.agentVersion !== '0.17.0')
+    fault('RELEASE_INVALID', 'XPath 检查需要 Agent 0.17.0', 422);
+  if (m.features?.includes('APK_FILE_ASSETS_V1') && !['0.16.0', '0.17.0'].includes(m.agentVersion))
     fault('RELEASE_INVALID', '文件资产需要 Agent 0.16.0', 422);
   if (
     m.features?.includes('APK_METADATA_ONLY_V1') &&
-    !['0.15.1', '0.16.0'].includes(m.agentVersion)
+    !['0.15.1', '0.16.0', '0.17.0'].includes(m.agentVersion)
   )
     fault('RELEASE_INVALID', '安装判定模式需要 Agent 0.15.1', 422);
   if (m.features?.includes('INCREMENTAL_DEPLOY_V1')) {
     if (
-      !['0.15.0', '0.15.1', '0.16.0'].includes(m.agentVersion) ||
+      !['0.15.0', '0.15.1', '0.16.0', '0.17.0'].includes(m.agentVersion) ||
       !m.environment ||
       !m.features.includes('DEVICE_SESSIONS_V1') ||
       m.environment.fingerprint !==
@@ -40,7 +42,7 @@ export function validManifest(body: unknown): ReleaseInput {
   } else if (m.environment) fault('RELEASE_INVALID', '环境摘要需要增量发布能力', 422);
   if (
     m.features?.includes('EXECUTION_CAPACITY_V1') &&
-    (!['0.14.0', '0.14.1', '0.15.0', '0.15.1', '0.16.0'].includes(m.agentVersion) ||
+    (!['0.14.0', '0.14.1', '0.15.0', '0.15.1', '0.16.0', '0.17.0'].includes(m.agentVersion) ||
       !m.features.includes('DEVICE_SESSIONS_V1'))
   )
     fault('RELEASE_INVALID', '容量扩展需要 Agent 0.14.0 和设备会话能力', 422);
@@ -56,6 +58,7 @@ export function validManifest(body: unknown): ReleaseInput {
       '0.15.0',
       '0.15.1',
       '0.16.0',
+      '0.17.0',
     ].includes(m.agentVersion) ||
       [
         'DEVICE_VARIANTS_V1',

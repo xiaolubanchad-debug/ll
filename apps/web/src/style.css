@@ -486,6 +486,45 @@ button:focus-visible {
     padding-left: 18px;
   }
 }
+.source-element-check {
+  padding: 16px;
+  margin: 16px 0;
+  border: 1px solid #d9e2e7;
+  border-radius: 10px;
+  background: #f8fbfc;
+}
+.source-element-warning {
+  border-color: #dca847;
+  background: #fff8e8;
+}
+.source-element-check article {
+  padding: 10px 0;
+  border-top: 1px solid #d9e2e7;
+}
+.source-element-check pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.source-check-editor {
+  margin: 18px 0;
+  padding: 16px;
+  border: 1px solid #d9e2e7;
+  border-radius: 10px;
+}
+.source-check-row {
+  padding: 12px 0;
+  border-top: 1px solid #d9e2e7;
+}
+.source-check-row small {
+  display: block;
+  overflow-wrap: anywhere;
+  margin: 8px 0;
+}
+.source-check-xpath {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 .validation-result.validation-error {
   color: #b94a40;
 }

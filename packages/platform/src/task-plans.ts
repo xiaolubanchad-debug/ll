@@ -18,6 +18,7 @@ import {
   appReadinessSupported,
   appOpenSupported,
   parallelAppOpenSupported,
+  xpathObservationSupported,
 } from '@apk/contracts';
 import { checked } from './secrets.js';
 import { configBody, configSecrets } from './configurations.js';
@@ -30,6 +31,7 @@ import { dailyOpenUsage } from './open-budget.js';
 import { manualAssetsForRun, assertNoPendingManualApks } from './manual-apks.js';
 import { beijingDay, validateBudget } from './daily-plan.js';
 import { createRun, stopRun, requestRunStop, downloadRetryParent, RUN_END } from './runs.js';
+import { taskSourceWarning } from './source-elements.js';
 type Tx = Prisma.TransactionClient;
 const closed = ['DONE', 'FAILED', 'STOPPED'];
 const cycleInclude = { runs: { orderBy: { createdAt: 'asc' as const } } };
@@ -105,6 +107,18 @@ async function readiness(db: PrismaClient, p: PlanRow) {
     add('LEGACY_PLAN_ENABLED', '此服务器的旧每日计划仍开启，请先关闭', 'runs');
   if (await db.managedTask.count({ where: { id: { not: p.id }, nodeId: p.nodeId, enabled: true } }))
     add('NODE_BUSY', '此服务器已有其他开启的任务', 'tasks');
+  if (c.source.elementChecks?.length) {
+    const sourceRelease = node.agentReleaseId
+      ? await db.release.findUnique({ where: { id: node.agentReleaseId } })
+      : null;
+    if (
+      !xpathObservationSupported(
+        (sourceRelease?.manifest as { features?: string[] } | null)?.features,
+        node.agentVersion,
+      )
+    )
+      add('NODE_UPGRADE_REQUIRED', '人工元素检查需要 Agent 0.17.0', 'nodes');
+  }
   if (c.execution.mode === 'FULL') {
     const release = node.agentReleaseId
       ? await db.release.findUnique({ where: { id: node.agentReleaseId } })
@@ -192,7 +206,9 @@ async function view(db: PrismaClient, p: PlanRow): Promise<TaskPlanView> {
   let next = new Date(day + 'T' + p.time + ':00+08:00');
   if (next <= now || p.cycles.some((c) => c.day === day))
     next = new Date(next.getTime() + 86400000);
+  const sourceWarning = await taskSourceWarning(db, p.cycles[0]?.downloadRunId);
   return checkedOutput('TaskPlanView', {
+    ...(sourceWarning ? { sourceWarning } : {}),
     id: p.id,
     executionKind: (p.currentVersion.body as unknown as TestConfiguration).execution.appOpen
       ? 'APP_OPEN'

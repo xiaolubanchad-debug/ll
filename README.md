@@ -1,5 +1,7 @@
 # APK 自动化测试部署中台
 
+1.21 人工元素检查配置、定位记录和中台提醒遵循 [检查契约](docs/V121_XPATH_OBSERVATION_CONTRACT.md)，对应 Agent 0.17.0。
+
 1.20 文件名资产、安装后包名发现和停止清理自动回收遵循 [新契约](docs/V120_FILE_ASSETS_AND_STOP_CONTRACT.md)，对应 Agent 0.16.0。
 
 1.19.1 按最新要求取消 APK 内容预校验，保留必要包信息读取及传输确认，见 [安装判定契约](docs/V1191_METADATA_ONLY_CONTRACT.md)。

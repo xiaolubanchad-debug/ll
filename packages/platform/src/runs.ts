@@ -22,6 +22,7 @@ import {
   appReadinessSupported,
   appOpenSupported,
   parallelAppOpenSupported,
+  xpathObservationSupported,
 } from '@apk/contracts';
 import { readFunctionalArtifact } from './functional-artifacts.js';
 import { checked, readSecret } from './secrets.js';
@@ -35,6 +36,8 @@ import { beijingDay, prepareDailyPlan, dailyTargetKey } from './daily-plan.js';
 import type { DailyExecutionPlan } from '@apk/contracts';
 import { lockLibrary } from './library-lock.js';
 import { executionCapacitySupported, openPolicyIssues } from '@apk/contracts';
+import { sourceAttributeNames } from '@apk/automation';
+import type { SourceElementObservation } from '@apk/contracts';
 import { dailyOpenUsage, openAdmissionDeadline } from './open-budget.js';
 type Tx = P.TransactionClient;
 export const ACTIVE_RUNS = ['ASSIGNED', 'RUNNING', 'STOP_REQUESTED'] as const;
@@ -286,6 +289,11 @@ export async function createRun(
     )
       fault('NODE_UPGRADE_REQUIRED', '请部署支持下载任务的 Agent 版本');
     const configuration = config.body as unknown as TestConfiguration;
+    if (
+      configuration.source.elementChecks?.length &&
+      !xpathObservationSupported(manifest?.features, node.agentVersion)
+    )
+      fault('NODE_UPGRADE_REQUIRED', '人工元素检查需要 Agent 0.17.0');
     if (
       configuration.execution.autoRegistration?.startup &&
       !appReadinessSupported(manifest?.features, node.agentVersion)
@@ -732,6 +740,56 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
   const plan = run.executionPlan as unknown as DailyExecutionPlan | null;
   const p = event.payload as Record<string, unknown>;
   const assignments = deviceAssignments(plan);
+  if (event.type === 'ELEMENT_OBSERVATION') {
+    if (run.purpose === 'REGISTER' || run.purpose === 'PROXY_CHECK')
+      fault('EVENT_CONFLICT', '来源元素检查只能属于网页下载阶段');
+    const observation = p as unknown as SourceElementObservation;
+    if (observation.phase === 'CHECK') {
+      const rule = config.source.elementChecks?.find((c) => c.id === observation.ruleId);
+      if (
+        !rule ||
+        event.taskId ||
+        run.discovered ||
+        (observation.status === 'FOUND') !== observation.matchedCount > 0
+      )
+        fault('EVENT_CONFLICT', '人工检查结果与配置不一致');
+      const previous = await tx.runEvent.count({
+        where: {
+          delivery: { runId },
+          sequence: { lt: event.sequence },
+          recordedForReview: false,
+          AND: [
+            { body: { path: ['type'], equals: 'ELEMENT_OBSERVATION' } },
+            { body: { path: ['payload', 'phase'], equals: 'CHECK' } },
+            { body: { path: ['payload', 'ruleId'], equals: observation.ruleId } },
+          ],
+        },
+      });
+      if (previous) fault('EVENT_CONFLICT', '人工检查项目不可重复登记');
+    } else if (observation.scope === 'CLICK') {
+      const task = event.taskId ? await tx.task.findUnique({ where: { id: event.taskId } }) : null;
+      const e = observation.element!;
+      const allowed = sourceAttributeNames(config.source.xpath);
+      if (
+        !task ||
+        task.runId !== runId ||
+        task.status !== 'DOWNLOADING' ||
+        task.label !== e.label ||
+        e.attributes.some((a) => !allowed.includes(a.name)) ||
+        new Set(e.attributes.map((a) => a.name)).size !== e.attributes.length ||
+        e.key !==
+          digest(
+            canonical(
+              e.scope === 'ATTRIBUTE'
+                ? { attributes: e.attributes }
+                : { position: e.position, tag: e.tag },
+            ),
+          )
+      )
+        fault('EVENT_CONFLICT', '点击定位记录与当前入口不一致');
+    } else if (event.taskId || run.discovered) fault('EVENT_CONFLICT', '来源页检查阶段不一致');
+    return;
+  }
   const sessionEvents = async () => {
     const rows = await tx.runEvent.findMany({
       where: {
@@ -1637,6 +1695,7 @@ export async function runEvents(db: PrismaClient, token: string, body: unknown) 
             'BROWSER_ENVIRONMENT',
             'APP_OBSTRUCTION',
             'DEVICE_SESSION',
+            'ELEMENT_OBSERVATION',
             'LOG',
           ].includes(event.type)
         )

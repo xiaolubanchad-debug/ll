@@ -213,6 +213,30 @@ export interface APKTestConfigurationVersion10 {
     url: string;
     xpath: string;
     browserUserAgent: string;
+    /**
+     * @maxItems 1000
+     */
+    elementChecks?: (
+      | {
+          id: string;
+          label: string;
+          kind: 'ATTRIBUTE';
+          attribute: string;
+          value: string;
+        }
+      | {
+          id: string;
+          label: string;
+          kind: 'TAG';
+          tag: string;
+        }
+      | {
+          id: string;
+          label: string;
+          kind: 'XPATH';
+          xpath: string;
+        }
+    )[];
   };
   download: {
     cacheTimezone: 'Asia/Shanghai';
@@ -386,6 +410,11 @@ export interface TaskPlanView {
     used: number;
     remaining: number;
   };
+  sourceWarning?: {
+    runId: string;
+    day: string;
+    count: number;
+  };
 }
 
 export interface TaskPlanDetail {
@@ -436,6 +465,11 @@ export interface TaskPlanDetail {
       used: number;
       remaining: number;
     };
+    sourceWarning?: {
+      runId: string;
+      day: string;
+      count: number;
+    };
   };
   configuration: APKTestConfigurationVersion10;
   cycles: {
@@ -465,6 +499,30 @@ export interface APKTestConfigurationVersion10 {
     url: string;
     xpath: string;
     browserUserAgent: string;
+    /**
+     * @maxItems 1000
+     */
+    elementChecks?: (
+      | {
+          id: string;
+          label: string;
+          kind: 'ATTRIBUTE';
+          attribute: string;
+          value: string;
+        }
+      | {
+          id: string;
+          label: string;
+          kind: 'TAG';
+          tag: string;
+        }
+      | {
+          id: string;
+          label: string;
+          kind: 'XPATH';
+          xpath: string;
+        }
+    )[];
   };
   download: {
     cacheTimezone: 'Asia/Shanghai';
@@ -614,6 +672,11 @@ export interface TaskPlanList {
       limit: number;
       used: number;
       remaining: number;
+    };
+    sourceWarning?: {
+      runId: string;
+      day: string;
+      count: number;
     };
   }[];
   nextCursor: string | null;
@@ -1026,6 +1089,43 @@ export interface RunSummaryView {
     failed: number;
     active: number;
   };
+  sourceElements?: {
+    xpath: string;
+    /**
+     * @maxItems 1000
+     */
+    checks: {
+      id: string;
+      label: string;
+      xpath: string;
+      status: 'PENDING' | 'FOUND' | 'NOT_FOUND' | 'READ_FAILED';
+      matchedCount: number;
+      occurredAt: string | null;
+    }[];
+    totalIssues: number;
+    /**
+     * @maxItems 20
+     */
+    issues: {
+      scope: 'DISCOVERY' | 'CLICK';
+      reason: 'NOT_FOUND' | 'NOT_VISIBLE' | 'NOT_UNIQUE' | 'CHANGED' | 'NO_MATCHES' | 'READ_FAILED';
+      element?: {
+        key: string;
+        position: number;
+        tag: string;
+        scope: 'ATTRIBUTE' | 'POSITION';
+        /**
+         * @maxItems 3
+         */
+        attributes: {
+          name: string;
+          value: string;
+        }[];
+        label: string;
+      };
+      occurredAt: string;
+    }[];
+  };
 }
 
 export interface TimelinePage {
@@ -1070,6 +1170,7 @@ export interface TimelinePage {
     deviceSessionId?: string;
     appIndex?: number;
     packageName?: string;
+    locator?: string;
   }[];
   hasEarlier: boolean;
   hasLater: boolean;
@@ -1196,6 +1297,30 @@ export interface TestConfiguration {
     url: string;
     xpath: string;
     browserUserAgent: string;
+    /**
+     * @maxItems 1000
+     */
+    elementChecks?: (
+      | {
+          id: string;
+          label: string;
+          kind: 'ATTRIBUTE';
+          attribute: string;
+          value: string;
+        }
+      | {
+          id: string;
+          label: string;
+          kind: 'TAG';
+          tag: string;
+        }
+      | {
+          id: string;
+          label: string;
+          kind: 'XPATH';
+          xpath: string;
+        }
+    )[];
   };
   download: {
     cacheTimezone: 'Asia/Shanghai';
@@ -1425,7 +1550,8 @@ export type AgentMessage =
           | 'PROXY_CHECKED'
           | 'BROWSER_ENVIRONMENT'
           | 'APP_OBSTRUCTION'
-          | 'DEVICE_SESSION';
+          | 'DEVICE_SESSION'
+          | 'ELEMENT_OBSERVATION';
         payload: {
           [k: string]: unknown;
         };
@@ -1556,6 +1682,7 @@ export interface ReleaseInput {
     | 'MANUAL_APK_IMPORT_V1'
     | 'APK_METADATA_ONLY_V1'
     | 'APK_FILE_ASSETS_V1'
+    | 'XPATH_OBSERVATION_V1'
   )[];
   environment?: {
     version: 1;
@@ -1781,6 +1908,126 @@ export interface ApkMetadata {
   minSdkVersion?: number;
   validationPolicy?: 'ANDROID_INSTALL' | 'FILE_NAME';
   fileName?: string;
+}
+
+export interface SourceElement {
+  key: string;
+  position: number;
+  tag: string;
+  scope: 'ATTRIBUTE' | 'POSITION';
+  /**
+   * @maxItems 3
+   */
+  attributes: {
+    name: string;
+    value: string;
+  }[];
+  label: string;
+}
+
+export type SourceElementCheck =
+  | {
+      id: string;
+      label: string;
+      kind: 'ATTRIBUTE';
+      attribute: string;
+      value: string;
+    }
+  | {
+      id: string;
+      label: string;
+      kind: 'TAG';
+      tag: string;
+    }
+  | {
+      id: string;
+      label: string;
+      kind: 'XPATH';
+      xpath: string;
+    };
+
+export interface SourceElementIssue {
+  scope: 'DISCOVERY' | 'CLICK';
+  reason: 'NOT_FOUND' | 'NOT_VISIBLE' | 'NOT_UNIQUE' | 'CHANGED' | 'NO_MATCHES' | 'READ_FAILED';
+  element?: {
+    key: string;
+    position: number;
+    tag: string;
+    scope: 'ATTRIBUTE' | 'POSITION';
+    /**
+     * @maxItems 3
+     */
+    attributes: {
+      name: string;
+      value: string;
+    }[];
+    label: string;
+  };
+}
+
+export type SourceElementObservation =
+  | {
+      phase: 'CHECK';
+      ruleId: string;
+      status: 'FOUND' | 'NOT_FOUND' | 'READ_FAILED';
+      matchedCount: number;
+    }
+  | {
+      scope: 'DISCOVERY' | 'CLICK';
+      reason: 'NOT_FOUND' | 'NOT_VISIBLE' | 'NOT_UNIQUE' | 'CHANGED' | 'NO_MATCHES' | 'READ_FAILED';
+      element?: {
+        key: string;
+        position: number;
+        tag: string;
+        scope: 'ATTRIBUTE' | 'POSITION';
+        /**
+         * @maxItems 3
+         */
+        attributes: {
+          name: string;
+          value: string;
+        }[];
+        label: string;
+      };
+      phase: 'ISSUE';
+    };
+
+export interface SourceElementSummary {
+  xpath: string;
+  /**
+   * @maxItems 1000
+   */
+  checks: {
+    id: string;
+    label: string;
+    xpath: string;
+    status: 'PENDING' | 'FOUND' | 'NOT_FOUND' | 'READ_FAILED';
+    matchedCount: number;
+    occurredAt: string | null;
+  }[];
+  totalIssues: number;
+  /**
+   * @maxItems 20
+   */
+  issues: {
+    scope: 'DISCOVERY' | 'CLICK';
+    reason: 'NOT_FOUND' | 'NOT_VISIBLE' | 'NOT_UNIQUE' | 'CHANGED' | 'NO_MATCHES' | 'READ_FAILED';
+    element?: {
+      key: string;
+      position: number;
+      tag: string;
+      scope: 'ATTRIBUTE' | 'POSITION';
+      /**
+       * @maxItems 3
+       */
+      attributes: {
+        name: string;
+        value: string;
+      }[];
+      label: string;
+    };
+    occurredAt: string;
+  }[];
 }
 
 export interface ArtifactInput {

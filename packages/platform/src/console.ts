@@ -1,4 +1,4 @@
-import { deviceAssignments } from '@apk/contracts';
+import { deviceAssignments, sourceCheckXPath, sourceElementXPath } from '@apk/contracts';
 import { Prisma } from '@prisma/client';
 import type { PrismaClient } from '@prisma/client';
 import type {
@@ -23,6 +23,7 @@ import { checked } from './secrets.js';
 import { fault } from './errors.js';
 import { canonical, digest } from './security.js';
 import { manualApkView, uploadEligibility } from './manual-apks.js';
+import { sourceElementSummary } from './source-elements.js';
 
 export const resultCategories: ResultCategory[] = [
   'SUCCESS',
@@ -643,6 +644,16 @@ export async function runSummary(db: PrismaClient, id: string): Promise<RunSumma
         packageName: apkView(task.apk)?.packageName ?? null,
       });
       return output('RunSummaryView', {
+        ...(row.purpose === 'DOWNLOAD' && c
+          ? {
+              sourceElements: await sourceElementSummary(
+                tx,
+                id,
+                c.source.xpath,
+                c.source.elementChecks ?? [],
+              ),
+            }
+          : {}),
         ...(deviceSessions ? { deviceSessions } : {}),
         concurrency: c?.execution.appOpen?.concurrency ?? 1,
         activeTasks: activeTasks.map(mapActive),
@@ -696,6 +707,27 @@ const stageTitles: Record<string, string> = {
   VERIFYING: '核验已提交的注册结果',
 };
 function title(type: string, p: Record<string, unknown>) {
+  if (type === 'ELEMENT_OBSERVATION')
+    return p.phase === 'CHECK'
+      ? (
+          {
+            FOUND: '人工元素检查：已找到',
+            NOT_FOUND: '人工元素检查：未找到，请核对配置',
+            READ_FAILED: '人工元素检查：页面或 XPath 未能读取',
+          } as Record<string, string>
+        )[String(p.status)]
+      : 'XPath 定位需要核对：' +
+          (
+            {
+              NOT_FOUND: '未找到对应元素',
+              NOT_VISIBLE: '元素不可见',
+              NOT_UNIQUE: '候选元素不唯一',
+              CHANGED: '点击目标发生变化',
+              NO_MATCHES: 'XPath 未匹配任何元素',
+              READ_FAILED: '网页或定位规则未能读取',
+              COUNT_DECREASED: '匹配元素数量减少',
+            } as Record<string, string>
+          )[String(p.reason)];
   if (type === 'DEVICE_SESSION')
     return (
       (p.phase === 'STARTED'
@@ -863,7 +895,7 @@ export async function runTimeline(
   ]);
   const run = await db.run.findUniqueOrThrow({
     where: { id },
-    select: { executionPlan: true },
+    select: { executionPlan: true, configVersion: { select: { body: true } } },
   });
   const assignments = deviceAssignments(
     run.executionPlan as unknown as import('@apk/contracts').DailyExecutionPlan,
@@ -885,7 +917,24 @@ export async function runTimeline(
         p = b.payload ?? {};
       const task = taskScope.find((t) => t.id === b.taskId),
         a = task ? assignments?.[task.position] : undefined;
+      const source = (run.configVersion?.body as unknown as TestConfiguration | undefined)?.source;
+      const configuredCheck =
+        b.type === 'ELEMENT_OBSERVATION' && p.phase === 'CHECK'
+          ? source?.elementChecks?.find((c) => c.id === p.ruleId)
+          : undefined;
+      const locator =
+        b.type === 'ELEMENT_OBSERVATION' && source
+          ? configuredCheck
+            ? sourceCheckXPath(configuredCheck)
+            : p.element
+              ? sourceElementXPath(
+                  source.xpath,
+                  p.element as import('@apk/contracts').SourceElement,
+                )
+              : source.xpath
+          : undefined;
       return {
+        ...(locator ? { locator } : {}),
         ...(typeof p.sessionId === 'string'
           ? { deviceSessionId: p.sessionId }
           : a

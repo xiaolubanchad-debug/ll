@@ -510,7 +510,8 @@
               "INCREMENTAL_DEPLOY_V1",
               "MANUAL_APK_IMPORT_V1",
               "APK_METADATA_ONLY_V1",
-              "APK_FILE_ASSETS_V1"
+              "APK_FILE_ASSETS_V1",
+              "XPATH_OBSERVATION_V1"
             ]
           }
         },
