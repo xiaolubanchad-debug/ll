@@ -57,10 +57,10 @@ test('1.5 old files are retained on failure and removed only after a complete ve
   assert.equal(events.at(-1).payload.status, 'SUCCEEDED');
   const old = await readdir(join(root, 'cache/files'));
   assert.equal(old.length, 3);
-  config.source = { ...config.source, url: site.url + '/invalid' };
+  config.source = { ...config.source, url: site.url + '/empty' };
   await run('2026-10-29');
   assert.equal(events.at(-1).payload.status, 'FAILED');
-  assert.equal(site.counts.get('/invalid.apk'), 1, 'daily downloads do not retry the source');
+  assert.equal(site.counts.get('/empty'), 1, 'daily downloads do not retry the source');
   assert.deepEqual(await readdir(join(root, 'cache/files')), old);
   config.source = { ...config.source, url: site.url + '/source' };
   await run('2026-10-29');
