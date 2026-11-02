@@ -14,7 +14,7 @@ export interface ManualApkView {
     | 'EXPIRED'
     | 'NEEDS_REVIEW';
   apk: {
-    packageName: string;
+    packageName?: string;
     versionName: string | null;
     versionCode: number | null;
     /**
@@ -25,7 +25,8 @@ export interface ManualApkView {
     apkSha256: string;
     cacheDay: string;
     minSdkVersion?: number;
-    validationPolicy?: 'ANDROID_INSTALL';
+    validationPolicy?: 'ANDROID_INSTALL' | 'FILE_NAME';
+    fileName?: string;
   } | null;
   errorCode: string | null;
   operationId: string | null;
@@ -40,7 +41,7 @@ export interface ManualApkImportInput {
   cacheDay: string;
   targetKey: string;
   apk: {
-    packageName: string;
+    packageName?: string;
     versionName: string | null;
     versionCode: number | null;
     /**
@@ -51,7 +52,8 @@ export interface ManualApkImportInput {
     apkSha256: string;
     cacheDay: string;
     minSdkVersion?: number;
-    validationPolicy?: 'ANDROID_INSTALL';
+    validationPolicy?: 'ANDROID_INSTALL' | 'FILE_NAME';
+    fileName?: string;
   };
   maxBytes: number;
 }
@@ -61,7 +63,7 @@ export interface ManualApkImportReceipt {
   status: 'CACHED';
   cacheKey: string;
   apk: {
-    packageName: string;
+    packageName?: string;
     versionName: string | null;
     versionCode: number | null;
     /**
@@ -72,7 +74,8 @@ export interface ManualApkImportReceipt {
     apkSha256: string;
     cacheDay: string;
     minSdkVersion?: number;
-    validationPolicy?: 'ANDROID_INSTALL';
+    validationPolicy?: 'ANDROID_INSTALL' | 'FILE_NAME';
+    fileName?: string;
   };
 }
 
@@ -726,6 +729,7 @@ export interface ConsoleRunListView {
     configVersion: number;
     cacheDay: string | null;
     executionKind?: 'APP_OPEN' | 'REGISTRATION' | 'DOWNLOAD_ONLY';
+    stopConfirmed?: boolean;
   }[];
   nextCursor: string | null;
 }
@@ -783,7 +787,7 @@ export interface RegistrationRecordView {
   finishedAt: string | null;
   elapsedMs: number | null;
   apk: {
-    packageName: string;
+    packageName?: string;
     versionName: string | null;
     versionCode: number | null;
     /**
@@ -794,11 +798,13 @@ export interface RegistrationRecordView {
     apkSha256: string;
     cacheDay: string;
     minSdkVersion?: number;
-    validationPolicy?: 'ANDROID_INSTALL';
+    validationPolicy?: 'ANDROID_INSTALL' | 'FILE_NAME';
+    fileName?: string;
   } | null;
   hasAccount: boolean;
   reviewOutcome: ('SUCCEEDED' | 'FAILED') | null;
   executionKind?: 'APP_OPEN' | 'REGISTRATION' | 'DOWNLOAD_ONLY';
+  stopConfirmed?: boolean;
 }
 
 export interface RegistrationListView {
@@ -822,7 +828,7 @@ export interface RegistrationListView {
     finishedAt: string | null;
     elapsedMs: number | null;
     apk: {
-      packageName: string;
+      packageName?: string;
       versionName: string | null;
       versionCode: number | null;
       /**
@@ -833,11 +839,13 @@ export interface RegistrationListView {
       apkSha256: string;
       cacheDay: string;
       minSdkVersion?: number;
-      validationPolicy?: 'ANDROID_INSTALL';
+      validationPolicy?: 'ANDROID_INSTALL' | 'FILE_NAME';
+      fileName?: string;
     } | null;
     hasAccount: boolean;
     reviewOutcome: ('SUCCEEDED' | 'FAILED') | null;
     executionKind?: 'APP_OPEN' | 'REGISTRATION' | 'DOWNLOAD_ONLY';
+    stopConfirmed?: boolean;
   }[];
   nextCursor: string | null;
 }
@@ -863,7 +871,7 @@ export interface RegistrationDetailView {
     finishedAt: string | null;
     elapsedMs: number | null;
     apk: {
-      packageName: string;
+      packageName?: string;
       versionName: string | null;
       versionCode: number | null;
       /**
@@ -874,11 +882,13 @@ export interface RegistrationDetailView {
       apkSha256: string;
       cacheDay: string;
       minSdkVersion?: number;
-      validationPolicy?: 'ANDROID_INSTALL';
+      validationPolicy?: 'ANDROID_INSTALL' | 'FILE_NAME';
+      fileName?: string;
     } | null;
     hasAccount: boolean;
     reviewOutcome: ('SUCCEEDED' | 'FAILED') | null;
     executionKind?: 'APP_OPEN' | 'REGISTRATION' | 'DOWNLOAD_ONLY';
+    stopConfirmed?: boolean;
   };
   observation: {
     model: string;
@@ -945,6 +955,7 @@ export interface OverviewView {
     attemptLimit: number;
     errorCode: string | null;
     executionKind?: 'APP_OPEN' | 'REGISTRATION' | 'DOWNLOAD_ONLY';
+    stopConfirmed?: boolean;
   }[];
   appOpens?: {
     completed: number;
@@ -971,6 +982,7 @@ export interface RunSummaryView {
     attemptLimit: number;
     errorCode: string | null;
     executionKind?: 'APP_OPEN' | 'REGISTRATION' | 'DOWNLOAD_ONLY';
+    stopConfirmed?: boolean;
   };
   nodeId: string;
   configVersion: number;
@@ -1078,7 +1090,7 @@ export interface AssetListView {
     errorCode: string | null;
     createdAt: string;
     apk: {
-      packageName: string;
+      packageName?: string;
       versionName: string | null;
       versionCode: number | null;
       /**
@@ -1089,7 +1101,8 @@ export interface AssetListView {
       apkSha256: string;
       cacheDay: string;
       minSdkVersion?: number;
-      validationPolicy?: 'ANDROID_INSTALL';
+      validationPolicy?: 'ANDROID_INSTALL' | 'FILE_NAME';
+      fileName?: string;
     } | null;
     cacheDay?: string;
     canUpload?: boolean;
@@ -1107,7 +1120,7 @@ export interface AssetListView {
         | 'EXPIRED'
         | 'NEEDS_REVIEW';
       apk: {
-        packageName: string;
+        packageName?: string;
         versionName: string | null;
         versionCode: number | null;
         /**
@@ -1118,7 +1131,8 @@ export interface AssetListView {
         apkSha256: string;
         cacheDay: string;
         minSdkVersion?: number;
-        validationPolicy?: 'ANDROID_INSTALL';
+        validationPolicy?: 'ANDROID_INSTALL' | 'FILE_NAME';
+        fileName?: string;
       } | null;
       errorCode: string | null;
       operationId: string | null;
@@ -1541,6 +1555,7 @@ export interface ReleaseInput {
     | 'INCREMENTAL_DEPLOY_V1'
     | 'MANUAL_APK_IMPORT_V1'
     | 'APK_METADATA_ONLY_V1'
+    | 'APK_FILE_ASSETS_V1'
   )[];
   environment?: {
     version: 1;
@@ -1741,6 +1756,7 @@ export interface AgentReconcileInput {
     }[];
   }[];
   cleanupComplete: boolean;
+  reason?: 'STARTUP' | 'EXECUTION_ERROR' | 'STOP_RECOVERY';
 }
 
 export interface DeliveryConfigInput {
@@ -1752,7 +1768,7 @@ export interface DeliveryConfigInput {
 }
 
 export interface ApkMetadata {
-  packageName: string;
+  packageName?: string;
   versionName: string | null;
   versionCode: number | null;
   /**
@@ -1763,7 +1779,8 @@ export interface ApkMetadata {
   apkSha256: string;
   cacheDay: string;
   minSdkVersion?: number;
-  validationPolicy?: 'ANDROID_INSTALL';
+  validationPolicy?: 'ANDROID_INSTALL' | 'FILE_NAME';
+  fileName?: string;
 }
 
 export interface ArtifactInput {
@@ -1848,7 +1865,7 @@ export interface DailyExecutionPlan {
     label: string;
     sourceUrl: string;
     apk: {
-      packageName: string;
+      packageName?: string;
       versionName: string | null;
       versionCode: number | null;
       /**
@@ -1859,7 +1876,8 @@ export interface DailyExecutionPlan {
       apkSha256: string;
       cacheDay: string;
       minSdkVersion?: number;
-      validationPolicy?: 'ANDROID_INSTALL';
+      validationPolicy?: 'ANDROID_INSTALL' | 'FILE_NAME';
+      fileName?: string;
     };
     entryId?: string;
   }[];
@@ -1891,6 +1909,7 @@ export interface DailyExecutionPlan {
       supportedAbis?: string[];
     }[];
     capacityVersion?: 1;
+    fileAssets?: true;
   };
 }
 

@@ -36,6 +36,15 @@ export async function registerApk(
   emit: (event: AutomationEvent) => Promise<void>,
   hooks: RegistrationHooks,
 ): Promise<RegistrationCompletion> {
+  if (!apk.packageName)
+    return {
+      status: 'SKIPPED',
+      proof: 'NONE',
+      artifactIds: [],
+      errorCode: 'FLOW_NOT_CONFIGURED',
+      cleanupComplete: true,
+    };
+  const packageName = apk.packageName;
   const template = registrationFlowFor(config, apk.packageName, target.entryId);
   const automatic = !template && config.execution.autoRegistration?.enabled === true;
   if (!template && !automatic)
@@ -64,7 +73,7 @@ export async function registerApk(
     flow.success.locator,
     flow.failure?.locator,
   ])
-    if (locator) locator.value = locator.value.replaceAll('{packageName}', apk.packageName);
+    if (locator) locator.value = locator.value.replaceAll('{packageName}', packageName);
   let session: AndroidSession | undefined,
     account: Account | undefined,
     submitted = false,

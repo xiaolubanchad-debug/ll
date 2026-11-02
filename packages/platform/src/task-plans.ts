@@ -453,7 +453,13 @@ export async function controlTaskPlan(
           data: { stopRequested: true, status: 'STOPPING' },
         });
         const pending = await tx.run.findMany({
-          where: { taskCycle: { taskId: id }, status: { notIn: RUN_END as Run['status'][] } },
+          where: {
+            taskCycle: { taskId: id },
+            OR: [
+              { status: { notIn: RUN_END as Run['status'][] } },
+              { status: 'NEEDS_REVIEW', reviewResolvedAt: null },
+            ],
+          },
           select: { id: true },
         });
         for (const run of pending) await requestRunStop(tx, run.id);

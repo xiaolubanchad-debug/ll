@@ -124,20 +124,16 @@ export async function runCachedAppOpens(
       taskId: target.taskId,
       payload: { stage: 'DOWNLOADING' },
     });
-    const found = await cache.get(
+    const found = await cache.asset(
       nodeId,
       plan.cacheDay,
       asset.targetKey,
+      asset.apk,
       config.download.maxApkBytes ?? 268435456,
       attemptSignal,
     );
     let completion: RegistrationCompletion;
-    if (
-      !found ||
-      found.apkSha256 !== asset.apk.apkSha256 ||
-      found.size !== asset.apk.size ||
-      found.packageName !== asset.apk.packageName
-    ) {
+    if (!found) {
       missing = true;
       completion = {
         status: 'FAILED',
@@ -153,13 +149,7 @@ export async function runCachedAppOpens(
         taskId: target.taskId,
         payload: { stage: 'DOWNLOADED', cacheHit: true, apk: asset.apk },
       });
-      completion = await execute(
-        target,
-        asset.apk,
-        cache.path(cache.key(nodeId, plan.cacheDay, asset.targetKey)),
-        index,
-        attemptSignal,
-      );
+      completion = await execute(target, asset.apk, found.file, index, attemptSignal);
     }
     if (!completion.cleanupComplete) {
       dirty = true;

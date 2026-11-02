@@ -619,7 +619,10 @@ export async function requestRunStop(tx: Tx, id: string) {
   await expireNodeRun(tx, previous.nodeId);
   const run = await tx.run.findUniqueOrThrow({ where: { id } });
   if (run.status === 'QUEUED') await closeRun(tx, run, 'CANCELLED');
-  else if (!RUN_END.includes(run.status))
+  else if (run.status === 'NEEDS_REVIEW' && !run.reviewResolvedAt) {
+    await tx.run.update({ where: { id }, data: { stopRequested: true } });
+    await resolveStoppedRun(tx, run.nodeId);
+  } else if (!RUN_END.includes(run.status))
     await tx.run.update({
       where: { id },
       data: { status: 'STOP_REQUESTED', stopRequested: true },
@@ -634,6 +637,71 @@ export async function requestRunStop(tx: Tx, id: string) {
           ? run.status
           : 'STOP_REQUESTED',
   };
+}
+// Caller holds the node row lock. Never infer cleanup from the STOP request itself.
+export async function resolveStoppedRun(tx: Tx, nodeId: string) {
+  const node = await tx.node.findUniqueOrThrow({
+    where: { id: nodeId },
+    include: { slot: true, agentCredential: true },
+  });
+  if (!node.slot?.runId || node.slot.operationId) return false;
+  const run = await tx.run.findUniqueOrThrow({
+    where: { id: node.slot.runId },
+    include: { delivery: true },
+  });
+  const plan = run.executionPlan as unknown as DailyExecutionPlan | null;
+  if (
+    run.status !== 'NEEDS_REVIEW' ||
+    !run.stopRequested ||
+    run.reviewResolvedAt ||
+    !(run.purpose === 'DOWNLOAD' || (run.purpose === 'REGISTER' && plan?.openPolicy)) ||
+    !run.delivery ||
+    node.slot.fence !== run.delivery.fence ||
+    !run.cleanupConfirmedAt ||
+    run.cleanupBootId !== node.agentCredential?.bootId ||
+    node.agentCredential?.revokedAt ||
+    !node.lastSeenAt ||
+    node.lastSeenAt <= run.cleanupConfirmedAt ||
+    Date.now() - node.lastSeenAt.getTime() > 45000 ||
+    node.currentDeliveryId
+  )
+    return false;
+  if (
+    await tx.task.count({
+      where: {
+        runId: run.id,
+        OR: [
+          { status: 'UNKNOWN' },
+          { submissionId: { not: null }, status: { notIn: ['SUCCEEDED', 'FAILED'] } },
+        ],
+      },
+    })
+  )
+    return false;
+  await tx.task.updateMany({
+    where: {
+      runId: run.id,
+      status: { notIn: ['SUCCEEDED', 'FAILED', 'SKIPPED', 'CANCELLED', 'UNKNOWN'] },
+    },
+    data: { status: 'CANCELLED', finishedAt: new Date() },
+  });
+  await tx.run.update({
+    where: { id: run.id },
+    data: {
+      reviewResolvedAt: new Date(),
+      reconciliationReason: '停止后自动确认：当前执行端清理完成且新的心跳空闲',
+    },
+  });
+  await tx.nodeSlot.update({ where: { nodeId }, data: { runId: null, quarantined: false } });
+  await tx.auditEvent.create({
+    data: {
+      adminId: run.createdBy,
+      action: 'STOP_CLEANUP_CONFIRMED',
+      requestId: 'agent-heartbeat',
+      details: { runId: run.id },
+    },
+  });
+  return true;
 }
 export async function stopRun(
   db: PrismaClient,
@@ -1168,6 +1236,20 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
         fault('EVENT_CONFLICT', '核验前必须保存提交意图');
       if (p.observation && stage !== 'INSTALLING')
         fault('EVENT_CONFLICT', '设备证据只能在安装前记录');
+      if (
+        p.installedPackageName !== undefined &&
+        (!openOnly ||
+          stage !== 'LAUNCHING' ||
+          (task.apk as { validationPolicy?: string } | null)?.validationPolicy !== 'FILE_NAME')
+      )
+        fault('EVENT_CONFLICT', '安装后包名只用于文件模式 APP 启动');
+      if (
+        openOnly &&
+        stage === 'LAUNCHING' &&
+        (task.apk as { validationPolicy?: string } | null)?.validationPolicy === 'FILE_NAME' &&
+        typeof p.installedPackageName !== 'string'
+      )
+        fault('EVENT_CONFLICT', '缺少 Android 安装后的包名');
       await tx.task.update({
         where: { id: task.id },
         data: {
@@ -1186,6 +1268,14 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
               }
             : {}),
           ...(p.observation ? { observation: p.observation as Prisma.InputJsonValue } : {}),
+          ...(p.installedPackageName
+            ? {
+                apk: {
+                  ...(task.apk as Prisma.InputJsonObject),
+                  packageName: String(p.installedPackageName),
+                },
+              }
+            : {}),
           ...(p.recognition ? { recognition: p.recognition as Prisma.InputJsonValue } : {}),
         },
       });
@@ -1601,6 +1691,48 @@ export async function runEvents(db: PrismaClient, token: string, body: unknown) 
       const current = await tx.run.findUniqueOrThrow({
         where: { id: d.runId },
       });
+      // A late stop receipt is cleanup evidence only; it cannot revive or complete the run.
+      if (
+        late &&
+        current.status === 'NEEDS_REVIEW' &&
+        current.stopRequested &&
+        input.events.some((e) => e.type === 'STOP_ACK' && e.payload.cleanupComplete === true)
+      ) {
+        const auth = await tx.agentCredential.findUnique({ where: { nodeId: input.nodeId } });
+        const slot = await tx.nodeSlot.findUnique({ where: { nodeId: input.nodeId } });
+        if (
+          auth?.bootId === d.bootId &&
+          slot?.runId === d.runId &&
+          slot.fence === d.fence &&
+          !slot.operationId
+        ) {
+          const ack = input.events
+            .filter((e) => e.type === 'STOP_ACK' && e.payload.cleanupComplete === true)
+            .at(-1)!;
+          const sessions = await tx.runEvent.findMany({
+            where: {
+              deliveryId: d.id,
+              sequence: { lte: ack.sequence },
+              body: { path: ['type'], equals: 'DEVICE_SESSION' },
+            },
+            orderBy: { sequence: 'asc' },
+          });
+          const states = new Map<string, boolean>();
+          for (const row of sessions) {
+            const p = (
+              row.body as {
+                payload: { sessionId: string; phase: string; cleanupComplete: boolean };
+              }
+            ).payload;
+            states.set(p.sessionId, p.phase === 'CLOSED' && p.cleanupComplete);
+          }
+          if ([...states.values()].every(Boolean))
+            await tx.run.update({
+              where: { id: d.runId },
+              data: { cleanupConfirmedAt: new Date(), cleanupBootId: auth.bootId },
+            });
+        }
+      }
       return {
         ackedEventIds: input.events.map((e) => e.eventId),
         appliedThroughSequence: applied,
@@ -1632,7 +1764,11 @@ export async function reconcileAgent(db: PrismaClient, token: string, body: unkn
         include: { delivery: true },
       });
       if (run.status !== 'QUEUED' && !RUN_END.includes(run.status))
-        await reviewRun(tx, run, 'AGENT_RESTARTED');
+        await reviewRun(
+          tx,
+          run,
+          run.delivery?.bootId !== input.bootId ? 'AGENT_RESTARTED' : 'AGENT_EXECUTION_INTERRUPTED',
+        );
       if (run.status !== 'QUEUED') {
         const local = run.delivery
           ? input.deliveries.find(

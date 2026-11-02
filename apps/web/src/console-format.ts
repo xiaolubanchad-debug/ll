@@ -31,6 +31,8 @@ export const stateLabels: Record<string, string> = {
   VERIFYING: '核验提交结果',
   SKIPPED: '已跳过',
 };
+export const runStateLabel = (run: { status: string; stopConfirmed?: boolean }) =>
+  run.stopConfirmed ? '已停止' : (stateLabels[run.status] ?? run.status);
 export const when = (value: string | null | undefined) =>
   value
     ? new Intl.DateTimeFormat('zh-CN', {

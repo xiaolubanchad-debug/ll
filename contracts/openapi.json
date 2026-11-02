@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "APK 部署中台 API",
-    "version": "1.19.1"
+    "version": "1.20.0"
   },
   "paths": {
     "/api/v1/auth/login": {
@@ -4853,7 +4853,6 @@
                 "type": "object",
                 "additionalProperties": false,
                 "required": [
-                  "packageName",
                   "versionName",
                   "versionCode",
                   "abis",
@@ -4910,10 +4909,41 @@
                   },
                   "validationPolicy": {
                     "enum": [
-                      "ANDROID_INSTALL"
+                      "ANDROID_INSTALL",
+                      "FILE_NAME"
                     ]
+                  },
+                  "fileName": {
+                    "type": "string",
+                    "minLength": 5,
+                    "maxLength": 200,
+                    "pattern": "^[^\\\\/\\u0000-\\u001f\\u007f]+\\.apk$"
                   }
-                }
+                },
+                "allOf": [
+                  {
+                    "if": {
+                      "properties": {
+                        "validationPolicy": {
+                          "const": "FILE_NAME"
+                        }
+                      },
+                      "required": [
+                        "validationPolicy"
+                      ]
+                    },
+                    "then": {
+                      "required": [
+                        "fileName"
+                      ]
+                    },
+                    "else": {
+                      "required": [
+                        "packageName"
+                      ]
+                    }
+                  }
+                ]
               },
               {
                 "type": "null"
@@ -4991,7 +5021,6 @@
             "type": "object",
             "additionalProperties": false,
             "required": [
-              "packageName",
               "versionName",
               "versionCode",
               "abis",
@@ -5048,10 +5077,41 @@
               },
               "validationPolicy": {
                 "enum": [
-                  "ANDROID_INSTALL"
+                  "ANDROID_INSTALL",
+                  "FILE_NAME"
                 ]
+              },
+              "fileName": {
+                "type": "string",
+                "minLength": 5,
+                "maxLength": 200,
+                "pattern": "^[^\\\\/\\u0000-\\u001f\\u007f]+\\.apk$"
               }
-            }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "validationPolicy": {
+                      "const": "FILE_NAME"
+                    }
+                  },
+                  "required": [
+                    "validationPolicy"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "fileName"
+                  ]
+                },
+                "else": {
+                  "required": [
+                    "packageName"
+                  ]
+                }
+              }
+            ]
           },
           "maxBytes": {
             "type": "integer",
@@ -5087,7 +5147,6 @@
             "type": "object",
             "additionalProperties": false,
             "required": [
-              "packageName",
               "versionName",
               "versionCode",
               "abis",
@@ -5144,10 +5203,41 @@
               },
               "validationPolicy": {
                 "enum": [
-                  "ANDROID_INSTALL"
+                  "ANDROID_INSTALL",
+                  "FILE_NAME"
                 ]
+              },
+              "fileName": {
+                "type": "string",
+                "minLength": 5,
+                "maxLength": 200,
+                "pattern": "^[^\\\\/\\u0000-\\u001f\\u007f]+\\.apk$"
               }
-            }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "validationPolicy": {
+                      "const": "FILE_NAME"
+                    }
+                  },
+                  "required": [
+                    "validationPolicy"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "fileName"
+                  ]
+                },
+                "else": {
+                  "required": [
+                    "packageName"
+                  ]
+                }
+              }
+            ]
           }
         },
         "required": [
@@ -6509,6 +6599,9 @@
                     "REGISTRATION",
                     "DOWNLOAD_ONLY"
                   ]
+                },
+                "stopConfirmed": {
+                  "type": "boolean"
                 }
               },
               "required": [
@@ -6790,7 +6883,6 @@
                 "type": "object",
                 "additionalProperties": false,
                 "required": [
-                  "packageName",
                   "versionName",
                   "versionCode",
                   "abis",
@@ -6847,10 +6939,41 @@
                   },
                   "validationPolicy": {
                     "enum": [
-                      "ANDROID_INSTALL"
+                      "ANDROID_INSTALL",
+                      "FILE_NAME"
                     ]
+                  },
+                  "fileName": {
+                    "type": "string",
+                    "minLength": 5,
+                    "maxLength": 200,
+                    "pattern": "^[^\\\\/\\u0000-\\u001f\\u007f]+\\.apk$"
                   }
-                }
+                },
+                "allOf": [
+                  {
+                    "if": {
+                      "properties": {
+                        "validationPolicy": {
+                          "const": "FILE_NAME"
+                        }
+                      },
+                      "required": [
+                        "validationPolicy"
+                      ]
+                    },
+                    "then": {
+                      "required": [
+                        "fileName"
+                      ]
+                    },
+                    "else": {
+                      "required": [
+                        "packageName"
+                      ]
+                    }
+                  }
+                ]
               },
               {
                 "type": "null"
@@ -6879,6 +7002,9 @@
               "REGISTRATION",
               "DOWNLOAD_ONLY"
             ]
+          },
+          "stopConfirmed": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -7020,7 +7146,6 @@
                       "type": "object",
                       "additionalProperties": false,
                       "required": [
-                        "packageName",
                         "versionName",
                         "versionCode",
                         "abis",
@@ -7077,10 +7202,41 @@
                         },
                         "validationPolicy": {
                           "enum": [
-                            "ANDROID_INSTALL"
+                            "ANDROID_INSTALL",
+                            "FILE_NAME"
                           ]
+                        },
+                        "fileName": {
+                          "type": "string",
+                          "minLength": 5,
+                          "maxLength": 200,
+                          "pattern": "^[^\\\\/\\u0000-\\u001f\\u007f]+\\.apk$"
                         }
-                      }
+                      },
+                      "allOf": [
+                        {
+                          "if": {
+                            "properties": {
+                              "validationPolicy": {
+                                "const": "FILE_NAME"
+                              }
+                            },
+                            "required": [
+                              "validationPolicy"
+                            ]
+                          },
+                          "then": {
+                            "required": [
+                              "fileName"
+                            ]
+                          },
+                          "else": {
+                            "required": [
+                              "packageName"
+                            ]
+                          }
+                        }
+                      ]
                     },
                     {
                       "type": "null"
@@ -7109,6 +7265,9 @@
                     "REGISTRATION",
                     "DOWNLOAD_ONLY"
                   ]
+                },
+                "stopConfirmed": {
+                  "type": "boolean"
                 }
               },
               "required": [
@@ -7265,7 +7424,6 @@
                     "type": "object",
                     "additionalProperties": false,
                     "required": [
-                      "packageName",
                       "versionName",
                       "versionCode",
                       "abis",
@@ -7322,10 +7480,41 @@
                       },
                       "validationPolicy": {
                         "enum": [
-                          "ANDROID_INSTALL"
+                          "ANDROID_INSTALL",
+                          "FILE_NAME"
                         ]
+                      },
+                      "fileName": {
+                        "type": "string",
+                        "minLength": 5,
+                        "maxLength": 200,
+                        "pattern": "^[^\\\\/\\u0000-\\u001f\\u007f]+\\.apk$"
                       }
-                    }
+                    },
+                    "allOf": [
+                      {
+                        "if": {
+                          "properties": {
+                            "validationPolicy": {
+                              "const": "FILE_NAME"
+                            }
+                          },
+                          "required": [
+                            "validationPolicy"
+                          ]
+                        },
+                        "then": {
+                          "required": [
+                            "fileName"
+                          ]
+                        },
+                        "else": {
+                          "required": [
+                            "packageName"
+                          ]
+                        }
+                      }
+                    ]
                   },
                   {
                     "type": "null"
@@ -7354,6 +7543,9 @@
                   "REGISTRATION",
                   "DOWNLOAD_ONLY"
                 ]
+              },
+              "stopConfirmed": {
+                "type": "boolean"
               }
             },
             "required": [
@@ -7696,6 +7888,9 @@
                     "REGISTRATION",
                     "DOWNLOAD_ONLY"
                   ]
+                },
+                "stopConfirmed": {
+                  "type": "boolean"
                 }
               },
               "required": [
@@ -7827,6 +8022,9 @@
                   "REGISTRATION",
                   "DOWNLOAD_ONLY"
                 ]
+              },
+              "stopConfirmed": {
+                "type": "boolean"
               }
             },
             "required": [
@@ -8349,7 +8547,6 @@
                       "type": "object",
                       "additionalProperties": false,
                       "required": [
-                        "packageName",
                         "versionName",
                         "versionCode",
                         "abis",
@@ -8406,10 +8603,41 @@
                         },
                         "validationPolicy": {
                           "enum": [
-                            "ANDROID_INSTALL"
+                            "ANDROID_INSTALL",
+                            "FILE_NAME"
                           ]
+                        },
+                        "fileName": {
+                          "type": "string",
+                          "minLength": 5,
+                          "maxLength": 200,
+                          "pattern": "^[^\\\\/\\u0000-\\u001f\\u007f]+\\.apk$"
                         }
-                      }
+                      },
+                      "allOf": [
+                        {
+                          "if": {
+                            "properties": {
+                              "validationPolicy": {
+                                "const": "FILE_NAME"
+                              }
+                            },
+                            "required": [
+                              "validationPolicy"
+                            ]
+                          },
+                          "then": {
+                            "required": [
+                              "fileName"
+                            ]
+                          },
+                          "else": {
+                            "required": [
+                              "packageName"
+                            ]
+                          }
+                        }
+                      ]
                     },
                     {
                       "type": "null"
@@ -8463,7 +8691,6 @@
                               "type": "object",
                               "additionalProperties": false,
                               "required": [
-                                "packageName",
                                 "versionName",
                                 "versionCode",
                                 "abis",
@@ -8520,10 +8747,41 @@
                                 },
                                 "validationPolicy": {
                                   "enum": [
-                                    "ANDROID_INSTALL"
+                                    "ANDROID_INSTALL",
+                                    "FILE_NAME"
                                   ]
+                                },
+                                "fileName": {
+                                  "type": "string",
+                                  "minLength": 5,
+                                  "maxLength": 200,
+                                  "pattern": "^[^\\\\/\\u0000-\\u001f\\u007f]+\\.apk$"
                                 }
-                              }
+                              },
+                              "allOf": [
+                                {
+                                  "if": {
+                                    "properties": {
+                                      "validationPolicy": {
+                                        "const": "FILE_NAME"
+                                      }
+                                    },
+                                    "required": [
+                                      "validationPolicy"
+                                    ]
+                                  },
+                                  "then": {
+                                    "required": [
+                                      "fileName"
+                                    ]
+                                  },
+                                  "else": {
+                                    "required": [
+                                      "packageName"
+                                    ]
+                                  }
+                                }
+                              ]
                             },
                             {
                               "type": "null"
@@ -10319,7 +10577,6 @@
                 "type": "object",
                 "additionalProperties": false,
                 "required": [
-                  "packageName",
                   "versionName",
                   "versionCode",
                   "abis",
@@ -10376,10 +10633,41 @@
                   },
                   "validationPolicy": {
                     "enum": [
-                      "ANDROID_INSTALL"
+                      "ANDROID_INSTALL",
+                      "FILE_NAME"
                     ]
+                  },
+                  "fileName": {
+                    "type": "string",
+                    "minLength": 5,
+                    "maxLength": 200,
+                    "pattern": "^[^\\\\/\\u0000-\\u001f\\u007f]+\\.apk$"
                   }
-                }
+                },
+                "allOf": [
+                  {
+                    "if": {
+                      "properties": {
+                        "validationPolicy": {
+                          "const": "FILE_NAME"
+                        }
+                      },
+                      "required": [
+                        "validationPolicy"
+                      ]
+                    },
+                    "then": {
+                      "required": [
+                        "fileName"
+                      ]
+                    },
+                    "else": {
+                      "required": [
+                        "packageName"
+                      ]
+                    }
+                  }
+                ]
               },
               "observation": {
                 "$ref": "#/components/schemas/AgentMessage/$defs/deviceObservation"
@@ -10454,6 +10742,11 @@
                 "type": "integer",
                 "minimum": 1,
                 "maximum": 1000
+              },
+              "installedPackageName": {
+                "type": "string",
+                "pattern": "^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)+$",
+                "maxLength": 256
               }
             }
           },
@@ -10953,7 +11246,9 @@
                   "自有测试 APK：请求未获接受",
                   "自有测试 APK：网络响应尚未确认",
                   "下载传输：文件已保存，读取启动所需包信息",
-                  "下载传输：已收到浏览器文件，等待保存与读取包信息"
+                  "下载传输：已收到浏览器文件，等待保存与读取包信息",
+                  "下载传输：文件已保存",
+                  "下载传输：已收到浏览器文件，等待保存"
                 ]
               }
             }
@@ -11887,7 +12182,8 @@
                 "EXECUTION_CAPACITY_V1",
                 "INCREMENTAL_DEPLOY_V1",
                 "MANUAL_APK_IMPORT_V1",
-                "APK_METADATA_ONLY_V1"
+                "APK_METADATA_ONLY_V1",
+                "APK_FILE_ASSETS_V1"
               ]
             }
           },
@@ -12723,6 +13019,13 @@
           },
           "cleanupComplete": {
             "type": "boolean"
+          },
+          "reason": {
+            "enum": [
+              "STARTUP",
+              "EXECUTION_ERROR",
+              "STOP_RECOVERY"
+            ]
           }
         }
       },
@@ -12762,7 +13065,6 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "packageName",
           "versionName",
           "versionCode",
           "abis",
@@ -12819,10 +13121,41 @@
           },
           "validationPolicy": {
             "enum": [
-              "ANDROID_INSTALL"
+              "ANDROID_INSTALL",
+              "FILE_NAME"
             ]
+          },
+          "fileName": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 200,
+            "pattern": "^[^\\\\/\\u0000-\\u001f\\u007f]+\\.apk$"
           }
-        }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "validationPolicy": {
+                  "const": "FILE_NAME"
+                }
+              },
+              "required": [
+                "validationPolicy"
+              ]
+            },
+            "then": {
+              "required": [
+                "fileName"
+              ]
+            },
+            "else": {
+              "required": [
+                "packageName"
+              ]
+            }
+          }
+        ]
       },
       "ArtifactInput": {
         "type": "object",
@@ -13219,7 +13552,6 @@
                   "type": "object",
                   "additionalProperties": false,
                   "required": [
-                    "packageName",
                     "versionName",
                     "versionCode",
                     "abis",
@@ -13276,10 +13608,41 @@
                     },
                     "validationPolicy": {
                       "enum": [
-                        "ANDROID_INSTALL"
+                        "ANDROID_INSTALL",
+                        "FILE_NAME"
                       ]
+                    },
+                    "fileName": {
+                      "type": "string",
+                      "minLength": 5,
+                      "maxLength": 200,
+                      "pattern": "^[^\\\\/\\u0000-\\u001f\\u007f]+\\.apk$"
                     }
-                  }
+                  },
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": {
+                          "validationPolicy": {
+                            "const": "FILE_NAME"
+                          }
+                        },
+                        "required": [
+                          "validationPolicy"
+                        ]
+                      },
+                      "then": {
+                        "required": [
+                          "fileName"
+                        ]
+                      },
+                      "else": {
+                        "required": [
+                          "packageName"
+                        ]
+                      }
+                    }
+                  ]
                 },
                 "entryId": {
                   "type": "string",
@@ -13369,6 +13732,9 @@
               },
               "capacityVersion": {
                 "const": 1
+              },
+              "fileAssets": {
+                "const": true
               }
             },
             "allOf": [

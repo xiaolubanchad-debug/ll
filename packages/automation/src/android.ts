@@ -250,6 +250,7 @@ export async function startAndroid(
   ) => androidCommand(file, args, env, interrupt ? signal : undefined, timeout, code, workspace);
   let closed = false,
     installUnconfirmed = false;
+  let installedPackage: string | undefined;
   const close = async () => {
     if (closed) return true;
     await client?.close();
@@ -585,8 +586,27 @@ export async function startAndroid(
         appUserAgent: 'UNVERIFIED',
         identitySource: 'EMULATOR_NOT_REAL_DEVICE',
       },
-      async install(file) {
+      async install(file, resolvePackage = false) {
         options.beforeAction();
+        const packages = async () => {
+          const listed = await command(
+            adb,
+            ['-s', record.serial!, 'shell', 'pm', 'list', 'packages', '-3'],
+            10000,
+            'APP_PACKAGE_UNCONFIRMED',
+          );
+          return new Set(
+            listed
+              .split(/\r?\n/)
+              .flatMap(
+                (line) =>
+                  /^package:([A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+)$/.exec(
+                    line.trim(),
+                  )?.[1] ?? [],
+              ),
+          );
+        };
+        const previous = resolvePackage ? await packages() : null;
         installUnconfirmed = true;
         const value = await command(
           adb,
@@ -594,11 +614,19 @@ export async function startAndroid(
           120000,
           'APK_INSTALL_FAILED',
         );
-        installUnconfirmed = false;
         if (!/^Success\s*$/m.test(value)) throw new RegistrationError('APK_INSTALL_FAILED');
+        if (previous) {
+          const added = [...(await packages())].filter((pkg) => !previous.has(pkg));
+          if (added.length !== 1) throw new RegistrationError('APP_PACKAGE_UNCONFIRMED');
+          installedPackage = added[0];
+          installUnconfirmed = false;
+          return installedPackage;
+        }
+        installUnconfirmed = false;
       },
-      async finishApplication(pkg) {
+      async finishApplication(pkg = installedPackage) {
         if (installUnconfirmed) return false;
+        if (!pkg) return true;
         if (!/^[A-Za-z][A-Za-z0-9_.]{1,255}$/.test(pkg))
           throw new RegistrationError('CLEANUP_INCOMPLETE');
         const initial = await command(

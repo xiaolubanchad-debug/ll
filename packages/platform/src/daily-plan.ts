@@ -16,7 +16,12 @@ import {
 } from './identity.js';
 import type { Prisma, ConfigVersion } from '@prisma/client';
 import type { DailyExecutionPlan, RunInput, TestConfiguration } from '@apk/contracts';
-import { schemaIssues, registrationAvailable, apkMetadataOnlySupported } from '@apk/contracts';
+import {
+  schemaIssues,
+  registrationAvailable,
+  apkMetadataOnlySupported,
+  apkFileAssetsSupported,
+} from '@apk/contracts';
 import { digest, canonical } from './security.js';
 import { manualAssetsForRun, assertNoPendingManualApks } from './manual-apks.js';
 import { fault } from './errors.js';
@@ -153,19 +158,41 @@ export async function prepareDailyPlan(
       const candidate = task.status === 'SUCCEEDED' ? task.apk : manual.get(task.id)?.apk;
       if (schemaIssues('ApkMetadata', candidate).length) continue;
       const apk = candidate as unknown as DailyExecutionPlan['assets'][number]['apk'];
+      if (!config.execution.appOpen && !apk.packageName) continue;
       if (apk.cacheDay !== plan.cacheDay)
         fault('DOWNLOAD_SOURCE_INVALID', '文件日期与当天批次不一致', 422);
-      if (!registrationAvailable(config, apk.packageName, task.entryId ?? undefined)) continue;
-      if (config.execution.appOpen?.ownedTestClient && !isOwnedTestPackage(apk.packageName))
+      if (!registrationAvailable(config, apk.packageName ?? '', task.entryId ?? undefined))
+        continue;
+      if (
+        config.execution.appOpen?.ownedTestClient &&
+        apk.packageName &&
+        !isOwnedTestPackage(apk.packageName)
+      )
         continue;
       plan.assets.push({
         targetKey: task.targetKey,
         label: task.label,
         sourceUrl: task.sourceUrl,
-        apk,
+        apk:
+          config.execution.appOpen &&
+          !apk.fileName &&
+          apkFileAssetsSupported(
+            (identityRelease?.manifest as { features?: string[] } | null)?.features,
+            identityNode.agentVersion,
+          )
+            ? { ...apk, fileName: 'history-' + task.targetKey.slice(0, 12) + '.apk' }
+            : apk,
         ...(task.entryId ? { entryId: task.entryId } : {}),
       });
     }
+    if (
+      plan.assets.some((a) => a.apk.validationPolicy === 'FILE_NAME') &&
+      !apkFileAssetsSupported(
+        (identityRelease?.manifest as { features?: string[] } | null)?.features,
+        identityNode.agentVersion,
+      )
+    )
+      fault('NODE_UPGRADE_REQUIRED', '文件名资产需要 Agent 0.16.0', 422);
     if (
       plan.assets.some((a) => a.apk.validationPolicy === 'ANDROID_INSTALL') &&
       !apkMetadataOnlySupported(
@@ -177,17 +204,29 @@ export async function prepareDailyPlan(
   }
   const groupPolicy = config.execution.appOpen?.appsPerDevice;
   if (groupPolicy && plan.purpose === 'REGISTER') {
-    plan.assets = plan.assets.filter((a) => a.apk.minSdkVersion !== undefined);
+    const nodeForFiles = await tx.node.findUniqueOrThrow({ where: { id: input.nodeId } });
+    const fileRelease = nodeForFiles.agentReleaseId
+      ? await tx.release.findUnique({ where: { id: nodeForFiles.agentReleaseId } })
+      : null;
+    const files = apkFileAssetsSupported(
+      (fileRelease?.manifest as { features?: string[] } | null)?.features,
+      nodeForFiles.agentVersion,
+    );
+    if (files) plan.openPolicy!.fileAssets = true;
+    else plan.assets = plan.assets.filter((a) => a.apk.minSdkVersion !== undefined);
     const seen = new Set<string>();
     plan.assets = plan.assets.filter((a) => {
-      if (seen.has(a.apk.packageName)) return false;
-      seen.add(a.apk.packageName);
+      const key = files
+        ? (a.apk.fileName?.toLowerCase() ?? a.targetKey)
+        : (a.apk.packageName ?? a.targetKey);
+      if (seen.has(key)) return false;
+      seen.add(key);
       return true;
     });
     const dynamic = plan.openPolicy?.capacityVersion === 1;
     const required = dynamic ? groupPolicy.min : groupPolicy.max;
     if (plan.assets.length < required)
-      fault('APK_POOL_INSUFFICIENT', '不同包名的兼容 APK 数量不足，请降低每台设备安装数量', 422);
+      fault('APK_POOL_INSUFFICIENT', '可用 APK 文件数量不足，请降低每台设备安装数量', 422);
     const node = await tx.node.findUniqueOrThrow({
       where: { id: input.nodeId },
     });

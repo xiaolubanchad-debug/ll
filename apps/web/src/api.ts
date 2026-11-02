@@ -70,6 +70,7 @@ export function uploadApk<T>(
     request.timeout = 600000;
     request.setRequestHeader('Content-Type', 'application/octet-stream');
     request.setRequestHeader('X-CSRF-Token', csrfToken);
+    request.setRequestHeader('X-Apk-Filename', encodeURIComponent(file.name));
     request.upload.onprogress = (event) => {
       if (event.lengthComputable) progress(Math.round((event.loaded / event.total) * 100));
     };

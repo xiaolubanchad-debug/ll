@@ -211,6 +211,8 @@ try {
   await run(['--test', '--test-concurrency=1', 'tests/v1111.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/v1112.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/app-open.test.mjs'], env);
+  await run(['--test', '--test-concurrency=1', 'tests/file-assets.test.mjs'], env);
+  await run(['--test', '--test-concurrency=1', 'tests/stop-recovery.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/open-performance.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/test-data.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/app-open-api.test.mjs'], env);

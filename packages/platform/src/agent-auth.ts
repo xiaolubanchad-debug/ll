@@ -5,7 +5,7 @@ import { randomBytes } from 'node:crypto';
 import { derivedToken, digest } from './security.js';
 import { fault } from './errors.js';
 import { lockNode } from './nodes.js';
-import { expireNodeRun, reviewRun, ACTIVE_RUNS } from './runs.js';
+import { expireNodeRun, reviewRun, ACTIVE_RUNS, resolveStoppedRun } from './runs.js';
 export async function issueEnrollment(
   db: PrismaClient,
   deploymentId: string,
@@ -162,11 +162,10 @@ export async function agentHeartbeat(db: PrismaClient, token: string, body: unkn
       desiredControl = 'STOP';
       reconcileRequired = active?.status === 'NEEDS_REVIEW';
     }
-    if (auth.bootId !== input.bootId)
-      await tx.agentCredential.update({
-        where: { nodeId: input.nodeId },
-        data: { bootId: input.bootId },
-      });
+    if (auth.bootId !== input.bootId) {
+      desiredControl = 'STOP';
+      reconcileRequired = true;
+    }
     const report = 'report' in input ? input.report : undefined;
     await tx.node.update({
       where: { id: input.nodeId },
@@ -184,6 +183,14 @@ export async function agentHeartbeat(db: PrismaClient, token: string, body: unkn
         }) as Prisma.InputJsonValue,
       },
     });
+    if (
+      auth.bootId === input.bootId &&
+      !input.currentDelivery &&
+      (await resolveStoppedRun(tx, input.nodeId))
+    ) {
+      desiredControl = 'CONTINUE';
+      reconcileRequired = false;
+    }
     return {
       serverTime: new Date().toISOString(),
       desiredControl,

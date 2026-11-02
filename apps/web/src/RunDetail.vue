@@ -3,7 +3,7 @@ import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
 import type { RunSummaryView, RegistrationDetailView } from '@apk/contracts';
 import { api, mutation } from './api';
 import { route, href, navigate } from './navigation';
-import { categoryLabels, stateLabels, when } from './console-format';
+import { categoryLabels, stateLabels, when, runStateLabel } from './console-format';
 import { purposeLabels, reasonLabels } from './result-labels';
 import TimelineViewer from './TimelineViewer.vue';
 import TaskEvidence from './TaskEvidence.vue';
@@ -181,7 +181,7 @@ onUnmounted(() => {
           }}</span>
           <h2>
             {{ summary.run.configName }} ·
-            {{ stateLabels[summary.run.status] ?? summary.run.status }}
+            {{ runStateLabel(summary.run) }}
           </h2>
           <p class="muted">
             {{ summary.run.nodeName }} · 配置版本 {{ summary.configVersion }} · 开始
@@ -190,7 +190,11 @@ onUnmounted(() => {
           </p>
         </div>
         <el-button
-          v-if="['QUEUED', 'ASSIGNED', 'RUNNING', 'STOP_REQUESTED'].includes(summary.run.status)"
+          v-if="
+            ['QUEUED', 'ASSIGNED', 'RUNNING', 'STOP_REQUESTED', 'NEEDS_REVIEW'].includes(
+              summary.run.status,
+            ) && !summary.run.stopConfirmed
+          "
           :disabled="busy || pendingStop || summary.run.status === 'STOP_REQUESTED'"
           @click="stop"
           >{{
@@ -264,7 +268,11 @@ onUnmounted(() => {
         >
       </div>
       <p v-if="summary.cleanup === 'NEEDS_REVIEW'" class="muted">
-        先逐项记录未知结果的人工决议，再确认执行环境清理。原记录保留，不自动提交。
+        {{
+          summary.run.executionKind === 'APP_OPEN' || summary.run.executionKind === 'DOWNLOAD_ONLY'
+            ? '请点击停止。执行端确认清理完成并回传空闲心跳后，会自动结束占用；失联或清理未确认时继续等待，不会自动重跑。'
+            : '先逐项记录未知结果的人工决议，再确认执行环境清理。原记录保留，不自动提交。'
+        }}
       </p>
       <el-button v-if="summary.cleanup === 'NEEDS_REVIEW'" :disabled="busy" @click="reconcile"
         >核验清理后解除占用</el-button

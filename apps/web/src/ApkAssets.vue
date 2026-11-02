@@ -20,7 +20,7 @@ const items = ref<Asset[]>([]),
   percent = ref(0);
 const manualLabels: Record<string, string> = {
   UPLOADING: '等待选择文件',
-  RECEIVING: '接收并读取包信息',
+  RECEIVING: '正在接收文件',
   QUEUED: '等待下发',
   IMPORTING: '正在下发到服务器',
   APPLIED: '补包已就绪',
@@ -178,7 +178,9 @@ onUnmounted(() => clearInterval(timer));
           <tr v-for="r in items" :key="r.id">
             <td>
               <strong>{{ r.label }}</strong
-              ><small>{{ packageOf(r)?.packageName ?? '尚无包信息' }}</small
+              ><small>{{
+                packageOf(r)?.fileName ?? packageOf(r)?.packageName ?? '尚无 APK 文件'
+              }}</small
               ><small v-if="packageOf(r)" class="fingerprint"
                 >SHA256 {{ packageOf(r)?.apkSha256.slice(0, 16) }}</small
               >

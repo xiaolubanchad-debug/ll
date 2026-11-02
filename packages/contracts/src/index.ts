@@ -452,6 +452,7 @@ const knownAgentVersions: readonly string[] = [
   '0.14.1',
   '0.15.0',
   '0.15.1',
+  '0.16.0',
 ];
 function knownAgentAtLeast(version: string | null | undefined, minimum: string): boolean {
   const index = knownAgentVersions.indexOf(version ?? '');
@@ -500,4 +501,10 @@ export function apkMetadataOnlySupported(
   return (
     knownAgentAtLeast(version, '0.15.1') && features?.includes('APK_METADATA_ONLY_V1') === true
   );
+}
+export function apkFileAssetsSupported(
+  features: readonly string[] | undefined,
+  version: string | null | undefined,
+) {
+  return knownAgentAtLeast(version, '0.16.0') && features?.includes('APK_FILE_ASSETS_V1') === true;
 }

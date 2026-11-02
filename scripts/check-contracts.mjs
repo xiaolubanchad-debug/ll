@@ -1257,7 +1257,66 @@ test('1.19.1 rejects unknown APK processing policies', () =>
   assert.ok(
     schemaIssues('ApkMetadata', read('contracts/fixtures/v1191.metadata.invalid.json')).length,
   ));
-for(const message of ["下载传输：文件已保存，读取启动所需包信息","下载传输：已收到浏览器文件，等待保存与读取包信息"])test('1.19.1 metadata progress log survives node transport',()=>{const envelope=structuredClone(messages.find(m=>m.kind==='events'));envelope.events=[{eventId:'11111111-1111-4111-8111-111111111111',runId:envelope.events[0].runId,taskId:'11111111-1111-4111-8111-111111111111',sequence:1,occurredAt:'2026-11-02T00:00:00.000Z',type:'LOG',payload:{level:'INFO',message}}];assert.deepEqual(agentIssues(envelope),[]);});
+for (const message of [
+  '下载传输：文件已保存，读取启动所需包信息',
+  '下载传输：已收到浏览器文件，等待保存与读取包信息',
+])
+  test('1.19.1 metadata progress log survives node transport', () => {
+    const envelope = structuredClone(messages.find((m) => m.kind === 'events'));
+    envelope.events = [
+      {
+        eventId: '11111111-1111-4111-8111-111111111111',
+        runId: envelope.events[0].runId,
+        taskId: '11111111-1111-4111-8111-111111111111',
+        sequence: 1,
+        occurredAt: '2026-11-02T00:00:00.000Z',
+        type: 'LOG',
+        payload: { level: 'INFO', message },
+      },
+    ];
+    assert.deepEqual(agentIssues(envelope), []);
+  });
+test('1.20 file assets do not require package metadata', () =>
+  assert.deepEqual(
+    schemaIssues('ApkMetadata', {
+      fileName: '1.apk',
+      validationPolicy: 'FILE_NAME',
+      versionName: null,
+      versionCode: null,
+      abis: [],
+      size: 20,
+      apkSha256: 'a'.repeat(64),
+      cacheDay: '2026-11-03',
+    }),
+    [],
+  ));
+for (const name of ['../1.apk', 'C:\\1.apk', '1.apk\n'])
+  test('1.20 rejects unsafe file name ' + JSON.stringify(name), () =>
+    assert.ok(
+      schemaIssues('ApkMetadata', {
+        fileName: name,
+        validationPolicy: 'FILE_NAME',
+        versionName: null,
+        versionCode: null,
+        abis: [],
+        size: 20,
+        apkSha256: 'a'.repeat(64),
+        cacheDay: '2026-11-03',
+      }).length,
+    ),
+  );
+test('1.20 file mode requires file name', () =>
+  assert.ok(
+    schemaIssues('ApkMetadata', {
+      validationPolicy: 'FILE_NAME',
+      versionName: null,
+      versionCode: null,
+      abis: [],
+      size: 20,
+      apkSha256: 'a'.repeat(64),
+      cacheDay: '2026-11-03',
+    }).length,
+  ));
 process.stdout.write(
   `${passed} contract checks passed${process.exitCode ? '; failures present' : ''}.\n`,
 );

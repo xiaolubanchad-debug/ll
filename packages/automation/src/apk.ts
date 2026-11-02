@@ -22,6 +22,48 @@ export class ApkValidationError extends DownloadError {
   }
 }
 
+export function apkFileName(value: string, fallback = 'download.apk') {
+  let name = Array.from(value.split(/[\\/]/).at(-1)!.normalize('NFC'))
+    .filter((c) => c.charCodeAt(0) >= 32 && c.charCodeAt(0) !== 127)
+    .join('')
+    .trim();
+  if (!name || name === '.' || name === '..') name = fallback;
+  name =
+    name
+      .replace(/\.apk$/i, '')
+      .slice(0, 196)
+      .trim() || 'download';
+  return name + '.apk';
+}
+
+// Receives bytes only. Android decides whether the file is an installable application.
+export async function describeApkFile(
+  file: string,
+  max: number,
+  day: string,
+  fileName: string,
+  signal: AbortSignal,
+): Promise<ApkMetadata> {
+  const before = await lstat(file);
+  if (!before.isFile() || before.isSymbolicLink() || before.size < 1)
+    throw new DownloadError('FILE_TRANSFER_MISMATCH');
+  if (before.size > max) throw new DownloadError('APK_TOO_LARGE');
+  const hash = createHash('sha256');
+  for await (const bytes of createReadStream(file, { signal })) hash.update(bytes);
+  const result: ApkMetadata = {
+    fileName: apkFileName(fileName),
+    versionName: null,
+    versionCode: null,
+    abis: [],
+    size: before.size,
+    apkSha256: hash.digest('hex'),
+    cacheDay: day,
+    validationPolicy: 'FILE_NAME',
+  };
+  await verifyFileTransfer(file, result, max, signal);
+  return result;
+}
+
 // Compare retained bytes with the transfer receipt; no APK content validation.
 export async function verifyFileTransfer(
   file: string,

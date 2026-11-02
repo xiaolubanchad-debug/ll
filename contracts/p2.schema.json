@@ -197,6 +197,13 @@
         },
         "cleanupComplete": {
           "type": "boolean"
+        },
+        "reason": {
+          "enum": [
+            "STARTUP",
+            "EXECUTION_ERROR",
+            "STOP_RECOVERY"
+          ]
         }
       }
     },
@@ -236,7 +243,6 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "packageName",
         "versionName",
         "versionCode",
         "abis",
@@ -293,10 +299,41 @@
         },
         "validationPolicy": {
           "enum": [
-            "ANDROID_INSTALL"
+            "ANDROID_INSTALL",
+            "FILE_NAME"
           ]
+        },
+        "fileName": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 200,
+          "pattern": "^[^\\\\/\\u0000-\\u001f\\u007f]+\\.apk$"
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "validationPolicy": {
+                "const": "FILE_NAME"
+              }
+            },
+            "required": [
+              "validationPolicy"
+            ]
+          },
+          "then": {
+            "required": [
+              "fileName"
+            ]
+          },
+          "else": {
+            "required": [
+              "packageName"
+            ]
+          }
+        }
+      ]
     }
   }
 }

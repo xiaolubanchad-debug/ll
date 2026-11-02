@@ -87,6 +87,8 @@ export const reasonLabels: Record<string, string> = {
   SCHEDULER_UNAVAILABLE: '计划检查暂未完成',
   DOWNLOAD_FAILED: '下载未完成（未细分原因）',
   DOWNLOAD_NO_FILE: '等待结束，未收到浏览器下载文件',
+  APP_PACKAGE_UNCONFIRMED: '已安装但无法确认要打开的应用，已停止并清理',
+  AGENT_EXECUTION_INTERRUPTED: '执行中断，正在确认清理结果',
   DOWNLOAD_SOURCE_UNCONFIRMED: '网站图标触屏操作未确认',
   DOWNLOAD_CONTROL_UNCONFIRMED: '下载控件触屏操作未确认',
   DOWNLOAD_TRANSFER_TIMEOUT: '文件传输超时，未完成保存',

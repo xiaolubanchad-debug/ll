@@ -38,9 +38,19 @@ export class V119Controller {
   }
   @BinaryUpload() @Put('apk-uploads/:id/file') @HttpCode(200) file(
     @Param('id') id: string,
+    @Headers('x-apk-filename') filename: string | undefined,
     @Req() req: AuthedRequest,
   ) {
-    return receiveManualApk(this.db, uuid(id), req, req.auth!.admin.id, req.requestId);
+    let name: string | undefined;
+    if (filename) {
+      if (filename.length > 1600) fault('VALIDATION_FAILED', '文件名过长', 422);
+      try {
+        name = decodeURIComponent(filename);
+      } catch {
+        fault('VALIDATION_FAILED', '文件名格式不正确', 422);
+      }
+    }
+    return receiveManualApk(this.db, uuid(id), req, req.auth!.admin.id, req.requestId, name);
   }
   @Post('apk-uploads/:id/retry') @HttpCode(200) retry(
     @Param('id') id: string,

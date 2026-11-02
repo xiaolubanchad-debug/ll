@@ -36,13 +36,19 @@ export function devicePlanIssues(config: TestConfiguration, plan: DailyExecution
     const assets = s.assetIndexes.map((j) => plan.assets[j]);
     if (
       assets.some((a) => !a) ||
-      new Set(assets.map((a) => a?.apk.packageName)).size !== assets.length
+      new Set(
+        assets.map((a) =>
+          plan.openPolicy?.fileAssets
+            ? (a?.apk.fileName?.toLowerCase() ?? a?.targetKey)
+            : a?.apk.packageName,
+        ),
+      ).size !== assets.length
     )
       return ['DUPLICATE_OR_MISSING_APP'];
     if (
       assets.some(
         (a) =>
-          a.apk.minSdkVersion === undefined ||
+          (!plan.openPolicy?.fileAssets && a.apk.minSdkVersion === undefined) ||
           (a.apk.minSdkVersion ?? 1) > (deviceVariant(s.variantId ?? '')?.apiLevel ?? 100) ||
           (a.apk.abis.length && !a.apk.abis.some((abi) => s.supportedAbis?.includes(abi))),
       )

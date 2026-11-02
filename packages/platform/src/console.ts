@@ -241,6 +241,12 @@ function search(q?: string): Prisma.TaskWhereInput {
     ? {
         OR: [
           { label: { contains: q, mode: 'insensitive' } },
+          { apk: { path: ['fileName'], string_contains: q, mode: 'insensitive' } },
+          {
+            manualApk: {
+              is: { apk: { path: ['fileName'], string_contains: q, mode: 'insensitive' } },
+            },
+          },
           {
             apk: {
               path: ['packageName'],
@@ -352,6 +358,8 @@ async function categoryCounts(db: Prisma.TransactionClient, where: Prisma.TaskWh
   ) as OverviewView['registrations'];
 }
 const runSelect = {
+  reviewResolvedAt: true,
+  stopRequested: true,
   id: true,
   nodeId: true,
   purpose: true,
@@ -384,6 +392,9 @@ const runView = (r: RunRow) => ({
         : ('REGISTRATION' as const),
   purpose: r.purpose,
   status: r.status,
+  stopConfirmed:
+    r.status === 'CANCELLED' ||
+    (r.status === 'NEEDS_REVIEW' && !!r.reviewResolvedAt && r.stopRequested),
   createdAt: r.createdAt.toISOString(),
   successes: r.successes,
   successTarget: r.successTarget,
@@ -650,7 +661,11 @@ export async function runSummary(db: PrismaClient, id: string): Promise<RunSumma
         automaticIdentityCount,
         taskCount,
         cleanup:
-          row.status === 'NEEDS_REVIEW' ? 'NEEDS_REVIEW' : row.finishedAt ? 'CONFIRMED' : 'PENDING',
+          row.status === 'NEEDS_REVIEW' && !row.reviewResolvedAt
+            ? 'NEEDS_REVIEW'
+            : row.reviewResolvedAt || row.finishedAt
+              ? 'CONFIRMED'
+              : 'PENDING',
         activeTask: c?.execution.appOpen
           ? activeTasks[0]
             ? mapActive(activeTasks[0])
@@ -701,6 +716,8 @@ function title(type: string, p: Record<string, unknown>) {
       '下载入口：准备操作下载控件',
       '下载传输：文件已保存，开始 APK 校验',
       '下载传输：文件已保存，读取启动所需包信息',
+      '下载传输：文件已保存',
+      '下载传输：已收到浏览器文件，等待保存',
       '下载入口：已操作配置控件',
       '下载入口：已操作明确下载文字',
       '下载入口：正在访问源码中的唯一 APK 地址',

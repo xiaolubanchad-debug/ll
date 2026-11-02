@@ -3,7 +3,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import type { NodeView, ConsoleRunListView, TestConfiguration } from '@apk/contracts';
 import { api, mutation } from './api';
 import { href, route, navigate } from './navigation';
-import { today, when, stateLabels } from './console-format';
+import { today, when, stateLabels, runStateLabel } from './console-format';
 import { purposeLabels, reasonLabels } from './result-labels';
 import DailySchedulePanel from './DailySchedulePanel.vue';
 const tab = ref(route.value.query.get('tab') ?? 'history'),
@@ -422,7 +422,7 @@ onUnmounted(() => clearInterval(timer));
                 }}
               </td>
               <td>
-                {{ stateLabels[r.status] ?? r.status
+                {{ runStateLabel(r)
                 }}<small>{{ r.errorCode ? (reasonLabels[r.errorCode] ?? r.errorCode) : '' }}</small>
               </td>
               <td>

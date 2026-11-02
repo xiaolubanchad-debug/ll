@@ -909,7 +909,6 @@
           "type": "object",
           "additionalProperties": false,
           "required": [
-            "packageName",
             "versionName",
             "versionCode",
             "abis",
@@ -966,10 +965,41 @@
             },
             "validationPolicy": {
               "enum": [
-                "ANDROID_INSTALL"
+                "ANDROID_INSTALL",
+                "FILE_NAME"
               ]
+            },
+            "fileName": {
+              "type": "string",
+              "minLength": 5,
+              "maxLength": 200,
+              "pattern": "^[^\\\\/\\u0000-\\u001f\\u007f]+\\.apk$"
             }
-          }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "validationPolicy": {
+                    "const": "FILE_NAME"
+                  }
+                },
+                "required": [
+                  "validationPolicy"
+                ]
+              },
+              "then": {
+                "required": [
+                  "fileName"
+                ]
+              },
+              "else": {
+                "required": [
+                  "packageName"
+                ]
+              }
+            }
+          ]
         },
         "observation": {
           "$ref": "#/$defs/deviceObservation"
@@ -1044,6 +1074,11 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 1000
+        },
+        "installedPackageName": {
+          "type": "string",
+          "pattern": "^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)+$",
+          "maxLength": 256
         }
       }
     },
@@ -1543,7 +1578,9 @@
             "自有测试 APK：请求未获接受",
             "自有测试 APK：网络响应尚未确认",
             "下载传输：文件已保存，读取启动所需包信息",
-            "下载传输：已收到浏览器文件，等待保存与读取包信息"
+            "下载传输：已收到浏览器文件，等待保存与读取包信息",
+            "下载传输：文件已保存",
+            "下载传输：已收到浏览器文件，等待保存"
           ]
         }
       }

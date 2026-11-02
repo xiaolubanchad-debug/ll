@@ -3,7 +3,7 @@ import { mkdir, lstat, rename, unlink, rm } from 'node:fs/promises';
 import { join, resolve, sep } from 'node:path';
 import type { ApkMetadata } from '@apk/contracts';
 import { schemaIssues } from '@apk/contracts';
-import { verifyFileTransfer } from './apk.js';
+import { verifyFileTransfer, apkFileName } from './apk.js';
 import { sha, DownloadError } from './common.js';
 export class ApkCache {
   readonly db: DatabaseSync;
@@ -55,6 +55,55 @@ export class ApkCache {
         'INSERT OR REPLACE INTO cache (key,node,day,target,metadata,active) VALUES (?,?,?,?,?,1)',
       )
       .run(key, node, day, target, JSON.stringify(metadata));
+  }
+  availableName(node: string, day: string, target: string, desired: string, sha: string) {
+    const name = apkFileName(desired);
+    const rows = this.db
+      .prepare('SELECT target,metadata FROM cache WHERE node=? AND day=?')
+      .all(node, day);
+    const conflict = rows.some((r) => {
+      const m = JSON.parse(String(r.metadata)) as ApkMetadata;
+      return (
+        r.target !== target &&
+        m.fileName?.toLowerCase() === name.toLowerCase() &&
+        m.apkSha256 !== sha
+      );
+    });
+    return conflict ? name.slice(0, -4).slice(0, 180) + '-' + target.slice(0, 12) + '.apk' : name;
+  }
+  async asset(
+    node: string,
+    day: string,
+    target: string,
+    expected: ApkMetadata,
+    max: number,
+    signal: AbortSignal,
+  ) {
+    const rows = this.db
+      .prepare('SELECT target,metadata FROM cache WHERE node=? AND day=?')
+      .all(node, day);
+    const named =
+      expected.fileName &&
+      rows.find((r) => {
+        const m = JSON.parse(String(r.metadata)) as ApkMetadata;
+        return (
+          m.fileName?.toLowerCase() === expected.fileName!.toLowerCase() &&
+          m.apkSha256 === expected.apkSha256
+        );
+      });
+    const source = named ? String(named.target) : target;
+    const metadata = await this.get(node, day, source, max, signal);
+    if (
+      !metadata ||
+      metadata.apkSha256 !== expected.apkSha256 ||
+      metadata.size !== expected.size ||
+      (expected.fileName &&
+        metadata.fileName &&
+        expected.fileName.toLowerCase() !== metadata.fileName.toLowerCase())
+    )
+      return null;
+    this.pin(node, day, source);
+    return { metadata, file: this.path(this.key(node, day, source)) };
   }
   pin(node: string, day: string, target: string) {
     this.db.prepare('UPDATE cache SET active=1 WHERE key=?').run(this.key(node, day, target));

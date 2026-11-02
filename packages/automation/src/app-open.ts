@@ -36,6 +36,7 @@ export async function openApk(
   let session: AndroidSession | undefined,
     cleanupComplete = true,
     reportUnconfirmed = false;
+  let packageName = apk.packageName;
   let result: TaskCompletion = {
     status: 'FAILED',
     proof: 'NONE',
@@ -103,27 +104,31 @@ export async function openApk(
           : {}),
       },
     });
-    await timer.measure('APK_INSTALL', () => session!.install(file));
+    const installed = await timer.measure('APK_INSTALL', () =>
+      session!.install(file, apk.validationPolicy === 'FILE_NAME'),
+    );
+    if (apk.validationPolicy === 'FILE_NAME')
+      packageName = typeof installed === 'string' ? installed : undefined;
+    if (!packageName) throw new RegistrationError('APP_PACKAGE_UNCONFIRMED');
+    await stage(
+      'LAUNCHING',
+      apk.validationPolicy === 'FILE_NAME' ? { installedPackageName: packageName } : {},
+    );
     if (config.execution.appOpen.ownedTestClient) {
-      if (
-        !isOwnedTestPackage(apk.packageName) ||
-        !hooks.testBootstrap ||
-        !session.provisionTestClient
-      )
+      if (!isOwnedTestPackage(packageName) || !hooks.testBootstrap || !session.provisionTestClient)
         throw new RegistrationError('TEST_BOOTSTRAP_REQUIRED');
       const bootstrap = await hooks.testBootstrap();
       action();
-      await session.provisionTestClient(bootstrap, apk.packageName);
+      await session.provisionTestClient(bootstrap, packageName);
     }
     action();
-    await stage('LAUNCHING');
-    await timer.measure('APP_LAUNCH', () => session!.launch(apk.packageName, '@launcher'));
+    await timer.measure('APP_LAUNCH', () => session!.launch(packageName!, '@launcher'));
     action();
     if (config.execution.appOpen.appsPerDevice) {
       await timer.measure('STARTUP_ADS', () =>
         appObstructions(
           session!,
-          apk.packageName,
+          packageName!,
           hooks.beforeAction,
           async (note) => {
             await emit({
@@ -142,7 +147,7 @@ export async function openApk(
       if (!session!.foreground) throw new RegistrationError('APP_NOT_FOREGROUND');
       while (true) {
         action();
-        if (await session!.foreground(apk.packageName)) return;
+        if (await session!.foreground(packageName!)) return;
         if (clock.now() >= deadline) throw new RegistrationError('APP_NOT_FOREGROUND');
         await clock.sleep(250, signal);
       }
@@ -155,7 +160,7 @@ export async function openApk(
         action();
         await clock.sleep(Math.min(1000, Math.max(1, 10000 - (clock.now() - began))), signal);
         action();
-        if (!(await session!.foreground!(apk.packageName)))
+        if (!(await session!.foreground!(packageName!)))
           throw new RegistrationError('APP_NOT_FOREGROUND');
         samples++;
         const elapsedMs = Math.floor(clock.now() - began);
@@ -188,8 +193,7 @@ export async function openApk(
     if (config.execution.appOpen.ownedTestClient) {
       action();
       const status =
-        (await session.testClientStatus?.(apk.packageName).catch(() => 'UNCONFIRMED')) ??
-        'UNCONFIRMED';
+        (await session.testClientStatus?.(packageName).catch(() => 'UNCONFIRMED')) ?? 'UNCONFIRMED';
       reportUnconfirmed =
         status.startsWith('NETWORK_') || !/^(?:HTTP_[1-4][0-9]{2}|CONFIG_ERROR)$/.test(status);
       const message =

@@ -16,7 +16,7 @@ import type {
 } from 'playwright';
 import type { TestConfiguration, ApkMetadata } from '@apk/contracts';
 import { ApkCache, removeOwned } from './cache.js';
-import { readApkMetadata, ApkValidationError } from './apk.js';
+import { describeApkFile, ApkValidationError } from './apk.js';
 import { NetworkPolicy, startEgress } from './network.js';
 import { sha, canonical, normalizeUrl, cacheDay, DownloadError } from './common.js';
 import type { RegistrationCompletion } from './registration.js';
@@ -392,7 +392,7 @@ async function capture(
       await log('下载等待结束：未收到浏览器下载文件');
       throw new DownloadError('DOWNLOAD_NO_FILE');
     }
-    await log('下载传输：已收到浏览器文件，等待保存与读取包信息');
+    await log('下载传输：已收到浏览器文件，等待保存');
     return result;
   } finally {
     context.off('page', fresh);
@@ -625,10 +625,23 @@ export async function runDownload(
                 await emit({
                   type: 'LOG',
                   taskId: target.taskId,
-                  payload: { level: 'INFO', message: '下载传输：文件已保存，读取启动所需包信息' },
+                  payload: { level: 'INFO', message: '下载传输：文件已保存' },
                 });
                 beforeAction();
-                const inspected = await readApkMetadata(file, max, day, signal);
+                const inspected = await describeApkFile(
+                  file,
+                  max,
+                  day,
+                  download.suggestedFilename() || 'apk-' + target.targetKey.slice(0, 12) + '.apk',
+                  signal,
+                );
+                inspected.fileName = cache.availableName(
+                  nodeId,
+                  day,
+                  target.targetKey,
+                  inspected.fileName!,
+                  inspected.apkSha256,
+                );
                 await cache.put(nodeId, day, target.targetKey, file, inspected);
                 apk = inspected;
                 break;

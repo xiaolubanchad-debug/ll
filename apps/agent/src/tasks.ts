@@ -121,6 +121,7 @@ export class TaskEngine {
     }
     this.recoveryBlocked = !clean;
     await this.hub('reconcile', {
+      reason: 'STARTUP',
       protocolVersion: '1.0',
       nodeId: this.nodeId,
       bootId: this.bootId,
@@ -266,6 +267,7 @@ export class TaskEngine {
           this.store.status(delivery.deliveryId, 'REVIEW');
           const row = this.store.deliveries().find((r) => r.id === delivery.deliveryId)!;
           await this.hub('reconcile', {
+            reason: 'EXECUTION_ERROR',
             protocolVersion: '1.0',
             nodeId: this.nodeId,
             bootId: this.bootId,
@@ -594,6 +596,7 @@ export class TaskEngine {
       } else {
         this.store.status(d.deliveryId, 'REVIEW', row.clean);
         await this.hub('reconcile', {
+          reason: 'EXECUTION_ERROR',
           protocolVersion: '1.0',
           nodeId: this.nodeId,
           bootId: this.bootId,
@@ -614,6 +617,7 @@ export class TaskEngine {
   private async reconcile(d: Delivery) {
     const row = this.store.deliveries().find((r) => r.id === d.deliveryId)!;
     await this.hub('reconcile', {
+      reason: this.control === 'STOP' ? 'STOP_RECOVERY' : 'EXECUTION_ERROR',
       protocolVersion: '1.0',
       nodeId: this.nodeId,
       bootId: this.bootId,

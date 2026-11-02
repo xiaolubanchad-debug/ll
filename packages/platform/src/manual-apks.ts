@@ -7,8 +7,8 @@ import { pipeline } from 'node:stream/promises';
 import { Transform } from 'node:stream';
 import type { Readable } from 'node:stream';
 import { join, resolve } from 'node:path';
-import { readApkMetadata, verifyFileTransfer } from '@apk/automation/apk';
-import { schemaIssues, apkMetadataOnlySupported } from '@apk/contracts';
+import { describeApkFile, apkFileName, verifyFileTransfer } from '@apk/automation/apk';
+import { schemaIssues, apkMetadataOnlySupported, apkFileAssetsSupported } from '@apk/contracts';
 import type { ManualApkView, TestConfiguration } from '@apk/contracts';
 import { checked } from './secrets.js';
 import { idempotent, stopJob } from './jobs.js';
@@ -128,6 +128,7 @@ export async function receiveManualApk(
   source: Readable,
   actor: string,
   requestId: string,
+  fileName?: string,
 ) {
   const owner = randomUUID();
   const row = await db.$transaction(async (tx) => {
@@ -176,12 +177,33 @@ export async function receiveManualApk(
       }),
       createWriteStream(temp, { flags: 'wx', mode: 0o600 }),
     );
-    const apk = await readApkMetadata(
+    const apk = await describeApkFile(
       temp,
       row.maxBytes,
       row.cacheDay,
+      fileName ?? 'apk-' + row.targetKey.slice(0, 12) + '.apk',
       AbortSignal.timeout(120000),
     );
+    const other = await db.task.findMany({
+      where: { run: { nodeId: row.nodeId, cacheDay: row.cacheDay, purpose: 'DOWNLOAD' } },
+      select: { targetKey: true, apk: true, manualApk: { select: { apk: true } } },
+    });
+    if (
+      other.some(
+        (t) =>
+          t.targetKey !== row.targetKey &&
+          [t.apk, t.manualApk?.apk].some((value) => {
+            const m = value as { fileName?: string; apkSha256?: string } | null;
+            return (
+              m?.fileName?.toLowerCase() === apk.fileName!.toLowerCase() &&
+              m?.apkSha256 !== apk.apkSha256
+            );
+          }),
+      )
+    )
+      apk.fileName = apkFileName(
+        apk.fileName!.slice(0, -4).slice(0, 180) + '-' + row.targetKey.slice(0, 12) + '.apk',
+      );
     if (schemaIssues('ApkMetadata', apk).length) fault('APK_INVALID', 'APK 包信息不符合要求', 422);
     const target = manualApkPath(apk.apkSha256);
     const existing = await lstat(target).catch(() => null);
@@ -408,16 +430,18 @@ export async function tickManualApks(db: PrismaClient, now = new Date()) {
         const slot = await tx.nodeSlot.findUnique({ where: { nodeId: n.id } });
         if (
           (current.apk as { validationPolicy?: string } | null)?.validationPolicy ===
-          'ANDROID_INSTALL'
+            'ANDROID_INSTALL' ||
+          (current.apk as { validationPolicy?: string } | null)?.validationPolicy === 'FILE_NAME'
         ) {
           const installed = n.agentReleaseId
             ? await tx.release.findUnique({ where: { id: n.agentReleaseId } })
             : null;
           if (
-            !apkMetadataOnlySupported(
-              (installed?.manifest as { features?: string[] } | null)?.features,
-              n.agentVersion,
-            )
+            !(
+              (current.apk as { validationPolicy?: string }).validationPolicy === 'FILE_NAME'
+                ? apkFileAssetsSupported
+                : apkMetadataOnlySupported
+            )((installed?.manifest as { features?: string[] } | null)?.features, n.agentVersion)
           ) {
             if (current.errorCode !== 'NODE_UPGRADE_REQUIRED')
               await tx.manualApkUpload.update({
@@ -455,7 +479,9 @@ export async function tickManualApks(db: PrismaClient, now = new Date()) {
           const manifest = r.manifest as { features?: string[]; agentVersion?: string };
           return (
             manifest.features?.includes(MANUAL_FEATURE) &&
-            apkMetadataOnlySupported(manifest.features, manifest.agentVersion)
+            ((current.apk as { validationPolicy?: string } | null)?.validationPolicy === 'FILE_NAME'
+              ? apkFileAssetsSupported
+              : apkMetadataOnlySupported)(manifest.features, manifest.agentVersion)
           );
         });
         if (!release) {

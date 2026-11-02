@@ -28,8 +28,8 @@ export function preferredTask(node: NodeView, tasks: TaskPlanView[], chosen?: st
   );
 }
 export function executionLabel(node: NodeView, task?: TaskPlanView) {
+  if (node.activeStopRequested) return '停止中 · 等待清理确认';
   if (node.occupancy === 'QUARANTINED') return '待核验';
-  if (node.activeStopRequested) return '等待清理';
   if (node.activeOperationId) return '部署 / 检查中';
   if (node.connection === 'OFFLINE') return node.occupancy === 'BUSY' ? '离线 · 等待确认' : '离线';
   const c = task?.latestCycle;
@@ -52,6 +52,7 @@ export function executionLabel(node: NodeView, task?: TaskPlanView) {
   return '空闲';
 }
 export function startReason(node: NodeView, task?: TaskPlanView) {
+  if (node.activeStopRequested) return '停止要求已保存，等待执行端清理确认';
   if (!task) return '请先配置任务';
   if (!currentFlow(task)) return '历史流程，请先在配置中转换为 APP 打开测试';
   if (node.connection !== 'ONLINE') return '服务器离线';

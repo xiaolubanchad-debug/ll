@@ -1,5 +1,7 @@
 # APK 自动化测试部署中台
 
+1.20 文件名资产、安装后包名发现和停止清理自动回收遵循 [新契约](docs/V120_FILE_ASSETS_AND_STOP_CONTRACT.md)，对应 Agent 0.16.0。
+
 1.19.1 按最新要求取消 APK 内容预校验，保留必要包信息读取及传输确认，见 [安装判定契约](docs/V1191_METADATA_ONLY_CONTRACT.md)。
 
 1.19 下载结果、失败入口手动补包见 [资产契约](docs/V119_APK_ASSETS_CONTRACT.md) 与 [操作说明](docs/APK_ASSETS_RUNBOOK.md)。

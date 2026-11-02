@@ -66,8 +66,8 @@ export interface TaskCompletion {
 export interface AndroidSession {
   observation: DeviceObservation;
   supportedAbis: string[];
-  install(file: string): Promise<void>;
-  finishApplication?(packageName: string): Promise<boolean>;
+  install(file: string, resolvePackage?: boolean): Promise<string | void>;
+  finishApplication?(packageName?: string): Promise<boolean>;
   provisionTestClient?(
     bootstrap: import('@apk/contracts').TestBootstrap,
     packageName?: string,
