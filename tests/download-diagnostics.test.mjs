@@ -132,5 +132,28 @@ test(
         }),
         [],
       );
+    const coveredBefore = requests.filter((p) => p === '/covered').length;
+    config.source.xpath = "//a[@pid='owned0']";
+    config.download.retries = 2;
+    const retryEvents = [];
+    await runDownload(
+      config,
+      randomUUID(),
+      root,
+      resolve('.'),
+      AbortSignal.timeout(18000),
+      async (e) => retryEvents.push(e),
+      { chromium, policy: new NetworkPolicy(new Set([origin])) },
+    );
+    assert.equal(
+      retryEvents.find((e) => e.type === 'TASK_FINISHED')?.payload.errorCode,
+      'DOWNLOAD_CONTROL_UNCONFIRMED',
+    );
+    assert.equal(
+      requests.filter((p) => p === '/covered').length - coveredBefore,
+      1,
+      'unknown touch result is never retried, including legacy retry configuration',
+    );
+    assert.deepEqual(await readdir(join(root, 'jobs')), []);
   },
 );

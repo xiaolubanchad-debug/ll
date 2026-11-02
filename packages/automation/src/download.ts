@@ -657,7 +657,14 @@ export async function runDownload(
                       : egress.wasBlocked()
                         ? 'NETWORK_BLOCKED'
                         : 'DOWNLOAD_FAILED';
-              if (errorCode === 'NAVIGATION_SITE') break;
+              if (
+                [
+                  'NAVIGATION_SITE',
+                  'DOWNLOAD_SOURCE_UNCONFIRMED',
+                  'DOWNLOAD_CONTROL_UNCONFIRMED',
+                ].includes(errorCode)
+              )
+                break;
               if (attempt < config.download.retries) await pause(250 * 2 ** attempt, signal);
             } finally {
               await download?.delete().catch(() => {});
