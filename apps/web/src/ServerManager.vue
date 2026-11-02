@@ -18,6 +18,7 @@ import {
   ownsRun,
   preferredTask,
   executionLabel,
+  executionMessage,
   startReason,
   logRun,
 } from './server-console';
@@ -320,10 +321,18 @@ async function checkServer(node: NodeView) {
   managementPanel.value?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 function logs(node: NodeView) {
-  const id = logRun(node, taskFor(node));
+  const task = taskFor(node);
+  const id = logRun(node, task);
   if (id) {
     visibleLog.value = id;
     editorNode.value = null;
+  } else if (
+    task?.latestCycle &&
+    (['QUEUED', 'WAITING'].includes(task.latestCycle.status) ||
+      task.latestCycle.errorCode === 'NODE_RELEASE_CHANGED')
+  ) {
+    visibleLog.value = null;
+    notice.value = '本次尚未创建执行批次。' + (executionMessage(task) || '正在等待后台领取。');
   } else void manage(node);
 }
 
@@ -605,6 +614,9 @@ onUnmounted(() => {
                   >完成 {{ taskFor(node)?.latestCycle?.successes }} /
                   {{ taskFor(node)?.latestCycle?.successTarget }}</small
                 >
+                <small v-if="executionMessage(taskFor(node))" role="status">{{
+                  executionMessage(taskFor(node))
+                }}</small>
                 <el-button
                   v-if="taskFor(node)?.sourceWarning"
                   link

@@ -269,6 +269,13 @@ export async function createRun(
     await idle(tx, node.id);
     if (!node.lastSeenAt || node.lastSeenAt.getTime() < Date.now() - 45000)
       fault('NODE_OFFLINE', '节点尚未在线');
+    if (
+      cycleId &&
+      node.deploymentStatus === 'INSTALLED' &&
+      node.agentReleaseId &&
+      node.agentReleaseId !== input.releaseId
+    )
+      fault('NODE_RELEASE_CHANGED', '执行版本已更新，请点击开始继续');
     if (node.agentReleaseId !== input.releaseId || node.deploymentStatus !== 'INSTALLED')
       fault('NODE_NOT_READY', '节点发布版本不匹配');
     const release = await tx.release.findUnique({

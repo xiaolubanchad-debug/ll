@@ -530,7 +530,8 @@ export async function controlTaskPlan(
           latest &&
           input.action === 'START' &&
           !closed.includes(latest.status) &&
-          latest.status !== 'NEEDS_REVIEW'
+          latest.status !== 'NEEDS_REVIEW' &&
+          latest.releaseId === node.agentReleaseId
         ) {
           if (latest.stopRequested) fault('STOP_PENDING', '正在等待停止确认');
         } else {
@@ -539,7 +540,8 @@ export async function controlTaskPlan(
             !node.lastSeenAt ||
             Date.now() - node.lastSeenAt.getTime() > 45000 ||
             node.archivedAt ||
-            node.deploymentStatus !== 'INSTALLED'
+            node.deploymentStatus !== 'INSTALLED' ||
+            !node.agentReleaseId
           )
             fault('NODE_NOT_READY', '服务器尚未就绪，请检查服务器');
           if (latest && input.action === 'START') {
@@ -569,6 +571,7 @@ export async function controlTaskPlan(
                   errorCode: null,
                   generation: { increment: 1 },
                   proxyRunId: null,
+                  releaseId: node.agentReleaseId,
                   configVersionId: effective.version.id,
                   deferredDownloadRules: effective.deferred,
                 },
@@ -635,6 +638,71 @@ async function updateCycle(
     data: { status, errorCode },
   });
 }
+async function pauseForReleaseChange(db: PrismaClient, snapshot: CycleRow) {
+  return db.$transaction(async (tx) => {
+    await lockLibrary(tx);
+    const node = await lockNode(tx, snapshot.nodeId);
+    const cycle = await tx.managedCycle.findUnique({
+      where: { id: snapshot.id },
+      include: { task: true },
+    });
+    // A scheduler snapshot must never overwrite a concurrent stop or new generation.
+    if (
+      !cycle ||
+      cycle.generation !== snapshot.generation ||
+      cycle.stopRequested ||
+      !cycle.task.enabled ||
+      cycle.task.archivedAt ||
+      [...closed, 'NEEDS_REVIEW'].includes(cycle.status)
+    )
+      return true;
+    if (
+      node.deploymentStatus !== 'INSTALLED' ||
+      !node.agentReleaseId ||
+      node.agentReleaseId === cycle.releaseId
+    )
+      return false;
+    const slot = await tx.nodeSlot.findUnique({ where: { nodeId: node.id } });
+    if (
+      !slot ||
+      slot.operationId ||
+      slot.runId ||
+      slot.quarantined ||
+      (await tx.run.count({
+        where: {
+          nodeId: node.id,
+          OR: [
+            { status: { notIn: RUN_END as Run['status'][] } },
+            { status: 'NEEDS_REVIEW', reviewResolvedAt: null },
+          ],
+        },
+      }))
+    )
+      return true;
+    await tx.managedCycle.update({
+      where: { id: cycle.id },
+      data: { status: 'FAILED', errorCode: 'NODE_RELEASE_CHANGED' },
+    });
+    await tx.managedTask.update({
+      where: { id: cycle.taskId },
+      data: { enabled: false, version: { increment: 1 } },
+    });
+    await tx.auditEvent.create({
+      data: {
+        action: 'TASK_RELEASE_CHANGED',
+        requestId: 'task-center',
+        details: {
+          taskId: cycle.taskId,
+          cycleId: cycle.id,
+          generation: cycle.generation,
+          previousReleaseId: cycle.releaseId,
+          installedReleaseId: node.agentReleaseId,
+        },
+      },
+    });
+    return true;
+  });
+}
 async function advance(db: PrismaClient, p: ManagedTask, c: CycleRow, now: Date) {
   const active = c.runs.filter((r) => !RUN_END.includes(r.status));
   if (c.stopRequested || !p.enabled || c.day !== beijingDay(now)) {
@@ -682,6 +750,7 @@ async function advance(db: PrismaClient, p: ManagedTask, c: CycleRow, now: Date)
     return;
   }
   if (active.length) return;
+  if (await pauseForReleaseChange(db, c)) return;
   const total = counts(c),
     config = (await db.configVersion.findUniqueOrThrow({ where: { id: c.configVersionId } }))
       .body as unknown as TestConfiguration;
@@ -836,13 +905,18 @@ export async function tickTaskPlans(db: PrismaClient, now = new Date()) {
     if (!plans.length) break;
     cursor = plans.at(-1)!.id;
     for (let p of plans) {
+      let advancing: CycleRow | undefined;
       try {
         let cycles = await db.managedCycle.findMany({
           where: { taskId: p.id, status: { notIn: closed } },
           include: cycleInclude,
           orderBy: { createdAt: 'asc' },
         });
-        for (const c of cycles) await advance(db, p, c, now);
+        for (const c of cycles) {
+          advancing = c;
+          await advance(db, p, c, now);
+          advancing = undefined;
+        }
         p = await db.managedTask.findUniqueOrThrow({ where: { id: p.id } });
         if (p.enabled && p.automatic && !p.archivedAt && time >= p.time) {
           await db.$transaction(async (tx) => {
@@ -871,10 +945,14 @@ export async function tickTaskPlans(db: PrismaClient, now = new Date()) {
       } catch (error) {
         if (error instanceof PlatformError && ['TASK_STOPPED', 'TASK_CHANGED'].includes(error.code))
           continue;
+        if (error instanceof PlatformError && error.code === 'NODE_RELEASE_CHANGED' && advancing) {
+          if (await pauseForReleaseChange(db, advancing).catch(() => false)) continue;
+        }
         await db.managedCycle
           .updateMany({
             where: {
               taskId: p.id,
+              ...(advancing ? { id: advancing.id, generation: advancing.generation } : {}),
               day: beijingDay(now),
               stopRequested: false,
               status: { notIn: [...closed, 'NEEDS_REVIEW'] },

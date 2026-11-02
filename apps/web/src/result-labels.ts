@@ -80,6 +80,7 @@ export const reasonLabels: Record<string, string> = {
   NODE_BUSY: '服务器正在执行其他任务或等待核验',
   NODE_OFFLINE: '服务器离线',
   NODE_NOT_READY: '服务器或发布尚未就绪',
+  NODE_RELEASE_CHANGED: '执行版本已更新，请点击开始继续；历史结果和已用次数保留',
   NODE_UPGRADE_REQUIRED: '请升级服务器到支持当前配置的 Agent 版本',
   PROXY_CONFIG_INVALID: '请应用已保存代理并保存完整配置版本',
   DOWNLOAD_SOURCE_INVALID: '需要本服务器、本配置当天的有效下载批次',

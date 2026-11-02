@@ -1,4 +1,5 @@
 import type { NodeView, TaskPlanView } from '@apk/contracts';
+import { reasonLabels } from './result-labels';
 
 export const activeCycle = (task: TaskPlanView) =>
   !!task.latestCycle && !['DONE', 'FAILED', 'STOPPED'].includes(task.latestCycle.status);
@@ -48,8 +49,16 @@ export function executionLabel(node: NodeView, task?: TaskPlanView) {
       )[c!.status] ?? '执行中'
     );
   if (node.occupancy === 'BUSY') return '执行中';
+  if (c?.errorCode === 'NODE_RELEASE_CHANGED') return '版本已更新 · 待继续';
+  if (c?.status === 'STOPPED') return '已停止';
+  if (c?.status === 'FAILED') return '任务未完成';
   if (task?.enabled && task.automatic) return '等待每日执行';
   return '空闲';
+}
+export function executionMessage(task?: TaskPlanView) {
+  const c = task?.latestCycle;
+  if (!c?.errorCode || ['DONE', 'STOPPED'].includes(c.status)) return '';
+  return reasonLabels[c.errorCode] ?? '任务暂未继续，请查看执行记录';
 }
 export function startReason(node: NodeView, task?: TaskPlanView) {
   if (node.activeStopRequested) return '停止要求已保存，等待执行端清理确认';
@@ -63,5 +72,10 @@ export function startReason(node: NodeView, task?: TaskPlanView) {
 }
 export function logRun(node: NodeView, task?: TaskPlanView) {
   const c = task?.latestCycle;
-  return node.activeRunId ?? c?.activeRunId ?? c?.registerRunIds.at(-1) ?? c?.downloadRunId ?? null;
+  const active = node.activeRunId ?? c?.activeRunId;
+  if (active) return active;
+  // A resumed cycle may not have created its new batch yet. Its old runs are history.
+  if (c && (['QUEUED', 'WAITING'].includes(c.status) || c.errorCode === 'NODE_RELEASE_CHANGED'))
+    return null;
+  return c?.registerRunIds.at(-1) ?? c?.downloadRunId ?? null;
 }

@@ -1,5 +1,7 @@
 # HTTP 接口契约
 
+1.22 任务继续时的版本选择、等待原因及已停止记录展示遵循 [恢复契约](../docs/V122_TASK_RESUME_CONTRACT.md)。
+
 1.21 人工元素检查配置、定位记录和中台提醒遵循 [检查契约](../docs/V121_XPATH_OBSERVATION_CONTRACT.md)，对应 Agent 0.17.0。
 
 1.20 文件名资产、安装后包名发现和停止清理自动回收遵循 [新契约](../docs/V120_FILE_ASSETS_AND_STOP_CONTRACT.md)，对应 Agent 0.16.0。

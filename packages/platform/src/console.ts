@@ -562,6 +562,7 @@ export async function runSummary(db: PrismaClient, id: string): Promise<RunSumma
     async (tx) => {
       const row = await tx.run.findUnique({ where: { id }, select: runSelect });
       if (!row) fault('NOT_FOUND', '执行批次不存在', 404);
+      const view = runView(row);
       const [counts, taskCount, activeTask, automaticIdentityCount, activeTasks] =
         await Promise.all([
           categoryCounts(tx, { runId: id }),
@@ -633,7 +634,9 @@ export async function runSummary(db: PrismaClient, id: string): Promise<RunSumma
           started: states.size,
           closed: [...states.values()].filter((v) => v === 'CLOSED').length,
           failed: [...states.values()].filter((v) => v === 'FAILED').length,
-          active: [...states.values()].filter((v) => v === 'STARTED').length,
+          active: view.stopConfirmed
+            ? 0
+            : [...states.values()].filter((v) => v === 'STARTED').length,
         };
       }
       const mapActive = (task: NonNullable<typeof activeTask>) => ({
@@ -656,14 +659,14 @@ export async function runSummary(db: PrismaClient, id: string): Promise<RunSumma
           : {}),
         ...(deviceSessions ? { deviceSessions } : {}),
         concurrency: c?.execution.appOpen?.concurrency ?? 1,
-        activeTasks: activeTasks.map(mapActive),
+        activeTasks: view.stopConfirmed ? [] : activeTasks.map(mapActive),
         executionKind:
           row.purpose === 'DOWNLOAD'
             ? 'DOWNLOAD_ONLY'
             : (row.configVersion?.body as unknown as TestConfiguration | null)?.execution.appOpen
               ? 'APP_OPEN'
               : 'REGISTRATION',
-        run: runView(row),
+        run: view,
         nodeId: row.nodeId,
         configVersion: row.configVersion?.version ?? 0,
         releaseId: row.releaseId,
@@ -677,19 +680,21 @@ export async function runSummary(db: PrismaClient, id: string): Promise<RunSumma
             : row.reviewResolvedAt || row.finishedAt
               ? 'CONFIRMED'
               : 'PENDING',
-        activeTask: c?.execution.appOpen
-          ? activeTasks[0]
-            ? mapActive(activeTasks[0])
-            : null
-          : activeTask
-            ? {
-                id: activeTask.id,
-                position: activeTask.position + 1,
-                label: activeTask.label,
-                stage: activeTask.status,
-                packageName: apkView(activeTask.apk)?.packageName ?? null,
-              }
-            : null,
+        activeTask: view.stopConfirmed
+          ? null
+          : c?.execution.appOpen
+            ? activeTasks[0]
+              ? mapActive(activeTasks[0])
+              : null
+            : activeTask
+              ? {
+                  id: activeTask.id,
+                  position: activeTask.position + 1,
+                  label: activeTask.label,
+                  stage: activeTask.status,
+                  packageName: apkView(activeTask.apk)?.packageName ?? null,
+                }
+              : null,
       });
     },
     { isolationLevel: 'RepeatableRead' },
