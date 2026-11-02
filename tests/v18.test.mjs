@@ -9,6 +9,7 @@ import { createServer as createVite } from 'vite';
 import { createApp } from '../apps/control-api/dist/app.js';
 import { passwordHash } from '../apps/control-api/dist/auth.js';
 import { initializeAdmin } from '../apps/control-api/dist/admin.js';
+import { prepareDailyPlan } from '../packages/platform/dist/daily-plan.js';
 import {
   saveTaskPlan,
   controlTaskPlan,
@@ -30,6 +31,7 @@ const db = new PrismaClient(),
     day: '2-digit',
   }).format(now);
 let app, vite, browser, base, cookie, csrf, admin, node, release, proxy, task;
+const extraReleases = [];
 const requestId = 'v18-owned-acceptance',
   key = () => randomUUID();
 async function call(path, method = 'GET', body, version, requestKey = key(), auth = true) {
@@ -391,6 +393,101 @@ test('1.8 managed tasks: real PostgreSQL, persistent orchestration and browser c
       },
     );
     await t.test(
+      'resume after an Agent upgrade uses the installed release and preserves counters and old snapshots',
+      async () => {
+        const before = await cycle(),
+          priorRelease = release.id,
+          upgraded = await db.release.create({
+            data: {
+              id: randomUUID(),
+              sha256: digest(randomUUID()),
+              artifactName: 'owned-upgrade-' + randomUUID() + '.tgz',
+              manifest: release.manifest,
+            },
+          });
+        extraReleases.push(upgraded.id);
+        await db.node.update({
+          where: { id: node.id },
+          data: { agentReleaseId: upgraded.id, lastSeenAt: new Date() },
+        });
+        await control('START');
+        const resumed = await cycle();
+        assert.equal(resumed.id, before.id);
+        assert.equal(resumed.releaseId, upgraded.id);
+        assert.equal(resumed.generation, before.generation + 1);
+        assert.equal(resumed.downloadRunId, before.downloadRunId);
+        assert.deepEqual(resumed.runs, before.runs);
+        const view = (await taskPlanDetail(db, task.id)).task.latestCycle;
+        assert.equal(
+          view.attemptsStarted,
+          before.runs.reduce((n, r) => n + r.attemptsStarted, 0),
+        );
+        assert.equal(
+          view.successes,
+          before.runs.reduce((n, r) => n + r.successes, 0),
+        );
+        await control('STOP');
+        await ticks();
+        // Reproduce a pending request that still points to the pre-upgrade release.
+        await db.node.update({ where: { id: node.id }, data: { agentReleaseId: priorRelease } });
+        await db.managedTask.update({ where: { id: task.id }, data: { enabled: true } });
+        await db.managedCycle.update({
+          where: { id: resumed.id },
+          data: { status: 'WAITING', stopRequested: false, errorCode: 'NODE_NOT_READY' },
+        });
+        await control('START');
+        const resumedWaiting = await cycle();
+        assert.equal(resumedWaiting.releaseId, priorRelease);
+        assert.equal(resumedWaiting.generation, resumed.generation + 1);
+        await control('STOP');
+        await ticks();
+        await db.node.update({ where: { id: node.id }, data: { agentReleaseId: upgraded.id } });
+        await db.managedTask.update({ where: { id: task.id }, data: { enabled: true } });
+        await db.managedCycle.update({
+          where: { id: resumed.id },
+          data: { status: 'WAITING', stopRequested: false, errorCode: 'NODE_NOT_READY' },
+        });
+        const runCount = await db.run.count({ where: { nodeId: node.id } });
+        await ticks();
+        assert.equal((await cycle()).status, 'QUEUED');
+        assert.equal((await cycle()).errorCode, null);
+        assert.equal((await cycle()).releaseId, upgraded.id);
+        assert.equal((await taskPlanDetail(db, task.id)).task.enabled, true);
+        assert.equal(await db.run.count({ where: { nodeId: node.id } }), runCount);
+        await control('START');
+        const current = await cycle();
+        assert.equal(current.releaseId, upgraded.id);
+        assert.equal(current.generation, resumedWaiting.generation + 1);
+        await assert.rejects(
+          createRun(
+            db,
+            {
+              nodeId: node.id,
+              configVersionId: resumed.configVersionId,
+              releaseId: upgraded.id,
+              purpose: 'PROXY_CHECK',
+              proxySecretVersionId: proxy.id,
+            },
+            admin.id,
+            requestId,
+            key(),
+            now,
+            undefined,
+            current.id,
+            resumed.generation,
+          ),
+          (e) => e.code === 'TASK_CHANGED',
+        );
+        await control('STOP');
+        await ticks();
+        await db.node.update({ where: { id: node.id }, data: { agentReleaseId: priorRelease } });
+        await control('START');
+        assert.equal((await cycle()).releaseId, priorRelease);
+        await control('STOP');
+        await ticks();
+      },
+    );
+    await t.test(
       'dispatched stop keeps the node reserved until a cleanup receipt arrives',
       async () => {
         await control('START');
@@ -421,6 +518,38 @@ test('1.8 managed tasks: real PostgreSQL, persistent orchestration and browser c
         await finish(c.proxyRunId, 'CANCELLED', { cleanupConfirmedAt: new Date() });
         await ticks();
         assert.equal((await cycle()).status, 'STOPPED');
+      },
+    );
+    await t.test(
+      'explicit cached filenames never fall back to other APKs or create a download',
+      async () => {
+        const current = await db.configVersion.findUniqueOrThrow({
+          where: { id: (await cycle()).configVersionId },
+        });
+        const selected = 'history-' + digest('v18-owned-target').slice(0, 12) + '.apk';
+        const config = structuredClone(current.body);
+        config.execution.appOpen = { dwellMs: 10000, concurrency: 1, assetFileNames: [selected] };
+        delete config.execution.autoRegistration;
+        config.registrationFlows = [];
+        const input = {
+          nodeId: node.id,
+          purpose: 'REGISTER',
+          sourceDownloadId: downloadId,
+          successTarget: 1,
+          attemptLimit: 1,
+        };
+        const before = await db.run.count({ where: { nodeId: node.id } });
+        const plan = await db.$transaction((tx) =>
+          prepareDailyPlan(tx, input, { ...current, body: config }, now),
+        );
+        assert.equal(plan.assets.length, 1);
+        assert.equal(plan.assets[0].targetKey, digest('v18-owned-target'));
+        config.execution.appOpen.assetFileNames = ['missing.apk'];
+        await assert.rejects(
+          db.$transaction((tx) => prepareDailyPlan(tx, input, { ...current, body: config }, now)),
+          (e) => e.code === 'APK_SELECTION_UNAVAILABLE',
+        );
+        assert.equal(await db.run.count({ where: { nodeId: node.id } }), before);
       },
     );
     await t.test(
@@ -739,6 +868,7 @@ test('1.8 managed tasks: real PostgreSQL, persistent orchestration and browser c
       await db.node.delete({ where: { id: node.id } });
     }
     if (release) await db.release.delete({ where: { id: release.id } });
+    await db.release.deleteMany({ where: { id: { in: extraReleases } } });
     if (proxy) await db.secretVersion.delete({ where: { id: proxy.id } });
     await db.$disconnect();
   }

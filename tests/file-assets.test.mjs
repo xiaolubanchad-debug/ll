@@ -15,6 +15,58 @@ import {
 import { chromium } from '@playwright/test';
 import { fixtureSite } from './p2-fixtures.mjs';
 import { schemaIssues, devicePlanIssues } from '@apk/contracts';
+import {
+  checkConfiguredSourceElements,
+  describeSourceElements,
+  locateSourceElement,
+} from '../packages/automation/dist/source-elements.js';
+
+test('manual checks support attributes, tags and XPath without extra taps, and retain missing/read-error distinctions', async (t) => {
+  const browser = await chromium.launch({ headless: true });
+  t.after(() => browser.close());
+  const page = await browser.newPage();
+  await page.setContent('<i name="download">Owned icon</i><button>Owned button</button>');
+  const value = `both'and"quotes`;
+  await page.locator('i').evaluate((e, value) => e.setAttribute('data-key', value), value);
+  const rules = [
+    { id: randomUUID(), label: 'name', kind: 'ATTRIBUTE', attribute: 'name', value: 'download' },
+    { id: randomUUID(), label: 'i', kind: 'TAG', tag: 'i' },
+    { id: randomUUID(), label: 'quotes', kind: 'ATTRIBUTE', attribute: 'data-key', value },
+    { id: randomUUID(), label: 'missing pid', kind: 'ATTRIBUTE', attribute: 'pid', value: '1230' },
+    { id: randomUUID(), label: 'invalid expression', kind: 'XPATH', xpath: '//*[' },
+  ];
+  const events = [];
+  await checkConfiguredSourceElements(
+    page,
+    rules,
+    AbortSignal.timeout(10000),
+    async (e) => events.push(e),
+    () => {},
+  );
+  assert.deepEqual(
+    events.map((e) => e.payload.status),
+    ['FOUND', 'FOUND', 'FOUND', 'NOT_FOUND', 'READ_FAILED'],
+  );
+  assert.deepEqual(
+    events.map((e) => e.payload.matchedCount),
+    [1, 1, 1, 0, 0],
+  );
+  const described = describeSourceElements([
+    {
+      position: 0,
+      tag: 'i',
+      label: 'Owned icon',
+      attributes: [{ name: 'name', value: 'download' }],
+    },
+  ])[0];
+  assert.equal(await (await locateSourceElement(page, '//i', described)).count(), 1);
+  await page.locator('i').evaluate((e) => e.remove());
+  await assert.rejects(
+    locateSourceElement(page, '//i', described),
+    (e) => e.code === 'TARGET_MISSING',
+  );
+  assert.ok(events.every((e) => schemaIssues('SourceElementObservation', e.payload).length === 0));
+});
 
 test('download receipt accepts arbitrary file bytes without manifest parsing and retains a safe filename', async (t) => {
   const dir = await mkdtemp(join(tmpdir(), 'file-assets-'));

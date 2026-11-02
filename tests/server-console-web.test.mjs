@@ -267,7 +267,31 @@ test('server row paginates choices, reuses failed intent and stops the actual oc
     state.node.occupancy = 'IDLE';
     state.node.activeRunId = null;
     state.node.activeStopRequested = false;
-    await expect(r.locator('.server-status').last()).toHaveText('空闲', { timeout: 7000 });
+    await expect(r.locator('.server-status').last()).toHaveText('已停止', { timeout: 7000 });
+  }));
+
+test('waiting without a current batch explains the blocker instead of opening old review logs', async () =>
+  fixture(async ({ page, state, requests, row }) => {
+    state.a.enabled = true;
+    state.a.latestCycle = {
+      ...state.cycle(state.runA, 'WAITING'),
+      activeRunId: null,
+      errorCode: 'NODE_NOT_READY',
+    };
+    await open(page);
+    await expect(row()).toContainText('服务器或发布尚未就绪');
+    await row().getByRole('button', { name: '日志', exact: true }).click();
+    await expect(page.getByRole('alert').first()).toContainText('本次尚未创建执行批次');
+    assert.equal(
+      requests.some((r) => r.path.startsWith('/runs/' + state.runA)),
+      false,
+    );
+    state.a.enabled = true;
+    state.a.latestCycle.status = 'WAITING';
+    state.a.latestCycle.errorCode = 'NODE_RELEASE_CHANGED';
+    await expect(row()).toContainText('正在衔接服务器当前版本', { timeout: 7000 });
+    await expect(row().getByRole('button', { name: '停止', exact: true })).toBeEnabled();
+    await expect(row()).toContainText('历史结果和已用次数保留');
   }));
 
 test('completed rounds require explicit confirmation; stale and legacy configurations cannot silently start', async () =>
@@ -318,6 +342,12 @@ test('server inline configuration copies a template without rebinding another ta
     await expect(page.locator('#task-name')).toHaveValue('共享打开测试配置');
     await page.locator('#task-target').fill('5');
     await page.locator('#task-limit').fill('10');
+    const checks = page.getByRole('region', { name: '每日元素检查配置' });
+    await checks.getByRole('button', { name: /添加检查/ }).click();
+    await checks.getByLabel('属性名', { exact: true }).fill('name');
+    await checks.getByLabel('属性值', { exact: true }).fill('owned-download');
+    await page.getByText('只运行指定缓存 APK（可选）', { exact: true }).click();
+    await page.locator('#task-apk-files').fill('owned-1.apk\nowned-2.apk');
     await page.getByRole('button', { name: '保存配置', exact: true }).click();
     await expect.poll(() => writes.length).toBe(1);
     const w = writes[0];
@@ -328,6 +358,13 @@ test('server inline configuration copies a template without rebinding another ta
     assert.deepEqual(schemaIssues('TaskPlanInput', w.body), []);
     assert.deepEqual(w.body.configuration.registrationFlows, []);
     assert.equal(w.body.configuration.execution.appOpen.dwellMs, 10000);
+    assert.equal(w.body.configuration.source.elementChecks[0].attribute, 'name');
+    assert.equal(w.body.configuration.source.elementChecks[0].value, 'owned-download');
+    assert.ok(w.body.configuration.source.elementChecks[0].label);
+    assert.deepEqual(w.body.configuration.execution.appOpen.assetFileNames, [
+      'owned-1.apk',
+      'owned-2.apk',
+    ]);
     await expect(r.getByRole('combobox')).toContainText('共享打开测试配置');
     assert.equal(
       writes.some((w) => w.path.includes('/control')),

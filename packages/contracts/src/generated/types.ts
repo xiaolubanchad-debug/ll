@@ -294,6 +294,11 @@ export interface APKTestConfigurationVersion10 {
       concurrency?: 1 | 2;
       randomDeviceProfile?: true;
       ownedTestClient?: true;
+      /**
+       * @minItems 1
+       * @maxItems 1000
+       */
+      assetFileNames?: string[];
       appsPerDevice?: {
         min: number;
         max: number;
@@ -580,6 +585,11 @@ export interface APKTestConfigurationVersion10 {
       concurrency?: 1 | 2;
       randomDeviceProfile?: true;
       ownedTestClient?: true;
+      /**
+       * @minItems 1
+       * @maxItems 1000
+       */
+      assetFileNames?: string[];
       appsPerDevice?: {
         min: number;
         max: number;
@@ -1378,6 +1388,11 @@ export interface TestConfiguration {
       concurrency?: 1 | 2;
       randomDeviceProfile?: true;
       ownedTestClient?: true;
+      /**
+       * @minItems 1
+       * @maxItems 1000
+       */
+      assetFileNames?: string[];
       appsPerDevice?: {
         min: number;
         max: number;

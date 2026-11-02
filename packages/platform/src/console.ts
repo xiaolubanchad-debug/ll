@@ -647,7 +647,7 @@ export async function runSummary(db: PrismaClient, id: string): Promise<RunSumma
         packageName: apkView(task.apk)?.packageName ?? null,
       });
       return output('RunSummaryView', {
-        ...(row.purpose === 'DOWNLOAD' && c
+        ...((row.purpose === 'DOWNLOAD' || row.purpose === 'LEGACY') && c
           ? {
               sourceElements: await sourceElementSummary(
                 tx,

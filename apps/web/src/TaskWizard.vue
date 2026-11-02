@@ -37,6 +37,9 @@ const step = ref(props.initialStep ?? 1),
   downloadLimit = ref(props.initial?.configuration.download.maxTargets ?? 100),
   importId = ref(props.copyConfigId ?? props.initial?.task.configId ?? '');
 const source = ref(props.initial?.configuration.source.url ?? ''),
+  assetFileNames = ref(
+    (props.initial?.configuration.execution.appOpen?.assetFileNames ?? []).join('\n'),
+  ),
   xpath = ref(props.initial?.configuration.source.xpath ?? example.source.xpath),
   mode = ref<'FULL' | 'DOWNLOAD_ONLY'>(props.initial?.configuration.execution.mode ?? 'FULL');
 const elementChecks = ref<NonNullable<TestConfiguration['source']['elementChecks']>>(
@@ -129,6 +132,15 @@ const draft = computed(() => {
   if (mode.value === 'FULL') {
     v.execution.proxySecretVersionId = proxyId.value;
     v.execution.appOpen = { dwellMs: 10000, concurrency: concurrency.value };
+    const selectedFiles = [
+      ...new Set(
+        assetFileNames.value
+          .split(/\r?\n/)
+          .map((s) => s.trim())
+          .filter(Boolean),
+      ),
+    ];
+    if (selectedFiles.length) v.execution.appOpen.assetFileNames = selectedFiles;
     if (multiApp.value)
       v.execution.appOpen.appsPerDevice = {
         min: appsMin.value,
@@ -226,6 +238,7 @@ function apply(value: string) {
     appsMax.value = c.execution.appOpen?.appsPerDevice?.max ?? 1;
     randomDeviceProfile.value = c.execution.appOpen?.randomDeviceProfile ?? false;
     ownedTestClient.value = c.execution.appOpen?.ownedTestClient ?? false;
+    assetFileNames.value = (c.execution.appOpen?.assetFileNames ?? []).join('\n');
     error.value = '';
   } catch (e) {
     error.value = e instanceof Error ? e.message : '配置无效';
@@ -478,7 +491,20 @@ onUnmounted(() => {
           </p>
           <p v-if="ownedTestClient" class="muted">
             仅用于“中台测试 APK”；账户创建回执显示在“测试数据”，与启动完成数分开。
-          </p></template
+          </p>
+          <details>
+            <summary>只运行指定缓存 APK（可选）</summary>
+            <label for="task-apk-files">APK 文件名，每行一个</label>
+            <textarea
+              id="task-apk-files"
+              v-model="assetFileNames"
+              rows="3"
+              placeholder="留空使用全部可用 APK"
+            />
+            <p class="muted">
+              只选择现有缓存，不会重新下载。所填文件不可用时会提示，不会改选其他 APK。
+            </p>
+          </details></template
         >
       </template>
       <template v-if="compact || step === 3">

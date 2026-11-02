@@ -49,7 +49,6 @@ export function executionLabel(node: NodeView, task?: TaskPlanView) {
       )[c!.status] ?? '执行中'
     );
   if (node.occupancy === 'BUSY') return '执行中';
-  if (c?.errorCode === 'NODE_RELEASE_CHANGED') return '版本已更新 · 待继续';
   if (c?.status === 'STOPPED') return '已停止';
   if (c?.status === 'FAILED') return '任务未完成';
   if (task?.enabled && task.automatic) return '等待每日执行';

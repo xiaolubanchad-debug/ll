@@ -1317,6 +1317,52 @@ test('1.20 file mode requires file name', () =>
       cacheDay: '2026-11-03',
     }).length,
   ));
+const checkRule = { id: '11111111-1111-4111-8111-111111111111', label: 'Owned check' };
+test('1.22 accepts an explicit selection of cached APK files', () => {
+  const c = structuredClone(read('contracts/fixtures/config.app-open.valid.json'));
+  c.execution.appOpen.assetFileNames = ['owned-1.apk', 'owned-2.apk'];
+  assert.deepEqual(configurationIssues(c), []);
+  c.execution.appOpen.assetFileNames = ['../owned.apk'];
+  assert.ok(configurationIssues(c).length);
+});
+for (const rule of [
+  { ...checkRule, kind: 'ATTRIBUTE', attribute: 'pid', value: '1230' },
+  { ...checkRule, kind: 'ATTRIBUTE', attribute: 'name', value: 'download' },
+  { ...checkRule, kind: 'TAG', tag: 'i' },
+  { ...checkRule, kind: 'XPATH', xpath: '//i[@name="download"]' },
+])
+  test('1.21 accepts manual element check ' + rule.kind, () =>
+    assert.deepEqual(schemaIssues('SourceElementCheck', rule), []),
+  );
+for (const rule of [
+  { ...checkRule, kind: 'TAG', tag: 'i or //*' },
+  { ...checkRule, kind: 'ATTRIBUTE', attribute: 'pid]', value: '1' },
+  { ...checkRule, kind: 'TAG', tag: 'i', password: 'forbidden' },
+])
+  test('1.21 rejects malformed manual element check', () =>
+    assert.ok(schemaIssues('SourceElementCheck', rule).length));
+for (const status of ['FOUND', 'NOT_FOUND', 'READ_FAILED'])
+  test('1.21 accepts bounded observation ' + status, () =>
+    assert.deepEqual(
+      schemaIssues('SourceElementObservation', {
+        phase: 'CHECK',
+        ruleId: checkRule.id,
+        status,
+        matchedCount: status === 'FOUND' ? 1 : 0,
+      }),
+      [],
+    ),
+  );
+test('1.21 rejects untrusted observation fields', () =>
+  assert.ok(
+    schemaIssues('SourceElementObservation', {
+      phase: 'CHECK',
+      ruleId: checkRule.id,
+      status: 'NOT_FOUND',
+      matchedCount: 0,
+      html: 'forbidden',
+    }).length,
+  ));
 process.stdout.write(
   `${passed} contract checks passed${process.exitCode ? '; failures present' : ''}.\n`,
 );

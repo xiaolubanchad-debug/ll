@@ -638,7 +638,7 @@ async function updateCycle(
     data: { status, errorCode },
   });
 }
-async function pauseForReleaseChange(db: PrismaClient, snapshot: CycleRow) {
+async function adoptInstalledRelease(db: PrismaClient, snapshot: CycleRow) {
   return db.$transaction(async (tx) => {
     await lockLibrary(tx);
     const node = await lockNode(tx, snapshot.nodeId);
@@ -681,15 +681,21 @@ async function pauseForReleaseChange(db: PrismaClient, snapshot: CycleRow) {
       return true;
     await tx.managedCycle.update({
       where: { id: cycle.id },
-      data: { status: 'FAILED', errorCode: 'NODE_RELEASE_CHANGED' },
+      data: {
+        status: 'QUEUED',
+        errorCode: null,
+        releaseId: node.agentReleaseId,
+        generation: { increment: 1 },
+        proxyRunId: null,
+      },
     });
     await tx.managedTask.update({
       where: { id: cycle.taskId },
-      data: { enabled: false, version: { increment: 1 } },
+      data: { version: { increment: 1 } },
     });
     await tx.auditEvent.create({
       data: {
-        action: 'TASK_RELEASE_CHANGED',
+        action: 'TASK_RELEASE_ADOPTED',
         requestId: 'task-center',
         details: {
           taskId: cycle.taskId,
@@ -750,7 +756,7 @@ async function advance(db: PrismaClient, p: ManagedTask, c: CycleRow, now: Date)
     return;
   }
   if (active.length) return;
-  if (await pauseForReleaseChange(db, c)) return;
+  if (await adoptInstalledRelease(db, c)) return;
   const total = counts(c),
     config = (await db.configVersion.findUniqueOrThrow({ where: { id: c.configVersionId } }))
       .body as unknown as TestConfiguration;
@@ -946,7 +952,7 @@ export async function tickTaskPlans(db: PrismaClient, now = new Date()) {
         if (error instanceof PlatformError && ['TASK_STOPPED', 'TASK_CHANGED'].includes(error.code))
           continue;
         if (error instanceof PlatformError && error.code === 'NODE_RELEASE_CHANGED' && advancing) {
-          if (await pauseForReleaseChange(db, advancing).catch(() => false)) continue;
+          if (await adoptInstalledRelease(db, advancing).catch(() => false)) continue;
         }
         await db.managedCycle
           .updateMany({

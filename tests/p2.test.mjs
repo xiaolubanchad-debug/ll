@@ -292,9 +292,9 @@ test('P2 acceptance with real PostgreSQL, SQLite, Chromium and owned fixture sit
         assert.ok(
           tasks.every(
             (x) =>
-              x.apk.packageName === 'com.example.p2' &&
-              x.apk.versionCode === 12 &&
-              x.apk.abis.includes('x86_64') &&
+              x.apk.validationPolicy === 'FILE_NAME' &&
+              x.apk.fileName.endsWith('.apk') &&
+              x.apk.packageName === undefined &&
               x.proof === 'FILE_VALIDATION' &&
               !x.cacheHit,
           ),
@@ -310,15 +310,13 @@ test('P2 acceptance with real PostgreSQL, SQLite, Chromium and owned fixture sit
         const timeline = (await req('/runs/' + id + '/timeline')).data;
         assert.equal(
           timeline.items.filter(
-            (item) =>
-              item.type === 'LOG' &&
-              item.title === '下载传输：已收到浏览器文件，等待保存与读取包信息',
+            (item) => item.type === 'LOG' && item.title === '下载传输：已收到浏览器文件，等待保存',
           ).length,
           3,
         );
         assert.equal(
           timeline.items.filter(
-            (item) => item.type === 'LOG' && item.title === '下载传输：文件已保存，读取启动所需包信息',
+            (item) => item.type === 'LOG' && item.title === '下载传输：文件已保存',
           ).length,
           3,
         );
@@ -373,14 +371,14 @@ test('P2 acceptance with real PostgreSQL, SQLite, Chromium and owned fixture sit
       },
     );
     await t.test(
-      'invalid APKs and target overflow fail explicitly; FULL cannot run in P2',
+      'file receipt defers APK validity to installation; target overflow and unsupported FULL still fail',
       async () => {
         await save(await body('/invalid'));
         let id = await begin();
-        assert.equal((await endRun(id)).status, 'FAILED');
+        assert.equal((await endRun(id)).status, 'SUCCEEDED');
         assert.equal(
-          (await req('/runs/' + id + '/tasks')).data.items[0].errorCode,
-          'APK_METADATA_UNREADABLE',
+          (await req('/runs/' + id + '/tasks')).data.items[0].apk.validationPolicy,
+          'FILE_NAME',
         );
         const c = await body();
         c.download.maxTargets = 1;
@@ -576,6 +574,126 @@ test('P2 acceptance with real PostgreSQL, SQLite, Chromium and owned fixture sit
           ).status,
           409,
         );
+      },
+    );
+    await t.test(
+      'manual source checks bind to the frozen configuration, reject duplicate/unknown rules and reach summary logs',
+      async () => {
+        await stopAgent();
+        const c = await body('/empty'),
+          ruleId = randomUUID(),
+          oldManifest = release.manifest;
+        c.source.elementChecks = [
+          {
+            id: ruleId,
+            label: 'Owned name',
+            kind: 'ATTRIBUTE',
+            attribute: 'name',
+            value: 'download',
+          },
+        ];
+        await save(c);
+        await assert.rejects(begin(), /NODE_UPGRADE_REQUIRED/);
+        await db.release.update({
+          where: { id: release.id },
+          data: {
+            manifest: {
+              ...oldManifest,
+              agentVersion: '0.17.0',
+              features: ['DOWNLOAD_V1', 'XPATH_OBSERVATION_V1'],
+            },
+          },
+        });
+        await db.node.update({
+          where: { id: node.id },
+          data: { agentVersion: '0.17.0', lastSeenAt: new Date() },
+        });
+        try {
+          const id = await begin(),
+            auth = await db.agentCredential.findUniqueOrThrow({ where: { nodeId: node.id } });
+          const d = (
+            await agent('claims', {
+              kind: 'claim',
+              protocolVersion: '1.0',
+              nodeId: node.id,
+              bootId: auth.bootId,
+            })
+          ).data;
+          assert.equal(
+            (
+              await agent('deliveries/' + d.deliveryId + '/accept', {
+                kind: 'accept',
+                protocolVersion: '1.0',
+                nodeId: node.id,
+                bootId: auth.bootId,
+                deliveryId: d.deliveryId,
+                fence: d.fence,
+              })
+            ).status,
+            200,
+          );
+          const event = (sequence, type, payload) => ({
+            eventId: randomUUID(),
+            runId: id,
+            sequence,
+            occurredAt: new Date().toISOString(),
+            type,
+            payload,
+          });
+          const send = (events) =>
+            agent('events', {
+              kind: 'events',
+              protocolVersion: '1.0',
+              nodeId: node.id,
+              deliveryId: d.deliveryId,
+              fence: d.fence,
+              events,
+            });
+          assert.equal(
+            (
+              await send([
+                event(1, 'RUN_STARTED', { configHash: d.configHash, releaseId: d.releaseId }),
+              ])
+            ).status,
+            200,
+          );
+          const observation = { phase: 'CHECK', ruleId, status: 'NOT_FOUND', matchedCount: 0 };
+          assert.equal(
+            (
+              await send([
+                event(2, 'ELEMENT_OBSERVATION', { ...observation, ruleId: randomUUID() }),
+              ])
+            ).status,
+            409,
+          );
+          assert.equal(
+            (await send([event(2, 'ELEMENT_OBSERVATION', { ...observation, matchedCount: 1 })]))
+              .status,
+            409,
+          );
+          const valid = event(2, 'ELEMENT_OBSERVATION', observation);
+          assert.equal((await send([valid])).status, 200);
+          assert.equal((await send([valid])).status, 200);
+          assert.equal((await send([event(3, 'ELEMENT_OBSERVATION', observation)])).status, 409);
+          const summary = (await req('/runs/' + id + '/summary')).data;
+          assert.equal(summary.sourceElements.totalIssues, 1);
+          assert.equal(summary.sourceElements.checks[0].status, 'NOT_FOUND');
+          assert.match(summary.sourceElements.checks[0].xpath, /name/);
+          assert.equal(
+            (
+              await send([
+                event(3, 'TARGETS_DISCOVERED', { targets: [] }),
+                event(4, 'RUN_FINISHED', { status: 'FAILED', errorCode: 'NO_TARGETS' }),
+                event(5, 'STOP_ACK', { cleanupComplete: true }),
+              ])
+            ).status,
+            200,
+          );
+          assert.equal((await endRun(id)).status, 'FAILED');
+        } finally {
+          await db.release.update({ where: { id: release.id }, data: { manifest: oldManifest } });
+          await db.node.update({ where: { id: node.id }, data: { agentVersion: '0.3.4' } });
+        }
       },
     );
     await t.test(

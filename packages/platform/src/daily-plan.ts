@@ -202,6 +202,26 @@ export async function prepareDailyPlan(
     )
       fault('NODE_UPGRADE_REQUIRED', '请先更新到支持 Android 安装判定的 Agent 0.15.1', 422);
   }
+  const selectedFiles = config.execution.appOpen?.assetFileNames;
+  if (plan.purpose === 'REGISTER' && selectedFiles?.length) {
+    const names = new Set(selectedFiles.map((name) => name.toLowerCase()));
+    plan.assets = plan.assets.filter((asset) =>
+      names.has(
+        (asset.apk.fileName ?? 'history-' + asset.targetKey.slice(0, 12) + '.apk').toLowerCase(),
+      ),
+    );
+    if (
+      [...names].some(
+        (name) =>
+          !plan.assets.some(
+            (a) =>
+              (a.apk.fileName ?? 'history-' + a.targetKey.slice(0, 12) + '.apk').toLowerCase() ===
+              name,
+          ),
+      )
+    )
+      fault('APK_SELECTION_UNAVAILABLE', '所选 APK 文件当天不可用，请核对缓存文件名', 422);
+  }
   const groupPolicy = config.execution.appOpen?.appsPerDevice;
   if (groupPolicy && plan.purpose === 'REGISTER') {
     const nodeForFiles = await tx.node.findUniqueOrThrow({ where: { id: input.nodeId } });

@@ -275,7 +275,7 @@ export async function createRun(
       node.agentReleaseId &&
       node.agentReleaseId !== input.releaseId
     )
-      fault('NODE_RELEASE_CHANGED', '执行版本已更新，请点击开始继续');
+      fault('NODE_RELEASE_CHANGED', '执行版本已更新，正在衔接当前版本');
     if (node.agentReleaseId !== input.releaseId || node.deploymentStatus !== 'INSTALLED')
       fault('NODE_NOT_READY', '节点发布版本不匹配');
     const release = await tx.release.findUnique({
