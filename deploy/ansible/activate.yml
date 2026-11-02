@@ -53,6 +53,14 @@
         src: apk-agent.service.j2
         dest: /etc/systemd/system/apk-agent.service
         mode: '0644'
+    - name: Make root-owned health proof readable by isolated Agent
+      tags: [health_proof_permissions]
+      ansible.builtin.file:
+        path: /var/lib/apk-platform/health.json
+        state: file
+        owner: root
+        group: root
+        mode: '0644'
     - name: Start isolated Agent
       ansible.builtin.systemd_service:
         daemon_reload: true
