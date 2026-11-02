@@ -3,6 +3,7 @@ import { readFile, writeFile, mkdir, rename, rm } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { resolve, join } from 'node:path';
 import { releasePlan } from './release-plan.mjs';
+import { validateHubConfig, moduleOverrides } from './hub-release-config.mjs';
 
 // This is a root-operated host CLI. Containers never receive the Docker socket.
 if (
@@ -67,17 +68,9 @@ const running = plan.modules.filter((x) => ['api', 'worker', 'web'].includes(x))
 const selected = plan.modules.filter((x) => x !== 'agent');
 try {
   await saveState();
-  const config = JSON.parse(output(['config', '--format', 'json']));
-  for (const key of ['api', 'web', 'tools']) {
-    const args = config.services[key].build?.args;
-    if (
-      !args ||
-      !['NODE_IMAGE', 'NGINX_IMAGE'].every((k) =>
-        /^[a-z0-9./:-]+@sha256:[a-f0-9]{64}$/.test(args[k] ?? ''),
-      )
-    )
-      throw Error('PINNED_BASE_REQUIRED');
-  }
+  const config = validateHubConfig(
+    JSON.parse(output(['--profile', 'maintenance', 'config', '--format', 'json'])),
+  );
   const guardArgs = [
     'compose',
     'run',
@@ -137,16 +130,7 @@ try {
   for (const service of ['api', 'worker', 'web', 'tools'])
     rollback.services[service] = { image: config.services[service].image };
   await writeFile(join(snapshot, 'rollback.json'), JSON.stringify(rollback), { mode: 0o600 });
-  for (const service of selected)
-    override.services[service] = {
-      image: `apk-hub-${service}:${sha}`,
-      build: {
-        context: source,
-        dockerfile: 'deploy/hub/Dockerfile',
-        target: service,
-        args: config.services[service === 'worker' ? 'api' : service].build.args,
-      },
-    };
+  override = moduleOverrides(config, selected, sha, source, override);
   const pending = join(ops, 'compose.pending.json');
   await writeFile(pending, JSON.stringify(override, null, 2), { mode: 0o600 });
   const withPending = ['-f', 'compose.yml', '-f', 'compose.pending.json'];
@@ -209,7 +193,8 @@ try {
   );
 } catch (error) {
   state.status = 'NEEDS_REVIEW';
-  if (locked && !migrationStarted) {
+  if (!switched && !migrationStarted) state.status = 'ROLLED_BACK';
+  else if (locked && !migrationStarted) {
     try {
       if (switched)
         await compose([

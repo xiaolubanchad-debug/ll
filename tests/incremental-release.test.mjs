@@ -12,6 +12,35 @@ import {
   reuseEnvironment,
 } from '../apps/agent/dist/environment.js';
 import { planChanges } from '../scripts/release-plan.mjs';
+import { validateHubConfig, moduleOverrides } from '../scripts/hub-release-config.mjs';
+
+test('profile omission fails before activation; selected builds preserve unrelated services', () => {
+  const args = {
+    NODE_IMAGE: 'node@sha256:' + 'a'.repeat(64),
+    NGINX_IMAGE: 'nginx@sha256:' + 'b'.repeat(64),
+  };
+  const config = {
+    services: Object.fromEntries(
+      ['api', 'worker', 'web', 'tools'].map((x) => [x, { image: 'old-' + x, build: { args } }]),
+    ),
+  };
+  const missing = structuredClone(config);
+  delete missing.services.tools;
+  assert.throws(() => validateHubConfig(missing), /HUB_SERVICE_MISSING/);
+  const before = { services: { api: { image: 'kept-api' }, web: { image: 'kept-web' } } };
+  const result = moduleOverrides(config, ['worker'], '1'.repeat(12), '/opt/apk-hub/source', before);
+  assert.deepEqual(result.services.api, before.services.api);
+  assert.deepEqual(result.services.web, before.services.web);
+  assert.equal(result.services.worker.build.target, 'worker');
+  assert.equal(before.services.worker, undefined);
+  assert.throws(
+    () => moduleOverrides(config, ['postgres'], '1'.repeat(12), 'unused'),
+    /HUB_MODULE_INVALID/,
+  );
+  const unpinned = structuredClone(config);
+  unpinned.services.api.build.args.NODE_IMAGE = 'node:latest';
+  assert.throws(() => validateHubConfig(unpinned), /PINNED_BASE_REQUIRED/);
+});
 
 test('module dependency expansion and conservative fallback', () => {
   assert.deepEqual(planChanges(['apps/web/src/App.vue']).modules, ['web']);
