@@ -1,10 +1,13 @@
-import { readFile, access, statfs } from 'node:fs/promises';
+import { readFile, access, statfs, lstat } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { arch, totalmem } from 'node:os';
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
 import { executionOSSupported } from '@apk/contracts';
 import { identityManifest, phoneManifest } from '@apk/automation';
+import { schemaIssues } from '@apk/contracts';
+import type { EnvironmentHealth } from '@apk/contracts';
+declare const __APK_AGENT_BUILD_COMMIT__: string;
 export interface AgentHealth {
   ubuntu: string;
   arch: string;
@@ -62,6 +65,7 @@ export async function collectHealth(
   sdkRoot: string,
   toolsRoot: string,
   releaseId: string,
+  environmentFingerprint?: string,
 ): Promise<AgentHealth> {
   const os = await readFile('/etc/os-release', 'utf8').catch(() => '');
   const id = os.match(/^ID=["']?([^\s"']+)/m)?.[1] ?? 'unknown';
@@ -74,6 +78,8 @@ export async function collectHealth(
     node: process.versions.node,
     systemImage: 'system-images;android-35;google_apis;x86_64',
   };
+  if (typeof __APK_AGENT_BUILD_COMMIT__ !== 'undefined')
+    versions.buildCommit = __APK_AGENT_BUILD_COMMIT__;
   const phones = await phoneManifest(sdkRoot).catch(() => []);
   versions.identityCatalog = JSON.stringify(phones.map((p) => p.id));
   versions.identityAbis = JSON.stringify(
@@ -111,14 +117,30 @@ export async function collectHealth(
   if (browser) versions.playwright = 'installed';
   const proof = JSON.parse(
     await readFile('/var/lib/apk-platform/health.json', 'utf8').catch(() => 'null'),
-  ) as { releaseId?: string; bootSucceeded?: boolean } | null;
+  ) as ({ releaseId?: string; bootSucceeded?: boolean } & Partial<EnvironmentHealth>) | null;
+  let environmentVerified = false;
+  if (environmentFingerprint) {
+    const info = await lstat('/var/lib/apk-platform/health.json').catch(() => null);
+    environmentVerified =
+      !!info?.isFile() &&
+      info.uid === 0 &&
+      (info.mode & 0o022) === 0 &&
+      schemaIssues('EnvironmentHealth', proof).length === 0 &&
+      proof?.environmentFingerprint === environmentFingerprint;
+    if (environmentVerified && proof) {
+      versions.environmentFingerprint = proof.environmentFingerprint!;
+      versions.environmentValidation = proof.mode!;
+      versions.environmentFullRelease = proof.fullReleaseId!;
+      versions.environmentFullVerifiedAt = proof.fullVerifiedAt!;
+    }
+  }
   const android =
     kvm &&
     acceleration.code === 0 &&
     adb.code === 0 &&
     appium.code === 0 &&
     proof?.releaseId === releaseId &&
-    proof.bootSucceeded === true;
+    (environmentFingerprint ? environmentVerified : proof.bootSucceeded === true);
   const errors: string[] = [];
   if (!kvm) errors.push('NO_KVM');
   if (freeDiskBytes < 20 * 1024 ** 3) errors.push('DISK_LOW');

@@ -10725,6 +10725,12 @@
           },
           "licenseAccepted": {
             "const": true
+          },
+          "mode": {
+            "enum": [
+              "AUTO",
+              "FULL"
+            ]
           }
         }
       },
@@ -10953,8 +10959,31 @@
                 "DEVICE_VARIANTS_V1",
                 "OWNED_TEST_CLIENT_V1",
                 "DEVICE_SESSIONS_V1",
-                "EXECUTION_CAPACITY_V1"
+                "EXECUTION_CAPACITY_V1",
+                "INCREMENTAL_DEPLOY_V1"
               ]
+            }
+          },
+          "environment": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "version",
+              "recipeSha256",
+              "fingerprint"
+            ],
+            "properties": {
+              "version": {
+                "const": 1
+              },
+              "recipeSha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "fingerprint": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
             }
           }
         }
@@ -11367,6 +11396,183 @@
           "admissionDeadline": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "EnvironmentSpec": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "recipeSha256",
+          "fingerprint"
+        ],
+        "properties": {
+          "version": {
+            "const": 1
+          },
+          "recipeSha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "fingerprint": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      },
+      "DeploymentOutcome": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "mode",
+          "reason",
+          "environmentFingerprint"
+        ],
+        "properties": {
+          "mode": {
+            "enum": [
+              "CODE",
+              "FULL"
+            ]
+          },
+          "reason": {
+            "enum": [
+              "BASELINE_VALID",
+              "BASELINE_MISSING",
+              "BASELINE_INVALID",
+              "ENVIRONMENT_CHANGED",
+              "FORCED_FULL",
+              "RUNTIME_MISSING"
+            ]
+          },
+          "environmentFingerprint": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      },
+      "EnvironmentInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "nodeId",
+          "releaseId",
+          "environmentFingerprint",
+          "sdkRoot",
+          "toolsRoot"
+        ],
+        "properties": {
+          "nodeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "releaseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "environmentFingerprint": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "sdkRoot": {
+            "type": "string",
+            "pattern": "^/opt/apk-platform/toolchains/[a-f0-9]{64}/android$"
+          },
+          "toolsRoot": {
+            "type": "string",
+            "pattern": "^/opt/apk-platform/toolchains/[a-f0-9]{64}/tools$"
+          }
+        }
+      },
+      "EnvironmentHealth": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "releaseId",
+          "mode",
+          "environmentFingerprint",
+          "fullReleaseId",
+          "fullVerifiedAt"
+        ],
+        "properties": {
+          "version": {
+            "const": 2
+          },
+          "releaseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "mode": {
+            "enum": [
+              "CODE",
+              "FULL"
+            ]
+          },
+          "environmentFingerprint": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "fullReleaseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fullVerifiedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "EnvironmentReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "nodeId",
+          "hostHash",
+          "osHash",
+          "environmentFingerprint",
+          "fullReleaseId",
+          "fullVerifiedAt",
+          "snapshotHash",
+          "controlsHash"
+        ],
+        "properties": {
+          "version": {
+            "const": 1
+          },
+          "nodeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "hostHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "osHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "environmentFingerprint": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "fullReleaseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fullVerifiedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "snapshotHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "controlsHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
           }
         }
       },

@@ -14,6 +14,7 @@ interface Config {
   toolsRoot: string;
   bootstrapToken?: string;
   dataRoot?: string;
+  environmentFingerprint?: string;
 }
 export interface Identity {
   credential?: string;
@@ -123,7 +124,12 @@ export async function startAgent(
     identity.credential = response.credential;
     await saveIdentity(dir, identity);
   }
-  let report = await health(config.sdkRoot, config.toolsRoot, config.releaseId),
+  let report = await health(
+      config.sdkRoot,
+      config.toolsRoot,
+      config.releaseId,
+      config.environmentFingerprint,
+    ),
     checkedAt = Date.now(),
     refreshing = false;
   const protocols = agentProtocolsForVersion(config.agentVersion);
@@ -150,7 +156,12 @@ export async function startAgent(
     while (!signal.aborted) {
       if (Date.now() - checkedAt > 60000 && !refreshing) {
         refreshing = true;
-        void health(config.sdkRoot, config.toolsRoot, config.releaseId)
+        void health(
+          config.sdkRoot,
+          config.toolsRoot,
+          config.releaseId,
+          config.environmentFingerprint,
+        )
           .then(
             (value) => {
               report = value;

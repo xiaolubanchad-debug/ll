@@ -276,6 +276,7 @@ export class DeploymentController {
       req.auth!.admin.id,
       req.requestId,
       keyRequired(key),
+      input.mode ?? 'AUTO',
     );
   }
   @Get('deployments') async list(@Query() query: Record<string, unknown>) {

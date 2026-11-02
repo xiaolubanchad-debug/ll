@@ -1343,6 +1343,7 @@ export interface DeploymentInput {
   nodeId: string;
   releaseId: string;
   licenseAccepted: true;
+  mode?: 'AUTO' | 'FULL';
 }
 
 export interface ReasonInput {
@@ -1410,7 +1411,13 @@ export interface ReleaseInput {
     | 'OWNED_TEST_CLIENT_V1'
     | 'DEVICE_SESSIONS_V1'
     | 'EXECUTION_CAPACITY_V1'
+    | 'INCREMENTAL_DEPLOY_V1'
   )[];
+  environment?: {
+    version: 1;
+    recipeSha256: string;
+    fingerprint: string;
+  };
 }
 
 export interface HealthReport {
@@ -1509,6 +1516,53 @@ export interface NodeCapacityView {
   reservePercent: 25;
   remainingTimeEstimate: number;
   admissionDeadline: string;
+}
+
+export interface EnvironmentSpec {
+  version: 1;
+  recipeSha256: string;
+  fingerprint: string;
+}
+
+export interface DeploymentOutcome {
+  mode: 'CODE' | 'FULL';
+  reason:
+    | 'BASELINE_VALID'
+    | 'BASELINE_MISSING'
+    | 'BASELINE_INVALID'
+    | 'ENVIRONMENT_CHANGED'
+    | 'FORCED_FULL'
+    | 'RUNTIME_MISSING';
+  environmentFingerprint: string;
+}
+
+export interface EnvironmentInput {
+  nodeId: string;
+  releaseId: string;
+  environmentFingerprint: string;
+  sdkRoot: string;
+  toolsRoot: string;
+}
+
+export interface EnvironmentHealth {
+  version: 2;
+  releaseId: string;
+  mode: 'CODE' | 'FULL';
+  environmentFingerprint: string;
+  fullReleaseId: string;
+  fullVerifiedAt: string;
+}
+
+export interface EnvironmentReceipt {
+  version: 1;
+  nodeId: string;
+  hostHash: string;
+  osHash: string;
+  environmentFingerprint: string;
+  fullReleaseId: string;
+  fullVerifiedAt: string;
+  snapshotHash: string;
+  controlsHash: string;
 }
 
 export interface ConfigInput {

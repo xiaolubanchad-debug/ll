@@ -118,6 +118,7 @@ model NodeSlot {
 }
 
 model Deployment {
+  mode String @default("AUTO") @db.VarChar(8)
   id                String            @id @default(uuid()) @db.Uuid
   nodeId            String            @db.Uuid
   node              Node              @relation(fields: [nodeId], references: [id], onDelete: Restrict)

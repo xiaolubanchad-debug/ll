@@ -4,7 +4,8 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { join, resolve, sep } from 'node:path';
 import type { Node } from '@prisma/client';
-import type { ReleaseInput } from '@apk/contracts';
+import { schemaIssues } from '@apk/contracts';
+import type { ReleaseInput, DeploymentOutcome } from '@apk/contracts';
 import { PlatformError, artifactPath, playbookDigest, hostKeyLine } from '@apk/platform';
 import ssh2 from 'ssh2';
 export interface InstallContext {
@@ -14,9 +15,10 @@ export interface InstallContext {
   apiUrl: string;
   ssh: { privateKey?: string; passphrase?: string; password?: string };
   sudoPassword?: string;
+  requestedMode?: 'AUTO' | 'FULL';
 }
 export interface Runner {
-  install(context: InstallContext, signal: AbortSignal): Promise<void>;
+  install(context: InstallContext, signal: AbortSignal): Promise<void | DeploymentOutcome>;
   activate(context: InstallContext, bootstrapToken: string, signal: AbortSignal): Promise<void>;
 }
 const root = fileURLToPath(new URL('../../../', import.meta.url));
@@ -114,6 +116,18 @@ export class AnsibleRunner implements Runner {
         toolchain: context.manifest.toolchain,
         toolchain_hash: toolchainHash,
         deployment_id: context.deploymentId,
+        requested_mode: context.requestedMode ?? 'AUTO',
+        ...(context.manifest.environment
+          ? {
+              environment_input: {
+                nodeId: context.node.id,
+                releaseId: context.manifest.id,
+                environmentFingerprint: context.manifest.environment.fingerprint,
+                sdkRoot: `/opt/apk-platform/toolchains/${toolchainHash}/android`,
+                toolsRoot: `/opt/apk-platform/toolchains/${toolchainHash}/tools`,
+              },
+            }
+          : {}),
         identity_enabled: context.manifest.features?.includes('DEVICE_VARIANTS_V1') ?? false,
         device_sessions_enabled: context.manifest.features?.includes('DEVICE_SESSIONS_V1') ?? false,
         download_enabled: context.manifest.features?.includes('DOWNLOAD_V1') ?? false,
@@ -124,6 +138,9 @@ export class AnsibleRunner implements Runner {
           apiUrl: context.apiUrl,
           sdkRoot: `/opt/apk-platform/toolchains/${toolchainHash}/android`,
           toolsRoot: `/opt/apk-platform/toolchains/${toolchainHash}/tools`,
+          ...(context.manifest.environment
+            ? { environmentFingerprint: context.manifest.environment.fingerprint }
+            : {}),
           ...(bootstrapToken ? { bootstrapToken } : {}),
         },
       };
@@ -229,15 +246,38 @@ export class AnsibleRunner implements Runner {
           '部署步骤未完成，请查看步骤状态',
         );
       }
+      if (playbook === 'update.yml') {
+        const receipts: unknown[] = [];
+        const events = join(dir, 'artifacts');
+        for (const artifact of await readdir(events))
+          for (const file of await readdir(join(events, artifact, 'job_events'))) {
+            const event = JSON.parse(
+              await readFile(join(events, artifact, 'job_events', file), 'utf8'),
+            );
+            if (
+              event.event === 'runner_on_ok' &&
+              event.event_data?.task === 'Report deployment strategy'
+            )
+              receipts.push(event.event_data?.res?.msg);
+          }
+        if (receipts.length !== 1 || schemaIssues('DeploymentOutcome', receipts[0]).length)
+          throw new PlatformError(409, 'ANSIBLE_FAILED', '缺少有效的节点部署回执');
+        return receipts[0] as DeploymentOutcome;
+      }
     } finally {
       const target = resolve(dir);
       if (target.startsWith(base + sep)) await rm(target, { recursive: true, force: true });
     }
   }
   install(context: InstallContext, signal: AbortSignal) {
-    return this.run(context, 'install.yml', undefined, signal);
+    return this.run(
+      context,
+      context.manifest.features?.includes('INCREMENTAL_DEPLOY_V1') ? 'update.yml' : 'install.yml',
+      undefined,
+      signal,
+    );
   }
-  activate(context: InstallContext, token: string, signal: AbortSignal) {
-    return this.run(context, 'activate.yml', token, signal);
+  async activate(context: InstallContext, token: string, signal: AbortSignal) {
+    await this.run(context, 'activate.yml', token, signal);
   }
 }

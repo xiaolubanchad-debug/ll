@@ -1,6 +1,6 @@
 {
   "name": "@apk/web",
-  "version": "0.1.0",
+  "version": "1.18.0",
   "private": true,
   "type": "module",
   "scripts": {

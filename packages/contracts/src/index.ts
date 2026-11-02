@@ -83,6 +83,11 @@ export type {
   NodeInput,
   SecretInput,
   HostKeyInput,
+  EnvironmentSpec,
+  DeploymentOutcome,
+  EnvironmentInput,
+  EnvironmentHealth,
+  EnvironmentReceipt,
   DeploymentInput,
   ReasonInput,
   ReconcileInput,
@@ -440,6 +445,7 @@ const knownAgentVersions: readonly string[] = [
   '0.13.3',
   '0.14.0',
   '0.14.1',
+  '0.15.0',
 ];
 function knownAgentAtLeast(version: string | null | undefined, minimum: string): boolean {
   const index = knownAgentVersions.indexOf(version ?? '');

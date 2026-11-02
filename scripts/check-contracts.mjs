@@ -1176,6 +1176,22 @@ test('1.17.1 raw download diagnostic rejected', () =>
     schemaIssues('AgentMessage', read('contracts/fixtures/agent.download-diagnostics.invalid.json'))
       .length,
   ));
+test('1.18 deployment defaults to AUTO and accepts explicit FULL', () => {
+  const input = {
+    nodeId: '11111111-1111-4111-8111-111111111111',
+    releaseId: '22222222-2222-4222-8222-222222222222',
+    licenseAccepted: true,
+  };
+  assert.deepEqual(schemaIssues('DeploymentInput', input), []);
+  assert.deepEqual(schemaIssues('DeploymentInput', { ...input, mode: 'FULL' }), []);
+  assert.ok(schemaIssues('DeploymentInput', { ...input, mode: 'SKIP' }).length);
+});
+test('1.18 deployment receipt requires bound environment and fixed reason', () => {
+  const result = { mode: 'CODE', reason: 'BASELINE_VALID', environmentFingerprint: 'a'.repeat(64) };
+  assert.deepEqual(schemaIssues('DeploymentOutcome', result), []);
+  assert.ok(schemaIssues('DeploymentOutcome', { ...result, reason: 'trust me' }).length);
+  assert.ok(schemaIssues('DeploymentOutcome', { ...result, bootSucceeded: true }).length);
+});
 process.stdout.write(
   `${passed} contract checks passed${process.exitCode ? '; failures present' : ''}.\n`,
 );

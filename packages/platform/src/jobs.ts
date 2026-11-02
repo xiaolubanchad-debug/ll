@@ -55,13 +55,14 @@ export async function enqueue(
   actorId: string,
   requestId: string,
   key: string,
+  mode: 'AUTO' | 'FULL' = 'AUTO',
 ) {
   return idempotent(
     db,
     actorId,
     `node:${nodeId}:${kind}`,
     key,
-    { nodeId, kind, releaseId },
+    { nodeId, kind, releaseId, ...(mode === 'FULL' ? { mode } : {}) },
     async (tx) => {
       await lockLibrary(tx);
       const node = await lockNode(tx, nodeId);
@@ -87,6 +88,7 @@ export async function enqueue(
           kind,
           releaseId,
           nodeVersion: node.version,
+          mode,
           createdBy: actorId,
           ...(kind === 'DEPLOY' ? { licenseAcceptedAt: new Date() } : {}),
         },

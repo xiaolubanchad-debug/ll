@@ -7,6 +7,7 @@ import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
 import { PrismaClient } from '@prisma/client';
 import EmbeddedPostgres from 'embedded-postgres';
+import { existsSync } from 'node:fs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const temp = path.join(root, '.tmp');
@@ -23,12 +24,25 @@ const freePort = () =>
       s.close(() => resolve(p));
     });
   });
+const onlyIndex = process.argv.indexOf('--only');
+const selectedTests =
+  onlyIndex < 0 ? null : new Set((process.argv[onlyIndex + 1] ?? '').split(','));
+if (
+  selectedTests &&
+  [...selectedTests].some((x) => !/^[a-z0-9-]+$/.test(x) || !existsSync('tests/' + x + '.test.mjs'))
+)
+  throw Error('TEST_SELECTION_INVALID');
+const executedTests = new Set();
 const children = [];
 let pg, baseDb, db;
 const schema = 'p0_' + randomUUID().replaceAll('-', '');
 let schemaCreated = false;
-const run = (args, env) =>
-  new Promise((resolve, reject) => {
+const run = (args, env) => {
+  const file = args.find((x) => /^tests\/.+\.test\.mjs$/.test(x));
+  const test = file?.slice(6, -9);
+  if (test && selectedTests && !selectedTests.has(test)) return Promise.resolve();
+  if (test) executedTests.add(test);
+  return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, args, {
       cwd: root,
       env,
@@ -40,6 +54,7 @@ const run = (args, env) =>
       code === 0 ? resolve() : reject(new Error(`测试子进程失败：${args[0]} (${code})`)),
     );
   });
+};
 async function start(args, env) {
   const child = spawn(process.execPath, args, {
     cwd: root,
@@ -163,6 +178,7 @@ try {
   });
   const version = await db.$queryRawUnsafe('SHOW server_version');
   console.log('Real PostgreSQL version:', version[0].server_version);
+  await run(['--test', '--test-concurrency=1', 'tests/incremental-release.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/agent-compatibility.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/agent-startup.test.mjs'], env);
   await run(['--test', '--test-concurrency=1', 'tests/boot-receipts.test.mjs'], env);
@@ -242,10 +258,14 @@ try {
   await run(['--test', 'tests/download-labels-web.test.mjs'], env);
   await run(['--test', 'tests/test-data-web.test.mjs'], env);
   await run(['--test', 'tests/device-sessions-web.test.mjs'], env);
-  await run(['--test', 'tests/capacity-web.test.mjs'], {...env, P0_SCREENSHOT_DIR: dir});
+  await run(['--test', 'tests/capacity-web.test.mjs'], { ...env, P0_SCREENSHOT_DIR: dir });
   await run(['--test', 'tests/server-console-web.test.mjs'], { ...env, P0_SCREENSHOT_DIR: dir });
+  if (selectedTests && [...selectedTests].some((x) => !executedTests.has(x)))
+    throw Error('TEST_SELECTION_NOT_EXECUTED');
   console.log(
-    'P0–P3 integration and browser tests passed (real PostgreSQL, SQLite and Chromium; EC2 installer and Appium boundary simulated here, real Android verified separately).',
+    'Selected integration and browser tests passed: ' +
+      [...executedTests].join(', ') +
+      ' (real PostgreSQL/SQLite/Chromium; installer/Appium simulated, EC2 validation separate).',
   );
 } catch (error) {
   console.error(error instanceof Error ? error.message : 'P0 tests failed');

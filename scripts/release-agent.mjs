@@ -5,8 +5,16 @@ import { readFile, writeFile, mkdir, mkdtemp } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { create } from 'tar';
-import { canonical, playbookDigest, validManifest, releasePayload } from '@apk/platform';
+import { create, t as listArchive } from 'tar';
+import {
+  canonical,
+  playbookDigest,
+  validManifest,
+  releasePayload,
+  verifyRelease,
+  artifactPath,
+} from '@apk/platform';
+import { environmentRecipe } from './environment-recipe.mjs';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const hash = (b) => createHash('sha256').update(b).digest('hex');
 async function official(url) {
@@ -63,7 +71,7 @@ export function sdkArchive(xml, packagePath, role, base) {
     revision,
   };
 }
-export async function publishAgent() {
+export async function publishAgent(options = {}) {
   if (
     execFileSync('git', ['status', '--porcelain'], {
       cwd: root,
@@ -99,70 +107,108 @@ export async function publishAgent() {
       2,
     ),
   );
-  if (!process.env.npm_execpath) throw Error('RUN_WITH_NPM');
-  execFileSync(
-    process.execPath,
-    [
-      process.env.npm_execpath,
-      'install',
-      '--package-lock-only',
-      '--ignore-scripts',
-      '--no-audit',
-      '--no-fund',
-      '--prefix',
-      npmDir,
-    ],
-    { stdio: 'ignore', windowsHide: true },
-  );
-  const xml = await official('https://dl.google.com/android/repository/repository2-1.xml');
-  const imageXml = await official(
-    'https://dl.google.com/android/repository/sys-img/google_apis/sys-img2-3.xml',
-  );
-  const nodeSums = await official('https://nodejs.org/dist/v24.18.0/SHASUMS256.txt');
-  const nodeSha256 = nodeSums
-    .split('\n')
-    .find((line) => line.trim().endsWith('node-v24.18.0-linux-x64.tar.xz'))
-    ?.split(/\s+/)[0];
-  if (!nodeSha256) throw Error('NODE_CHECKSUM_MISSING');
-  const toolchain = {
-    nodeVersion: '24.18.0',
-    nodeUrl: 'https://nodejs.org/dist/v24.18.0/node-v24.18.0-linux-x64.tar.xz',
-    nodeSha256,
-    playwrightVersion: dependencies.playwright,
-    appiumVersion: dependencies.appium,
-    uiautomator2Version: dependencies['appium-uiautomator2-driver'],
-    npmLockSha256: hash(await readFile(join(npmDir, 'package-lock.json'))),
-    systemImage: 'system-images;android-35;google_apis;x86_64',
-    extraSystemImages: [29, 31, 33, 34, 36].map((apiLevel) => ({
-      ...sdkArchive(
-        imageXml,
-        'system-images;android-' + apiLevel + ';google_apis;x86_64',
-        'systemImage',
-        'https://dl.google.com/android/repository/sys-img/google_apis/',
+  const baseId = options.baseReleaseId ?? process.env.RELEASE_BASE_ID;
+  let base;
+  if (baseId) {
+    if (!/^[a-f0-9-]{36}$/.test(baseId)) throw Error('BASE_RELEASE_INVALID');
+    base = await verifyRelease(
+      JSON.parse(
+        await readFile(
+          join(resolve(process.env.RELEASE_DIR ?? 'data/releases'), baseId + '.manifest.json'),
+          'utf8',
+        ),
       ),
-      apiLevel,
-    })),
-    archives: [
-      sdkArchive(
-        xml,
-        'cmdline-tools;19.0',
-        'cmdlineTools',
-        'https://dl.google.com/android/repository/',
-      ),
-      sdkArchive(xml, 'emulator', 'emulator', 'https://dl.google.com/android/repository/'),
-      sdkArchive(
-        xml,
-        'platform-tools',
-        'platformTools',
-        'https://dl.google.com/android/repository/',
-      ),
-      sdkArchive(
-        imageXml,
-        'system-images;android-35;google_apis;x86_64',
-        'systemImage',
-        'https://dl.google.com/android/repository/sys-img/google_apis/',
-      ),
-    ],
+    );
+    const metadata = new Map();
+    await listArchive({
+      file: artifactPath(base.artifactName),
+      onentry(entry) {
+        if (['npm/package.json', 'npm/package-lock.json'].includes(entry.path)) {
+          const chunks = [];
+          entry.on('data', (b) => chunks.push(b));
+          entry.on('end', () => metadata.set(entry.path, Buffer.concat(chunks)));
+        }
+      },
+    });
+    const pkg = JSON.parse(metadata.get('npm/package.json').toString('utf8'));
+    if (canonical(pkg.dependencies) !== canonical(dependencies))
+      throw Error('ENVIRONMENT_REFRESH_REQUIRED');
+    await writeFile(join(npmDir, 'package.json'), metadata.get('npm/package.json'));
+    await writeFile(join(npmDir, 'package-lock.json'), metadata.get('npm/package-lock.json'));
+  }
+  if (!base && !process.env.npm_execpath) throw Error('RUN_WITH_NPM');
+  if (!base) {
+    execFileSync(
+      process.execPath,
+      [
+        process.env.npm_execpath,
+        'install',
+        '--package-lock-only',
+        '--ignore-scripts',
+        '--no-audit',
+        '--no-fund',
+        '--prefix',
+        npmDir,
+      ],
+      { stdio: 'ignore', windowsHide: true },
+    );
+    const xml = await official('https://dl.google.com/android/repository/repository2-1.xml');
+    const imageXml = await official(
+      'https://dl.google.com/android/repository/sys-img/google_apis/sys-img2-3.xml',
+    );
+    const nodeSums = await official('https://nodejs.org/dist/v24.18.0/SHASUMS256.txt');
+    const nodeSha256 = nodeSums
+      .split('\n')
+      .find((line) => line.trim().endsWith('node-v24.18.0-linux-x64.tar.xz'))
+      ?.split(/\s+/)[0];
+    if (!nodeSha256) throw Error('NODE_CHECKSUM_MISSING');
+    var refreshedToolchain = {
+      nodeVersion: '24.18.0',
+      nodeUrl: 'https://nodejs.org/dist/v24.18.0/node-v24.18.0-linux-x64.tar.xz',
+      nodeSha256,
+      playwrightVersion: dependencies.playwright,
+      appiumVersion: dependencies.appium,
+      uiautomator2Version: dependencies['appium-uiautomator2-driver'],
+      npmLockSha256: hash(await readFile(join(npmDir, 'package-lock.json'))),
+      systemImage: 'system-images;android-35;google_apis;x86_64',
+      extraSystemImages: [29, 31, 33, 34, 36].map((apiLevel) => ({
+        ...sdkArchive(
+          imageXml,
+          'system-images;android-' + apiLevel + ';google_apis;x86_64',
+          'systemImage',
+          'https://dl.google.com/android/repository/sys-img/google_apis/',
+        ),
+        apiLevel,
+      })),
+      archives: [
+        sdkArchive(
+          xml,
+          'cmdline-tools;19.0',
+          'cmdlineTools',
+          'https://dl.google.com/android/repository/',
+        ),
+        sdkArchive(xml, 'emulator', 'emulator', 'https://dl.google.com/android/repository/'),
+        sdkArchive(
+          xml,
+          'platform-tools',
+          'platformTools',
+          'https://dl.google.com/android/repository/',
+        ),
+        sdkArchive(
+          imageXml,
+          'system-images;android-35;google_apis;x86_64',
+          'systemImage',
+          'https://dl.google.com/android/repository/sys-img/google_apis/',
+        ),
+      ],
+    };
+  }
+  const toolchain = base?.toolchain ?? refreshedToolchain;
+  const recipeSha256 = await environmentRecipe(root);
+  const environment = {
+    version: 1,
+    recipeSha256,
+    fingerprint: hash(canonical({ version: 1, toolchain, recipeSha256 })),
   };
   for (const [entry, out] of [
     ['entry', 'agent'],
@@ -170,6 +216,7 @@ export async function publishAgent() {
     ['identity-entry', 'identity-images'],
     ['egress-entry', 'egress'],
     ['ocr-entry', 'ocr-worker'],
+    ['environment-entry', 'environment-check'],
   ])
     await build({
       entryPoints: [
@@ -185,6 +232,7 @@ export async function publishAgent() {
       platform: 'node',
       format: 'esm',
       target: 'node24',
+      define: { __APK_AGENT_BUILD_COMMIT__: JSON.stringify(gitCommit) },
       banner: {
         js: "import { createRequire as __apkCreateRequire } from 'node:module'; const require = __apkCreateRequire(import.meta.url);",
       },
@@ -199,6 +247,7 @@ export async function publishAgent() {
     'identity-images.js',
     'egress.js',
     'ocr-worker.js',
+    'environment-check.js',
     'npm/package.json',
     'npm/package-lock.json',
   ]);
@@ -212,7 +261,7 @@ export async function publishAgent() {
   const body = {
     id: randomUUID(),
     gitCommit,
-    agentVersion: '0.14.1',
+    agentVersion: '0.15.0',
     protocolVersion: '1.0',
     features: [
       'DOWNLOAD_V1',
@@ -227,11 +276,13 @@ export async function publishAgent() {
       'DEVICE_SESSIONS_V1',
       'EXECUTION_CAPACITY_V1',
       'OWNED_TEST_CLIENT_V1',
+      'INCREMENTAL_DEPLOY_V1',
     ],
     artifactName,
     sha256,
     playbookSha256: await playbookDigest(join(root, 'deploy/ansible')),
     toolchain,
+    environment,
   };
   const signature = sign(null, Buffer.from(canonical(body)), key).toString('base64');
   const manifest = validManifest({ ...body, signature });

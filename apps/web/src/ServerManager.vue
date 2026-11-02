@@ -63,6 +63,7 @@ const form = reactive({
 const fingerprint = ref(''),
   releaseId = ref(''),
   licenseAccepted = ref(false),
+  deploymentMode = ref<'AUTO' | 'FULL'>('AUTO'),
   manifestText = ref(''),
   taskChoices = ref<TaskPlanView[]>([]),
   templateConfigs = ref<{ id: string; name: string }[]>([]),
@@ -88,6 +89,8 @@ const stages: Record<string, string> = {
   NEEDS_REVIEW: '需要核验',
 };
 const codes: Record<string, string> = {
+  CODE_UPDATE: '代码增量更新（复用已核验环境）',
+  FULL_VALIDATION: '完整环境校验',
   NO_KVM: '未检测到 KVM 设备',
   DISK_LOW: '磁盘剩余空间不足',
   SUDO_REQUIRED: 'sudo 权限或密码不可用',
@@ -445,7 +448,12 @@ async function deploy() {
     await api(
       '/deployments',
       'POST',
-      { nodeId: selected.value!.id, releaseId: releaseId.value, licenseAccepted: true },
+      {
+        nodeId: selected.value!.id,
+        releaseId: releaseId.value,
+        licenseAccepted: true,
+        mode: deploymentMode.value,
+      },
       { 'Idempotency-Key': crypto.randomUUID() },
     );
     await refresh();
@@ -867,6 +875,12 @@ onUnmounted(() => {
         </div>
         <div class="deploy-panel">
           <h3>部署固定版本</h3>
+          <label for="deployment-mode">部署方式</label>
+          <select id="deployment-mode" v-model="deploymentMode">
+            <option value="AUTO">自动：环境一致时增量更新</option>
+            <option value="FULL">强制完整环境校验（耗时较长）</option>
+          </select>
+          <p class="muted">首次部署或环境变化时自动完整校验。增量更新保留签名校验与新心跳确认。</p>
           <label for="release-id">发布版本</label>
           <p class="muted">
             执行节点支持 Ubuntu 24.04 / 26.04 LTS x86_64；选择已登记的签名版本进行部署。
@@ -925,7 +939,13 @@ onUnmounted(() => {
             ></el-table-column
           ><el-table-column label="结果"
             ><template #default="s">{{
-              codes[s.row.errorCode] ?? s.row.errorCode ?? ''
+              codes[s.row.errorCode] ??
+              s.row.errorCode ??
+              (s.row.result?.deployment?.mode === 'CODE'
+                ? '增量完成 · 环境基线复用'
+                : s.row.result?.deployment?.mode === 'FULL'
+                  ? '完整校验完成'
+                  : '')
             }}</template></el-table-column
           ><el-table-column label="操作"
             ><template #default="s"

@@ -15,14 +15,33 @@ export function releasePayload(manifest: ReleaseInput) {
 }
 export function validManifest(body: unknown): ReleaseInput {
   const m = checked<ReleaseInput>('ReleaseInput', body);
+  if (m.features?.includes('INCREMENTAL_DEPLOY_V1')) {
+    if (
+      m.agentVersion !== '0.15.0' ||
+      !m.environment ||
+      !m.features.includes('DEVICE_SESSIONS_V1') ||
+      m.environment.fingerprint !==
+        digest(
+          canonical({
+            version: 1,
+            toolchain: m.toolchain,
+            recipeSha256: m.environment.recipeSha256,
+          }),
+        )
+    )
+      fault('RELEASE_INVALID', '增量发布环境摘要无效', 422);
+  } else if (m.environment) fault('RELEASE_INVALID', '环境摘要需要增量发布能力', 422);
   if (
     m.features?.includes('EXECUTION_CAPACITY_V1') &&
-    (!['0.14.0', '0.14.1'].includes(m.agentVersion) || !m.features.includes('DEVICE_SESSIONS_V1'))
+    (!['0.14.0', '0.14.1', '0.15.0'].includes(m.agentVersion) ||
+      !m.features.includes('DEVICE_SESSIONS_V1'))
   )
     fault('RELEASE_INVALID', '容量扩展需要 Agent 0.14.0 和设备会话能力', 422);
   if (
     m.features?.includes('DEVICE_SESSIONS_V1') &&
-    (!['0.13.0', '0.13.1', '0.13.2', '0.13.3', '0.14.0', '0.14.1'].includes(m.agentVersion) ||
+    (!['0.13.0', '0.13.1', '0.13.2', '0.13.3', '0.14.0', '0.14.1', '0.15.0'].includes(
+      m.agentVersion,
+    ) ||
       [
         'DEVICE_VARIANTS_V1',
         'APP_OPEN_V1',
@@ -89,6 +108,7 @@ export async function verifyRelease(body: unknown) {
     if (manifest.features?.includes('DOWNLOAD_V1')) expected.add('egress.js');
     if (manifest.features?.includes('AUTO_REGISTRATION_V1')) expected.add('ocr-worker.js');
     if (manifest.features?.includes('DEVICE_VARIANTS_V1')) expected.add('identity-images.js');
+    if (manifest.features?.includes('INCREMENTAL_DEPLOY_V1')) expected.add('environment-check.js');
     let invalid = false;
     const lockChunks: Buffer[] = [];
     await listArchive({

@@ -1,0 +1,101 @@
+---
+- name: Stage signed code and choose validation strategy
+  hosts: target
+  gather_facts: false
+  become: true
+  vars:
+    release_root: '/opt/apk-platform/releases/{{ release_id }}'
+  tasks:
+    - name: Create protected release directories
+      ansible.builtin.file:
+        path: '{{ item }}'
+        state: directory
+        owner: root
+        mode: '0755'
+      loop: [/var/lib/apk-platform, '{{ release_root }}']
+    - name: Stage verified signed archive
+      ansible.builtin.copy:
+        src: agent.tgz
+        dest: '{{ release_root }}/agent.tgz'
+        owner: root
+        mode: '0644'
+    - name: Hash staged signed archive
+      ansible.builtin.stat:
+        path: '{{ release_root }}/agent.tgz'
+        checksum_algorithm: sha256
+      register: staged_archive
+    - name: Require signed bytes
+      ansible.builtin.assert:
+        that: staged_archive.stat.checksum == artifact_sha256
+        fail_msg: RELEASE_INVALID
+    - name: Extract signed code
+      ansible.builtin.unarchive:
+        src: '{{ release_root }}/agent.tgz'
+        dest: '{{ release_root }}'
+        remote_src: true
+    - name: Write fixed environment input
+      ansible.builtin.copy:
+        dest: /var/lib/apk-platform/environment-input.json
+        content: '{{ environment_input | to_json }}'
+        owner: root
+        mode: '0600'
+    - name: Check installed Node runtime
+      ansible.builtin.stat:
+        path: /opt/apk-platform/runtime/node/bin/node
+      register: installed_node
+    - name: Default to full validation without a runtime
+      ansible.builtin.set_fact:
+        environment_plan:
+          mode: FULL
+          reason: RUNTIME_MISSING
+          environmentFingerprint: '{{ environment_input.environmentFingerprint }}'
+    - name: Inspect environment baseline without reading image bodies
+      ansible.builtin.command:
+        argv: [/opt/apk-platform/runtime/node/bin/node, '{{ release_root }}/environment-check.js', plan, '{{ requested_mode }}']
+      register: environment_probe
+      changed_when: false
+      when: installed_node.stat.exists
+    - name: Use actual validation strategy
+      ansible.builtin.set_fact:
+        environment_plan: '{{ environment_probe.stdout | from_json }}'
+      when: installed_node.stat.exists
+
+- ansible.builtin.import_playbook: install.yml
+  when: environment_plan.mode == 'FULL'
+
+- name: Install code using a previously verified environment
+  hosts: target
+  gather_facts: false
+  become: true
+  vars:
+    release_root: '/opt/apk-platform/releases/{{ release_id }}'
+  tasks:
+    - name: Update code under remote installation lock
+      when: environment_plan.mode == 'CODE'
+      block:
+        - name: Acquire remote installation lock
+          ansible.builtin.command:
+            argv: [/usr/bin/mkdir, /var/lib/apk-platform/install.lock.d]
+          changed_when: true
+        - name: Record installation owner
+          ansible.builtin.copy:
+            dest: /var/lib/apk-platform/install.lock
+            content: "{{ deployment_id }}\n"
+            owner: root
+            mode: '0600'
+        - name: Stop old Agent before final consistency check
+          ansible.builtin.systemd_service:
+            name: apk-agent
+            state: stopped
+        - name: Recheck baseline under lock and preserve actual full proof
+          ansible.builtin.command:
+            argv: [/opt/apk-platform/runtime/node/bin/node, '{{ release_root }}/environment-check.js', reuse, AUTO]
+          changed_when: true
+    - name: Capture baseline after actual full validation
+      ansible.builtin.command:
+        argv: [/opt/apk-platform/runtime/node/bin/node, '{{ release_root }}/environment-check.js', capture, FULL]
+      when: environment_plan.mode == 'FULL'
+      changed_when: true
+    - name: Report deployment strategy
+      ansible.builtin.debug:
+        msg: '{{ environment_plan }}'

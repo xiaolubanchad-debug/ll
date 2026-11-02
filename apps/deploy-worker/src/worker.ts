@@ -168,6 +168,8 @@ export class Worker {
       const auth = await this.db.agentCredential.findUnique({ where: { nodeId: node.id } });
       const health = node.health as { android?: boolean } | null;
       if (
+        job.mode !== 'FULL' &&
+        !manifest.features?.includes('INCREMENTAL_DEPLOY_V1') &&
         auth &&
         !auth.revokedAt &&
         auth.releaseId === job.releaseId &&
@@ -219,15 +221,31 @@ export class Worker {
         apiUrl,
         ssh,
         sudoPassword,
+        requestedMode: job.mode === 'FULL' ? 'FULL' : 'AUTO',
       };
       await jobPhase(this.db, job.id, this.id, job.fence, 'INSTALLING');
       touched = true;
-      await this.runner.install(context, abort.signal);
-      await jobPhase(this.db, job.id, this.id, job.fence, 'CONFIGURING');
+      const outcome = await this.runner.install(context, abort.signal);
+      if (
+        manifest.environment &&
+        (!outcome ||
+          outcome.environmentFingerprint !== manifest.environment.fingerprint ||
+          (job.mode === 'FULL' && outcome.mode !== 'FULL'))
+      )
+        throw new PlatformError(409, 'ANSIBLE_FAILED', '节点部署方式与签名发布不一致');
+      await jobPhase(
+        this.db,
+        job.id,
+        this.id,
+        job.fence,
+        'CONFIGURING',
+        outcome?.mode === 'CODE' ? 'CODE_UPDATE' : 'FULL_VALIDATION',
+      );
       await renew();
       if (abort.signal.aborted) throw new PlatformError(409, 'JOB_CANCELLED', '操作已停止');
       const bootstrap = await issueEnrollment(this.db, job.id, this.id, job.fence);
       await jobPhase(this.db, job.id, this.id, job.fence, 'STARTING');
+      const activationStartedAt = new Date();
       await this.runner.activate(context, bootstrap, abort.signal);
       await jobPhase(this.db, job.id, this.id, job.fence, 'VERIFYING');
       const deadline = Date.now() + 90000;
@@ -237,14 +255,20 @@ export class Worker {
         const currentHealth = current.health as {
           android?: boolean;
           markerPresent?: boolean;
+          versions?: Record<string, string>;
         } | null;
         if (
           current.lastSeenAt &&
+          current.lastSeenAt > activationStartedAt &&
           current.lastSeenAt.getTime() > Date.now() - 45000 &&
           current.agentReleaseId === manifest.id &&
           current.agentVersion === manifest.agentVersion &&
           currentHealth?.android &&
           !currentHealth.markerPresent &&
+          (!manifest.environment ||
+            (currentHealth.versions?.environmentFingerprint === manifest.environment.fingerprint &&
+              currentHealth.versions?.buildCommit === manifest.gitCommit &&
+              currentHealth.versions?.environmentValidation === outcome?.mode)) &&
           requiredAgentProtocolsReady(manifest.features, current)
         ) {
           verified = true;
@@ -261,6 +285,7 @@ export class Worker {
       await finishJob(this.db, job.id, this.id, job.fence, 'SUCCEEDED', 'OK', {
         releaseId: manifest.id,
         androidVerified: true,
+        ...(outcome ? { deployment: outcome } : {}),
       });
     } catch (error) {
       const code = error instanceof PlatformError ? error.code : 'ANSIBLE_FAILED';

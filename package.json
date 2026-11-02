@@ -26,7 +26,9 @@
     "worker": "node --env-file=data/keys/worker.env --env-file=data/keys/worker-url.env apps/deploy-worker/dist/main.js",
     "db:worker": "node --env-file=.env scripts/setup-worker-db.mjs",
     "setup:deployment": "node scripts/setup-deployment.mjs",
-    "release:agent": "node --env-file=.env scripts/release-agent.mjs"
+    "release:agent": "node --env-file=.env scripts/release-agent.mjs",
+    "release:plan": "node scripts/release-plan.mjs",
+    "release:verify": "node scripts/verify-release.mjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

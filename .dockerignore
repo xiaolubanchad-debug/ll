@@ -1,0 +1,14 @@
+.git
+.tmp
+.env
+.env.*
+!.env.example
+node_modules
+**/node_modules
+**/dist
+data
+artifacts
+*.log
+*.apk
+*.tgz
+archive
