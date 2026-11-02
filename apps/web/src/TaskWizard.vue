@@ -7,7 +7,9 @@ import type {
   NodeView,
   TestClientInfo,
 } from '@apk/contracts';
-import { configurationIssues } from '@apk/contracts';
+import NodeCapacitySettings from './NodeCapacitySettings.vue';
+import type { NodeCapacityView } from '@apk/contracts';
+import { configurationIssues, MAX_DAILY_OPEN_LIMIT, MAX_DEVICE_APPS } from '@apk/contracts';
 import example from '../../../contracts/fixtures/config.valid.json';
 import { api, mutation } from './api';
 const props = defineProps<{
@@ -30,6 +32,8 @@ const step = ref(props.initialStep ?? 1),
   concurrency = ref<1>(1),
   target = ref(props.initial?.task.successTarget ?? 10),
   limit = ref(props.initial?.task.attemptLimit ?? 30),
+  capacity = ref<NodeCapacityView | null>(null),
+  downloadLimit = ref(props.initial?.configuration.download.maxTargets ?? 100),
   importId = ref(props.copyConfigId ?? props.initial?.task.configId ?? '');
 const source = ref(props.initial?.configuration.source.url ?? ''),
   xpath = ref(props.initial?.configuration.source.xpath ?? example.source.xpath),
@@ -77,17 +81,19 @@ const proxyName = ref(''),
   password = ref('');
 watch(nodeId, (id) => {
   if (!props.initial && !props.ownedTest)
-    multiApp.value = ['0.13.0', '0.13.1', '0.13.2', '0.13.3'].includes(
+    multiApp.value = ['0.13.0', '0.13.1', '0.13.2', '0.13.3', '0.14.0'].includes(
       nodes.value.find((n) => n.id === id)?.agentVersion ?? '',
     );
 });
 watch(target, (value, previous) => {
-  if (limit.value === previous * 3) limit.value = Math.min(800, value * 3);
+  if (limit.value < value) limit.value = value;
+  else if (limit.value === previous * 3) limit.value = Math.min(MAX_DAILY_OPEN_LIMIT, value * 3);
 });
 const draft = computed(() => {
   const v = JSON.parse(JSON.stringify(base.value)) as TestConfiguration;
   v.name = name.value || 'APK 测试任务';
   v.source = { ...v.source, url: source.value, xpath: xpath.value };
+  v.download.maxTargets = downloadLimit.value;
   v.execution.mode = mode.value;
   v.execution.contentIsolation = true;
   delete v.execution.autoRegistration;
@@ -163,7 +169,7 @@ async function choices() {
   if (
     props.fixedNodeId &&
     !props.initial &&
-    ['0.13.0', '0.13.1', '0.13.2', '0.13.3'].includes(
+    ['0.13.0', '0.13.1', '0.13.2', '0.13.3', '0.14.0'].includes(
       nodes.value.find((n) => n.id === nodeId.value)?.agentVersion ?? '',
     )
   ) {
@@ -180,6 +186,7 @@ function apply(value: string) {
     legacyLoaded.value = c.execution.mode === 'FULL' && !c.execution.appOpen;
     conversionAccepted.value = false;
     base.value = c;
+    downloadLimit.value = c.download.maxTargets;
     source.value = c.source.url;
     xpath.value = c.source.xpath;
     proxyId.value = c.execution.proxySecretVersionId ?? '';
@@ -333,6 +340,18 @@ onUnmounted(() => {
             }}
           </p>
         </details>
+        <label for="task-download-limit">每日下载入口上限</label
+        ><input
+          id="task-download-limit"
+          v-model.number="downloadLimit"
+          type="number"
+          min="1"
+          :max="MAX_DEVICE_APPS"
+        />
+        <p class="muted">
+          单次下载最多处理多少个图标入口；与 APP 复用次数分别设置。复制方案会保留原上限，请按当前
+          XPath 核对。
+        </p>
         <label for="task-name">任务名称</label
         ><input
           id="task-name"
@@ -408,19 +427,24 @@ onUnmounted(() => {
           <div v-if="multiApp" class="form-actions">
             <label
               >每台最少安装
-              <el-input-number v-model="appsMin" :min="1" :max="10" aria-label="每台最少安装数量"
+              <el-input-number
+                v-model="appsMin"
+                :min="1"
+                :max="MAX_DEVICE_APPS"
+                aria-label="每台最少安装数量"
             /></label>
             <label
               >每台最多安装
               <el-input-number
                 v-model="appsMax"
                 :min="appsMin"
-                :max="10"
+                :max="MAX_DEVICE_APPS"
                 aria-label="每台最多安装数量"
             /></label>
           </div>
           <p v-if="multiApp" class="muted">
-            在同一台设备内随机选包且不重复。APP 完成目标和尝试上限按应用次数统计；设备内型号不变。
+            在同一台设备内随机选包且不重复；最多受当天兼容的不同 APK 数量约束。APP
+            完成目标和尝试上限按应用次数统计，设备内型号不变。
           </p>
           <p v-if="ownedTestClient" class="muted">
             仅用于“中台测试 APK”；账户创建回执显示在“测试数据”，与启动完成数分开。
@@ -428,6 +452,15 @@ onUnmounted(() => {
         >
       </template>
       <template v-if="compact || step === 3">
+        <NodeCapacitySettings
+          v-if="mode === 'FULL' && nodeId"
+          :node-id="nodeId"
+          :group-size="multiApp ? appsMin : 1"
+          @updated="capacity = $event"
+        />
+        <p v-if="capacity && limit > capacity.remaining" class="result-explanation">
+          本计划尝试上限超过今日剩余额度，请调整服务器额度或降低本计划数量；保存不会自动开始。
+        </p>
         <div v-if="mode === 'FULL'" class="filter-grid">
           <label for="task-target"
             >所有 APK 合计完成轮数<input
@@ -435,14 +468,14 @@ onUnmounted(() => {
               v-model.number="target"
               type="number"
               min="1"
-              max="800" /></label
+              :max="MAX_DAILY_OPEN_LIMIT" /></label
           ><label for="task-limit"
             >总尝试上限<input
               id="task-limit"
               v-model.number="limit"
               type="number"
               :min="target"
-              max="800"
+              :max="MAX_DAILY_OPEN_LIMIT"
           /></label>
         </div>
         <p v-if="mode === 'DOWNLOAD_ONLY'" class="muted">本任务只下载 APK，不打开 APP。</p>
@@ -472,7 +505,7 @@ onUnmounted(() => {
                   ' 个不同 APP，逐个卸载后再关闭整机；'
                 : '停留完成后关闭模拟器并清理；'
             }}APK 保留复用。最多同时运行 {{ concurrency }} 台模拟器，完成次数按所有 APP
-            合计。每台服务器每日最多尝试 800 次 APP，23:55 停止新增。保存后请点击开始。</small
+            合计。每日额度按服务器自动估算或手动设置，23:55 停止新增。保存后请点击开始。</small
           >
         </div>
         <details class="advanced-settings" :open="initialStep === 3">
@@ -484,7 +517,7 @@ onUnmounted(() => {
           >
         </details>
         <p v-if="initial" class="muted">
-          保存不影响正在执行的批次。下载规则修改次日生效；当前任务需先停止并确认清理后再调整。
+          保存不影响正在执行的批次。下载规则通常次日生效；当天下载失败后，可在任务详情明确选择“重新下载”使用新规则。调整前请先停止并确认清理。
         </p>
       </template>
     </fieldset>

@@ -19,3 +19,5 @@ export * from './open-budget.js';
 export * from './test-data.js';
 
 export * from './identity.js';
+
+export * from './capacity.js';

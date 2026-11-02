@@ -17,6 +17,8 @@ import type { Response } from 'express';
 import type { DeploymentInput, ReasonInput, ReconcileInput } from '@apk/contracts';
 import {
   createNode,
+  nodeCapacity,
+  updateNodeCapacity,
   updateNode,
   archiveNode,
   trustNode,
@@ -63,6 +65,26 @@ export class NodesController {
       select: { id: true },
     });
     return page(await Promise.all(ids.map((n) => nodeView(this.db, n.id))), limit);
+  }
+  @Get(':id/execution-capacity') capacity(@Param('id') id: string, @Query() query: unknown) {
+    return nodeCapacity(this.db, uuid(id), query);
+  }
+  @Put(':id/execution-capacity') capacityUpdate(
+    @Param('id') id: string,
+    @Body() body: unknown,
+    @Headers('if-match') version: string | undefined,
+    @Headers('idempotency-key') key: string | undefined,
+    @Req() req: AuthedRequest,
+  ) {
+    return updateNodeCapacity(
+      this.db,
+      uuid(id),
+      body,
+      ifMatch(version),
+      req.auth!.admin.id,
+      req.requestId,
+      keyRequired(key),
+    );
   }
   @Post() create(@Body() body: unknown, @Req() req: AuthedRequest) {
     return createNode(this.db, body, req.auth!.admin.id, req.requestId);

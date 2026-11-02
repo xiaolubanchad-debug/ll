@@ -1,4 +1,5 @@
 import type { DailyExecutionPlan, TestConfiguration } from './generated/types.js';
+import { openPolicyIssues } from './index.js';
 import { deviceVariant } from './device-catalog.js';
 export function deviceAssignments(plan: DailyExecutionPlan | null | undefined) {
   return plan?.openPolicy?.sessions?.flatMap((session, sessionIndex) =>
@@ -13,6 +14,7 @@ export function deviceAssignments(plan: DailyExecutionPlan | null | undefined) {
 }
 
 export function devicePlanIssues(config: TestConfiguration, plan: DailyExecutionPlan): string[] {
+  if (plan.openPolicy && openPolicyIssues(plan).length) return ['OPEN_POLICY_INVALID'];
   const range = config.execution.appOpen?.appsPerDevice,
     sessions = plan.openPolicy?.sessions;
   if (!range || plan.purpose !== 'REGISTER') return sessions ? ['UNEXPECTED_DEVICE_SESSIONS'] : [];

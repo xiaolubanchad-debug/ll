@@ -302,7 +302,7 @@ export interface TaskPlanView {
   concurrency?: 1 | 2;
   dailyUsage?: {
     day: string;
-    limit: 800;
+    limit: number;
     used: number;
     remaining: number;
   };
@@ -352,7 +352,7 @@ export interface TaskPlanDetail {
     concurrency?: 1 | 2;
     dailyUsage?: {
       day: string;
-      limit: 800;
+      limit: number;
       used: number;
       remaining: number;
     };
@@ -531,7 +531,7 @@ export interface TaskPlanList {
     concurrency?: 1 | 2;
     dailyUsage?: {
       day: string;
-      limit: 800;
+      limit: number;
       used: number;
       remaining: number;
     };
@@ -1409,6 +1409,7 @@ export interface ReleaseInput {
     | 'DEVICE_VARIANTS_V1'
     | 'OWNED_TEST_CLIENT_V1'
     | 'DEVICE_SESSIONS_V1'
+    | 'EXECUTION_CAPACITY_V1'
   )[];
 }
 
@@ -1477,6 +1478,37 @@ export interface NodeView {
 export interface ExecutionOS {
   distribution: 'ubuntu';
   version: '24.04' | '26.04';
+}
+
+export interface NodeCapacityQuery {
+  appsPerDeviceMin?: string;
+}
+
+export interface NodeCapacityInput {
+  dailyLimit: number | null;
+}
+
+export interface NodeCapacityView {
+  nodeId: string;
+  version: number;
+  day: string;
+  supported: boolean;
+  mode: 'AUTO' | 'MANUAL';
+  manualLimit: number | null;
+  recommendedLimit: number;
+  limit: number;
+  used: number;
+  remaining: number;
+  frozen: boolean;
+  sampleRuns: number;
+  sampleApps: number;
+  sampleScope: 'OWNED_TEST_ONLY' | 'NODE_HISTORY' | 'CONSERVATIVE_REFERENCE';
+  deviceSetupMs: number;
+  appMs: number;
+  appsPerDeviceMin: number;
+  reservePercent: 25;
+  remainingTimeEstimate: number;
+  admissionDeadline: string;
 }
 
 export interface ConfigInput {
@@ -1642,7 +1674,7 @@ export interface DailyExecutionPlan {
   }[];
   openPolicy?: {
     concurrency: 1 | 2;
-    dailyLimit: 800;
+    dailyLimit: number;
     admissionDeadline: string;
     /**
      * @minItems 1
@@ -1651,14 +1683,14 @@ export interface DailyExecutionPlan {
     variantIds?: string[];
     /**
      * @minItems 1
-     * @maxItems 800
+     * @maxItems 8640
      */
     sessions?: {
       id: string;
       variantId?: string;
       /**
        * @minItems 1
-       * @maxItems 10
+       * @maxItems 1000
        */
       assetIndexes: number[];
       /**
@@ -1667,6 +1699,7 @@ export interface DailyExecutionPlan {
        */
       supportedAbis?: string[];
     }[];
+    capacityVersion?: 1;
   };
 }
 

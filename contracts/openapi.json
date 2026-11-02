@@ -1569,6 +1569,145 @@
         "parameters": []
       }
     },
+    "/api/v1/nodes/{id}/execution-capacity": {
+      "get": {
+        "operationId": "nodeCapacity",
+        "x-phase": "P1",
+        "security": [
+          {
+            "AdminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodeCapacityView"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "统一错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "query",
+            "name": "appsPerDeviceMin",
+            "schema": {
+              "type": "string",
+              "pattern": "^(?:[1-9]|[1-9][0-9]{1,2}|1000)$"
+            },
+            "required": false
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      },
+      "put": {
+        "operationId": "updateNodeCapacity",
+        "x-phase": "P1",
+        "security": [
+          {
+            "AdminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodeCapacityView"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "统一错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NodeCapacityInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
     "/api/v1/configs": {
       "get": {
         "operationId": "configs",
@@ -4912,12 +5051,12 @@
           "successTarget": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 1000
+            "maximum": 8640
           },
           "attemptLimit": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 1000
+            "maximum": 8640
           }
         },
         "required": [
@@ -4956,11 +5095,23 @@
               "properties": {
                 "successTarget": {
                   "type": "integer",
-                  "maximum": 800
+                  "maximum": 8640
                 },
                 "attemptLimit": {
                   "type": "integer",
-                  "maximum": 800
+                  "maximum": 8640
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "successTarget": {
+                  "type": "integer",
+                  "maximum": 1000
+                },
+                "attemptLimit": {
+                  "type": "integer",
+                  "maximum": 1000
                 }
               }
             }
@@ -5230,7 +5381,9 @@
                 "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
               },
               "limit": {
-                "const": 800
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 8640
               },
               "used": {
                 "type": "integer",
@@ -5239,7 +5392,7 @@
               "remaining": {
                 "type": "integer",
                 "minimum": 0,
-                "maximum": 800
+                "maximum": 8640
               }
             }
           }
@@ -7358,7 +7511,7 @@
                 "appIndex": {
                   "type": "integer",
                   "minimum": 0,
-                  "maximum": 9
+                  "maximum": 999
                 },
                 "packageName": {
                   "type": "string",
@@ -7994,12 +8147,12 @@
                       "min": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 10
+                        "maximum": 1000
                       },
                       "max": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 10
+                        "maximum": 1000
                       }
                     }
                   }
@@ -9207,7 +9360,7 @@
               "startIndex": {
                 "type": "integer",
                 "minimum": 0,
-                "maximum": 1000
+                "maximum": 8640
               }
             }
           },
@@ -9547,7 +9700,7 @@
                   "appIndex": {
                     "type": "integer",
                     "minimum": 0,
-                    "maximum": 9
+                    "maximum": 999
                   }
                 }
               },
@@ -9954,7 +10107,7 @@
               "appIndex": {
                 "type": "integer",
                 "minimum": 0,
-                "maximum": 9
+                "maximum": 999
               }
             },
             "allOf": [
@@ -10796,7 +10949,8 @@
                 "APP_OPEN_PARALLEL_V1",
                 "DEVICE_VARIANTS_V1",
                 "OWNED_TEST_CLIENT_V1",
-                "DEVICE_SESSIONS_V1"
+                "DEVICE_SESSIONS_V1",
+                "EXECUTION_CAPACITY_V1"
               ]
             }
           }
@@ -11066,6 +11220,153 @@
           }
         }
       },
+      "NodeCapacityQuery": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "appsPerDeviceMin": {
+            "type": "string",
+            "pattern": "^(?:[1-9]|[1-9][0-9]{1,2}|1000)$"
+          }
+        },
+        "required": []
+      },
+      "NodeCapacityInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "dailyLimit"
+        ],
+        "properties": {
+          "dailyLimit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "maximum": 8640
+          }
+        }
+      },
+      "NodeCapacityView": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "nodeId",
+          "version",
+          "day",
+          "supported",
+          "mode",
+          "manualLimit",
+          "recommendedLimit",
+          "limit",
+          "used",
+          "remaining",
+          "frozen",
+          "sampleRuns",
+          "sampleApps",
+          "sampleScope",
+          "deviceSetupMs",
+          "appMs",
+          "appsPerDeviceMin",
+          "reservePercent",
+          "remainingTimeEstimate",
+          "admissionDeadline"
+        ],
+        "properties": {
+          "nodeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "day": {
+            "type": "string",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+          },
+          "supported": {
+            "type": "boolean"
+          },
+          "mode": {
+            "enum": [
+              "AUTO",
+              "MANUAL"
+            ]
+          },
+          "manualLimit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "maximum": 8640
+          },
+          "recommendedLimit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8640
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8640
+          },
+          "used": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "remaining": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 8640
+          },
+          "frozen": {
+            "type": "boolean"
+          },
+          "sampleRuns": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sampleApps": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sampleScope": {
+            "enum": [
+              "OWNED_TEST_ONLY",
+              "NODE_HISTORY",
+              "CONSERVATIVE_REFERENCE"
+            ]
+          },
+          "deviceSetupMs": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "appMs": {
+            "type": "integer",
+            "minimum": 10000
+          },
+          "appsPerDeviceMin": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "reservePercent": {
+            "const": 25
+          },
+          "remainingTimeEstimate": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 8640
+          },
+          "admissionDeadline": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "ConfigInput": {
         "type": "object",
         "additionalProperties": false,
@@ -11119,12 +11420,12 @@
           "successTarget": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 1000
+            "maximum": 8640
           },
           "attemptLimit": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 1000
+            "maximum": 8640
           },
           "proxySecretVersionId": {
             "type": "string",
@@ -11710,12 +12011,12 @@
           "successTarget": {
             "type": "integer",
             "minimum": 0,
-            "maximum": 1000
+            "maximum": 8640
           },
           "attemptLimit": {
             "type": "integer",
             "minimum": 0,
-            "maximum": 1000
+            "maximum": 8640
           },
           "proxySecretVersionId": {
             "type": "string",
@@ -11833,7 +12134,9 @@
                 ]
               },
               "dailyLimit": {
-                "const": 800
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 8640
               },
               "admissionDeadline": {
                 "type": "string",
@@ -11852,7 +12155,7 @@
               "sessions": {
                 "type": "array",
                 "minItems": 1,
-                "maxItems": 800,
+                "maxItems": 8640,
                 "items": {
                   "type": "object",
                   "additionalProperties": false,
@@ -11872,7 +12175,7 @@
                     "assetIndexes": {
                       "type": "array",
                       "minItems": 1,
-                      "maxItems": 10,
+                      "maxItems": 1000,
                       "uniqueItems": true,
                       "items": {
                         "type": "integer",
@@ -11892,8 +12195,34 @@
                     }
                   }
                 }
+              },
+              "capacityVersion": {
+                "const": 1
               }
-            }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "required": [
+                    "capacityVersion"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "concurrency": {
+                      "const": 1
+                    }
+                  }
+                },
+                "else": {
+                  "properties": {
+                    "dailyLimit": {
+                      "const": 800
+                    }
+                  }
+                }
+              }
+            ]
           }
         },
         "allOf": [
@@ -11911,12 +12240,69 @@
                 "successTarget": {
                   "type": "integer",
                   "minimum": 1,
-                  "maximum": 800
+                  "maximum": 8640
                 },
                 "attemptLimit": {
                   "type": "integer",
                   "minimum": 1,
-                  "maximum": 800
+                  "maximum": 8640
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "required": [
+                "openPolicy"
+              ],
+              "properties": {
+                "openPolicy": {
+                  "required": [
+                    "capacityVersion"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "then": {},
+            "else": {
+              "properties": {
+                "successTarget": {
+                  "maximum": 1000,
+                  "type": "integer"
+                },
+                "attemptLimit": {
+                  "maximum": 1000,
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "required": [
+                "openPolicy"
+              ],
+              "properties": {
+                "openPolicy": {
+                  "not": {
+                    "required": [
+                      "capacityVersion"
+                    ]
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "successTarget": {
+                  "maximum": 800,
+                  "type": "integer"
+                },
+                "attemptLimit": {
+                  "maximum": 800,
+                  "type": "integer"
                 }
               }
             }

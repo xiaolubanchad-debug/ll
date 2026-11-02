@@ -188,8 +188,8 @@ onUnmounted(() => {
         </div>
         <p v-if="task.executionKind === 'APP_OPEN'" class="muted">
           单模拟器执行 · 每台服务器每日额度：今日已用
-          {{ task.dailyUsage?.used ?? 0 }} / {{ task.dailyUsage?.limit ?? 800 }}，剩余
-          {{ task.dailyUsage?.remaining ?? 800 }} 轮尝试。
+          {{ task.dailyUsage?.used ?? 0 }} / {{ task.dailyUsage?.limit ?? '—' }}，剩余
+          {{ task.dailyUsage?.remaining ?? '—' }} 轮尝试。
         </p>
         <p v-if="task.nextRunAt" class="muted">
           下次自动执行：{{ when(task.nextRunAt) }}（北京时间）

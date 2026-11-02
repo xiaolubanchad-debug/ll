@@ -8,7 +8,12 @@
       "request": "NodeInput",
       "status": 201
     },
-    { "method": "get", "path": "/nodes/{id}", "operationId": "getNode", "status": 200 },
+    {
+      "method": "get",
+      "path": "/nodes/{id}",
+      "operationId": "getNode",
+      "status": 200
+    },
     {
       "method": "patch",
       "path": "/nodes/{id}",
@@ -61,7 +66,12 @@
       "request": "SecretInput",
       "status": 201
     },
-    { "method": "get", "path": "/secrets", "operationId": "secrets", "status": 200 },
+    {
+      "method": "get",
+      "path": "/secrets",
+      "operationId": "secrets",
+      "status": 200
+    },
     {
       "method": "post",
       "path": "/secrets/{id}/revoke",
@@ -76,7 +86,12 @@
       "request": "ReleaseInput",
       "status": 201
     },
-    { "method": "get", "path": "/releases", "operationId": "releases", "status": 200 },
+    {
+      "method": "get",
+      "path": "/releases",
+      "operationId": "releases",
+      "status": 200
+    },
     {
       "method": "post",
       "path": "/deployments",
@@ -85,8 +100,18 @@
       "idempotent": true,
       "status": 202
     },
-    { "method": "get", "path": "/deployments", "operationId": "deployments", "status": 200 },
-    { "method": "get", "path": "/deployments/{id}", "operationId": "getDeployment", "status": 200 },
+    {
+      "method": "get",
+      "path": "/deployments",
+      "operationId": "deployments",
+      "status": 200
+    },
+    {
+      "method": "get",
+      "path": "/deployments/{id}",
+      "operationId": "getDeployment",
+      "status": 200
+    },
     {
       "method": "get",
       "path": "/deployments/{id}/events",
@@ -116,6 +141,24 @@
       "operationId": "heartbeat",
       "node": true,
       "request": "AgentMessage",
+      "status": 200
+    },
+    {
+      "method": "get",
+      "path": "/nodes/{id}/execution-capacity",
+      "operationId": "nodeCapacity",
+      "query": "NodeCapacityQuery",
+      "response": "NodeCapacityView",
+      "status": 200
+    },
+    {
+      "method": "put",
+      "path": "/nodes/{id}/execution-capacity",
+      "operationId": "updateNodeCapacity",
+      "request": "NodeCapacityInput",
+      "response": "NodeCapacityView",
+      "idempotent": true,
+      "ifMatch": true,
       "status": 200
     }
   ]

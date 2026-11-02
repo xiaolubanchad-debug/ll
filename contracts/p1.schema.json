@@ -414,7 +414,8 @@
               "APP_OPEN_PARALLEL_V1",
               "DEVICE_VARIANTS_V1",
               "OWNED_TEST_CLIENT_V1",
-              "DEVICE_SESSIONS_V1"
+              "DEVICE_SESSIONS_V1",
+              "EXECUTION_CAPACITY_V1"
             ]
           }
         }
@@ -632,6 +633,138 @@
         },
         "version": {
           "enum": ["24.04", "26.04"]
+        }
+      }
+    },
+    "NodeCapacityQuery": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "appsPerDeviceMin": {
+          "type": "string",
+          "pattern": "^(?:[1-9]|[1-9][0-9]{1,2}|1000)$"
+        }
+      },
+      "required": []
+    },
+    "NodeCapacityInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dailyLimit"],
+      "properties": {
+        "dailyLimit": {
+          "type": ["integer", "null"],
+          "minimum": 1,
+          "maximum": 8640
+        }
+      }
+    },
+    "NodeCapacityView": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nodeId",
+        "version",
+        "day",
+        "supported",
+        "mode",
+        "manualLimit",
+        "recommendedLimit",
+        "limit",
+        "used",
+        "remaining",
+        "frozen",
+        "sampleRuns",
+        "sampleApps",
+        "sampleScope",
+        "deviceSetupMs",
+        "appMs",
+        "appsPerDeviceMin",
+        "reservePercent",
+        "remainingTimeEstimate",
+        "admissionDeadline"
+      ],
+      "properties": {
+        "nodeId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "day": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        },
+        "supported": {
+          "type": "boolean"
+        },
+        "mode": {
+          "enum": ["AUTO", "MANUAL"]
+        },
+        "manualLimit": {
+          "type": ["integer", "null"],
+          "minimum": 1,
+          "maximum": 8640
+        },
+        "recommendedLimit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8640
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8640
+        },
+        "used": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "remaining": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 8640
+        },
+        "frozen": {
+          "type": "boolean"
+        },
+        "sampleRuns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sampleApps": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sampleScope": {
+          "enum": ["OWNED_TEST_ONLY", "NODE_HISTORY", "CONSERVATIVE_REFERENCE"]
+        },
+        "deviceSetupMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "appMs": {
+          "type": "integer",
+          "minimum": 10000
+        },
+        "appsPerDeviceMin": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "reservePercent": {
+          "const": 25
+        },
+        "remainingTimeEstimate": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 8640
+        },
+        "admissionDeadline": {
+          "type": "string",
+          "format": "date-time"
         }
       }
     }

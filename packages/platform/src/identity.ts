@@ -1,6 +1,7 @@
 import type { TestConfiguration } from '@apk/contracts';
 import {
   IDENTITY_MODELS,
+  executionCapacitySupported,
   identitySupported,
   ownedTestSupported,
   deviceSessionsSupported,
@@ -21,6 +22,12 @@ export function assertIdentityReady(
   health: unknown,
   attempts: number,
 ) {
+  if (
+    config.execution.appOpen &&
+    ((config.execution.appOpen.appsPerDevice?.max ?? 1) > 10 || attempts > 800) &&
+    !executionCapacitySupported(features, version)
+  )
+    fault('NODE_UPGRADE_REQUIRED', '扩展安装数量和每日额度需要 Agent 0.14.0', 422);
   if (config.execution.appOpen?.randomDeviceProfile) {
     if (!identitySupported(features, version))
       fault('NODE_UPGRADE_REQUIRED', '测试型号需要 Agent 0.12.0', 422);

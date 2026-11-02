@@ -1,5 +1,7 @@
 # 契约结构与检查
 
+1.17 的服务器容量输入正反例为 fixtures/capacity.manual.valid.json 与 fixtures/capacity.manual.invalid.json；自动估算、当天冻结、扩展设备安装数和 Agent 能力门禁见 [容量契约](../docs/V117_CAPACITY_CONTRACT.md)。
+
 config.schema.json 定义不可变测试配置，不包含代理明文。agent.schema.json 定义节点注册、心跳、领取、分配、接收确认、账户专用上传及事件消息。HTTP_API.md 定义接口、鉴权和业务含义；仅有 Schema 校验不代表数据库状态转换或节点权限正确。
 
 样例中的 UUID、example.test 地址、包名、控件及 sampleuser 账户均为虚构值，没有实际登录用途。账户样例只用于专用上传结构校验，禁止将真实账户写回样例。注册流程默认禁用；不能直接用于真实测试。样例 UA 为空，表示使用已安装浏览器默认 UA，不表示修改了 App 原生请求。

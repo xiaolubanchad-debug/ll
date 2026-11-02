@@ -1,7 +1,7 @@
 import { scheduleDeviceSessions } from './device-sessions.js';
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
-import { devicePlanIssues, EXECUTION_DEVICE_LIMIT } from '@apk/contracts';
+import { devicePlanIssues, EXECUTION_DEVICE_LIMIT, openPolicyIssues } from '@apk/contracts';
 import type { DailyExecutionPlan, TestConfiguration } from '@apk/contracts';
 import type { Target, AutomationEvent } from './download.js';
 import type { RegistrationCompletion } from './registration.js';
@@ -46,7 +46,7 @@ export async function runCachedAppOpens(
   )
     throw new DownloadError('IDENTITY_PLAN_INVALID');
   const deadline = Date.parse(policy.admissionDeadline);
-  if (!Number.isFinite(deadline) || policy.dailyLimit !== 800 || plan.attemptLimit > 800)
+  if (!Number.isFinite(deadline) || openPolicyIssues(plan).length > 0)
     throw new DownloadError('OPEN_POLICY_INVALID');
   const assignments = policy.sessions?.flatMap((s) =>
     s.assetIndexes.map((assetIndex, appIndex) => ({

@@ -45,12 +45,12 @@
         "successTarget": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 1000
+          "maximum": 8640
         },
         "attemptLimit": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 1000
+          "maximum": 8640
         },
         "proxySecretVersionId": {
           "type": "string",

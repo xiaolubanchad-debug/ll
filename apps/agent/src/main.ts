@@ -87,9 +87,16 @@ export async function callHub(
         ? 'IDENTITY_REJECTED'
         : 'HUB_REQUEST_FAILED',
     );
-  const text = await response.text();
-  if (text.length > 1048576) throw Error('HUB_RESPONSE_INVALID');
-  return JSON.parse(text) as Record<string, unknown>;
+  const limit = /^deliveries\/[a-f0-9-]{36}\/config$/.test(path) ? 8 * 1024 * 1024 : 1024 * 1024;
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  if (response.body)
+    for await (const chunk of response.body) {
+      size += chunk.byteLength;
+      if (size > limit) throw Error('HUB_RESPONSE_INVALID');
+      chunks.push(chunk);
+    }
+  return JSON.parse(Buffer.concat(chunks).toString('utf8')) as Record<string, unknown>;
 }
 export async function startAgent(
   config: Config,

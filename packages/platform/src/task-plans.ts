@@ -12,6 +12,7 @@ import type {
 } from '@apk/contracts';
 import {
   schemaIssues,
+  MAX_DAILY_OPEN_LIMIT,
   autoRegistrationSupported,
   contentIsolationSupported,
   appReadinessSupported,
@@ -148,7 +149,7 @@ async function readiness(db: PrismaClient, p: PlanRow) {
         )
       )
         add('NODE_UPGRADE_REQUIRED', '并发与每日额度需要 Agent 0.11.0', 'nodes');
-      const budget = await dailyOpenUsage(db, node.id);
+      const budget = await dailyOpenUsage(db, node.id, undefined, c);
       if (!p.enabled && p.attemptLimit > budget.remaining)
         add('DAILY_OPEN_LIMIT', '当日剩余额度不足，请降低目标及尝试上限', 'tasks');
     }
@@ -198,7 +199,12 @@ async function view(db: PrismaClient, p: PlanRow): Promise<TaskPlanView> {
         : 'DOWNLOAD_ONLY',
     concurrency:
       (p.currentVersion.body as unknown as TestConfiguration).execution.appOpen?.concurrency ?? 1,
-    dailyUsage: await dailyOpenUsage(db, p.nodeId),
+    dailyUsage: await dailyOpenUsage(
+      db,
+      p.nodeId,
+      undefined,
+      p.currentVersion.body as unknown as TestConfiguration,
+    ),
     name: p.name,
     nodeId: p.nodeId,
     nodeName: p.node.name,
@@ -275,7 +281,11 @@ export async function saveTaskPlan(
 ) {
   const input = checked<TaskPlanInput>('TaskPlanInput', body),
     config = configBody(input.configuration);
-  validateBudget(input.successTarget, input.attemptLimit);
+  validateBudget(
+    input.successTarget,
+    input.attemptLimit,
+    config.execution.appOpen ? MAX_DAILY_OPEN_LIMIT : 1000,
+  );
   const result = await idempotent(
     db,
     actor,

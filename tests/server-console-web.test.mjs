@@ -381,6 +381,37 @@ test('deployment and standalone stop preserve actual ownership; offline servers 
     });
   }));
 
+test('TARGET_LIMIT on server start explicitly confirms current-rule download retry and cancellation has no effect', async () =>
+  fixture(async ({ page, state, writes, row }) => {
+    state.a.latestCycle = {
+      id: randomUUID(),
+      executionKind: 'APP_OPEN',
+      day: '2026-11-02',
+      round: 1,
+      status: 'FAILED',
+      successes: 0,
+      attemptsStarted: 0,
+      successTarget: 20,
+      attemptLimit: 20,
+      apkCount: 0,
+      registerRunIds: [],
+      downloadRunId: randomUUID(),
+      activeRunId: null,
+      errorCode: 'TARGET_LIMIT',
+    };
+    await open(page);
+    await row().getByRole('button', { name: '开始', exact: true }).click();
+    await expect(page.getByRole('alert', { name: '确认重新下载', exact: true })).toBeVisible();
+    assert.equal(writes.length, 0);
+    await page.getByRole('button', { name: '取消', exact: true }).click();
+    assert.equal(writes.length, 0);
+    await row().getByRole('button', { name: '开始', exact: true }).click();
+    await page.getByRole('button', { name: '确认重新下载并测试', exact: true }).click();
+    await expect.poll(() => writes.length).toBe(1);
+    assert.deepEqual(writes[0].body, { action: 'RETRY_DOWNLOAD' });
+    assert.equal(writes[0].headers['if-match'], '1');
+  }));
+
 test('legacy configuration conversion requires a deliberate choice and creates only a current-flow version', async () =>
   fixture(async ({ page, state, writes, row }) => {
     state.legacy = true;

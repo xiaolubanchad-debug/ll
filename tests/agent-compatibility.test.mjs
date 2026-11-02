@@ -29,6 +29,7 @@ test('signed 0.12 releases retain all managed-task gates, while missing features
       '0.13.1',
       '0.13.2',
       '0.13.3',
+      '0.14.0',
     ]) {
       assert.equal(supported([feature], version), true, feature + ':' + version);
       assert.equal(supported([], version), false);

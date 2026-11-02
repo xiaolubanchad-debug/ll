@@ -54,7 +54,7 @@ test('thirty distinct real model codes and six actual Android API targets; malfo
   for (const [min, max] of [
     [0, 3],
     [4, 3],
-    [1, 11],
+    [1, 1001],
     [1.5, 3],
   ]) {
     const c = structuredClone(config);

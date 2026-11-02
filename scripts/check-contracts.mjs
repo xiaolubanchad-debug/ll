@@ -1119,7 +1119,7 @@ test('1.15 grouped device configuration', () =>
 for (const range of [
   { min: 0, max: 3 },
   { min: 4, max: 3 },
-  { min: 1, max: 11 },
+  { min: 1, max: 1001 },
   { min: 1.5, max: 3 },
   { min: 1, max: 3, shell: 'forbidden' },
 ])
@@ -1143,6 +1143,28 @@ for (const patch of [{ completed: -1 }, { attempts: '20' }, { testReports: -1 },
         appOpens: { ...serverOverview.appOpens, ...patch },
       }).length,
     ),
+  );
+test('1.17 manual quota positive fixture', () =>
+  assert.deepEqual(
+    schemaIssues('NodeCapacityInput', read('contracts/fixtures/capacity.manual.valid.json')),
+    [],
+  ));
+test('1.17 manual quota upper bound negative fixture', () =>
+  assert.ok(
+    schemaIssues('NodeCapacityInput', read('contracts/fixtures/capacity.manual.invalid.json'))
+      .length,
+  ));
+test('1.17 automatic quota', () =>
+  assert.deepEqual(schemaIssues('NodeCapacityInput', { dailyLimit: null }), []));
+test('1.17 more than ten APPs per device', () => {
+  const c = structuredClone(groupedConfig);
+  c.execution.appOpen.appsPerDevice = { min: 8, max: 37 };
+  c.download.maxTargets = 100;
+  assert.deepEqual(configurationIssues(c), []);
+});
+for (const value of ['0', '1001', '1.5', '8;id'])
+  test('1.17 invalid capacity query ' + value, () =>
+    assert.ok(schemaIssues('NodeCapacityQuery', { appsPerDeviceMin: value }).length),
   );
 process.stdout.write(
   `${passed} contract checks passed${process.exitCode ? '; failures present' : ''}.\n`,

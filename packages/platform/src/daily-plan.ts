@@ -4,6 +4,8 @@ import {
   deviceVariant,
   devicePlanIssues,
   EXECUTION_DEVICE_LIMIT,
+  executionCapacitySupported,
+  MAX_DAILY_OPEN_LIMIT,
 } from '@apk/contracts';
 import {
   assertIdentityReady,
@@ -27,11 +29,11 @@ export function beijingDay(now: Date) {
     day: '2-digit',
   }).format(now);
 }
-export function validateBudget(n: number, m: number) {
-  if (!Number.isInteger(n) || !Number.isInteger(m) || n < 1 || m < n || m > 1000)
+export function validateBudget(n: number, m: number, maximum = 1000) {
+  if (!Number.isInteger(n) || !Number.isInteger(m) || n < 1 || m < n || m > maximum)
     fault(
       'VALIDATION_FAILED',
-      '成功目标和尝试上限需为 1–1000 的整数，且尝试上限不小于成功目标',
+      '目标和尝试上限需为 1–' + maximum + ' 的整数，且尝试上限不小于完成目标',
       422,
     );
 }
@@ -71,7 +73,11 @@ export async function prepareDailyPlan(
     fault('VALIDATION_FAILED', '独立代理引用只用于代理检查', 422);
   if (input.purpose === 'PROXY_CHECK') plan.proxySecretVersionId = input.proxySecretVersionId;
   if (input.purpose === 'REGISTER') {
-    validateBudget(input.successTarget!, input.attemptLimit!);
+    validateBudget(
+      input.successTarget!,
+      input.attemptLimit!,
+      config.execution.appOpen ? MAX_DAILY_OPEN_LIMIT : 1000,
+    );
     const identityNode = await tx.node.findUniqueOrThrow({
       where: { id: input.nodeId },
     });
@@ -88,7 +94,7 @@ export async function prepareDailyPlan(
       input.attemptLimit!,
     );
     if (config.execution.appOpen) {
-      const budget = await dailyOpenUsage(tx, input.nodeId, plan.cacheDay);
+      const budget = await dailyOpenUsage(tx, input.nodeId, plan.cacheDay, config);
       if (input.attemptLimit! > budget.remaining)
         fault('DAILY_OPEN_LIMIT', '当日剩余执行额度不足，请降低目标和尝试上限', 422);
       if (config.execution.appOpen.concurrency !== undefined) {
@@ -97,7 +103,13 @@ export async function prepareDailyPlan(
           fault('DAY_CUTOFF', '今日停止新增轮次，请等待次日下载', 422);
         plan.openPolicy = {
           concurrency: EXECUTION_DEVICE_LIMIT,
-          dailyLimit: 800,
+          dailyLimit: budget.limit,
+          ...(executionCapacitySupported(
+            (identityRelease?.manifest as { features?: string[] } | null)?.features,
+            identityNode.agentVersion,
+          )
+            ? { capacityVersion: 1 as const }
+            : {}),
           admissionDeadline: deadline,
           ...(config.execution.appOpen.randomDeviceProfile &&
           !config.execution.appOpen.appsPerDevice
@@ -158,7 +170,9 @@ export async function prepareDailyPlan(
       seen.add(a.apk.packageName);
       return true;
     });
-    if (plan.assets.length < groupPolicy.max)
+    const dynamic = plan.openPolicy?.capacityVersion === 1;
+    const required = dynamic ? groupPolicy.min : groupPolicy.max;
+    if (plan.assets.length < required)
       fault('APK_POOL_INSUFFICIENT', '不同包名的兼容 APK 数量不足，请降低每台设备安装数量', 422);
     const node = await tx.node.findUniqueOrThrow({
       where: { id: input.nodeId },
@@ -178,7 +192,7 @@ export async function prepareDailyPlan(
             (a) =>
               (a.apk.minSdkVersion ?? 1) <= (deviceVariant(id)?.apiLevel ?? 0) &&
               (!a.apk.abis.length || a.apk.abis.some((abi) => abiCatalog[id]?.includes(abi))),
-          ).length >= groupPolicy.max,
+          ).length >= required,
       );
       let available = modelBag.filter((id) => compatibleVariants.includes(id));
       if (!available.length) {
@@ -203,9 +217,11 @@ export async function prepareDailyPlan(
           ? [i]
           : [],
       );
-      if (indexes.length < groupPolicy.max)
-        fault('APK_POOL_INSUFFICIENT', '兼容 APK 数量不足', 422);
-      const count = Math.min(left, randomInt(groupPolicy.min, groupPolicy.max + 1));
+      if (indexes.length < required) fault('APK_POOL_INSUFFICIENT', '兼容 APK 数量不足', 422);
+      const count = Math.min(
+        left,
+        randomInt(groupPolicy.min, Math.min(groupPolicy.max, indexes.length) + 1),
+      );
       for (let i = indexes.length - 1; i > 0; i--) {
         const j = randomInt(i + 1);
         [indexes[i], indexes[j]] = [indexes[j], indexes[i]];

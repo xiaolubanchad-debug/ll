@@ -30,7 +30,7 @@ const failed = (code = 'APP_OPEN_FAILED') => ({
   cleanupComplete: true,
   errorCode: code,
 });
-test('parallel configuration is bounded, quota cannot exceed 800, and capability refuses old nodes', async () => {
+test('serial configuration and extended quota are bounded, and capability refuses old nodes', async () => {
   const c = JSON.parse(
     await readFile('contracts/fixtures/config.concurrent-open.valid.json', 'utf8'),
   );
@@ -54,8 +54,8 @@ test('parallel configuration is bounded, quota cannot exceed 800, and capability
     schemaIssues('TaskPlanInput', {
       ...fixture,
       configuration: c,
-      successTarget: 801,
-      attemptLimit: 801,
+      successTarget: 8641,
+      attemptLimit: 8641,
     }).length,
   );
   assert.equal(parallelAppOpenSupported(['APP_OPEN_PARALLEL_V1'], '0.10.0'), false);

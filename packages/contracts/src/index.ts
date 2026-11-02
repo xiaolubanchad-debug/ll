@@ -1,6 +1,34 @@
 import validators from './generated/validators.js';
 // Historical snapshots may contain 2; all new plans and execution use this limit.
 export const EXECUTION_DEVICE_LIMIT = 1;
+export const MAX_DAILY_OPEN_LIMIT = 8640;
+export const MAX_DEVICE_APPS = 1000;
+export type { NodeCapacityInput, NodeCapacityQuery, NodeCapacityView } from './generated/types.js';
+export function executionCapacitySupported(
+  features: readonly string[] | undefined,
+  version: string | null | undefined,
+) {
+  return (
+    knownAgentAtLeast(version, '0.14.0') && features?.includes('EXECUTION_CAPACITY_V1') === true
+  );
+}
+export function openPolicyIssues(
+  plan: import('./generated/types.js').DailyExecutionPlan,
+): string[] {
+  const p = plan.openPolicy;
+  if (!p) return ['OPEN_POLICY_INVALID'];
+  return p.capacityVersion === 1
+    ? p.concurrency !== 1 ||
+      !Number.isInteger(p.dailyLimit) ||
+      p.dailyLimit < 1 ||
+      p.dailyLimit > MAX_DAILY_OPEN_LIMIT ||
+      plan.attemptLimit > p.dailyLimit
+      ? ['OPEN_POLICY_INVALID']
+      : []
+    : p.dailyLimit !== 800 || plan.attemptLimit > 800
+      ? ['OPEN_POLICY_INVALID']
+      : [];
+}
 export type {
   TestEnrollInput,
   TestEnrollResult,
@@ -190,6 +218,11 @@ export function configurationIssues(value: unknown): Issue[] {
     issues.push({
       path: '/execution/appOpen/appsPerDevice',
       message: '每台设备安装数量范围无效，且需要明确并发数',
+    });
+  if (perDevice && perDevice.min > config.download.maxTargets)
+    issues.push({
+      path: '/execution/appOpen/appsPerDevice/min',
+      message: '每台最少安装数量不能超过下载入口上限',
     });
   let url: URL;
   try {
@@ -405,6 +438,7 @@ const knownAgentVersions: readonly string[] = [
   '0.13.1',
   '0.13.2',
   '0.13.3',
+  '0.14.0',
 ];
 function knownAgentAtLeast(version: string | null | undefined, minimum: string): boolean {
   const index = knownAgentVersions.indexOf(version ?? '');

@@ -71,6 +71,7 @@ const fingerprint = ref(''),
   editorNode = ref<NodeView | null>(null),
   editorTask = ref<TaskPlanDetail | undefined>(undefined),
   confirmTask = ref<TaskPlanView | null>(null),
+  confirmTaskKind = ref<'NEW_ROUND' | 'RETRY_DOWNLOAD'>('NEW_ROUND'),
   visibleLog = ref<string | null>(null),
   managementPanel = ref<HTMLElement | null>(null);
 const stages: Record<string, string> = {
@@ -226,13 +227,22 @@ async function startTask(node: NodeView) {
     error.value = startReason(node, task);
     return;
   }
+  if (
+    task.latestCycle?.errorCode === 'TARGET_LIMIT' &&
+    ['FAILED', 'STOPPED'].includes(task.latestCycle.status)
+  ) {
+    confirmTaskKind.value = 'RETRY_DOWNLOAD';
+    confirmTask.value = task;
+    return;
+  }
   if (finishedCycle(task)) {
+    confirmTaskKind.value = 'NEW_ROUND';
     confirmTask.value = task;
     return;
   }
   await control(task, 'START');
 }
-async function control(task: TaskPlanView, kind: 'START' | 'NEW_ROUND') {
+async function control(task: TaskPlanView, kind: 'START' | 'NEW_ROUND' | 'RETRY_DOWNLOAD') {
   await action(async () => {
     const fresh = await api<TaskPlanDetail>('/task-plans/' + task.id);
     if (fresh.task.nodeId !== task.nodeId || fresh.task.version !== task.version) {
@@ -615,7 +625,10 @@ onUnmounted(() => {
                   <option value="__new__">＋ 新建任务配置</option></select
                 ><small v-if="taskFor(node)?.nextRunAt"
                   >下次 {{ when(taskFor(node)?.nextRunAt) }}</small
-                ><small v-else-if="taskFor(node)">{{
+                ><small v-if="taskFor(node)?.dailyUsage"
+                  >今日额度 {{ taskFor(node)?.dailyUsage?.used }} /
+                  {{ taskFor(node)?.dailyUsage?.limit }}</small
+                ><small v-if="taskFor(node) && !taskFor(node)?.nextRunAt">{{
                   taskFor(node)?.automatic
                     ? '每日 ' + taskFor(node)?.time + '（未开启）'
                     : '手动执行'
@@ -700,16 +713,23 @@ onUnmounted(() => {
       v-if="confirmTask"
       class="surface confirmation-box"
       role="alert"
-      aria-label="确认再次开始"
+      :aria-label="confirmTaskKind === 'RETRY_DOWNLOAD' ? '确认重新下载' : '确认再次开始'"
     >
-      <h2>再次开始：{{ confirmTask.name }}</h2>
-      <p>
+      <h2>
+        {{ confirmTaskKind === 'RETRY_DOWNLOAD' ? '重新下载' : '再次开始' }}：{{ confirmTask.name }}
+      </h2>
+      <p v-if="confirmTaskKind === 'RETRY_DOWNLOAD'">
+        上次匹配入口超过下载上限。请先在配置中核对“每日下载入口上限”。确认后使用当前配置重新访问网站和下载，随后执行
+        APP 打开测试；原失败记录保留。取消不会开始。
+      </p>
+      <p v-else>
         本轮已达到完成目标或尝试上限。确认后新增一轮，目标
         {{ confirmTask.successTarget }} 次，最多尝试 {{ confirmTask.attemptLimit }} 次；复用当天
         APK，历史计数保留。
       </p>
-      <el-button type="primary" :disabled="busy" @click="control(confirmTask, 'NEW_ROUND')"
-        >确认新增一轮</el-button
+      <el-button type="primary" :disabled="busy" @click="control(confirmTask, confirmTaskKind)">{{
+        confirmTaskKind === 'RETRY_DOWNLOAD' ? '确认重新下载并测试' : '确认新增一轮'
+      }}</el-button
       ><el-button :disabled="busy" @click="confirmTask = null">取消</el-button>
     </section>
     <div v-if="editorNode" class="server-task-editor">

@@ -34,6 +34,7 @@ import { isIP } from 'node:net';
 import { beijingDay, prepareDailyPlan, dailyTargetKey } from './daily-plan.js';
 import type { DailyExecutionPlan } from '@apk/contracts';
 import { lockLibrary } from './library-lock.js';
+import { executionCapacitySupported, openPolicyIssues } from '@apk/contracts';
 import { dailyOpenUsage, openAdmissionDeadline } from './open-budget.js';
 type Tx = P.TransactionClient;
 export const ACTIVE_RUNS = ['ASSIGNED', 'RUNNING', 'STOP_REQUESTED'] as const;
@@ -502,7 +503,8 @@ async function assertIsolatedRun(tx: Tx, run: Run) {
       !policy ||
       (policy.concurrency !== EXECUTION_DEVICE_LIMIT &&
         policy.concurrency !== settings.appOpen.concurrency) ||
-      policy.dailyLimit !== 800 ||
+      openPolicyIssues(run.executionPlan as unknown as DailyExecutionPlan).length > 0 ||
+      (policy.capacityVersion === 1 && !executionCapacitySupported(features, node.agentVersion)) ||
       !run.cacheDay ||
       policy.admissionDeadline !== openAdmissionDeadline(run.cacheDay)
     )
@@ -1034,7 +1036,16 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
         if (openOnly) {
           if (plan?.openPolicy && Date.now() >= Date.parse(plan.openPolicy.admissionDeadline))
             fault('DAY_CUTOFF', '今日停止新增轮次');
-          if ((await dailyOpenUsage(tx, run.nodeId)).remaining < 1)
+          if (
+            (
+              await dailyOpenUsage(
+                tx,
+                run.nodeId,
+                undefined,
+                config as unknown as TestConfiguration,
+              )
+            ).remaining < 1
+          )
             fault('DAILY_OPEN_LIMIT', '已用完今日额度');
         }
         await tx.run.update({

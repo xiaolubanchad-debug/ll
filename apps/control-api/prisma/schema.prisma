@@ -52,6 +52,7 @@ model LoginBucket {
 }
 
 model Node {
+  dailyOpenLimitOverride Int?
   managedTasks            ManagedTask[]
   id                      String           @id @default(uuid()) @db.Uuid
   name                    String           @db.VarChar(100)
