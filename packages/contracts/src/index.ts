@@ -522,6 +522,12 @@ export function xpathObservationSupported(
     knownAgentAtLeast(version, '0.17.0') && features?.includes('XPATH_OBSERVATION_V1') === true
   );
 }
+export function cachedApkSelectionSupported(
+  features: readonly string[] | undefined,
+  version: string | null | undefined,
+) {
+  return knownAgentAtLeast(version, '0.17.0') && features?.includes('APK_FILE_ASSETS_V1') === true;
+}
 export type {
   SourceElement,
   SourceElementCheck,

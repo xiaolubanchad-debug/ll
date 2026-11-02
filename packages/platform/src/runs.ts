@@ -38,6 +38,7 @@ import { lockLibrary } from './library-lock.js';
 import { executionCapacitySupported, openPolicyIssues } from '@apk/contracts';
 import { sourceAttributeNames } from '@apk/automation';
 import type { SourceElementObservation } from '@apk/contracts';
+import { cachedApkSelectionSupported } from '@apk/contracts';
 import { dailyOpenUsage, openAdmissionDeadline } from './open-budget.js';
 type Tx = P.TransactionClient;
 export const ACTIVE_RUNS = ['ASSIGNED', 'RUNNING', 'STOP_REQUESTED'] as const;
@@ -296,6 +297,11 @@ export async function createRun(
     )
       fault('NODE_UPGRADE_REQUIRED', '请部署支持下载任务的 Agent 版本');
     const configuration = config.body as unknown as TestConfiguration;
+    if (
+      configuration.execution.appOpen?.assetFileNames?.length &&
+      !cachedApkSelectionSupported(manifest?.features, node.agentVersion)
+    )
+      fault('NODE_UPGRADE_REQUIRED', '指定缓存 APK 需要 Agent 0.17.0');
     if (
       configuration.source.elementChecks?.length &&
       !xpathObservationSupported(manifest?.features, node.agentVersion)

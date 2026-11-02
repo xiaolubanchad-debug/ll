@@ -175,6 +175,18 @@ test(
         policy: new NetworkPolicy(new Set([origin])),
         afterDownload: async (target, metadata, file) => {
           assert.match(file, /[/\\]cache[/\\]files[/\\][a-f0-9]{64}\.apk$/);
+          if (target.pid === 'invalid') {
+            assert.equal(metadata.validationPolicy, 'FILE_NAME');
+            assert.ok(!(await readFile(file)).equals(apk));
+            handoffs.push(target.pid);
+            return {
+              status: 'FAILED',
+              proof: 'NONE',
+              artifactIds: [],
+              cleanupComplete: true,
+              errorCode: 'APK_INSTALL_FAILED',
+            };
+          }
           assert.ok((await readFile(file)).equals(apk));
           assert.equal(metadata.size, apk.length);
           handoffs.push(target.pid);
@@ -203,9 +215,9 @@ test(
       ],
       JSON.stringify(finished),
     );
-    assert.equal(finished[6].payload.errorCode, 'APK_METADATA_UNREADABLE');
+    assert.equal(finished[6].payload.errorCode, 'APK_INSTALL_FAILED');
     assert.equal(finished[7].payload.errorCode, 'NETWORK_BLOCKED');
-    assert.deepEqual(handoffs, routes.slice(0, 5));
+    assert.deepEqual(handoffs, [...routes.slice(0, 5), 'invalid']);
     assert.deepEqual(touches, ['touchend']);
     for (const path of [
       '/touch.apk',
@@ -232,7 +244,7 @@ test(
     assert.deepEqual(await readdir(join(root, 'jobs')), []);
     const cache = await ApkCache.open(join(root, 'cache'));
     try {
-      assert.equal(cache.db.prepare('SELECT count(*) n FROM cache').get().n, 5);
+      assert.equal(cache.db.prepare('SELECT count(*) n FROM cache').get().n, 6);
     } finally {
       cache.close();
     }

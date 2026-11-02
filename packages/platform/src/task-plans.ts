@@ -19,6 +19,7 @@ import {
   appOpenSupported,
   parallelAppOpenSupported,
   xpathObservationSupported,
+  cachedApkSelectionSupported,
 } from '@apk/contracts';
 import { checked } from './secrets.js';
 import { configBody, configSecrets } from './configurations.js';
@@ -118,6 +119,18 @@ async function readiness(db: PrismaClient, p: PlanRow) {
       )
     )
       add('NODE_UPGRADE_REQUIRED', '人工元素检查需要 Agent 0.17.0', 'nodes');
+  }
+  if (c.execution.appOpen?.assetFileNames?.length) {
+    const release = node.agentReleaseId
+      ? await db.release.findUnique({ where: { id: node.agentReleaseId } })
+      : null;
+    if (
+      !cachedApkSelectionSupported(
+        (release?.manifest as { features?: string[] } | null)?.features,
+        node.agentVersion,
+      )
+    )
+      add('NODE_UPGRADE_REQUIRED', '指定缓存 APK 需要 Agent 0.17.0', 'nodes');
   }
   if (c.execution.mode === 'FULL') {
     const release = node.agentReleaseId
