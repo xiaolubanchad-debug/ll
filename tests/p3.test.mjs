@@ -22,6 +22,8 @@ import {
   proxyObservation,
   registerApk,
   inspectApk,
+  runDownload,
+  ApkCache,
   RegistrationError,
 } from '@apk/automation';
 import { digest, tickSchedules } from '@apk/platform';
@@ -378,6 +380,41 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
       'If-Match': '1',
     });
     assert.equal(v.status, 201, JSON.stringify(v.data));
+    // Historical form registration requires known package metadata. Seed only the
+    // controlled fixture cache; production downloads continue to use filenames.
+    const downloads = join(root, 'p3-execution/downloads');
+    await runDownload(
+      { ...body, execution: { ...body.execution, mode: 'DOWNLOAD_ONLY' } },
+      node.id,
+      downloads,
+      resolve('.'),
+      AbortSignal.timeout(30000),
+      async () => {},
+      { chromium, policy: new NetworkPolicy(new Set([site.url])), dailyDownload: true },
+    );
+    const cache = await ApkCache.open(join(downloads, 'cache'));
+    try {
+      for (const row of cache.db
+        .prepare('SELECT key,day,metadata FROM cache WHERE node=?')
+        .all(node.id)) {
+        const old = JSON.parse(row.metadata);
+        const known = await inspectApk(
+          cache.path(row.key),
+          body.download.maxApkBytes ?? 268435456,
+          row.day,
+          AbortSignal.timeout(10000),
+        );
+        assert.match(known.packageName, /^com\.example\./);
+        cache.db
+          .prepare('UPDATE cache SET metadata=? WHERE key=?')
+          .run(
+            JSON.stringify({ ...known, ...(old.fileName ? { fileName: old.fileName } : {}) }),
+            row.key,
+          );
+      }
+    } finally {
+      cache.close();
+    }
     return v.data;
   }
   async function run(cycle = false) {
