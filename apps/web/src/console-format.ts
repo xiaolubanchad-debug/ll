@@ -21,7 +21,7 @@ export const stateLabels: Record<string, string> = {
   NEEDS_REVIEW: '待核验',
   UNKNOWN: '结果未知',
   DOWNLOADING: '读取或下载 APK',
-  DOWNLOADED: '文件已校验',
+  DOWNLOADED: '文件已保存',
   PREPARING: '准备模拟器',
   INSTALLING: '安装 APK',
   LAUNCHING: '启动 APP',

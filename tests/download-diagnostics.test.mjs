@@ -98,7 +98,7 @@ test(
       ['DOWNLOAD_TRANSFER_TIMEOUT', 'DOWNLOAD_TRANSFER_FAILED'].includes(ends[2].payload.errorCode),
       JSON.stringify(ends[2]),
     );
-    assert.equal(ends[3].payload.errorCode, 'APK_INVALID_NOT_ZIP');
+    assert.equal(ends[3].payload.errorCode, 'APK_METADATA_UNREADABLE');
     assert.equal(ends[4].payload.status, 'SUCCEEDED');
     assert.equal(requests.filter((p) => p === '/touch-count').length, 1);
     assert.equal(requests.includes('/must-not.apk'), false);
@@ -106,8 +106,8 @@ test(
       events.filter((e) => e.taskId === id && e.type === 'LOG').map((e) => e.payload.message);
     assert.ok(!logs(ends[0].taskId).includes('下载入口：已操作配置控件'));
     assert.equal(logs(ends[1].taskId).filter((m) => m === '下载入口：已操作配置控件').length, 1);
-    assert.ok(!logs(ends[2].taskId).includes('下载传输：文件已保存，开始 APK 校验'));
-    assert.ok(logs(ends[3].taskId).includes('下载传输：文件已保存，开始 APK 校验'));
+    assert.ok(!logs(ends[2].taskId).includes('下载传输：文件已保存，读取启动所需包信息'));
+    assert.ok(logs(ends[3].taskId).includes('下载传输：文件已保存，读取启动所需包信息'));
     assert.ok(
       !JSON.stringify(
         events.filter((e) => e.type === 'LOG' || e.type === 'TASK_FINISHED'),

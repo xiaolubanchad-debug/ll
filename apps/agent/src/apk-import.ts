@@ -1,6 +1,6 @@
 import { readFile, lstat } from 'node:fs/promises';
 import { join } from 'node:path';
-import { ApkCache, inspectApk } from '@apk/automation';
+import { ApkCache, verifyFileTransfer } from '@apk/automation';
 import { schemaIssues } from '@apk/contracts';
 import type { ManualApkImportInput, ManualApkImportReceipt } from '@apk/contracts';
 
@@ -20,12 +20,8 @@ export async function importCachedApk(
   if (input.cacheDay !== day) throw Error('APK_IMPORT_EXPIRED');
   const info = await lstat(file);
   if (!info.isFile() || info.isSymbolicLink()) throw Error('APK_IMPORT_INVALID');
-  const actual = await inspectApk(
-    file,
-    input.maxBytes,
-    input.cacheDay,
-    AbortSignal.timeout(120000),
-  );
+  await verifyFileTransfer(file, input.apk, input.maxBytes, AbortSignal.timeout(120000));
+  const actual = input.apk;
   const stable = (value: unknown): string =>
     JSON.stringify(Object.entries(value as object).sort(([a], [b]) => a.localeCompare(b)));
   if (stable(actual) !== stable(input.apk)) throw Error('APK_IMPORT_INVALID');

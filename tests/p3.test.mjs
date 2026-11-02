@@ -426,7 +426,7 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
       {
         nodeId: node.id,
         releaseId: release.id,
-        agentVersion: '0.8.0',
+        agentVersion: '0.15.1',
         apiUrl: base,
         sdkRoot: '/fixture',
         toolsRoot: resolve('.'),
@@ -530,13 +530,14 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
         artifactName: 'agent-' + randomBytes(32).toString('hex') + '.tgz',
         sha256: randomBytes(32).toString('hex'),
         manifest: {
-          agentVersion: '0.8.0',
+          agentVersion: '0.15.1',
           features: [
             'DOWNLOAD_V1',
             'REGISTRATION_V1',
             'DAILY_V1',
             'AUTO_REGISTRATION_V1',
             'CONTENT_ISOLATION_V1',
+            'APK_METADATA_ONLY_V1',
           ],
           toolchain: { systemImage: body.execution.deviceProfiles[0].systemImage },
         },
@@ -548,7 +549,7 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
         host: 'p3.example.test',
         deploymentStatus: 'INSTALLED',
         agentReleaseId: release.id,
-        agentVersion: '0.8.0',
+        agentVersion: '0.15.1',
         downloadProtocol: '1.0',
         health: report,
         lastSeenAt: new Date(),

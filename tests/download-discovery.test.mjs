@@ -203,7 +203,7 @@ test(
       ],
       JSON.stringify(finished),
     );
-    assert.equal(finished[6].payload.errorCode, 'APK_INVALID_TOO_SMALL');
+    assert.equal(finished[6].payload.errorCode, 'APK_METADATA_UNREADABLE');
     assert.equal(finished[7].payload.errorCode, 'NETWORK_BLOCKED');
     assert.deepEqual(handoffs, routes.slice(0, 5));
     assert.deepEqual(touches, ['touchend']);

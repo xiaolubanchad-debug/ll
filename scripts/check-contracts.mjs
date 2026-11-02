@@ -1248,6 +1248,16 @@ test('1.19 APK result metadata accepts SDK but rejects secrets', () => {
     }).length,
   );
 });
+test('1.19.1 runtime metadata defers APK validity to Android', () =>
+  assert.deepEqual(
+    schemaIssues('ApkMetadata', read('contracts/fixtures/v1191.metadata.valid.json')),
+    [],
+  ));
+test('1.19.1 rejects unknown APK processing policies', () =>
+  assert.ok(
+    schemaIssues('ApkMetadata', read('contracts/fixtures/v1191.metadata.invalid.json')).length,
+  ));
+for(const message of ["下载传输：文件已保存，读取启动所需包信息","下载传输：已收到浏览器文件，等待保存与读取包信息"])test('1.19.1 metadata progress log survives node transport',()=>{const envelope=structuredClone(messages.find(m=>m.kind==='events'));envelope.events=[{eventId:'11111111-1111-4111-8111-111111111111',runId:envelope.events[0].runId,taskId:'11111111-1111-4111-8111-111111111111',sequence:1,occurredAt:'2026-11-02T00:00:00.000Z',type:'LOG',payload:{level:'INFO',message}}];assert.deepEqual(agentIssues(envelope),[]);});
 process.stdout.write(
   `${passed} contract checks passed${process.exitCode ? '; failures present' : ''}.\n`,
 );

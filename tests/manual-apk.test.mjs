@@ -220,7 +220,7 @@ test('manual APK: real authenticated upload, durable results, idle import, daily
           'content-type': 'application/octet-stream',
         });
         assert.equal(invalid.status, 422, JSON.stringify(invalid));
-        assert.equal(invalid.data.error.code, 'APK_INVALID');
+        assert.equal(invalid.data.error.code, 'APK_METADATA_UNREADABLE');
         await create();
         await assert.rejects(
           receiveManualApk(
@@ -339,12 +339,12 @@ test('manual APK: real authenticated upload, durable results, idle import, daily
           sha = digest(archiveBytes),
           body = {
             id: randomUUID(),
-            agentVersion: '0.2.0',
+            agentVersion: '0.15.1',
             protocolVersion: '1.0',
             gitCommit: 'a'.repeat(40),
             artifactName: 'agent-' + sha + '.tgz',
             sha256: sha,
-            features: ['MANUAL_APK_IMPORT_V1'],
+            features: ['MANUAL_APK_IMPORT_V1', 'APK_METADATA_ONLY_V1'],
             playbookSha256: await playbookDigest(resolve('deploy/ansible')),
             toolchain: {
               nodeVersion: '24.18.0',
@@ -378,6 +378,27 @@ test('manual APK: real authenticated upload, durable results, idle import, daily
         release = await db.release.create({
           data: { id: body.id, artifactName: body.artifactName, sha256: sha, manifest },
         });
+        await db.node.update({
+          where: { id: node.id },
+          data: { agentVersion: '0.15.1', agentReleaseId: release.id },
+        });
+        await db.release.update({ where: { id: release.id }, data: { archivedAt: new Date() } });
+        const oldTool = await db.release.create({
+          data: {
+            id:randomUUID(),
+            artifactName: 'agent-' + digest('old-import-tool') + '.tgz',
+            sha256: digest('old-import-tool'),
+            manifest: { agentVersion: '0.15.0', features: ['MANUAL_APK_IMPORT_V1'] },
+          },
+        });
+        await tickManualApks(db);
+        assert.equal(
+          (await db.manualApkUpload.findUniqueOrThrow({ where: { id: upload.id } })).errorCode,
+          'IMPORT_TOOL_REQUIRED',
+        );
+        assert.equal(await db.deployment.count({ where: { manualApkId: upload.id } }), 0);
+        await db.release.update({ where: { id: release.id }, data: { archivedAt: null } });
+        await db.release.delete({ where: { id: oldTool.id } });
         await tickManualApks(db);
         await tickManualApks(db);
         upload = await db.manualApkUpload.findUniqueOrThrow({ where: { id: upload.id } });
@@ -424,7 +445,7 @@ test('manual APK: real authenticated upload, durable results, idle import, daily
         );
         assert.equal(
           (await db.node.findUniqueOrThrow({ where: { id: node.id } })).agentReleaseId,
-          null,
+          release.id,
         );
       },
     );
@@ -440,6 +461,12 @@ test('manual APK: real authenticated upload, durable results, idle import, daily
         };
         let plan = await prepareDailyPlan(db, input, version, new Date());
         assert.equal(plan.assets.length, 2);
+        await db.node.update({ where: { id: node.id }, data: { agentVersion: '0.15.0' } });
+        await assert.rejects(
+          prepareDailyPlan(db, input, version, new Date()),
+          (e) => e.code === 'NODE_UPGRADE_REQUIRED',
+        );
+        await db.node.update({ where: { id: node.id }, data: { agentVersion: '0.15.1' } });
         await db.run.update({ where: { id: run.id }, data: { status: 'FAILED' } });
         await db.task.update({ where: { id: taskIds[0] }, data: { status: 'FAILED' } });
         plan = await prepareDailyPlan(db, input, version, new Date());
@@ -497,7 +524,7 @@ test('manual APK: real authenticated upload, durable results, idle import, daily
         });
         await expect(browserRow).toContainText('等待下发');
         await expect(
-          page.getByText('APK 已校验，等待服务器空闲后下发。补包就绪后，请手动开始任务。', {
+          page.getByText('APK 文件已接收，等待服务器空闲后下发。补包就绪后，请手动开始任务。', {
             exact: true,
           }),
         ).toBeVisible();

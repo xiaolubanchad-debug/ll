@@ -1,9 +1,10 @@
+import { DownloadError } from './common.js';
 import type { ApkMetadata, TestConfiguration, RegistrationRecognition } from '@apk/contracts';
 import { registrationFlowFor } from '@apk/contracts';
 import { appObstructions } from './app-obstructions.js';
 import { startAndroid } from './android.js';
 import type { AndroidOptions } from './android.js';
-import { inspectApk } from './apk.js';
+import { verifyFileTransfer } from './apk.js';
 import { functionalEvidence } from './functional-evidence.js';
 import type { Target, AutomationEvent } from './download.js';
 import { RegistrationError } from './registration-types.js';
@@ -95,19 +96,9 @@ export async function registerApk(
     action();
     if (apk.abis.length && !apk.abis.some((abi) => session!.supportedAbis.includes(abi)))
       throw new RegistrationError('APK_ABI_UNSUPPORTED');
-    // Reinspect immediately before installation; cached bytes are never trusted by name alone.
-    const actual = await inspectApk(
-      file,
-      config.download.maxApkBytes ?? 268435456,
-      apk.cacheDay,
-      signal,
-    );
-    if (
-      actual.apkSha256 !== apk.apkSha256 ||
-      actual.size !== apk.size ||
-      actual.packageName !== flow.packageName
-    )
-      throw new RegistrationError('APK_INVALID');
+    await verifyFileTransfer(file, apk, config.download.maxApkBytes ?? 268435456, signal);
+    if (apk.packageName !== flow.packageName)
+      throw new RegistrationError('APK_METADATA_UNREADABLE');
     await stage('INSTALLING', { observation: session.observation });
     await session.install(file);
     action();
@@ -374,7 +365,10 @@ export async function registerApk(
         errorCode: 'REGISTRATION_UNKNOWN',
       };
     else {
-      let code = error instanceof RegistrationError ? error.code : 'ANDROID_FAILED';
+      let code =
+        error instanceof RegistrationError || error instanceof DownloadError
+          ? error.code
+          : 'ANDROID_FAILED';
       if (code === 'AUTO_ENTRY_NOT_FOUND' && recognition?.automaticIdentity && !account)
         code = 'APP_AUTO_IDENTITY';
       if (

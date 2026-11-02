@@ -508,7 +508,8 @@
               "DEVICE_SESSIONS_V1",
               "EXECUTION_CAPACITY_V1",
               "INCREMENTAL_DEPLOY_V1",
-              "MANUAL_APK_IMPORT_V1"
+              "MANUAL_APK_IMPORT_V1",
+              "APK_METADATA_ONLY_V1"
             ]
           }
         },

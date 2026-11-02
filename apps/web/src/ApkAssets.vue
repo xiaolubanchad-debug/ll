@@ -20,7 +20,7 @@ const items = ref<Asset[]>([]),
   percent = ref(0);
 const manualLabels: Record<string, string> = {
   UPLOADING: '等待选择文件',
-  RECEIVING: '接收并校验',
+  RECEIVING: '接收并读取包信息',
   QUEUED: '等待下发',
   IMPORTING: '正在下发到服务器',
   APPLIED: '补包已就绪',
@@ -30,7 +30,10 @@ const manualLabels: Record<string, string> = {
   NEEDS_REVIEW: '下发结果待核验',
 };
 const reasons: Record<string, string> = {
-  APK_INVALID: '文件不是有效 APK 或完整性校验失败',
+  APK_INVALID: '历史 APK 预校验失败，可重新上传',
+  APK_METADATA_UNREADABLE: '无法读取启动所需包名或系统版本',
+  FILE_TRANSFER_MISMATCH: '文件传输结果不一致，请重新上传',
+  NODE_UPGRADE_REQUIRED: '等待执行节点更新到 Agent 0.15.1',
   APK_TOO_LARGE: '文件超过配置大小限制',
   DOWNLOAD_FAILED: '网页未取得 APK',
   NODE_BUSY: '服务器忙，请停止任务并等待清理后下发',
@@ -82,7 +85,7 @@ async function upload(row: Asset, event: Event) {
       file,
       (p) => (percent.value = p),
     );
-    notice.value = 'APK 已校验，等待服务器空闲后下发。补包就绪后，请手动开始任务。';
+    notice.value = 'APK 文件已接收，等待服务器空闲后下发。补包就绪后，请手动开始任务。';
   } catch (e) {
     actionError.value = e instanceof Error ? e.message : '补包失败';
   } finally {
@@ -268,7 +271,7 @@ onUnmounted(() => clearInterval(timer));
       所选日期和筛选条件下暂无下载记录。
     </p>
     <p class="muted">
-      历史包信息不代表文件仍保留在服务器；安装前会重新校验缓存。补包仅用于当前日期、同一服务器及来源配置。
+      历史包信息不代表文件仍保留在服务器；安装前确认缓存文件未在传输中改变。补包仅用于当前日期、同一服务器及来源配置。
     </p>
     <el-button v-if="cursor" :disabled="busy" @click="load(true)">加载更多</el-button>
   </section>

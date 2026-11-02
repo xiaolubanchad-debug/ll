@@ -1,5 +1,7 @@
 # 开发契约
 
+1.19.1 按最新要求取消 APK 内容预校验，保留必要包信息读取及传输确认，见 [安装判定契约](V1191_METADATA_ONLY_CONTRACT.md)。
+
 1.19 下载结果与手动补包见 [资产契约](V119_APK_ASSETS_CONTRACT.md)。
 
 1.18 模块增量发布、可信环境基线及完整校验规则见 [发布契约](V118_INCREMENTAL_RELEASE_CONTRACT.md)，对应 Agent 0.15.0。

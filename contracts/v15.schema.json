@@ -57,10 +57,15 @@
     "ProxyObservation": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["status"],
+      "required": [
+        "status"
+      ],
       "properties": {
         "status": {
-          "enum": ["SUCCEEDED", "FAILED"]
+          "enum": [
+            "SUCCEEDED",
+            "FAILED"
+          ]
         },
         "ip": {
           "type": "string",
@@ -81,10 +86,20 @@
     "DailyExecutionPlan": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["purpose", "cacheDay", "successTarget", "attemptLimit", "assets"],
+      "required": [
+        "purpose",
+        "cacheDay",
+        "successTarget",
+        "attemptLimit",
+        "assets"
+      ],
       "properties": {
         "purpose": {
-          "enum": ["DOWNLOAD", "REGISTER", "PROXY_CHECK"]
+          "enum": [
+            "DOWNLOAD",
+            "REGISTER",
+            "PROXY_CHECK"
+          ]
         },
         "cacheDay": {
           "type": "string",
@@ -110,7 +125,12 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["targetKey", "label", "sourceUrl", "apk"],
+            "required": [
+              "targetKey",
+              "label",
+              "sourceUrl",
+              "apk"
+            ],
             "properties": {
               "targetKey": {
                 "type": "string",
@@ -145,11 +165,17 @@
                     "maxLength": 256
                   },
                   "versionName": {
-                    "type": ["string", "null"],
+                    "type": [
+                      "string",
+                      "null"
+                    ],
                     "maxLength": 256
                   },
                   "versionCode": {
-                    "type": ["integer", "null"],
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
                     "minimum": 0
                   },
                   "abis": {
@@ -178,6 +204,11 @@
                     "type": "integer",
                     "minimum": 1,
                     "maximum": 1000
+                  },
+                  "validationPolicy": {
+                    "enum": [
+                      "ANDROID_INSTALL"
+                    ]
                   }
                 }
               },
@@ -191,11 +222,18 @@
         "openPolicy": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["concurrency", "dailyLimit", "admissionDeadline"],
+          "required": [
+            "concurrency",
+            "dailyLimit",
+            "admissionDeadline"
+          ],
           "properties": {
             "concurrency": {
               "type": "integer",
-              "enum": [1, 2]
+              "enum": [
+                1,
+                2
+              ]
             },
             "dailyLimit": {
               "type": "integer",
@@ -223,7 +261,10 @@
               "items": {
                 "type": "object",
                 "additionalProperties": false,
-                "required": ["id", "assetIndexes"],
+                "required": [
+                  "id",
+                  "assetIndexes"
+                ],
                 "properties": {
                   "id": {
                     "type": "string",
@@ -264,7 +305,9 @@
           "allOf": [
             {
               "if": {
-                "required": ["capacityVersion"]
+                "required": [
+                  "capacityVersion"
+                ]
               },
               "then": {
                 "properties": {
@@ -287,7 +330,9 @@
       "allOf": [
         {
           "if": {
-            "required": ["openPolicy"]
+            "required": [
+              "openPolicy"
+            ]
           },
           "then": {
             "properties": {
@@ -309,10 +354,14 @@
         },
         {
           "if": {
-            "required": ["openPolicy"],
+            "required": [
+              "openPolicy"
+            ],
             "properties": {
               "openPolicy": {
-                "required": ["capacityVersion"],
+                "required": [
+                  "capacityVersion"
+                ],
                 "type": "object"
               }
             }
@@ -333,11 +382,15 @@
         },
         {
           "if": {
-            "required": ["openPolicy"],
+            "required": [
+              "openPolicy"
+            ],
             "properties": {
               "openPolicy": {
                 "not": {
-                  "required": ["capacityVersion"]
+                  "required": [
+                    "capacityVersion"
+                  ]
                 },
                 "type": "object"
               }

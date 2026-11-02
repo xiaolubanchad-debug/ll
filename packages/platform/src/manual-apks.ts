@@ -7,8 +7,8 @@ import { pipeline } from 'node:stream/promises';
 import { Transform } from 'node:stream';
 import type { Readable } from 'node:stream';
 import { join, resolve } from 'node:path';
-import { inspectApk } from '@apk/automation/apk';
-import { schemaIssues } from '@apk/contracts';
+import { readApkMetadata, verifyFileTransfer } from '@apk/automation/apk';
+import { schemaIssues, apkMetadataOnlySupported } from '@apk/contracts';
 import type { ManualApkView, TestConfiguration } from '@apk/contracts';
 import { checked } from './secrets.js';
 import { idempotent, stopJob } from './jobs.js';
@@ -176,20 +176,19 @@ export async function receiveManualApk(
       }),
       createWriteStream(temp, { flags: 'wx', mode: 0o600 }),
     );
-    const apk = await inspectApk(temp, row.maxBytes, row.cacheDay, AbortSignal.timeout(120000));
+    const apk = await readApkMetadata(
+      temp,
+      row.maxBytes,
+      row.cacheDay,
+      AbortSignal.timeout(120000),
+    );
     if (schemaIssues('ApkMetadata', apk).length) fault('APK_INVALID', 'APK 包信息不符合要求', 422);
     const target = manualApkPath(apk.apkSha256);
     const existing = await lstat(target).catch(() => null);
     if (existing) {
       if (!existing.isFile() || existing.isSymbolicLink() || existing.size !== apk.size)
         fault('APK_UPLOAD_INVALID', '补包存储校验失败', 422);
-      const stored = await inspectApk(
-        target,
-        row.maxBytes,
-        row.cacheDay,
-        AbortSignal.timeout(120000),
-      );
-      if (stored.apkSha256 !== apk.apkSha256) fault('APK_UPLOAD_INVALID', '补包存储校验失败', 422);
+      await verifyFileTransfer(target, apk, row.maxBytes, AbortSignal.timeout(120000));
       await unlink(temp);
     } else {
       await rename(temp, target);
@@ -226,15 +225,25 @@ export async function receiveManualApk(
     const code =
       error instanceof PlatformError
         ? error.code
-        : (error as { code?: string }).code === 'APK_INVALID'
-          ? 'APK_INVALID'
+        : ['APK_METADATA_UNREADABLE', 'FILE_TRANSFER_MISMATCH', 'APK_TOO_LARGE'].includes(
+              (error as { code?: string }).code ?? '',
+            )
+          ? (error as { code: string }).code
           : 'APK_UPLOAD_INTERRUPTED';
     await db.manualApkUpload.updateMany({
       where: { id, status: 'RECEIVING', receiveOwner: owner },
       data: { status: 'FAILED', errorCode: code, receiveOwner: null, receiveUntil: null },
     });
     if (error instanceof PlatformError) throw error;
-    fault(code, code === 'APK_INVALID' ? '文件未通过 APK 完整性校验' : '上传未完成，请重试', 422);
+    fault(
+      code,
+      code === 'APK_METADATA_UNREADABLE'
+        ? '文件已收到，但无法读取启动所需包信息'
+        : code === 'FILE_TRANSFER_MISMATCH'
+          ? '文件传输结果不一致，请重传'
+          : '上传未完成，请重试',
+      422,
+    );
   }
   return manualApkView(await db.manualApkUpload.findUniqueOrThrow({ where: { id } }));
 }
@@ -398,6 +407,27 @@ export async function tickManualApks(db: PrismaClient, now = new Date()) {
         }
         const slot = await tx.nodeSlot.findUnique({ where: { nodeId: n.id } });
         if (
+          (current.apk as { validationPolicy?: string } | null)?.validationPolicy ===
+          'ANDROID_INSTALL'
+        ) {
+          const installed = n.agentReleaseId
+            ? await tx.release.findUnique({ where: { id: n.agentReleaseId } })
+            : null;
+          if (
+            !apkMetadataOnlySupported(
+              (installed?.manifest as { features?: string[] } | null)?.features,
+              n.agentVersion,
+            )
+          ) {
+            if (current.errorCode !== 'NODE_UPGRADE_REQUIRED')
+              await tx.manualApkUpload.update({
+                where: { id: row.id },
+                data: { errorCode: 'NODE_UPGRADE_REQUIRED' },
+              });
+            return;
+          }
+        }
+        if (
           slot?.runId ||
           slot?.operationId ||
           slot?.quarantined ||
@@ -421,9 +451,13 @@ export async function tickManualApks(db: PrismaClient, now = new Date()) {
           orderBy: { createdAt: 'desc' },
           take: 50,
         });
-        const release = releases.find((r) =>
-          (r.manifest as { features?: string[] }).features?.includes(MANUAL_FEATURE),
-        );
+        const release = releases.find((r) => {
+          const manifest = r.manifest as { features?: string[]; agentVersion?: string };
+          return (
+            manifest.features?.includes(MANUAL_FEATURE) &&
+            apkMetadataOnlySupported(manifest.features, manifest.agentVersion)
+          );
+        });
         if (!release) {
           if (current.errorCode !== 'IMPORT_TOOL_REQUIRED')
             await tx.manualApkUpload.update({

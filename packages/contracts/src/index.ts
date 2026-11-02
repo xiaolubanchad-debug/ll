@@ -102,7 +102,11 @@ export type {
   DeliveryConfigInput,
   ApkMetadata,
 } from './generated/types.js';
-export type { ManualApkView, ManualApkImportInput, ManualApkImportReceipt } from './generated/types.js';
+export type {
+  ManualApkView,
+  ManualApkImportInput,
+  ManualApkImportReceipt,
+} from './generated/types.js';
 export interface Issue {
   path: string;
   message: string;
@@ -447,6 +451,7 @@ const knownAgentVersions: readonly string[] = [
   '0.14.0',
   '0.14.1',
   '0.15.0',
+  '0.15.1',
 ];
 function knownAgentAtLeast(version: string | null | undefined, minimum: string): boolean {
   const index = knownAgentVersions.indexOf(version ?? '');
@@ -487,3 +492,12 @@ export function autoRegistrationSupported(
 }
 
 export { deviceAssignments, devicePlanIssues } from './session-plan.js';
+
+export function apkMetadataOnlySupported(
+  features: readonly string[] | undefined,
+  version: string | null | undefined,
+) {
+  return (
+    knownAgentAtLeast(version, '0.15.1') && features?.includes('APK_METADATA_ONLY_V1') === true
+  );
+}

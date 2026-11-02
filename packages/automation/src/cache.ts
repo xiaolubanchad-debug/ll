@@ -2,7 +2,8 @@ import { DatabaseSync } from 'node:sqlite';
 import { mkdir, lstat, rename, unlink, rm } from 'node:fs/promises';
 import { join, resolve, sep } from 'node:path';
 import type { ApkMetadata } from '@apk/contracts';
-import { inspectApk } from './apk.js';
+import { schemaIssues } from '@apk/contracts';
+import { verifyFileTransfer } from './apk.js';
 import { sha, DownloadError } from './common.js';
 export class ApkCache {
   readonly db: DatabaseSync;
@@ -34,10 +35,10 @@ export class ApkCache {
       const info = await lstat(this.path(key));
       if (info.isSymbolicLink()) throw new Error();
       const expected = JSON.parse(String(row.metadata)) as ApkMetadata;
-      const actual = await inspectApk(this.path(key), max, day, signal);
-      if (actual.apkSha256 !== expected.apkSha256 || actual.size !== expected.size)
-        throw new Error();
-      return actual;
+      if (schemaIssues('ApkMetadata', expected).length || expected.cacheDay !== day)
+        throw new DownloadError('CACHE_INVALID');
+      await verifyFileTransfer(this.path(key), expected, max, signal);
+      return expected;
     } catch (error) {
       if (signal.aborted) throw error;
       this.db.prepare('DELETE FROM cache WHERE key=?').run(key);

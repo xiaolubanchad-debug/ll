@@ -3,7 +3,7 @@ import { appObstructions } from './app-readiness.js';
 import { loadIdentityImage } from './identity-images.js';
 import { setTimeout as delay } from 'node:timers/promises';
 import type { ApkMetadata, TestConfiguration } from '@apk/contracts';
-import { verifyApkIntegrity } from './apk.js';
+import { verifyFileTransfer } from './apk.js';
 import { DownloadError } from './common.js';
 import { openTimer } from './open-timings.js';
 import { startAndroid } from './android.js';
@@ -90,7 +90,7 @@ export async function openApk(
     if (apk.abis.length && !apk.abis.some((abi) => session!.supportedAbis.includes(abi)))
       throw new RegistrationError('APK_ABI_UNSUPPORTED');
     await timer.measure('APK_VERIFY', () =>
-      verifyApkIntegrity(file, apk, config.download.maxApkBytes ?? 268435456, signal),
+      verifyFileTransfer(file, apk, config.download.maxApkBytes ?? 268435456, signal),
     );
     await stage('INSTALLING', {
       observation: {

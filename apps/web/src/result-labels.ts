@@ -91,6 +91,8 @@ export const reasonLabels: Record<string, string> = {
   DOWNLOAD_CONTROL_UNCONFIRMED: '下载控件触屏操作未确认',
   DOWNLOAD_TRANSFER_TIMEOUT: '文件传输超时，未完成保存',
   DOWNLOAD_TRANSFER_FAILED: '文件传输中断或保存失败',
+  APK_METADATA_UNREADABLE: '无法读取启动所需包信息',
+  FILE_TRANSFER_MISMATCH: '文件传输结果不一致',
   APK_INVALID: 'APK 校验未通过（旧记录未细分）',
   APK_INVALID_TOO_SMALL: '下载文件过小，无法作为 APK 校验',
   APK_INVALID_NOT_ZIP: '下载文件不是可读取的 ZIP/APK',

@@ -25,6 +25,7 @@ export interface ManualApkView {
     apkSha256: string;
     cacheDay: string;
     minSdkVersion?: number;
+    validationPolicy?: 'ANDROID_INSTALL';
   } | null;
   errorCode: string | null;
   operationId: string | null;
@@ -50,6 +51,7 @@ export interface ManualApkImportInput {
     apkSha256: string;
     cacheDay: string;
     minSdkVersion?: number;
+    validationPolicy?: 'ANDROID_INSTALL';
   };
   maxBytes: number;
 }
@@ -70,6 +72,7 @@ export interface ManualApkImportReceipt {
     apkSha256: string;
     cacheDay: string;
     minSdkVersion?: number;
+    validationPolicy?: 'ANDROID_INSTALL';
   };
 }
 
@@ -791,6 +794,7 @@ export interface RegistrationRecordView {
     apkSha256: string;
     cacheDay: string;
     minSdkVersion?: number;
+    validationPolicy?: 'ANDROID_INSTALL';
   } | null;
   hasAccount: boolean;
   reviewOutcome: ('SUCCEEDED' | 'FAILED') | null;
@@ -829,6 +833,7 @@ export interface RegistrationListView {
       apkSha256: string;
       cacheDay: string;
       minSdkVersion?: number;
+      validationPolicy?: 'ANDROID_INSTALL';
     } | null;
     hasAccount: boolean;
     reviewOutcome: ('SUCCEEDED' | 'FAILED') | null;
@@ -869,6 +874,7 @@ export interface RegistrationDetailView {
       apkSha256: string;
       cacheDay: string;
       minSdkVersion?: number;
+      validationPolicy?: 'ANDROID_INSTALL';
     } | null;
     hasAccount: boolean;
     reviewOutcome: ('SUCCEEDED' | 'FAILED') | null;
@@ -1083,6 +1089,7 @@ export interface AssetListView {
       apkSha256: string;
       cacheDay: string;
       minSdkVersion?: number;
+      validationPolicy?: 'ANDROID_INSTALL';
     } | null;
     cacheDay?: string;
     canUpload?: boolean;
@@ -1111,6 +1118,7 @@ export interface AssetListView {
         apkSha256: string;
         cacheDay: string;
         minSdkVersion?: number;
+        validationPolicy?: 'ANDROID_INSTALL';
       } | null;
       errorCode: string | null;
       operationId: string | null;
@@ -1532,6 +1540,7 @@ export interface ReleaseInput {
     | 'EXECUTION_CAPACITY_V1'
     | 'INCREMENTAL_DEPLOY_V1'
     | 'MANUAL_APK_IMPORT_V1'
+    | 'APK_METADATA_ONLY_V1'
   )[];
   environment?: {
     version: 1;
@@ -1754,6 +1763,7 @@ export interface ApkMetadata {
   apkSha256: string;
   cacheDay: string;
   minSdkVersion?: number;
+  validationPolicy?: 'ANDROID_INSTALL';
 }
 
 export interface ArtifactInput {
@@ -1849,6 +1859,7 @@ export interface DailyExecutionPlan {
       apkSha256: string;
       cacheDay: string;
       minSdkVersion?: number;
+      validationPolicy?: 'ANDROID_INSTALL';
     };
     entryId?: string;
   }[];

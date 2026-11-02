@@ -15,9 +15,11 @@ export function releasePayload(manifest: ReleaseInput) {
 }
 export function validManifest(body: unknown): ReleaseInput {
   const m = checked<ReleaseInput>('ReleaseInput', body);
+  if (m.features?.includes('APK_METADATA_ONLY_V1') && m.agentVersion !== '0.15.1')
+    fault('RELEASE_INVALID', '安装判定模式需要 Agent 0.15.1', 422);
   if (m.features?.includes('INCREMENTAL_DEPLOY_V1')) {
     if (
-      m.agentVersion !== '0.15.0' ||
+      !['0.15.0', '0.15.1'].includes(m.agentVersion) ||
       !m.environment ||
       !m.features.includes('DEVICE_SESSIONS_V1') ||
       m.environment.fingerprint !==
@@ -33,13 +35,13 @@ export function validManifest(body: unknown): ReleaseInput {
   } else if (m.environment) fault('RELEASE_INVALID', '环境摘要需要增量发布能力', 422);
   if (
     m.features?.includes('EXECUTION_CAPACITY_V1') &&
-    (!['0.14.0', '0.14.1', '0.15.0'].includes(m.agentVersion) ||
+    (!['0.14.0', '0.14.1', '0.15.0', '0.15.1'].includes(m.agentVersion) ||
       !m.features.includes('DEVICE_SESSIONS_V1'))
   )
     fault('RELEASE_INVALID', '容量扩展需要 Agent 0.14.0 和设备会话能力', 422);
   if (
     m.features?.includes('DEVICE_SESSIONS_V1') &&
-    (!['0.13.0', '0.13.1', '0.13.2', '0.13.3', '0.14.0', '0.14.1', '0.15.0'].includes(
+    (!['0.13.0', '0.13.1', '0.13.2', '0.13.3', '0.14.0', '0.14.1', '0.15.0', '0.15.1'].includes(
       m.agentVersion,
     ) ||
       [

@@ -1,0 +1,13 @@
+{
+  "packageName": "com.example.owned",
+  "versionName": "1",
+  "versionCode": 1,
+  "abis": [
+    "x86_64"
+  ],
+  "size": 1234,
+  "apkSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "cacheDay": "2026-11-02",
+  "minSdkVersion": 26,
+  "validationPolicy": "IGNORE_EVERYTHING"
+}

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "APK 部署中台 API",
-    "version": "1.19.0"
+    "version": "1.19.1"
   },
   "paths": {
     "/api/v1/auth/login": {
@@ -4907,6 +4907,11 @@
                     "type": "integer",
                     "minimum": 1,
                     "maximum": 1000
+                  },
+                  "validationPolicy": {
+                    "enum": [
+                      "ANDROID_INSTALL"
+                    ]
                   }
                 }
               },
@@ -5040,6 +5045,11 @@
                 "type": "integer",
                 "minimum": 1,
                 "maximum": 1000
+              },
+              "validationPolicy": {
+                "enum": [
+                  "ANDROID_INSTALL"
+                ]
               }
             }
           },
@@ -5131,6 +5141,11 @@
                 "type": "integer",
                 "minimum": 1,
                 "maximum": 1000
+              },
+              "validationPolicy": {
+                "enum": [
+                  "ANDROID_INSTALL"
+                ]
               }
             }
           }
@@ -6829,6 +6844,11 @@
                     "type": "integer",
                     "minimum": 1,
                     "maximum": 1000
+                  },
+                  "validationPolicy": {
+                    "enum": [
+                      "ANDROID_INSTALL"
+                    ]
                   }
                 }
               },
@@ -7054,6 +7074,11 @@
                           "type": "integer",
                           "minimum": 1,
                           "maximum": 1000
+                        },
+                        "validationPolicy": {
+                          "enum": [
+                            "ANDROID_INSTALL"
+                          ]
                         }
                       }
                     },
@@ -7294,6 +7319,11 @@
                         "type": "integer",
                         "minimum": 1,
                         "maximum": 1000
+                      },
+                      "validationPolicy": {
+                        "enum": [
+                          "ANDROID_INSTALL"
+                        ]
                       }
                     }
                   },
@@ -8373,6 +8403,11 @@
                           "type": "integer",
                           "minimum": 1,
                           "maximum": 1000
+                        },
+                        "validationPolicy": {
+                          "enum": [
+                            "ANDROID_INSTALL"
+                          ]
                         }
                       }
                     },
@@ -8482,6 +8517,11 @@
                                   "type": "integer",
                                   "minimum": 1,
                                   "maximum": 1000
+                                },
+                                "validationPolicy": {
+                                  "enum": [
+                                    "ANDROID_INSTALL"
+                                  ]
                                 }
                               }
                             },
@@ -10333,6 +10373,11 @@
                     "type": "integer",
                     "minimum": 1,
                     "maximum": 1000
+                  },
+                  "validationPolicy": {
+                    "enum": [
+                      "ANDROID_INSTALL"
+                    ]
                   }
                 }
               },
@@ -10861,7 +10906,9 @@
                   "AUTO_ADAPTATION_REQUIRED",
                   "NO_APK_AVAILABLE",
                   "NO_REGISTERABLE_APK",
-                  "DAY_CUTOFF"
+                  "DAY_CUTOFF",
+                  "APK_METADATA_UNREADABLE",
+                  "FILE_TRANSFER_MISMATCH"
                 ]
               }
             }
@@ -10904,7 +10951,9 @@
                   "自有测试 APK：上报结果尚未确认",
                   "自有测试 APK：配置读取失败",
                   "自有测试 APK：请求未获接受",
-                  "自有测试 APK：网络响应尚未确认"
+                  "自有测试 APK：网络响应尚未确认",
+                  "下载传输：文件已保存，读取启动所需包信息",
+                  "下载传输：已收到浏览器文件，等待保存与读取包信息"
                 ]
               }
             }
@@ -11837,7 +11886,8 @@
                 "DEVICE_SESSIONS_V1",
                 "EXECUTION_CAPACITY_V1",
                 "INCREMENTAL_DEPLOY_V1",
-                "MANUAL_APK_IMPORT_V1"
+                "MANUAL_APK_IMPORT_V1",
+                "APK_METADATA_ONLY_V1"
               ]
             }
           },
@@ -12766,6 +12816,11 @@
             "type": "integer",
             "minimum": 1,
             "maximum": 1000
+          },
+          "validationPolicy": {
+            "enum": [
+              "ANDROID_INSTALL"
+            ]
           }
         }
       },
@@ -13218,6 +13273,11 @@
                       "type": "integer",
                       "minimum": 1,
                       "maximum": 1000
+                    },
+                    "validationPolicy": {
+                      "enum": [
+                        "ANDROID_INSTALL"
+                      ]
                     }
                   }
                 },

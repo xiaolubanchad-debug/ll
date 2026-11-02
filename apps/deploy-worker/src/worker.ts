@@ -239,6 +239,7 @@ export class Worker {
           upload.nodeId !== node.id ||
           !upload.storageSha ||
           !manifest.features?.includes('MANUAL_APK_IMPORT_V1') ||
+          !manifest.features?.includes('APK_METADATA_ONLY_V1') ||
           !this.runner.importApk
         )
           throw new PlatformError(409, 'APK_UPLOAD_INVALID', '补包操作已失效');

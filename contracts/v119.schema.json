@@ -50,11 +50,17 @@
                   "maxLength": 256
                 },
                 "versionName": {
-                  "type": ["string", "null"],
+                  "type": [
+                    "string",
+                    "null"
+                  ],
                   "maxLength": 256
                 },
                 "versionCode": {
-                  "type": ["integer", "null"],
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
                   "minimum": 0
                 },
                 "abis": {
@@ -83,6 +89,11 @@
                   "type": "integer",
                   "minimum": 1,
                   "maximum": 1000
+                },
+                "validationPolicy": {
+                  "enum": [
+                    "ANDROID_INSTALL"
+                  ]
                 }
               }
             },
@@ -177,11 +188,17 @@
               "maxLength": 256
             },
             "versionName": {
-              "type": ["string", "null"],
+              "type": [
+                "string",
+                "null"
+              ],
               "maxLength": 256
             },
             "versionCode": {
-              "type": ["integer", "null"],
+              "type": [
+                "integer",
+                "null"
+              ],
               "minimum": 0
             },
             "abis": {
@@ -210,6 +227,11 @@
               "type": "integer",
               "minimum": 1,
               "maximum": 1000
+            },
+            "validationPolicy": {
+              "enum": [
+                "ANDROID_INSTALL"
+              ]
             }
           }
         },
@@ -219,7 +241,14 @@
           "maximum": 536870912
         }
       },
-      "required": ["id", "nodeId", "cacheDay", "targetKey", "apk", "maxBytes"]
+      "required": [
+        "id",
+        "nodeId",
+        "cacheDay",
+        "targetKey",
+        "apk",
+        "maxBytes"
+      ]
     },
     "ManualApkImportReceipt": {
       "type": "object",
@@ -255,11 +284,17 @@
               "maxLength": 256
             },
             "versionName": {
-              "type": ["string", "null"],
+              "type": [
+                "string",
+                "null"
+              ],
               "maxLength": 256
             },
             "versionCode": {
-              "type": ["integer", "null"],
+              "type": [
+                "integer",
+                "null"
+              ],
               "minimum": 0
             },
             "abis": {
@@ -288,11 +323,21 @@
               "type": "integer",
               "minimum": 1,
               "maximum": 1000
+            },
+            "validationPolicy": {
+              "enum": [
+                "ANDROID_INSTALL"
+              ]
             }
           }
         }
       },
-      "required": ["id", "status", "cacheKey", "apk"]
+      "required": [
+        "id",
+        "status",
+        "cacheKey",
+        "apk"
+      ]
     }
   }
 }

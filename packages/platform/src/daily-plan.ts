@@ -16,7 +16,7 @@ import {
 } from './identity.js';
 import type { Prisma, ConfigVersion } from '@prisma/client';
 import type { DailyExecutionPlan, RunInput, TestConfiguration } from '@apk/contracts';
-import { schemaIssues, registrationAvailable } from '@apk/contracts';
+import { schemaIssues, registrationAvailable, apkMetadataOnlySupported } from '@apk/contracts';
 import { digest, canonical } from './security.js';
 import { manualAssetsForRun, assertNoPendingManualApks } from './manual-apks.js';
 import { fault } from './errors.js';
@@ -166,6 +166,14 @@ export async function prepareDailyPlan(
         ...(task.entryId ? { entryId: task.entryId } : {}),
       });
     }
+    if (
+      plan.assets.some((a) => a.apk.validationPolicy === 'ANDROID_INSTALL') &&
+      !apkMetadataOnlySupported(
+        (identityRelease?.manifest as { features?: string[] } | null)?.features,
+        identityNode.agentVersion,
+      )
+    )
+      fault('NODE_UPGRADE_REQUIRED', '请先更新到支持 Android 安装判定的 Agent 0.15.1', 422);
   }
   const groupPolicy = config.execution.appOpen?.appsPerDevice;
   if (groupPolicy && plan.purpose === 'REGISTER') {

@@ -312,13 +312,13 @@ test('P2 acceptance with real PostgreSQL, SQLite, Chromium and owned fixture sit
           timeline.items.filter(
             (item) =>
               item.type === 'LOG' &&
-              item.title === '下载传输：已收到浏览器文件，等待保存与 APK 校验',
+              item.title === '下载传输：已收到浏览器文件，等待保存与读取包信息',
           ).length,
           3,
         );
         assert.equal(
           timeline.items.filter(
-            (item) => item.type === 'LOG' && item.title === '下载传输：文件已保存，开始 APK 校验',
+            (item) => item.type === 'LOG' && item.title === '下载传输：文件已保存，读取启动所需包信息',
           ).length,
           3,
         );
@@ -380,7 +380,7 @@ test('P2 acceptance with real PostgreSQL, SQLite, Chromium and owned fixture sit
         assert.equal((await endRun(id)).status, 'FAILED');
         assert.equal(
           (await req('/runs/' + id + '/tasks')).data.items[0].errorCode,
-          'APK_INVALID_TOO_SMALL',
+          'APK_METADATA_UNREADABLE',
         );
         const c = await body();
         c.download.maxTargets = 1;

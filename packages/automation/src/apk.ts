@@ -1,3 +1,4 @@
+export { readApkMetadata } from './apk-metadata.js';
 import { createReadStream, constants } from 'node:fs';
 import { stat, lstat, open } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
@@ -21,9 +22,8 @@ export class ApkValidationError extends DownloadError {
   }
 }
 
-// Identical bytes retain the structure/CRC/manifest validation already performed
-// by inspectApk. Still hash the actual installation file immediately beforehand.
-export async function verifyApkIntegrity(
+// Compare retained bytes with the transfer receipt; no APK content validation.
+export async function verifyFileTransfer(
   file: string,
   expected: ApkMetadata,
   max: number,
@@ -36,7 +36,7 @@ export async function verifyApkIntegrity(
     before.size !== BigInt(expected.size) ||
     expected.size > max
   )
-    throw new DownloadError('APK_INVALID');
+    throw new DownloadError('FILE_TRANSFER_MISMATCH');
   const handle = await open(file, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
   const same = (a: typeof before, b: typeof before) =>
     a.dev === b.dev &&
@@ -46,7 +46,8 @@ export async function verifyApkIntegrity(
     a.ctimeNs === b.ctimeNs;
   try {
     if (signal.aborted) throw new DownloadError('CANCELLED');
-    if (!same(before, await handle.stat({ bigint: true }))) throw new DownloadError('APK_INVALID');
+    if (!same(before, await handle.stat({ bigint: true })))
+      throw new DownloadError('FILE_TRANSFER_MISMATCH');
     const hash = createHash('sha256');
     for await (const bytes of handle.createReadStream({
       autoClose: false,
@@ -59,7 +60,7 @@ export async function verifyApkIntegrity(
       !same(before, await handle.stat({ bigint: true })) ||
       !same(before, await lstat(file, { bigint: true }))
     )
-      throw new DownloadError('APK_INVALID');
+      throw new DownloadError('FILE_TRANSFER_MISMATCH');
   } finally {
     await handle.close();
   }
@@ -299,5 +300,15 @@ export async function inspectApk(
     });
   } finally {
     zip.close();
+  }
+}
+
+export async function verifyApkIntegrity(...args: Parameters<typeof verifyFileTransfer>) {
+  try {
+    return await verifyFileTransfer(...args);
+  } catch (error) {
+    if (error instanceof DownloadError && error.code === 'FILE_TRANSFER_MISMATCH')
+      throw new DownloadError('APK_INVALID');
+    throw error;
   }
 }
