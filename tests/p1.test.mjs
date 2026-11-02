@@ -12,6 +12,7 @@ import { createApp } from '../apps/control-api/dist/app.js';
 import { passwordHash } from '../apps/control-api/dist/auth.js';
 import { Worker, sshTransport, parseInspection } from '../apps/deploy-worker/dist/worker.js';
 import { startAgent, callHub, loadIdentity } from '../apps/agent/dist/main.js';
+import { environmentHealthVersions } from '../apps/agent/dist/health.js';
 import { canonical, digest, playbookDigest, claimJob, expireJobs, finishJob } from '@apk/platform';
 import { provisionWorkerRole } from '../scripts/setup-worker-db.mjs';
 import { sdkArchive } from '../scripts/release-agent.mjs';
@@ -103,6 +104,21 @@ const report = {
   versions: { node: '24.18.0', appium: '3.9.0' },
   errors: [],
 };
+Object.assign(
+  report.versions,
+  JSON.parse(await readFile('contracts/fixtures/health.incremental.valid.json', 'utf8')).versions,
+);
+Object.assign(
+  report.versions,
+  environmentHealthVersions({
+    version: 2,
+    releaseId: randomUUID(),
+    mode: 'CODE',
+    environmentFingerprint: 'b'.repeat(64),
+    fullReleaseId: '22222222-2222-4222-8222-222222222222',
+    fullVerifiedAt: '2026-11-02T00:00:00.000Z',
+  }),
+);
 async function request(path, method = 'GET', body, headers = {}) {
   const response = await fetch(base + '/api/v1' + path, {
     method,

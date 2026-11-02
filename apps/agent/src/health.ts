@@ -62,6 +62,15 @@ const exists = (file: string, mode = constants.F_OK) =>
     () => false,
   );
 type BootProof = { releaseId?: string; bootSucceeded?: boolean } & Partial<EnvironmentHealth>;
+export function environmentHealthVersions(proof: EnvironmentHealth): Record<string, string> {
+  return {
+    environmentFingerprint: proof.environmentFingerprint,
+    environmentValidation: proof.mode,
+    environmentFullRelease: proof.fullReleaseId,
+    environmentFullVerifiedAt: proof.fullVerifiedAt,
+    environmentBaselineVersion: '1',
+  };
+}
 export async function readBootProof(file: string): Promise<BootProof | null> {
   try {
     const info = await lstat(file);
@@ -138,11 +147,7 @@ export async function collectHealth(
       schemaIssues('EnvironmentHealth', proof).length === 0 &&
       proof?.environmentFingerprint === environmentFingerprint;
     if (environmentVerified && proof) {
-      versions.environmentFingerprint = proof.environmentFingerprint!;
-      versions.environmentValidation = proof.mode!;
-      versions.environmentFullRelease = proof.fullReleaseId!;
-      versions.environmentFullVerifiedAt = proof.fullVerifiedAt!;
-      versions.environmentBaselineVersion = '1';
+      Object.assign(versions, environmentHealthVersions(proof as EnvironmentHealth));
     }
   }
   const android =

@@ -1176,6 +1176,35 @@ test('1.17.1 raw download diagnostic rejected', () =>
     schemaIssues('AgentMessage', read('contracts/fixtures/agent.download-diagnostics.invalid.json'))
       .length,
   ));
+test('1.18 health metadata works in both shared and heartbeat schemas', () => {
+  const report = read('contracts/fixtures/health.incremental.valid.json');
+  assert.deepEqual(schemaIssues('HealthReport', report), []);
+  const heartbeat = {
+    kind: 'heartbeat',
+    protocolVersion: '1.0',
+    nodeId: '11111111-1111-4111-8111-111111111111',
+    releaseId: report.versions.environmentFullRelease,
+    agentVersion: '0.15.0',
+    bootId: '33333333-3333-4333-8333-333333333333',
+    sentAt: report.versions.environmentFullVerifiedAt,
+    capabilities: { android: true, download: true, kvm: true, freeDiskBytes: 100000000000 },
+    currentDelivery: null,
+    report,
+  };
+  assert.deepEqual(agentIssues(heartbeat), []);
+  assert.ok(
+    agentIssues({
+      ...heartbeat,
+      report: { ...report, versions: { ...report.versions, environmentValidation: 'SKIP' } },
+    }).length,
+  );
+  assert.ok(
+    schemaIssues('HealthReport', {
+      ...report,
+      versions: { ...report.versions, password: 'not-permitted' },
+    }).length,
+  );
+});
 test('1.18 deployment defaults to AUTO and accepts explicit FULL', () => {
   const input = {
     nodeId: '11111111-1111-4111-8111-111111111111',

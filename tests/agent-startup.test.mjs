@@ -6,7 +6,23 @@ import { resolve, join, sep } from 'node:path';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { setImmediate } from 'node:timers';
 import { startAgent } from '../apps/agent/dist/main.js';
-import { agentProtocolsForVersion } from '@apk/contracts';
+import { environmentHealthVersions } from '../apps/agent/dist/health.js';
+import { agentProtocolsForVersion, agentIssues } from '@apk/contracts';
+import { readFile } from 'node:fs/promises';
+const modernReport = JSON.parse(
+  await readFile('contracts/fixtures/health.incremental.valid.json', 'utf8'),
+);
+Object.assign(
+  modernReport.versions,
+  environmentHealthVersions({
+    version: 2,
+    releaseId: randomUUID(),
+    mode: 'CODE',
+    environmentFingerprint: 'b'.repeat(64),
+    fullReleaseId: '22222222-2222-4222-8222-222222222222',
+    fullVerifiedAt: '2026-11-02T00:00:00.000Z',
+  }),
+);
 
 for (const agentVersion of ['0.12.3', '0.13.1', '0.13.2', '0.14.0', '0.14.1', '0.15.0'])
   test(
@@ -23,6 +39,14 @@ for (const agentVersion of ['0.12.3', '0.13.1', '0.13.2', '0.14.0', '0.14.1', '0
         for await (const bytes of req) text += bytes;
         const body = JSON.parse(text);
         res.setHeader('content-type', 'application/json');
+        if (
+          ['/api/v1/agent/enroll', '/api/v1/agent/heartbeats'].includes(req.url) &&
+          agentIssues(body).length
+        ) {
+          res.statusCode = 422;
+          res.end('{}');
+          return;
+        }
         if (req.url === '/api/v1/agent/enroll') {
           seen.enrollment++;
           res.end(JSON.stringify({ credential: token }));
@@ -67,7 +91,10 @@ for (const agentVersion of ['0.12.3', '0.13.1', '0.13.2', '0.14.0', '0.14.1', '0
             memoryKiB: 16000000,
             markerPresent: false,
             errors: [],
-            versions: {},
+            ubuntu: 'ubuntu:24.04',
+            arch: 'x86_64',
+            sudo: false,
+            versions: agentVersion === '0.15.0' ? modernReport.versions : {},
           }),
         );
         assert.equal(seen.enrollment, 1);

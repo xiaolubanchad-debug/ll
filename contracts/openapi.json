@@ -8778,6 +8778,31 @@
                       "identityAbis": {
                         "type": "string",
                         "maxLength": 4000
+                      },
+                      "buildCommit": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{40}$"
+                      },
+                      "environmentFingerprint": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      },
+                      "environmentValidation": {
+                        "enum": [
+                          "FULL",
+                          "CODE"
+                        ]
+                      },
+                      "environmentFullRelease": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "environmentFullVerifiedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "environmentBaselineVersion": {
+                        "const": "1"
                       }
                     }
                   },
@@ -11075,6 +11100,31 @@
               "identityAbis": {
                 "type": "string",
                 "maxLength": 4000
+              },
+              "buildCommit": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{40}$"
+              },
+              "environmentFingerprint": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "environmentValidation": {
+                "enum": [
+                  "FULL",
+                  "CODE"
+                ]
+              },
+              "environmentFullRelease": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "environmentFullVerifiedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "environmentBaselineVersion": {
+                "const": "1"
               }
             }
           },

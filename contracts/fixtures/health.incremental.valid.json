@@ -1,0 +1,22 @@
+{
+  "ubuntu": "ubuntu:24.04",
+  "arch": "x86_64",
+  "memoryKiB": 32768000,
+  "freeDiskBytes": 53687091200,
+  "kvm": true,
+  "sudo": false,
+  "markerPresent": false,
+  "android": true,
+  "download": true,
+  "versions": {
+    "node": "24.18.0",
+    "appium": "3.9.0",
+    "buildCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "environmentFingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "environmentValidation": "CODE",
+    "environmentFullRelease": "22222222-2222-4222-8222-222222222222",
+    "environmentFullVerifiedAt": "2026-11-02T00:00:00.000Z",
+    "environmentBaselineVersion": "1"
+  },
+  "errors": []
+}

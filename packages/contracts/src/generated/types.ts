@@ -1213,6 +1213,12 @@ export type AgentMessage =
           identityModels?: string;
           identityCatalog?: string;
           identityAbis?: string;
+          buildCommit?: string;
+          environmentFingerprint?: string;
+          environmentValidation?: 'FULL' | 'CODE';
+          environmentFullRelease?: string;
+          environmentFullVerifiedAt?: string;
+          environmentBaselineVersion?: '1';
         };
         /**
          * @maxItems 20
@@ -1440,6 +1446,12 @@ export interface HealthReport {
     identityModels?: string;
     identityCatalog?: string;
     identityAbis?: string;
+    buildCommit?: string;
+    environmentFingerprint?: string;
+    environmentValidation?: 'FULL' | 'CODE';
+    environmentFullRelease?: string;
+    environmentFullVerifiedAt?: string;
+    environmentBaselineVersion?: '1';
   };
   /**
    * @maxItems 20

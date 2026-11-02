@@ -16,6 +16,8 @@ CODE 路径只安装已验签 Agent 程序及必要配置，复用 Node/SDK/浏�
 
 健康回执区分本次 FULL 与 CODE。CODE 保留实际全量核验的发布和时间，不把旧启动证据改成新启动成功。中台比对目标环境指纹、签名构建提交、协议和本次发布 ID，并等待新心跳。部署结果和界面显示采用的方式及原因。同一个现代发布也会走轻量一致性检查，不能仅靠旧心跳绕过漂移检测。
 
+HealthReport 和 AgentMessage.report 使用相同的严格结构，显式接收 versions.buildCommit（40 位提交摘要）、environmentFingerprint（64 位摘要）、environmentValidation（FULL/CODE）、environmentFullRelease（UUID）、environmentFullVerifiedAt（ISO 时间）、environmentBaselineVersion（字符串 1）。字段对旧 Agent 可选；任意其他字段、错误摘要及伪造方式名称仍拒绝。验收包含真实 API 接收这些版本字段的心跳，不能仅用返回 200 的 HTTP 模拟服务代替。
+
 ## 中台模块发布
 
 建立受版本控制的发布规划、构建目标和宿主机发布入口。根据两个确定提交的差异，计算 web、api、worker、tools、agent 及数据库变更；共享依赖按实际依赖关系扩散，未知代码变更保守扩大检查。文档变更不重启服务。构建按模块进行，依赖安装层在业务源文件之前，普通源码变更复用依赖缓存。
