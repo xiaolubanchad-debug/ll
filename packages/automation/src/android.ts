@@ -48,6 +48,35 @@ export function isForegroundPackage(output: string, pkg: string): boolean {
   const packages = lines.map((line) => /\bu\d+\s+([A-Za-z][A-Za-z0-9_.]*)\//.exec(line)?.[1]);
   return packages.length > 0 && packages.every((p) => p === pkg);
 }
+export function focusedAndroidWindow(
+  output: string,
+  pkg: string,
+): import('./registration-types.js').ForegroundWindow {
+  const windows = [...output.matchAll(/^[ \t]*mCurrentFocus=([^\r\n]+)$/gm)];
+  if (windows.length !== 1) return 'UNKNOWN';
+  const title = /^Window\{[\da-f]+ u\d+ ([^}]+)\}$/.exec(windows[0][1].trim())?.[1];
+  if (!title) return 'UNKNOWN';
+  if (title === 'Application Error: ' + pkg) return 'CRASH';
+  if (title === 'Splash Screen ' + pkg || title === 'Starting ' + pkg) return 'SPLASH';
+  const owner = /^([A-Za-z][\w.]*)\/[\w.$]+$/.exec(title)?.[1];
+  if (owner === pkg) {
+    const focused = [
+      ...output.matchAll(/^\s*mFocusedApp=ActivityRecord\{[^\r\n]*?\bu\d+ ([A-Za-z][\w.]*)\//gm),
+    ];
+    return focused.length === 1 && focused[0][1] === pkg ? 'TARGET' : 'UNKNOWN';
+  }
+  if (
+    (owner &&
+      /^(?:android|com\.android\.(?:systemui|permissioncontroller|packageinstaller|settings)|com\.google\.android\.(?:permissioncontroller|packageinstaller))$/.test(
+        owner,
+      )) ||
+    /^(?:Application Error|Application Not Responding): |^(?:NotificationShade|StatusBar|Keyguard)$/.test(
+      title,
+    )
+  )
+    return 'SYSTEM';
+  return owner ? 'OTHER' : 'UNKNOWN';
+}
 const installRejection =
   /^(?:adb: failed to install [^\r\n]+:[ \t]*)?Failure \[(INSTALL_(?:FAILED|PARSE_FAILED)_[A-Z0-9_]+)(?::[^\r\n]*)?\][ \t]*\r?$/m;
 const installCategories: Readonly<Record<string, ApkInstallFailureCode>> = {
@@ -791,14 +820,30 @@ export async function startAndroid(
       },
       async launch(pkg, activity) {
         options.beforeAction();
+        const opening = options.controlMode !== undefined;
+        const launchCommand = (args: string[], timeout: number, timeoutCode: string) =>
+          androidCommand(
+            adb,
+            ['-s', record.serial!, 'shell', ...args],
+            env,
+            signal,
+            timeout,
+            opening ? 'APP_LAUNCH_COMMAND_FAILED' : 'APP_LAUNCH_FAILED',
+            workspace,
+            16384,
+            undefined,
+            opening
+              ? (output) =>
+                  /^\s*(?:Error:|Error type |Security exception:)/im.test(output)
+                    ? 'APP_LAUNCH_REJECTED'
+                    : undefined
+              : undefined,
+            opening ? timeoutCode : 'APP_LAUNCH_FAILED',
+          );
         let component = pkg + '/' + activity;
         if (activity === '@launcher') {
-          const resolved = await command(
-            adb,
+          const resolved = await launchCommand(
             [
-              '-s',
-              record.serial!,
-              'shell',
               'cmd',
               'package',
               'resolve-activity',
@@ -811,21 +856,20 @@ export async function startAndroid(
               pkg,
             ],
             10000,
-            'APP_LAUNCH_FAILED',
+            'APP_LAUNCH_RESOLVE_TIMEOUT',
           );
           const found = resolved
             .split(/\r?\n/)
             .map((s) => s.trim())
             .find((s) => s.startsWith(pkg + '/') && /^[A-Za-z0-9_.$]+\/[A-Za-z0-9_.$]+$/.test(s));
-          if (!found) throw new RegistrationError('APP_LAUNCH_FAILED');
+          if (!found)
+            throw new RegistrationError(
+              opening ? 'APP_LAUNCH_ENTRY_UNRESOLVED' : 'APP_LAUNCH_FAILED',
+            );
           component = found;
         }
-        const value = await command(
-          adb,
+        const value = await launchCommand(
           [
-            '-s',
-            record.serial!,
-            'shell',
             'am',
             'start',
             ...(options.controlMode === 'LAUNCH_ONLY' ? [] : ['-W']),
@@ -833,15 +877,18 @@ export async function startAndroid(
             "'" + component + "'",
           ],
           30000,
-          'APP_LAUNCH_FAILED',
+          'APP_LAUNCH_TIMEOUT',
         );
+        if (opening && /^\s*Status: timeout\s*$/im.test(value))
+          throw new RegistrationError('APP_LAUNCH_TIMEOUT');
+        if (/Error:|Error type/.test(value))
+          throw new RegistrationError(opening ? 'APP_LAUNCH_REJECTED' : 'APP_LAUNCH_FAILED');
         if (
           !(options.controlMode === 'LAUNCH_ONLY'
             ? /^Starting: Intent /m.test(value)
-            : /Status: ok/.test(value)) ||
-          /Error:|Error type/.test(value)
+            : /Status: ok/.test(value))
         )
-          throw new RegistrationError('APP_LAUNCH_FAILED');
+          throw new RegistrationError(opening ? 'APP_LAUNCH_UNCONFIRMED' : 'APP_LAUNCH_FAILED');
       },
       async foreground(pkg) {
         bridge?.assertHealthy();
@@ -854,6 +901,21 @@ export async function startAndroid(
         );
         return isForegroundPackage(output, pkg);
       },
+      async foregroundWindow(pkg, observationSignal) {
+        bridge?.assertHealthy();
+        options.beforeAction();
+        const output = await androidCommand(
+          adb,
+          ['-s', record.serial!, 'shell', 'dumpsys', 'window', 'displays'],
+          env,
+          observationSignal,
+          3000,
+          'APP_FOREGROUND_FAILED',
+          workspace,
+          128 * 1024,
+        );
+        return focusedAndroidWindow(output, pkg);
+      },
       find: (l, t, s) => rpc().find(l, t, s),
       click: (id, t) => rpc().click(id, t),
       tap: (x, y, t) => rpc().tap(x, y, t),
@@ -862,7 +924,7 @@ export async function startAndroid(
       input: (id, value) => rpc().input(id, value),
       hideKeyboard: () => rpc().hideKeyboard(),
       back: (t, s) => rpc().back(t, s),
-      rect: (id) => rpc().rect(id),
+      rect: (id, s) => rpc().rect(id, s),
       attached: (id, s) => rpc().attached(id, s),
       screenshot: (s) => rpc().screenshot(s),
       source: (s) => rpc().source(s),

@@ -4,7 +4,7 @@ import { mkdtemp, writeFile, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
-import { openApk, inspectApk, isForegroundPackage } from '@apk/automation';
+import { openApk, inspectApk, isForegroundPackage, focusedAndroidWindow } from '@apk/automation';
 import { appOpenSupported, agentIssues } from '@apk/contracts';
 import { fixtureApk } from './p2-fixtures.mjs';
 
@@ -37,6 +37,35 @@ test('foreground uses resumed package only and rejects missing, ambiguous or for
   assert.equal(appOpenSupported(['APP_OPEN_V1'], '0.11.1'), true);
 });
 
+test('focused window separates target, splash, system overlays, external apps and crash dialogs', () => {
+  const sample = (title, focused = 'com.example.app') =>
+    '  mCurrentFocus=Window{123ab u0 ' +
+    title +
+    '}\n  mFocusedApp=ActivityRecord{345ab u0 ' +
+    focused +
+    '/.Main t1}';
+  for (const [title, state] of [
+    ['com.example.app/.Main', 'TARGET'],
+    ['Splash Screen com.example.app', 'SPLASH'],
+    ['com.android.permissioncontroller/.Permission', 'SYSTEM'],
+    ['com.android.chrome/.Browser', 'OTHER'],
+    ['Application Error: com.example.app', 'CRASH'],
+    ['Application Error: com.example.other', 'SYSTEM'],
+  ])
+    assert.equal(focusedAndroidWindow(sample(title), 'com.example.app'), state);
+  assert.equal(
+    focusedAndroidWindow(sample('com.example.app/.Main', 'com.other'), 'com.example.app'),
+    'UNKNOWN',
+  );
+  assert.equal(
+    focusedAndroidWindow(
+      sample('com.example.app/.Main') + '\n mCurrentFocus=null',
+      'com.example.app',
+    ),
+    'UNKNOWN',
+  );
+});
+
 test('open-only completion follows measured foreground dwell and cleanup, without any UI/account calls', async (t) => {
   const dir = await mkdtemp(join(tmpdir(), 'apk-open-'));
   t.after(() => rm(dir, { recursive: true, force: true }));
@@ -50,6 +79,8 @@ test('open-only completion follows measured foreground dwell and cleanup, withou
   async function run(variant = {}) {
     const file = variant.owned ? clientFile : join(dir, 'owned.apk');
     const apk = await inspectApk(file, 268435456, '2026-10-30', new AbortController().signal);
+    if (variant.grouped) config.execution.appOpen.appsPerDevice = { min: 1, max: 1 };
+    else delete config.execution.appOpen.appsPerDevice;
     if (variant.owned) config.execution.appOpen.ownedTestClient = true;
     else delete config.execution.appOpen.ownedTestClient;
     const logs = [],
@@ -58,7 +89,8 @@ test('open-only completion follows measured foreground dwell and cleanup, withou
       samples = 0,
       closed = false;
     const abort = new AbortController(),
-      stages = [];
+      stages = [],
+      notes = [];
     const result = await openApk(
       config,
       { taskId: randomUUID() },
@@ -69,6 +101,10 @@ test('open-only completion follows measured foreground dwell and cleanup, withou
       async (e) => {
         if (e.type === 'LOG') {
           logs.push(e.payload.message);
+          return;
+        }
+        if (e.type === 'APP_OBSTRUCTION') {
+          notes.push(e.payload);
           return;
         }
         assert.equal(e.type, 'TASK_STAGE');
@@ -112,7 +148,7 @@ test('open-only completion follows measured foreground dwell and cleanup, withou
             }
           : {}),
         androidFactory: async (_profile, _signal, options) => {
-          assert.equal(options.controlMode, 'LAUNCH_ONLY');
+          assert.equal(options.controlMode, variant.grouped ? 'DEVICE_SESSION' : 'LAUNCH_ONLY');
           assert.equal(options.ownedTestClient, variant.owned === true);
           const session = {
             supportedAbis: apk.abis,
@@ -139,6 +175,34 @@ test('open-only completion follows measured foreground dwell and cleanup, withou
               if (variant.neverForeground || (variant.delayForeground && now < 1000)) return false;
               return !(variant.crash && now >= 4000);
             },
+            ...(variant.grouped
+              ? {
+                  foregroundWindow: async () => variant.window?.(now) ?? 'TARGET',
+                  source: async () => {
+                    const pkg = apk.packageName;
+                    const text = variant.countdown?.(now)
+                      ? '跳过 5 秒'
+                      : variant.closable && !order.includes('close-ad')
+                        ? '跳过广告'
+                        : '正常页面';
+                    const extra = variant.mixed
+                      ? '<node package="com.other.app" class="android.widget.Button" text="outside" clickable="true" bounds="[5,5][60,40]" />'
+                      : '';
+                    return (
+                      '<hierarchy><node package="' +
+                      pkg +
+                      '" class="android.widget.Button" text="' +
+                      text +
+                      '" enabled="true" clickable="true" bounds="[5,5][60,40]" />' +
+                      extra +
+                      '</hierarchy>'
+                    );
+                  },
+                  find: async () => 'target',
+                  rect: async () => ({ x: 5, y: 5, width: 55, height: 35 }),
+                  click: async () => order.push('close-ad'),
+                }
+              : {}),
             close: async () => {
               closed = true;
               if (variant.stopInCleanup) abort.abort();
@@ -158,11 +222,12 @@ test('open-only completion follows measured foreground dwell and cleanup, withou
     assert.equal(closed, true);
     assert.deepEqual(
       stages,
-      variant.neverForeground
+      variant.neverForeground ||
+        (variant.grouped && result.status === 'FAILED' && !stages.includes('HOLDING'))
         ? ['PREPARING', 'INSTALLING', 'LAUNCHING']
         : ['PREPARING', 'INSTALLING', 'LAUNCHING', 'HOLDING'],
     );
-    return { result, now, samples, logs, order };
+    return { result, now, samples, logs, order, notes };
   }
   const { result, now, samples } = await run();
   assert.equal(now, 10000);
@@ -173,8 +238,41 @@ test('open-only completion follows measured foreground dwell and cleanup, withou
   assert.equal(result.cleanupComplete, true);
   const delayed = await run({ delayForeground: true });
   assert.equal(delayed.result.status, 'SUCCEEDED');
-  assert.equal(delayed.now, 11000);
+  assert.ok(delayed.now >= 11000 && delayed.now < 11400);
   assert.equal(delayed.result.openObservation.elapsedMs, 10000);
+  const mixed = await run({ grouped: true, mixed: true, countdown: (ms) => ms < 4500 });
+  assert.equal(mixed.result.status, 'SUCCEEDED');
+  assert.ok(mixed.now >= 14500 && mixed.now < 16000);
+  assert.deepEqual(
+    mixed.notes.map((n) => n.action),
+    ['WAIT_SPLASH'],
+  );
+  assert.ok(!mixed.order.includes('close-ad'));
+  const closed = await run({ grouped: true, closable: true });
+  assert.equal(closed.result.status, 'SUCCEEDED');
+  assert.ok(closed.order.includes('close-ad'));
+  assert.deepEqual(
+    closed.notes.map((n) => n.phase),
+    ['DETECTED', 'ACTION_SENT'],
+  );
+  const recovered = await run({
+    grouped: true,
+    window: (ms) => (ms >= 3500 && ms < 6200 ? 'OTHER' : 'TARGET'),
+  });
+  assert.equal(recovered.result.status, 'SUCCEEDED');
+  assert.ok(recovered.now >= 16200);
+  assert.equal(recovered.result.openObservation.elapsedMs, 10000);
+  for (const [variant, code] of [
+    [{ window: () => 'SYSTEM' }, 'APP_SYSTEM_WINDOW_BLOCKED'],
+    [{ window: () => 'OTHER' }, 'APP_EXTERNAL_WINDOW_TIMEOUT'],
+    [{ countdown: () => true }, 'APP_SPLASH_TIMEOUT'],
+    [{ window: () => 'CRASH' }, 'APP_STARTUP_CRASH'],
+  ]) {
+    const blocked = await run({ grouped: true, ...variant });
+    assert.equal(blocked.result.errorCode, code);
+    assert.equal(blocked.result.cleanupComplete, true);
+    assert.equal(blocked.now, code === 'APP_STARTUP_CRASH' ? 0 : 20000);
+  }
   for (const [variant, code] of [
     [{ crash: true }, 'APP_NOT_FOREGROUND'],
     [{ stop: true }, 'CANCELLED'],

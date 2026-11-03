@@ -207,6 +207,14 @@ for (const scenario of [
           return;
         }
       }
+      if (scenario === 'serial' && index === 0) {
+        const waiting = { action: 'WAIT_SPLASH', method: 'CONTROLS', index: 1, phase: 'WAITING' };
+        await send(index, 'APP_OBSTRUCTION', waiting);
+        await assert.rejects(
+          send(index, 'APP_OBSTRUCTION', { ...waiting, action: 'RETRY_LOAD' }),
+          (error) => error.code === 'EVENT_CONFLICT',
+        );
+      }
       const payload = {
         status: 'SUCCEEDED',
         proof: 'APP_OPEN',

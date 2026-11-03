@@ -5,7 +5,7 @@ import {
   apkInstallDiagnosticCode,
   APK_INSTALL_DIAGNOSTIC_PREFIX,
 } from '@apk/contracts';
-import { appObstructions } from './app-readiness.js';
+import { holdAppInForeground } from './app-open-foreground.js';
 import { loadIdentityImage } from './identity-images.js';
 import { setTimeout as delay } from 'node:timers/promises';
 import type { ApkMetadata, TestConfiguration } from '@apk/contracts';
@@ -44,12 +44,7 @@ export async function openApk(
     cleanupComplete = true,
     reportUnconfirmed = false;
   let packageName = apk.packageName;
-  let result: TaskCompletion = {
-    status: 'FAILED',
-    proof: 'NONE',
-    artifactIds: [],
-    errorCode: 'APP_OPEN_FAILED',
-  };
+  let result: TaskCompletion;
   const stage = (name: string, extra: Record<string, unknown> = {}) =>
     emit({
       type: 'TASK_STAGE',
@@ -142,73 +137,37 @@ export async function openApk(
     action();
     await timer.measure('APP_LAUNCH', () => session!.launch(packageName!, '@launcher'));
     action();
-    if (config.execution.appOpen.appsPerDevice) {
-      await timer.measure('STARTUP_ADS', () =>
-        appObstructions(
-          session!,
-          packageName!,
-          hooks.beforeAction,
-          async (note) => {
-            await emit({
-              type: 'APP_OBSTRUCTION',
-              taskId: target.taskId,
-              payload: { ...note },
-            });
-          },
-          false,
-          { totalTimeoutMs: 30000, maxActions: 8 },
-        ).clear(signal),
-      );
-    }
-    await timer.measure('FOREGROUND_CHECK', async () => {
-      const deadline = clock.now() + 30000;
-      if (!session!.foreground) throw new RegistrationError('APP_NOT_FOREGROUND');
-      while (true) {
-        action();
-        if (await session!.foreground(packageName!)) return;
-        if (clock.now() >= deadline) throw new RegistrationError('APP_NOT_FOREGROUND');
-        await clock.sleep(250, signal);
-      }
-    });
-    await timer.measure('FOREGROUND_DWELL', async () => {
-      const began = clock.now();
-      let samples = 1;
-      await stage('HOLDING');
-      while (true) {
-        action();
-        await clock.sleep(Math.min(1000, Math.max(1, 10000 - (clock.now() - began))), signal);
-        action();
-        if (!(await session!.foreground!(packageName!)))
-          throw new RegistrationError('APP_NOT_FOREGROUND');
-        samples++;
-        const elapsedMs = Math.floor(clock.now() - began);
-        if (elapsedMs > 60000) throw new RegistrationError('APP_OPEN_TIMEOUT');
-        if (elapsedMs >= 10000) {
-          action();
-          result = {
-            status: 'SUCCEEDED',
-            proof: 'APP_OPEN',
-            artifactIds: [],
-            openObservation: {
-              dwellMs: 10000,
-              elapsedMs,
-              samples,
-              scope: 'FOREGROUND_POLL_ONLY',
-              cleanupComplete: true,
-              ...(target.deviceSessionId
-                ? {
-                    cleanupScope: 'APP_UNINSTALLED' as const,
-                    deviceSessionId: target.deviceSessionId,
-                    appIndex: target.appIndex,
-                    ...(target.deviceEpoch ? { deviceEpoch: target.deviceEpoch } : {}),
-                  }
-                : {}),
-            },
-          };
-          break;
-        }
-      }
-    });
+    const foreground = await holdAppInForeground(
+      session,
+      packageName,
+      !!config.execution.appOpen.appsPerDevice,
+      signal,
+      action,
+      clock,
+      timer.measure,
+      () => stage('HOLDING'),
+      async (note) =>
+        emit({ type: 'APP_OBSTRUCTION', taskId: target.taskId, payload: { ...note } }),
+    );
+    result = {
+      status: 'SUCCEEDED',
+      proof: 'APP_OPEN',
+      artifactIds: [],
+      openObservation: {
+        dwellMs: 10000,
+        ...foreground,
+        scope: 'FOREGROUND_POLL_ONLY',
+        cleanupComplete: true,
+        ...(target.deviceSessionId
+          ? {
+              cleanupScope: 'APP_UNINSTALLED' as const,
+              deviceSessionId: target.deviceSessionId,
+              appIndex: target.appIndex,
+              ...(target.deviceEpoch ? { deviceEpoch: target.deviceEpoch } : {}),
+            }
+          : {}),
+      },
+    };
     if (config.execution.appOpen.ownedTestClient) {
       action();
       const status =

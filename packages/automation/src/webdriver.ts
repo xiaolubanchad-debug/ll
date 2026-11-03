@@ -201,13 +201,13 @@ export class AppiumClient {
   async back(timeout = 10000, signal?: AbortSignal) {
     await this.command('POST', this.path('/back'), {}, timeout, signal ?? this.signal ?? null);
   }
-  async rect(id: string) {
+  async rect(id: string, signal?: AbortSignal) {
     const r = (await this.command(
       'GET',
       this.path('/element/' + id + '/rect'),
       undefined,
       5000,
-      null,
+      signal ?? null,
     )) as Rect;
     if (!r || ![r.x, r.y, r.width, r.height].every(Number.isFinite))
       throw new RegistrationError('EVIDENCE_UNSAFE');

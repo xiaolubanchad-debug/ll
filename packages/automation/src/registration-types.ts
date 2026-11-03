@@ -64,6 +64,7 @@ export interface TaskCompletion {
     appIndex?: number;
   };
 }
+export type ForegroundWindow = 'TARGET' | 'SPLASH' | 'SYSTEM' | 'OTHER' | 'UNKNOWN' | 'CRASH';
 export interface AndroidSession {
   observation: DeviceObservation;
   supportedAbis: string[];
@@ -76,6 +77,7 @@ export interface AndroidSession {
   testClientStatus?(packageName?: string): Promise<string>;
   launch(packageName: string, activity: string): Promise<void>;
   foreground?(packageName: string): Promise<boolean>;
+  foregroundWindow?(packageName: string, signal: AbortSignal): Promise<ForegroundWindow>;
   find(locator: Locator, timeout: number, signal?: AbortSignal): Promise<string>;
   click(id: string, timeout?: number): Promise<void>;
   tap?(x: number, y: number, timeout?: number): Promise<void>;
@@ -84,7 +86,7 @@ export interface AndroidSession {
   input(id: string, value: string): Promise<void>;
   hideKeyboard?(): Promise<void>;
   back(timeout?: number, signal?: AbortSignal): Promise<void>;
-  rect(id: string): Promise<Rect>;
+  rect(id: string, signal?: AbortSignal): Promise<Rect>;
   attached?(id: string, signal?: AbortSignal): Promise<boolean>;
   screenshot(signal?: AbortSignal): Promise<Buffer>;
   source(signal?: AbortSignal): Promise<string>;

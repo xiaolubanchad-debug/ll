@@ -1074,7 +1074,11 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
         fault('EVENT_CONFLICT', '页面事件与执行阶段不一致');
       if (
         event.type === 'APP_OBSTRUCTION' &&
-        (!full || !['LAUNCHING', 'DISCOVERING', 'REGISTERING'].includes(task.status))
+        (!full ||
+          !(
+            ['LAUNCHING', 'DISCOVERING', 'REGISTERING'].includes(task.status) ||
+            (openOnly && task.status === 'HOLDING' && p.action !== 'RETRY_LOAD')
+          ))
       )
         fault('EVENT_CONFLICT', '当前阶段不能处理 APP 弹窗');
       if (event.type === 'APP_OBSTRUCTION' && p.phase) {

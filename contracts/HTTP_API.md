@@ -1,6 +1,6 @@
 # HTTP 接口契约
 
-1.23 的网页下载也通过节点私有 `secretVersions` 下发已绑定的 HTTP 代理，错误与回执规则见 [网页代理与故障恢复契约](../docs/V123_WEB_PROXY_AND_RECOVERY_CONTRACT.md)。
+1.23 的网页下载也通过节点私有 `secretVersions` 下发已绑定的 HTTP 代理。1.23.1 的分组 APP 启动停留在 `HOLDING` 可继续上报非重试的弹窗处理事件，并用固定错误码区分前台等待和启动回执，见 [网页代理与故障恢复契约](../docs/V123_WEB_PROXY_AND_RECOVERY_CONTRACT.md)。
 
 1.22 任务继续时的版本选择、等待原因及已停止记录展示遵循 [恢复契约](../docs/V122_TASK_RESUME_CONTRACT.md)。
 
