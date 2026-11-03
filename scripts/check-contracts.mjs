@@ -22,6 +22,9 @@ const ajv = new Ajv2020({
 // Conditional required fields are declared in their enclosing object schemas.
 addFormats(ajv);
 const configCheck = ajv.compile(read('contracts/config.schema.json'));
+const foregroundContracts = read('contracts/v17.schema.json');
+for (const name of ['AppForegroundSample', 'AppForegroundDiagnostic'])
+  ajv.addSchema({ ...foregroundContracts.$defs[name], $id: foregroundContracts.$id + '/' + name });
 const agentCheck = ajv.compile(read('contracts/agent.schema.json'));
 const config = read('contracts/fixtures/config.valid.json');
 const messages = read('contracts/fixtures/agent.valid.json');
@@ -1223,6 +1226,30 @@ test('1.17.1 raw download diagnostic rejected', () =>
     schemaIssues('AgentMessage', read('contracts/fixtures/agent.download-diagnostics.invalid.json'))
       .length,
   ));
+test('1.23.2 binds foreground diagnostics to their log and rejects private window data', () => {
+  const envelope = read('contracts/fixtures/agent.download-diagnostics.valid.json');
+  const sample = { kind: 'BROWSER', packageName: 'com.android.chrome', offsetMs: 1210 };
+  const appForeground = {
+    scope: 'POLL',
+    targetFocus: 'NOT_SEEN',
+    switchCount: 0,
+    samples: [sample],
+    last: sample,
+  };
+  envelope.events[0].payload = { level: 'INFO', message: 'APP 前台观察', appForeground };
+  assert.deepEqual(agentIssues(envelope), []);
+  for (const change of [
+    (p) => delete p.appForeground,
+    (p) => (p.message = 'APK 安装诊断：APK_INSTALL_TIMEOUT'),
+    (p) => (p.appForeground.samples[0].packageName = 'https://private.invalid/'),
+    (p) => (p.appForeground.samples[0].title = '原始窗口标题'),
+    (p) => (p.appForeground.samples = Array(9).fill(sample)),
+  ]) {
+    const bad = structuredClone(envelope);
+    change(bad.events[0].payload);
+    assert.ok(agentIssues(bad).length);
+  }
+});
 test('1.18 health metadata works in both shared and heartbeat schemas', () => {
   const report = read('contracts/fixtures/health.incremental.valid.json');
   assert.deepEqual(schemaIssues('HealthReport', report), []);

@@ -52,18 +52,35 @@ export function focusedAndroidWindow(
   output: string,
   pkg: string,
 ): import('./registration-types.js').ForegroundWindow {
+  const { kind } = androidForegroundSample(output, pkg);
+  return kind === 'BROWSER' || kind === 'STORE' || kind === 'LAUNCHER' ? 'OTHER' : kind;
+}
+export function androidForegroundSample(
+  output: string,
+  pkg: string,
+): import('./registration-types.js').ForegroundSample {
   const windows = [...output.matchAll(/^[ \t]*mCurrentFocus=([^\r\n]+)$/gm)];
-  if (windows.length !== 1) return 'UNKNOWN';
+  if (windows.length !== 1) return { kind: 'UNKNOWN' };
   const title = /^Window\{[\da-f]+ u\d+ ([^}]+)\}$/.exec(windows[0][1].trim())?.[1];
-  if (!title) return 'UNKNOWN';
-  if (title === 'Application Error: ' + pkg) return 'CRASH';
-  if (title === 'Splash Screen ' + pkg || title === 'Starting ' + pkg) return 'SPLASH';
+  if (!title) return { kind: 'UNKNOWN' };
+  const packageField = (value: string | undefined) =>
+    value &&
+    value.length <= 255 &&
+    /^(?:android|[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+)$/.test(value)
+      ? { packageName: value }
+      : {};
+  if (title === 'Application Error: ' + pkg) return { kind: 'CRASH', ...packageField(pkg) };
+  if (title === 'Splash Screen ' + pkg || title === 'Starting ' + pkg)
+    return { kind: 'SPLASH', ...packageField(pkg) };
   const owner = /^([A-Za-z][\w.]*)\/[\w.$]+$/.exec(title)?.[1];
   if (owner === pkg) {
     const focused = [
       ...output.matchAll(/^\s*mFocusedApp=ActivityRecord\{[^\r\n]*?\bu\d+ ([A-Za-z][\w.]*)\//gm),
     ];
-    return focused.length === 1 && focused[0][1] === pkg ? 'TARGET' : 'UNKNOWN';
+    return {
+      kind: focused.length === 1 && focused[0][1] === pkg ? 'TARGET' : 'UNKNOWN',
+      ...packageField(owner),
+    };
   }
   if (
     (owner &&
@@ -74,8 +91,17 @@ export function focusedAndroidWindow(
       title,
     )
   )
-    return 'SYSTEM';
-  return owner ? 'OTHER' : 'UNKNOWN';
+    return { kind: 'SYSTEM', ...packageField(owner) };
+  const kind = /^(?:com\.android\.chrome|com\.android\.browser)$/.test(owner ?? '')
+    ? 'BROWSER'
+    : owner === 'com.android.vending'
+      ? 'STORE'
+      : /^(?:com\.android\.launcher3|com\.google\.android\.apps\.nexuslauncher)$/.test(owner ?? '')
+        ? 'LAUNCHER'
+        : owner
+          ? 'OTHER'
+          : 'UNKNOWN';
+  return { kind, ...packageField(owner) };
 }
 const installRejection =
   /^(?:adb: failed to install [^\r\n]+:[ \t]*)?Failure \[(INSTALL_(?:FAILED|PARSE_FAILED)_[A-Z0-9_]+)(?::[^\r\n]*)?\][ \t]*\r?$/m;
@@ -914,7 +940,7 @@ export async function startAndroid(
           workspace,
           128 * 1024,
         );
-        return focusedAndroidWindow(output, pkg);
+        return androidForegroundSample(output, pkg);
       },
       find: (l, t, s) => rpc().find(l, t, s),
       click: (id, t) => rpc().click(id, t),

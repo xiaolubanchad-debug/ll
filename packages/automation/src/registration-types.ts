@@ -1,4 +1,9 @@
-import type { TestConfiguration, RegistrationRecognition, AppOpenTimings } from '@apk/contracts';
+import type {
+  TestConfiguration,
+  RegistrationRecognition,
+  AppOpenTimings,
+  AppForegroundSample,
+} from '@apk/contracts';
 export type Locator = TestConfiguration['registrationFlows'][number]['success']['locator'];
 export type Profile = TestConfiguration['execution']['deviceProfiles'][number];
 export interface Account {
@@ -65,6 +70,7 @@ export interface TaskCompletion {
   };
 }
 export type ForegroundWindow = 'TARGET' | 'SPLASH' | 'SYSTEM' | 'OTHER' | 'UNKNOWN' | 'CRASH';
+export type ForegroundSample = Omit<AppForegroundSample, 'offsetMs'>;
 export interface AndroidSession {
   observation: DeviceObservation;
   supportedAbis: string[];
@@ -77,7 +83,7 @@ export interface AndroidSession {
   testClientStatus?(packageName?: string): Promise<string>;
   launch(packageName: string, activity: string): Promise<void>;
   foreground?(packageName: string): Promise<boolean>;
-  foregroundWindow?(packageName: string, signal: AbortSignal): Promise<ForegroundWindow>;
+  foregroundWindow?(packageName: string, signal: AbortSignal): Promise<ForegroundSample>;
   find(locator: Locator, timeout: number, signal?: AbortSignal): Promise<string>;
   click(id: string, timeout?: number): Promise<void>;
   tap?(x: number, y: number, timeout?: number): Promise<void>;

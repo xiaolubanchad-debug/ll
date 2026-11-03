@@ -46,6 +46,8 @@ export type {
   OverviewView,
   RunSummaryView,
   TimelinePage,
+  AppForegroundSample,
+  AppForegroundDiagnostic,
   AppOpenTimings,
   AssetListView,
   ValidationListView,
@@ -463,6 +465,7 @@ const knownAgentVersions: readonly string[] = [
   '0.17.2',
   '0.17.3',
   '0.17.4',
+  '0.17.5',
 ];
 export function knownAgentAtLeast(version: string | null | undefined, minimum: string): boolean {
   const required = knownAgentVersions.indexOf(minimum);
@@ -562,6 +565,7 @@ export const APK_INSTALL_FAILURE_CODES = [
 ] as const;
 export type ApkInstallFailureCode = (typeof APK_INSTALL_FAILURE_CODES)[number];
 export const APK_INSTALL_DIAGNOSTIC_PREFIX = 'APK 安装诊断：';
+export const APP_FOREGROUND_LOG = 'APP 前台观察';
 export function apkInstallDiagnosticCode(message: unknown) {
   return APK_INSTALL_FAILURE_CODES.find((code) => message === APK_INSTALL_DIAGNOSTIC_PREFIX + code);
 }

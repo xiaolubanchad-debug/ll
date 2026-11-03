@@ -3,6 +3,7 @@ import {
   sourceCheckXPath,
   sourceElementXPath,
   apkInstallDiagnosticCode,
+  APP_FOREGROUND_LOG,
 } from '@apk/contracts';
 import { Prisma } from '@prisma/client';
 import type { PrismaClient } from '@prisma/client';
@@ -16,6 +17,7 @@ import type {
   OverviewQuery,
   RunSummaryView,
   TimelinePage,
+  AppForegroundDiagnostic,
   TimelineQuery,
   AssetQuery,
   AssetListView,
@@ -764,6 +766,7 @@ function title(type: string, p: Record<string, unknown>) {
     );
   if (type === 'LOG') {
     const message = String(p.message);
+    if (message === APP_FOREGROUND_LOG) return APP_FOREGROUND_LOG;
     if (apkInstallDiagnosticCode(message)) return 'APK 安装诊断';
     return [
       '下载入口：准备操作网站图标',
@@ -977,6 +980,11 @@ export async function runTimeline(
         type: b.type,
         stage: typeof p.stage === 'string' ? p.stage : null,
         title: title(b.type, p),
+        ...(b.type === 'LOG' &&
+        p.message === APP_FOREGROUND_LOG &&
+        !schemaIssues('AppForegroundDiagnostic', p.appForeground).length
+          ? { appForeground: p.appForeground as AppForegroundDiagnostic }
+          : {}),
         ...(b.type === 'TASK_FINISHED' &&
         p.openTimings &&
         !appOpenTimingsIssues(p.openTimings).length

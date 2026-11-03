@@ -25,6 +25,7 @@ import {
   xpathObservationSupported,
   knownAgentAtLeast,
   apkInstallDiagnosticCode,
+  APP_FOREGROUND_LOG,
 } from '@apk/contracts';
 import { readFunctionalArtifact } from './functional-artifacts.js';
 import { checked, readSecret } from './secrets.js';
@@ -1029,6 +1030,7 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
     const task = await tx.task.findUnique({ where: { id: event.taskId } });
     const native = String(p.message).startsWith('自有测试 APK：');
     const install = apkInstallDiagnosticCode(p.message);
+    const foreground = p.message === APP_FOREGROUND_LOG;
     if (
       !task ||
       task.runId !== runId ||
@@ -1042,7 +1044,9 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
           )
         : install
           ? !openOnly || task.status !== 'INSTALLING'
-          : task.status !== 'DOWNLOADING')
+          : foreground
+            ? !openOnly || !['LAUNCHING', 'HOLDING'].includes(task.status)
+            : task.status !== 'DOWNLOADING')
     )
       fault('EVENT_CONFLICT', '日志与执行阶段不一致');
     if (

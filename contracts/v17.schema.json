@@ -2124,6 +2124,9 @@
               "title": {
                 "type": "string"
               },
+              "appForeground": {
+                "$ref": "https://contracts.apk-platform.example/v1/v17.schema.json/AppForegroundDiagnostic"
+              },
               "errorCode": {
                 "anyOf": [
                   {
@@ -2754,6 +2757,57 @@
         "items",
         "nextCursor"
       ]
+    },
+    "AppForegroundSample": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "offsetMs"],
+      "properties": {
+        "kind": {
+          "enum": [
+            "TARGET",
+            "SPLASH",
+            "SYSTEM",
+            "BROWSER",
+            "STORE",
+            "LAUNCHER",
+            "OTHER",
+            "UNKNOWN",
+            "CRASH"
+          ]
+        },
+        "packageName": {
+          "type": "string",
+          "maxLength": 255,
+          "pattern": "^(?:android|[A-Za-z][A-Za-z0-9_]*(?:\\.[A-Za-z][A-Za-z0-9_]*)+)$"
+        },
+        "offsetMs": { "type": "integer", "minimum": 0, "maximum": 120000 }
+      }
+    },
+    "AppForegroundDiagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scope", "targetFocus", "switchCount", "samples", "last"],
+      "properties": {
+        "scope": { "enum": ["POLL", "AFTER_LAUNCH_ERROR"] },
+        "targetFocus": { "enum": ["SEEN", "NOT_SEEN", "UNOBSERVED"] },
+        "switchCount": { "type": "integer", "minimum": 0, "maximum": 256 },
+        "samples": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "$ref": "https://contracts.apk-platform.example/v1/v17.schema.json/AppForegroundSample"
+          }
+        },
+        "last": {
+          "anyOf": [
+            {
+              "$ref": "https://contracts.apk-platform.example/v1/v17.schema.json/AppForegroundSample"
+            },
+            { "type": "null" }
+          ]
+        }
+      }
     },
     "AppOpenTimings": {
       "type": "object",

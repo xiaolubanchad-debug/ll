@@ -1148,6 +1148,24 @@ export interface TimelinePage {
     type: string;
     stage: string | null;
     title: string;
+    appForeground?: {
+      scope: 'POLL' | 'AFTER_LAUNCH_ERROR';
+      targetFocus: 'SEEN' | 'NOT_SEEN' | 'UNOBSERVED';
+      switchCount: number;
+      /**
+       * @maxItems 8
+       */
+      samples: {
+        kind: 'TARGET' | 'SPLASH' | 'SYSTEM' | 'BROWSER' | 'STORE' | 'LAUNCHER' | 'OTHER' | 'UNKNOWN' | 'CRASH';
+        packageName?: string;
+        offsetMs: number;
+      }[];
+      last: {
+        kind: 'TARGET' | 'SPLASH' | 'SYSTEM' | 'BROWSER' | 'STORE' | 'LAUNCHER' | 'OTHER' | 'UNKNOWN' | 'CRASH';
+        packageName?: string;
+        offsetMs: number;
+      } | null;
+    };
     errorCode: string | null;
     recordedForReview: boolean;
     applied: boolean;
@@ -1271,6 +1289,31 @@ export interface ValidationListView {
     }[];
   }[];
   nextCursor: string | null;
+}
+
+export interface AppForegroundSample {
+  kind: 'TARGET' | 'SPLASH' | 'SYSTEM' | 'BROWSER' | 'STORE' | 'LAUNCHER' | 'OTHER' | 'UNKNOWN' | 'CRASH';
+  packageName?: string;
+  offsetMs: number;
+}
+
+export interface AppForegroundDiagnostic {
+  scope: 'POLL' | 'AFTER_LAUNCH_ERROR';
+  targetFocus: 'SEEN' | 'NOT_SEEN' | 'UNOBSERVED';
+  switchCount: number;
+  /**
+   * @maxItems 8
+   */
+  samples: {
+    kind: 'TARGET' | 'SPLASH' | 'SYSTEM' | 'BROWSER' | 'STORE' | 'LAUNCHER' | 'OTHER' | 'UNKNOWN' | 'CRASH';
+    packageName?: string;
+    offsetMs: number;
+  }[];
+  last: {
+    kind: 'TARGET' | 'SPLASH' | 'SYSTEM' | 'BROWSER' | 'STORE' | 'LAUNCHER' | 'OTHER' | 'UNKNOWN' | 'CRASH';
+    packageName?: string;
+    offsetMs: number;
+  } | null;
 }
 
 export interface AppOpenTimings {

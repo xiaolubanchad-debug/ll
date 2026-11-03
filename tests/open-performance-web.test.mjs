@@ -38,11 +38,28 @@ test('timeline displays measured step durations and keeps old events without inv
           items: [
             { ...event, openTimings },
             { ...event, id: randomUUID(), sequence: 2 },
+            {
+              ...event,
+              id: randomUUID(),
+              sequence: 3,
+              type: 'LOG',
+              title: 'APP 前台观察',
+              appForeground: {
+                scope: 'POLL',
+                targetFocus: 'SEEN',
+                switchCount: 1,
+                samples: [
+                  { kind: 'TARGET', packageName: 'com.example.app', offsetMs: 1100 },
+                  { kind: 'BROWSER', packageName: 'com.android.chrome', offsetMs: 2300 },
+                ],
+                last: { kind: 'BROWSER', packageName: 'com.android.chrome', offsetMs: 20000 },
+              },
+            },
           ],
           hasEarlier: false,
           hasLater: false,
           firstSequence: 1,
-          lastSequence: 2,
+          lastSequence: 3,
         },
       }),
     );
@@ -60,6 +77,9 @@ test('timeline displays measured step durations and keeps old events without inv
     await expect(details.getByText('安卓冷启动', { exact: true })).toBeVisible();
     await expect(details.getByText('3.00 秒', { exact: true })).toBeVisible();
     await expect(details.getByText('准备步骤可能重叠', { exact: false })).toBeVisible();
+    await expect(page.getByText('已观察到目标 APP 获得焦点 · 最后窗口 浏览器')).toBeVisible();
+    await page.getByText('查看窗口切换时间（1 次）').click();
+    await expect(page.getByText('启动后 2.30 秒 · 浏览器', { exact: false })).toBeVisible();
     assert.equal(await page.locator('img,video,audio,iframe').count(), 0);
     assert.deepEqual(errors, []);
   } finally {

@@ -4,8 +4,9 @@ import {
   schemaIssues,
   apkInstallDiagnosticCode,
   APK_INSTALL_DIAGNOSTIC_PREFIX,
+  APP_FOREGROUND_LOG,
 } from '@apk/contracts';
-import { holdAppInForeground } from './app-open-foreground.js';
+import { foregroundTrace, holdAppInForeground } from './app-open-foreground.js';
 import { loadIdentityImage } from './identity-images.js';
 import { setTimeout as delay } from 'node:timers/promises';
 import type { ApkMetadata, TestConfiguration } from '@apk/contracts';
@@ -45,6 +46,8 @@ export async function openApk(
     reportUnconfirmed = false;
   let packageName = apk.packageName;
   let result: TaskCompletion;
+  let trace: ReturnType<typeof foregroundTrace> | undefined;
+  let launchConfirmed = false;
   const stage = (name: string, extra: Record<string, unknown> = {}) =>
     emit({
       type: 'TASK_STAGE',
@@ -135,7 +138,9 @@ export async function openApk(
       await session.provisionTestClient(bootstrap, packageName);
     }
     action();
+    trace = foregroundTrace(clock.now);
     await timer.measure('APP_LAUNCH', () => session!.launch(packageName!, '@launcher'));
+    launchConfirmed = true;
     action();
     const foreground = await holdAppInForeground(
       session,
@@ -148,6 +153,7 @@ export async function openApk(
       () => stage('HOLDING'),
       async (note) =>
         emit({ type: 'APP_OBSTRUCTION', taskId: target.taskId, payload: { ...note } }),
+      trace.record,
     );
     result = {
       status: 'SUCCEEDED',
@@ -204,6 +210,27 @@ export async function openApk(
     if (error instanceof RegistrationError && error.code === 'CLEANUP_INCOMPLETE')
       cleanupComplete = false;
   } finally {
+    if (trace && session && packageName && !signal.aborted) {
+      if (!launchConfirmed && 'foregroundWindow' in session && session.foregroundWindow) {
+        const probe = AbortSignal.any([signal, AbortSignal.timeout(1500)]);
+        try {
+          action();
+          trace.record(await session.foregroundWindow(packageName, probe));
+        } catch {
+          // No sample is also a useful distinction from an observed external window.
+        }
+      }
+      if (!signal.aborted)
+        await emit({
+          type: 'LOG',
+          taskId: target.taskId,
+          payload: {
+            level: 'INFO',
+            message: APP_FOREGROUND_LOG,
+            appForeground: trace.snapshot(launchConfirmed ? 'POLL' : 'AFTER_LAUNCH_ERROR'),
+          },
+        }).catch(() => {});
+    }
     if (session)
       cleanupComplete = await timer.measure('CLEANUP', () => session!.close()).catch(() => false);
   }

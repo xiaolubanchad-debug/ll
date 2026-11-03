@@ -1,16 +1,47 @@
 import { appLoading, labels, readRegistrationPage } from './registration-ui.js';
+import type { AppForegroundDiagnostic, AppForegroundSample } from '@apk/contracts';
 import {
   obstructionCandidates,
   obstructionEvidence,
   type ObstructionNote,
 } from './app-readiness.js';
-import { RegistrationError, type AndroidSession } from './registration-types.js';
+import {
+  RegistrationError,
+  type AndroidSession,
+  type ForegroundSample,
+} from './registration-types.js';
 import type { MeasureOpenStep } from './open-timings.js';
 
 const dwellMs = 10000;
 const waitingMs = 20000;
 const totalMs = 40000;
 type Clock = { now(): number; sleep(ms: number, signal: AbortSignal): Promise<void> };
+
+export function foregroundTrace(now: () => number) {
+  const began = now();
+  const samples: AppForegroundSample[] = [];
+  let targetFocus: AppForegroundDiagnostic['targetFocus'] = 'UNOBSERVED';
+  let last: AppForegroundSample | null = null;
+  let switchCount = 0;
+  return {
+    record(sample: ForegroundSample) {
+      const next = {
+        ...sample,
+        offsetMs: Math.min(120000, Math.max(0, Math.floor(now() - began))),
+      };
+      if (sample.kind === 'TARGET') targetFocus = 'SEEN';
+      else if (targetFocus === 'UNOBSERVED' && sample.kind !== 'UNKNOWN') targetFocus = 'NOT_SEEN';
+      if (last?.kind !== next.kind || last.packageName !== next.packageName) {
+        if (last) switchCount = Math.min(256, switchCount + 1);
+        if (samples.length < 8) samples.push(next);
+      }
+      last = next;
+    },
+    snapshot(scope: AppForegroundDiagnostic['scope']): AppForegroundDiagnostic {
+      return { scope, targetFocus, switchCount, samples, last };
+    },
+  };
+}
 
 export async function holdAppInForeground(
   session: AndroidSession,
@@ -22,6 +53,7 @@ export async function holdAppInForeground(
   measure: MeasureOpenStep,
   holding: () => Promise<void>,
   note: (value: ObstructionNote) => Promise<void>,
+  record: (value: ForegroundSample) => void,
 ) {
   const deadline = clock.now() + totalMs;
   let waitLeft = waitingMs;
@@ -29,14 +61,19 @@ export async function holdAppInForeground(
   const observe = async (bounded: AbortSignal) => {
     action();
     bounded.throwIfAborted();
-    if ('foregroundWindow' in session && session.foregroundWindow)
-      return session.foregroundWindow(pkg, bounded).catch((error: unknown) => {
-        if (error instanceof RegistrationError && error.code === 'APP_FOREGROUND_FAILED')
-          return 'UNKNOWN' as const;
-        throw error;
-      });
-    if (session.foreground && (await session.foreground(pkg))) return 'TARGET' as const;
-    return 'UNKNOWN' as const;
+    const sample: ForegroundSample =
+      'foregroundWindow' in session && session.foregroundWindow
+        ? await session.foregroundWindow(pkg, bounded).catch((error: unknown) => {
+            if (error instanceof RegistrationError && error.code === 'APP_FOREGROUND_FAILED')
+              return { kind: 'UNKNOWN' as const };
+            throw error;
+          })
+        : session.foreground && (await session.foreground(pkg))
+          ? { kind: 'TARGET' }
+          : { kind: 'UNKNOWN' };
+    record(sample);
+    const { kind } = sample;
+    return kind === 'BROWSER' || kind === 'STORE' || kind === 'LAUNCHER' ? 'OTHER' : kind;
   };
   const reasonFor = (window: Awaited<ReturnType<typeof observe>>) =>
     window === 'SPLASH'

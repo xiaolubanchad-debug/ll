@@ -4,8 +4,15 @@ import { mkdtemp, writeFile, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
-import { openApk, inspectApk, isForegroundPackage, focusedAndroidWindow } from '@apk/automation';
-import { appOpenSupported, agentIssues } from '@apk/contracts';
+import {
+  openApk,
+  inspectApk,
+  isForegroundPackage,
+  focusedAndroidWindow,
+  androidForegroundSample,
+  RegistrationError,
+} from '@apk/automation';
+import { appOpenSupported, agentIssues, APP_FOREGROUND_LOG } from '@apk/contracts';
 import { fixtureApk } from './p2-fixtures.mjs';
 
 test('foreground uses resumed package only and rejects missing, ambiguous or foreign activity', () => {
@@ -53,6 +60,17 @@ test('focused window separates target, splash, system overlays, external apps an
     ['Application Error: com.example.other', 'SYSTEM'],
   ])
     assert.equal(focusedAndroidWindow(sample(title), 'com.example.app'), state);
+  assert.deepEqual(
+    androidForegroundSample(sample('com.android.chrome/.Browser'), 'com.example.app'),
+    {
+      kind: 'BROWSER',
+      packageName: 'com.android.chrome',
+    },
+  );
+  assert.deepEqual(
+    androidForegroundSample(sample('Browser https://private.invalid'), 'com.example.app'),
+    { kind: 'UNKNOWN' },
+  );
   assert.equal(
     focusedAndroidWindow(sample('com.example.app/.Main', 'com.other'), 'com.example.app'),
     'UNKNOWN',
@@ -84,6 +102,7 @@ test('open-only completion follows measured foreground dwell and cleanup, withou
     if (variant.owned) config.execution.appOpen.ownedTestClient = true;
     else delete config.execution.appOpen.ownedTestClient;
     const logs = [],
+      foregroundLogs = [],
       order = [];
     let now = 0,
       samples = 0,
@@ -100,7 +119,11 @@ test('open-only completion follows measured foreground dwell and cleanup, withou
       abort.signal,
       async (e) => {
         if (e.type === 'LOG') {
-          logs.push(e.payload.message);
+          if (e.payload.message === APP_FOREGROUND_LOG) {
+            assert.equal(closed, false);
+            foregroundLogs.push(e.payload.appForeground);
+            if (variant.diagnosticUnavailable) throw Error('diagnostic unavailable');
+          } else logs.push(e.payload.message);
           return;
         }
         if (e.type === 'APP_OBSTRUCTION') {
@@ -169,6 +192,10 @@ test('open-only completion follows measured foreground dwell and cleanup, withou
               order.push('launch');
               assert.equal(pkg, apk.packageName);
               assert.equal(activity, '@launcher');
+              if (variant.launchTimeout) {
+                now += 10400;
+                throw new RegistrationError('APP_LAUNCH_TIMEOUT');
+              }
             },
             foreground: async () => {
               samples++;
@@ -177,7 +204,13 @@ test('open-only completion follows measured foreground dwell and cleanup, withou
             },
             ...(variant.grouped
               ? {
-                  foregroundWindow: async () => variant.window?.(now) ?? 'TARGET',
+                  foregroundWindow: async () => {
+                    const kind = variant.window?.(now) ?? 'TARGET';
+                    return {
+                      kind,
+                      ...(kind === 'BROWSER' ? { packageName: 'com.android.chrome' } : {}),
+                    };
+                  },
                   source: async () => {
                     const pkg = apk.packageName;
                     const text = variant.countdown?.(now)
@@ -227,7 +260,7 @@ test('open-only completion follows measured foreground dwell and cleanup, withou
         ? ['PREPARING', 'INSTALLING', 'LAUNCHING']
         : ['PREPARING', 'INSTALLING', 'LAUNCHING', 'HOLDING'],
     );
-    return { result, now, samples, logs, order, notes };
+    return { result, now, samples, logs, order, notes, foregroundLogs };
   }
   const { result, now, samples } = await run();
   assert.equal(now, 10000);
@@ -257,11 +290,28 @@ test('open-only completion follows measured foreground dwell and cleanup, withou
   );
   const recovered = await run({
     grouped: true,
-    window: (ms) => (ms >= 3500 && ms < 6200 ? 'OTHER' : 'TARGET'),
+    window: (ms) => (ms >= 3500 && ms < 6200 ? 'BROWSER' : 'TARGET'),
   });
   assert.equal(recovered.result.status, 'SUCCEEDED');
   assert.ok(recovered.now >= 16200);
   assert.equal(recovered.result.openObservation.elapsedMs, 10000);
+  const [log] = recovered.foregroundLogs;
+  assert.equal(log.targetFocus, 'SEEN');
+  assert.equal(log.switchCount, 2);
+  assert.deepEqual(
+    log.samples.map((s) => s.kind),
+    ['TARGET', 'BROWSER', 'TARGET'],
+  );
+  assert.equal(log.samples[1].packageName, 'com.android.chrome');
+  assert.ok(log.samples[1].offsetMs >= 3500 && log.samples[2].offsetMs >= 6200);
+  assert.equal(log.last.kind, 'TARGET');
+  const failedLaunch = await run({ grouped: true, launchTimeout: true, window: () => 'BROWSER' });
+  assert.equal(failedLaunch.result.errorCode, 'APP_LAUNCH_TIMEOUT');
+  assert.deepEqual(
+    failedLaunch.foregroundLogs.map((l) => [l.scope, l.targetFocus, l.last.offsetMs, l.last.kind]),
+    [['AFTER_LAUNCH_ERROR', 'NOT_SEEN', 10400, 'BROWSER']],
+  );
+  assert.equal((await run({ diagnosticUnavailable: true })).result.status, 'SUCCEEDED');
   for (const [variant, code] of [
     [{ window: () => 'SYSTEM' }, 'APP_SYSTEM_WINDOW_BLOCKED'],
     [{ window: () => 'OTHER' }, 'APP_EXTERNAL_WINDOW_TIMEOUT'],

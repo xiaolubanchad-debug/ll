@@ -214,6 +214,20 @@ for (const scenario of [
           send(index, 'APP_OBSTRUCTION', { ...waiting, action: 'RETRY_LOAD' }),
           (error) => error.code === 'EVENT_CONFLICT',
         );
+        const sample = { kind: 'TARGET', packageName: 'com.example.app', offsetMs: 1234 };
+        const appForeground = {
+          scope: 'POLL',
+          targetFocus: 'SEEN',
+          switchCount: 0,
+          samples: [sample],
+          last: sample,
+        };
+        await send(index, 'LOG', { level: 'INFO', message: 'APP 前台观察', appForeground });
+        assert.deepEqual(
+          (await runTimeline(db, runId, {})).items.find((event) => event.title === 'APP 前台观察')
+            ?.appForeground,
+          appForeground,
+        );
       }
       const payload = {
         status: 'SUCCEEDED',

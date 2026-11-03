@@ -21,6 +21,22 @@ const timingLabels: Record<string, string> = {
   CLEANUP: '关闭并清理',
 };
 const seconds = (ms: number) => (ms / 1000).toFixed(2) + ' 秒';
+const focusLabels = {
+  SEEN: '已观察到目标 APP 获得焦点',
+  NOT_SEEN: '采样期间未观察到目标 APP 获得焦点',
+  UNOBSERVED: '目标 APP 焦点无法确认',
+};
+const windowLabels = {
+  TARGET: '目标 APP',
+  SPLASH: '开屏窗口',
+  SYSTEM: '系统窗口',
+  BROWSER: '浏览器',
+  STORE: '应用商店',
+  LAUNCHER: '桌面',
+  OTHER: '其他应用',
+  UNKNOWN: '无法确认',
+  CRASH: '崩溃窗口',
+};
 const selectedSession = ref('');
 const sessions = computed(() => [
   ...new Set(items.value.map((e) => e.deviceSessionId).filter((id): id is string => !!id)),
@@ -152,6 +168,36 @@ onUnmounted(() => {
           >
         </p>
         <strong>{{ event.title }}</strong>
+        <template v-if="event.appForeground">
+          <p class="muted">
+            {{ focusLabels[event.appForeground.targetFocus] }} · 最后窗口
+            {{
+              event.appForeground.last ? windowLabels[event.appForeground.last.kind] : '无可用采样'
+            }}
+            <code v-if="event.appForeground.last?.packageName">{{
+              event.appForeground.last.packageName
+            }}</code>
+          </p>
+          <p v-if="event.appForeground.scope === 'AFTER_LAUNCH_ERROR'" class="muted">
+            启动回执失败后的快照
+          </p>
+          <details v-if="event.appForeground.samples.length">
+            <summary>查看窗口切换时间（{{ event.appForeground.switchCount }} 次）</summary>
+            <p v-for="(sample, i) in event.appForeground.samples" :key="i">
+              启动后 {{ seconds(sample.offsetMs) }} · {{ windowLabels[sample.kind] }}
+              <code v-if="sample.packageName">{{ sample.packageName }}</code>
+            </p>
+            <p
+              v-if="event.appForeground.switchCount >= event.appForeground.samples.length"
+              class="muted"
+            >
+              此处保留最早的 8 条变化记录和末次采样。
+            </p>
+            <p v-if="event.appForeground.last" class="muted">
+              最后采样于启动后 {{ seconds(event.appForeground.last.offsetMs) }}
+            </p>
+          </details>
+        </template>
         <details v-if="event.locator">
           <summary>查看本条定位 XPath</summary>
           <pre class="source-check-xpath">{{ event.locator }}</pre>

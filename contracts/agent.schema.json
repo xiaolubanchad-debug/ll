@@ -1583,10 +1583,7 @@
     "log": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "level",
-        "message"
-      ],
+      "required": ["level", "message"],
       "properties": {
         "level": {
           "const": "INFO"
@@ -1623,10 +1620,17 @@
             "APK 安装诊断：APK_INSTALL_REJECTED",
             "APK 安装诊断：APK_INSTALL_DEVICE_UNAVAILABLE",
             "APK 安装诊断：APK_INSTALL_TIMEOUT",
-            "APK 安装诊断：APK_INSTALL_UNCONFIRMED"
+            "APK 安装诊断：APK_INSTALL_UNCONFIRMED",
+            "APP 前台观察"
           ]
+        },
+        "appForeground": {
+          "$ref": "https://contracts.apk-platform.example/v1/v17.schema.json/AppForegroundDiagnostic"
         }
-      }
+      },
+      "if": { "properties": { "message": { "const": "APP 前台观察" } } },
+      "then": { "required": ["appForeground"] },
+      "else": { "not": { "required": ["appForeground"] } }
     },
     "deviceObservation": {
       "type": "object",
