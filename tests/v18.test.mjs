@@ -91,7 +91,7 @@ test('1.8 managed tasks: real PostgreSQL, persistent orchestration and browser c
         sha256: digest(randomUUID()),
         artifactName: 'agent-' + digest(randomUUID()) + '.tgz',
         manifest: {
-          agentVersion: '0.12.3',
+          agentVersion: '0.17.3',
           features: [
             'DOWNLOAD_V1',
             'REGISTRATION_V1',
@@ -108,7 +108,7 @@ test('1.8 managed tasks: real PostgreSQL, persistent orchestration and browser c
         name: '1.8 自有测试服务器',
         host: '192.0.2.181',
         lastSeenAt: new Date(),
-        agentVersion: '0.12.3',
+        agentVersion: '0.17.3',
         agentReleaseId: release.id,
         deploymentStatus: 'INSTALLED',
         downloadProtocol: '1.0',
@@ -784,7 +784,7 @@ test('1.8 managed tasks: real PostgreSQL, persistent orchestration and browser c
           .fill('https://owned-browser.example.test/');
         await page.getByRole('button', { name: '下一步', exact: true }).click();
         await page.getByLabel('执行服务器', { exact: true }).selectOption(node.id);
-        await page.getByLabel('APP 网络代理', { exact: true }).selectOption(proxy.id);
+        await page.getByLabel('网页与 APP 网络代理', { exact: true }).selectOption(proxy.id);
         await expect(page.getByLabel('同时执行轮数', { exact: true })).toBeDisabled();
         await expect(page.getByLabel('同时执行轮数', { exact: true })).toHaveValue('1');
         await page.getByRole('button', { name: '下一步', exact: true }).click();
@@ -798,14 +798,14 @@ test('1.8 managed tasks: real PostgreSQL, persistent orchestration and browser c
         await expect(page.locator('.readiness-list')).toContainText('启动停留需要 Agent 0.10.0');
         await db.node.update({
           where: { id: node.id },
-          data: { agentVersion: '0.11.0', lastSeenAt: new Date() },
+          data: { agentVersion: '0.17.3', lastSeenAt: new Date() },
         });
         await db.release.update({
           where: { id: release.id },
           data: {
             manifest: {
               ...release.manifest,
-              agentVersion: '0.11.0',
+              agentVersion: '0.17.3',
               features: [...release.manifest.features, 'APP_OPEN_V1', 'APP_OPEN_PARALLEL_V1'],
             },
           },

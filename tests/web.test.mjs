@@ -118,10 +118,20 @@ test('browser login, config checks, refresh, password change and logout', async 
     await expect(page.getByText('代理已加密保存，可将引用应用到草稿')).toBeVisible();
     await expect(page.getByLabel('代理密码', { exact: true })).toHaveValue('');
     await page.getByRole('button', { name: '将代理应用到当前草稿', exact: true }).click();
+    const downloadDraft = JSON.parse(
+      await page.getByLabel('完整配置 JSON', { exact: true }).inputValue(),
+    );
+    assert.equal(downloadDraft.execution.mode, 'DOWNLOAD_ONLY');
+    assert.match(downloadDraft.execution.proxySecretVersionId, /^[a-f0-9-]{36}$/);
+    await page.getByLabel('执行模式', { exact: true }).selectOption('FULL');
     const proxyDraft = JSON.parse(
       await page.getByLabel('完整配置 JSON', { exact: true }).inputValue(),
     );
     assert.equal(proxyDraft.execution.mode, 'FULL');
+    assert.equal(
+      proxyDraft.execution.proxySecretVersionId,
+      downloadDraft.execution.proxySecretVersionId,
+    );
     assert.deepEqual(configurationIssues(proxyDraft), []);
     assert.equal(proxyDraft.execution.appOpen.dwellMs, 10000);
     assert.equal(proxyDraft.execution.appOpen.concurrency, 1);

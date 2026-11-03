@@ -71,6 +71,19 @@ export function planChanges(files) {
         );
         continue;
       }
+      if (
+        /^packages\/automation\/src\/(download|mobile-browser|apk-links|source-elements|network|proxy|cache|common)\.ts$/.test(
+          f,
+        )
+      )
+        ['download-discovery', 'mobile-download', 'file-assets'].forEach((x) => tests.add(x));
+      if (/^packages\/automation\/src\/(network|proxy)\.ts$/.test(f)) tests.add('proxy-probe');
+      if (
+        /^(apps\/agent\/src\/(tasks|store|main)|packages\/automation\/src\/(concurrent-open|device-sessions))\.ts$/.test(
+          f,
+        )
+      )
+        ['concurrent-open', 'device-sessions-api', 'stop-recovery'].forEach((x) => tests.add(x));
       [
         'p1',
         'p2',

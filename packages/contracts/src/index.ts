@@ -461,6 +461,7 @@ const knownAgentVersions: readonly string[] = [
   '0.17.0',
   '0.17.1',
   '0.17.2',
+  '0.17.3',
 ];
 export function knownAgentAtLeast(version: string | null | undefined, minimum: string): boolean {
   const required = knownAgentVersions.indexOf(minimum);
@@ -543,3 +544,23 @@ export {
   sourceCheckXPath,
   xpathString,
 } from './source-elements.js';
+export const APK_INSTALL_FAILURE_CODES = [
+  'APK_INSTALL_INVALID',
+  'APK_INSTALL_SPLIT_REQUIRED',
+  'APK_INSTALL_ABI_MISMATCH',
+  'APK_INSTALL_ANDROID_VERSION',
+  'APK_INSTALL_SIGNATURE_CONFLICT',
+  'APK_INSTALL_ALREADY_PRESENT',
+  'APK_INSTALL_VERSION_CONFLICT',
+  'APK_INSTALL_NO_SPACE',
+  'APK_INSTALL_RESTRICTED',
+  'APK_INSTALL_REJECTED',
+  'APK_INSTALL_DEVICE_UNAVAILABLE',
+  'APK_INSTALL_TIMEOUT',
+  'APK_INSTALL_UNCONFIRMED',
+] as const;
+export type ApkInstallFailureCode = (typeof APK_INSTALL_FAILURE_CODES)[number];
+export const APK_INSTALL_DIAGNOSTIC_PREFIX = 'APK 安装诊断：';
+export function apkInstallDiagnosticCode(message: unknown) {
+  return APK_INSTALL_FAILURE_CODES.find((code) => message === APK_INSTALL_DIAGNOSTIC_PREFIX + code);
+}

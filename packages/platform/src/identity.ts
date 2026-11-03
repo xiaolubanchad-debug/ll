@@ -1,4 +1,4 @@
-import type { TestConfiguration } from '@apk/contracts';
+import type { ApkMetadata, TestConfiguration } from '@apk/contracts';
 import {
   IDENTITY_MODELS,
   executionCapacitySupported,
@@ -90,4 +90,20 @@ export function readyDeviceAbis(health: unknown): Record<string, string[]> {
   } catch {
     return {};
   }
+}
+
+export function preferFileAssetVariants(
+  variants: string[],
+  abiCatalog: Record<string, string[]>,
+  assets: readonly { apk: Pick<ApkMetadata, 'validationPolicy' | 'abis'> }[],
+) {
+  if (
+    !assets.length ||
+    assets.some(({ apk }) => apk.validationPolicy !== 'FILE_NAME' || apk.abis.length)
+  )
+    return variants;
+  const wide = variants.filter(
+    (id) => abiCatalog[id]?.includes('arm64-v8a') && abiCatalog[id]?.includes('x86_64'),
+  );
+  return wide.length >= 2 ? wide : variants;
 }

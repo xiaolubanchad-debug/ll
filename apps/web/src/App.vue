@@ -159,10 +159,6 @@ function syncMode() {
     if (executionMode.value === 'FULL')
       value.execution.appOpen ??= { dwellMs: 10000, concurrency: 1 };
     else delete value.execution.appOpen;
-    if (executionMode.value === 'DOWNLOAD_ONLY') {
-      delete value.execution.proxySecretVersionId;
-      delete value.execution.autoRegistration;
-    }
     draftText.value = JSON.stringify(value, null, 2);
   } catch {
     error.value = '请先修正高级设置中的 JSON 格式';
@@ -354,7 +350,7 @@ onMounted(async () => {
       </details>
       <div class="sidebar-bottom">
         <span class="status-dot"></span> 执行记录统一管理
-        <p>1.22.1 · 任务恢复与定位检查</p>
+        <p>1.23 · 网页代理与任务恢复</p>
       </div>
     </aside>
     <div class="main-area">
@@ -385,7 +381,7 @@ onMounted(async () => {
               }}
             </p>
           </div>
-          <span class="phase-tag">1.22.1 管理控制台</span>
+          <span class="phase-tag">1.23 管理控制台</span>
         </div>
         <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon />
         <el-alert v-if="notice" :title="notice" type="success" :closable="false" show-icon />
@@ -402,7 +398,8 @@ onMounted(async () => {
           <h2>任务方案设置</h2>
           <p class="muted">维护可复用的配置版本。日常执行请在服务器列表操作。</p>
           <p class="muted">
-            网页与落地页使用 Android 手机模式。APP 通过代理打开，前台停留 10 秒后关闭并清理。
+            目标网站、落地页和 APK 下载使用所选代理。网页采用 Android 手机模式，APP 前台停留 10
+            秒后清理。
           </p>
           <label for="scheme-mode">执行模式</label
           ><select id="scheme-mode" v-model="executionMode" @change="syncMode">

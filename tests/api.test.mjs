@@ -305,6 +305,30 @@ test('P0 real PostgreSQL acceptance', async (t) => {
         ).status,
         429,
       );
+      for (let i = 0; i < 7; i++)
+        assert.equal(
+          (
+            await call('/auth/login', {
+              method: 'POST',
+              body: { username: `quota${i}`, password: 'wrong' },
+              token: null,
+            })
+          ).status,
+          401,
+        );
+      const bucketCount = await db.loginBucket.count();
+      for (const username of ['blockedone', 'blockedtwo'])
+        assert.equal(
+          (
+            await call('/auth/login', {
+              method: 'POST',
+              body: { username, password: 'wrong' },
+              token: null,
+            })
+          ).status,
+          429,
+        );
+      assert.equal(await db.loginBucket.count(), bucketCount);
       delete process.env.LOGIN_MAX_ATTEMPTS;
       await db.loginBucket.deleteMany();
     });

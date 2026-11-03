@@ -22,7 +22,12 @@ import {
 } from '@apk/automation';
 import type { DownloadOptions, RegistrationHooks, ProxyCredential } from '@apk/automation';
 import { openAgentStore, lockAgent } from './store.js';
-import type { AgentStore, Delivery } from './store.js';
+import type { AgentStore, Delivery, LocalDelivery } from './store.js';
+export class HubRequestError extends Error {
+  constructor(readonly status: number) {
+    super(status === 401 || status === 410 ? 'IDENTITY_REJECTED' : 'HUB_REQUEST_FAILED');
+  }
+}
 export type Hub = (
   path: string,
   body: unknown,
@@ -43,6 +48,7 @@ export class TaskEngine {
   private closed = false;
   private recoveryBlocked = false;
   private pendingFlush: Promise<void> = Promise.resolve();
+  private readonly retryDelivery = new Map<string, { delay: number; after: number }>();
   private constructor(
     readonly store: AgentStore,
     private readonly unlock: () => Promise<void>,
@@ -232,6 +238,22 @@ export class TaskEngine {
       this.abort?.abort();
     }
   }
+  private async syncDelivery(row: LocalDelivery) {
+    try {
+      await this.flush(row.payload);
+    } catch (error) {
+      // A rejected event must not prevent reporting independently verified resource cleanup.
+      if (
+        row.reconcilePending &&
+        error instanceof HubRequestError &&
+        [400, 404, 409, 413, 422].includes(error.status)
+      )
+        await this.reconcile(row);
+      throw error;
+    }
+    if (row.reconcilePending) await this.reconcile(row);
+    if (row.status === 'COMPLETED') this.store.status(row.id, 'DONE', true);
+  }
   async tick() {
     if (this.closed || this.recoveryBlocked) return;
     if (this.current && Date.now() >= this.lease) {
@@ -244,8 +266,15 @@ export class TaskEngine {
       for (const row of this.store
         .deliveries()
         .filter((r) => ['DONE', 'COMPLETED', 'REVIEW'].includes(r.status))) {
-        await this.flush(row.payload);
-        if (row.status === 'COMPLETED') this.store.status(row.id, 'DONE', true);
+        const retry = this.retryDelivery.get(row.id);
+        if (retry && retry.after > Date.now()) continue;
+        try {
+          await this.syncDelivery(row);
+          this.retryDelivery.delete(row.id);
+        } catch {
+          const delay = Math.min(retry ? retry.delay * 2 : 1000, 30000);
+          this.retryDelivery.set(row.id, { delay, after: Date.now() + delay });
+        }
       }
       const response = await this.hub('claims', {
         kind: 'claim',
@@ -263,25 +292,7 @@ export class TaskEngine {
       this.control = 'CONTINUE';
       this.abort = new AbortController();
       this.running = this.execute(delivery, this.abort.signal)
-        .catch(async () => {
-          this.store.status(delivery.deliveryId, 'REVIEW');
-          const row = this.store.deliveries().find((r) => r.id === delivery.deliveryId)!;
-          await this.hub('reconcile', {
-            reason: 'EXECUTION_ERROR',
-            protocolVersion: '1.0',
-            nodeId: this.nodeId,
-            bootId: this.bootId,
-            deliveries: [
-              {
-                deliveryId: delivery.deliveryId,
-                fence: delivery.fence,
-                cleanupComplete: row.clean,
-                submissions: this.store.submissions(delivery.deliveryId),
-              },
-            ],
-            cleanupComplete: row.clean,
-          }).catch(() => {});
-        })
+        .catch(() => this.reportCleanup(delivery))
         .finally(() => {
           this.running = null;
           this.current = null;
@@ -346,35 +357,23 @@ export class TaskEngine {
       !plan.openPolicy
     )
       throw Error('OPEN_POLICY_INVALID');
-    let proxy: ProxyCredential | undefined;
+    const versions = snapshot.secretVersions;
     if (
-      plan?.purpose === 'PROXY_CHECK' ||
-      plan?.purpose === 'REGISTER' ||
-      (!plan && config.execution.mode === 'FULL')
-    ) {
-      const versions = snapshot.secretVersions;
-      if (
-        (!this.options.sdkRoot && plan?.purpose !== 'PROXY_CHECK') ||
-        !Array.isArray(versions) ||
-        versions.length !== 1
-      )
-        throw Error('PROXY_CONFIG_INVALID');
-      const secret = versions[0] as {
-        id?: unknown;
-        type?: unknown;
-        secretValue?: unknown;
-      };
-      if (
-        secret.id !== (plan?.proxySecretVersionId ?? config.execution.proxySecretVersionId) ||
-        secret.type !== 'HTTP_PROXY' ||
-        schemaIssues('SecretInput', {
-          type: 'HTTP_PROXY',
-          secretValue: secret.secretValue,
-        }).length
-      )
-        throw Error('PROXY_CONFIG_INVALID');
-      proxy = secret.secretValue as ProxyCredential;
-    }
+      (!this.options.sdkRoot &&
+        (plan?.purpose === 'REGISTER' || (!plan && config.execution.mode === 'FULL'))) ||
+      !Array.isArray(versions) ||
+      versions.length !== 1
+    )
+      throw Error('PROXY_CONFIG_INVALID');
+    const secret = versions[0] as { id?: unknown; type?: unknown; secretValue?: unknown } | null;
+    if (
+      !secret ||
+      secret.id !== (plan?.proxySecretVersionId ?? config.execution.proxySecretVersionId) ||
+      secret.type !== 'HTTP_PROXY' ||
+      schemaIssues('SecretInput', { type: 'HTTP_PROXY', secretValue: secret.secretValue }).length
+    )
+      throw Error('PROXY_CONFIG_INVALID');
+    const proxy = secret.secretValue as ProxyCredential;
     this.store.status(d.deliveryId, 'RUNNING');
     this.store.append(d, {
       type: 'RUN_STARTED',
@@ -447,7 +446,7 @@ export class TaskEngine {
                       sdkRoot: this.options.sdkRoot!,
                       toolsRoot: this.toolsRoot,
                       root: join(this.store.root, 'android'),
-                      proxy: proxy!,
+                      proxy,
                       policy: this.options.policy,
                       proxyCheckUrl: this.options.proxyCheckUrl,
                       beginAttempt: beginAttempt
@@ -524,7 +523,7 @@ export class TaskEngine {
                       sdkRoot: this.options.sdkRoot!,
                       toolsRoot: this.toolsRoot,
                       root: join(this.store.root, 'android'),
-                      proxy: proxy!,
+                      proxy,
                       policy: this.options.policy,
                       proxyCheckUrl: this.options.proxyCheckUrl,
                       androidFactory: this.options.androidFactory,
@@ -584,7 +583,7 @@ export class TaskEngine {
         );
       else if (plan?.purpose === 'PROXY_CHECK') {
         beforeAction();
-        await runProxyCheck(proxy!, signal, emit, this.options.policy, this.options.proxyCheckUrl);
+        await runProxyCheck(proxy, signal, emit, this.options.policy, this.options.proxyCheckUrl);
       } else
         await runDownload(
           plan
@@ -600,6 +599,7 @@ export class TaskEngine {
           emit,
           {
             ...runOptions,
+            webProxy: proxy,
             ...(plan ? { dailyDownload: true, fixedCacheDay: plan.cacheDay } : {}),
           },
         );
@@ -607,7 +607,7 @@ export class TaskEngine {
         this.store.status(d.deliveryId, 'REVIEW');
         await this.flush(d).catch(() => {});
         for (const id of failedDeviceCleanups) await closeDeviceSession(id, true);
-        await this.reconcile(d);
+        await this.reportCleanup(d);
         return;
       }
       if (signal.aborted && this.control === 'STOP') throw new RegistrationError('CANCELLED');
@@ -623,44 +623,33 @@ export class TaskEngine {
         });
         await this.flush(d);
         this.store.status(d.deliveryId, row.clean ? 'DONE' : 'REVIEW', row.clean);
-      } else {
-        this.store.status(d.deliveryId, 'REVIEW', row.clean);
-        await this.hub('reconcile', {
-          reason: 'EXECUTION_ERROR',
-          protocolVersion: '1.0',
-          nodeId: this.nodeId,
-          bootId: this.bootId,
-          deliveries: [
-            {
-              deliveryId: d.deliveryId,
-              fence: d.fence,
-              cleanupComplete: row.clean,
-              submissions: this.store.submissions(d.deliveryId),
-            },
-          ],
-          cleanupComplete: row.clean,
-        }).catch(() => {});
-        throw error;
-      }
+        if (!row.clean) await this.reportCleanup(d);
+      } else throw error;
     }
   }
-  private async reconcile(d: Delivery) {
+  private async reportCleanup(d: Delivery) {
+    this.store.queueReconcile(d.deliveryId);
     const row = this.store.deliveries().find((r) => r.id === d.deliveryId)!;
-    await this.hub('reconcile', {
-      reason: this.control === 'STOP' ? 'STOP_RECOVERY' : 'EXECUTION_ERROR',
+    await this.syncDelivery(row).catch(() => {});
+  }
+  private async reconcile(row: LocalDelivery) {
+    const result = await this.hub('reconcile', {
+      reason: 'EXECUTION_ERROR',
       protocolVersion: '1.0',
       nodeId: this.nodeId,
       bootId: this.bootId,
       deliveries: [
         {
-          deliveryId: d.deliveryId,
-          fence: d.fence,
+          deliveryId: row.id,
+          fence: row.payload.fence,
           cleanupComplete: row.clean,
-          submissions: this.store.submissions(d.deliveryId),
+          submissions: this.store.submissions(row.id),
         },
       ],
       cleanupComplete: row.clean,
-    }).catch(() => {});
+    });
+    if (result.reconciled !== true) throw Error('HUB_RESPONSE_INVALID');
+    this.store.acknowledgeReconcile(row.id);
   }
   async close() {
     this.closed = true;

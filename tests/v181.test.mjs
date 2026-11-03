@@ -6,6 +6,7 @@ import { PrismaClient } from '@prisma/client';
 import { initializeAdmin } from '../apps/control-api/dist/admin.js';
 import {
   createRun,
+  createSecret,
   digest,
   saveTaskPlan,
   taskPlanDetail,
@@ -33,7 +34,7 @@ test('1.8.1 explicit download retry preserves history, receipts and daily reuse'
         id: key(),
         sha256: digest(key()),
         artifactName: 'agent-' + digest(key()) + '.tgz',
-        manifest: { agentVersion: '0.6.0', features: ['DOWNLOAD_V1', 'DAILY_V1'] },
+        manifest: { agentVersion: '0.17.3', features: ['DOWNLOAD_V1', 'DAILY_V1'] },
       },
     });
     node = await db.node.create({
@@ -41,7 +42,7 @@ test('1.8.1 explicit download retry preserves history, receipts and daily reuse'
         name: '1.8.1 owned retry',
         host: '192.0.2.182',
         lastSeenAt: now,
-        agentVersion: '0.6.1',
+        agentVersion: '0.17.3',
         agentReleaseId: release.id,
         deploymentStatus: 'INSTALLED',
         downloadProtocol: '1.0',
@@ -54,7 +55,21 @@ test('1.8.1 explicit download retry preserves history, receipts and daily reuse'
     input.name = '1.8.1 retry';
     input.configuration.execution.mode = 'DOWNLOAD_ONLY';
     delete input.configuration.execution.autoRegistration;
-    delete input.configuration.execution.proxySecretVersionId;
+    const proxy = await createSecret(
+      db,
+      {
+        type: 'HTTP_PROXY',
+        secretValue: {
+          host: 'proxy.example.test',
+          port: 8080,
+          username: 'fixture',
+          password: 'FixtureWebProxy',
+        },
+      },
+      admin.id,
+      'v181',
+    );
+    input.configuration.execution.proxySecretVersionId = proxy.id;
     const task = await saveTaskPlan(db, input, admin.id, 'v181', key());
     const runInput = {
       nodeId: node.id,

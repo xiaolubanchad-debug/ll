@@ -45,7 +45,20 @@ for (const customUa of [
         sockets = new Set(),
         seen = [],
         counts = new Map();
+      const proxyCredentials = {
+        host: '127.0.0.1',
+        port: 0,
+        username: 'owned',
+        password: 'fixture-pass',
+      };
+      const proxyAuth = 'Basic ' + Buffer.from('owned:fixture-pass').toString('base64');
+      let directRequests = 0;
       const server = createServer((req, res) => {
+        if (!req.url.startsWith('http://')) directRequests++;
+        if (req.headers['proxy-authorization'] !== proxyAuth) {
+          res.writeHead(407).end();
+          return;
+        }
         const url = new URL(req.url, 'http://localhost');
         counts.set(url.pathname, (counts.get(url.pathname) ?? 0) + 1);
         for (const key of ['source', 'landing']) {
@@ -70,17 +83,30 @@ for (const customUa of [
           return;
         }
         res.setHeader('content-type', 'text/html; charset=utf-8');
+        if (url.pathname === '/unverified') {
+          res.end(
+            html(
+              '<a class="icon" href="/unexpected.apk">APK</a><script>Object.defineProperty(navigator,"userAgent",{value:"Desktop fixture"})</script>',
+            ),
+          );
+          return;
+        }
         if (url.pathname === '/source') {
           res.end(
             html(
-              routes
-                .map((route) => {
-                  const target = route === 'direct' ? '/direct.apk' : '/' + route;
-                  return `<a class="icon" pid="${route}" href="${target}" data-popup="${route.endsWith('popup')}">${route}</a>`;
-                })
-                .join('') +
+              '<template id="icons">' +
+                '<a class="icon" href="tel:123">Telephone</a>' +
+                routes
+                  .map((route) => {
+                    const target = route === 'direct' ? '/direct.apk' : '/' + route;
+                    return `<a class="icon" pid="${route}" href="${target}" data-popup="${route.endsWith('popup')}">${route}</a>`;
+                  })
+                  .join('') +
+                '</template>' +
                 `<script>${mobileState}
-          for (const icon of document.querySelectorAll('.icon')) {
+          setTimeout(() => {
+          document.body.append(document.querySelector('#icons').content.cloneNode(true));
+          for (const icon of document.querySelectorAll('.icon[data-popup]')) {
             icon.addEventListener('click', e => e.preventDefault());
             icon.addEventListener('touchend', async e => {
               e.preventDefault();
@@ -90,6 +116,7 @@ for (const customUa of [
               else location.assign(next.href);
             });
           }
+          }, 350);
         </script>`,
             ),
           );
@@ -133,6 +160,7 @@ for (const customUa of [
         await rm(root, { recursive: true, force: true });
       });
       const origin = 'http://127.0.0.1:' + server.address().port;
+      proxyCredentials.port = server.address().port;
       const config = JSON.parse(await readFile('contracts/fixtures/config.valid.json', 'utf8'));
       config.source = {
         url: origin + '/source',
@@ -157,7 +185,7 @@ for (const customUa of [
         async (event) => {
           events.push(event);
         },
-        { chromium, policy: new NetworkPolicy(new Set([origin])) },
+        { chromium, policy: new NetworkPolicy(new Set([origin])), webProxy: proxyCredentials },
       );
       const tasks = events.filter((e) => e.type === 'TASK_FINISHED');
       assert.equal(tasks.length, routes.length);
@@ -171,6 +199,7 @@ for (const customUa of [
         'one source touch per icon',
       );
       assert.equal(seen.filter((e) => e.key === 'landing').length, routes.length - 1);
+      assert.equal(directRequests, 0);
       for (const route of routes) assert.equal(counts.get('/' + route + '.apk'), 1, route);
       for (const evidence of seen) {
         assert.equal(evidence.width, 412);
@@ -196,6 +225,33 @@ for (const customUa of [
       }
       assert.deepEqual(await readdir(join(root, 'jobs')), [], 'owned browser profile cleaned');
       assert.deepEqual(warnings, [], 'keep-alive sockets register ownership cleanup once');
+      if (!customUa) {
+        const runFailure = async (path, webProxy) => {
+          const results = [];
+          await runDownload(
+            { ...config, source: { ...config.source, url: origin + path } },
+            randomUUID(),
+            root,
+            resolve('.'),
+            AbortSignal.timeout(15000),
+            async (event) => results.push(event),
+            { chromium, policy: new NetworkPolicy(new Set([origin])), webProxy },
+          );
+          return results.at(-1).payload.errorCode;
+        };
+        assert.equal(
+          await runFailure('/unverified', proxyCredentials),
+          'BROWSER_ENVIRONMENT_INVALID',
+        );
+        assert.equal(counts.get('/unexpected.apk'), undefined);
+        const sourceRequests = counts.get('/source');
+        assert.equal(
+          await runFailure('/source', { ...proxyCredentials, password: 'wrong' }),
+          'PROXY_AUTH_FAILED',
+        );
+        assert.equal(counts.get('/source'), sourceRequests);
+        assert.equal(directRequests, 0);
+      }
     },
   );
 }

@@ -1,4 +1,9 @@
-import { deviceAssignments, sourceCheckXPath, sourceElementXPath } from '@apk/contracts';
+import {
+  deviceAssignments,
+  sourceCheckXPath,
+  sourceElementXPath,
+  apkInstallDiagnosticCode,
+} from '@apk/contracts';
 import { Prisma } from '@prisma/client';
 import type { PrismaClient } from '@prisma/client';
 import type {
@@ -759,6 +764,7 @@ function title(type: string, p: Record<string, unknown>) {
     );
   if (type === 'LOG') {
     const message = String(p.message);
+    if (apkInstallDiagnosticCode(message)) return 'APK 安装诊断';
     return [
       '下载入口：准备操作网站图标',
       '下载入口：准备操作下载控件',
@@ -976,7 +982,12 @@ export async function runTimeline(
         !appOpenTimingsIssues(p.openTimings).length
           ? { openTimings: p.openTimings as AppOpenTimings }
           : {}),
-        errorCode: typeof p.errorCode === 'string' ? p.errorCode : null,
+        errorCode:
+          typeof p.errorCode === 'string'
+            ? p.errorCode
+            : b.type === 'LOG'
+              ? (apkInstallDiagnosticCode(p.message) ?? null)
+              : null,
         recordedForReview: r.recordedForReview,
         applied: !r.recordedForReview && r.sequence <= d.appliedThroughSequence,
       };

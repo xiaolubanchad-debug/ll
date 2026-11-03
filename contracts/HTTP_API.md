@@ -1,5 +1,7 @@
 # HTTP 接口契约
 
+1.23 的网页下载也通过节点私有 `secretVersions` 下发已绑定的 HTTP 代理，错误与回执规则见 [网页代理与故障恢复契约](../docs/V123_WEB_PROXY_AND_RECOVERY_CONTRACT.md)。
+
 1.22 任务继续时的版本选择、等待原因及已停止记录展示遵循 [恢复契约](../docs/V122_TASK_RESUME_CONTRACT.md)。
 
 1.21 人工元素检查配置、定位记录和中台提醒遵循 [检查契约](../docs/V121_XPATH_OBSERVATION_CONTRACT.md)，对应 Agent 0.17.0。
@@ -68,7 +70,7 @@
 
 Agent 0.4.1 的 [移动端屏幕增量 1.4.1](../docs/MOBILE_SCREEN_CONTRACT.md) 不改变本接口版本：browserUserAgent 为空时使用固定 Android 手机浏览器默认值；非空时仅覆盖网页 UA，所有网页仍使用手机屏幕及触屏。
 
-P0 提供登录和校验基础，P1 提供服务器及部署，P2 提供配置版本、下载批次、领取、配置下发、事件和重启核验，见 [P2 契约](../docs/P2_CONTRACT.md)。P3 增加账户加密上传、脱敏 PNG、账户查看审计及人工决议，见 [P3 契约](../docs/P3_CONTRACT.md)。配置与批次的创建、保存、停止和人工核验都要求幂等键，保存版本另需 If-Match。下载模式不下发代理口令。列表查询以机器清单及 Controller 为准，执行事件使用分页轮询，SSE 尚未实现。
+P0 提供登录和校验基础，P1 提供服务器及部署，P2 提供配置版本、下载批次、领取、配置下发、事件和重启核验，见 [P2 契约](../docs/P2_CONTRACT.md)。P3 增加账户加密上传、脱敏 PNG、账户查看审计及人工决议，见 [P3 契约](../docs/P3_CONTRACT.md)。配置与批次的创建、保存、停止和人工核验都要求幂等键，保存版本另需 If-Match。列表查询以机器清单及 Controller 为准，执行事件使用分页轮询，SSE 尚未实现。
 
 节点平台新增接受 Ubuntu 26.04，与 24.04 共用检查和错误码；见 [兼容契约](../docs/UBUNTU_COMPATIBILITY.md)。新签名发布使用 Agent 0.3.1 / Playwright 1.64.1，不改变路由或数据库结构。
 

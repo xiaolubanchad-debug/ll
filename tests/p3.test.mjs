@@ -463,7 +463,7 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
       {
         nodeId: node.id,
         releaseId: release.id,
-        agentVersion: '0.15.1',
+        agentVersion: '0.17.3',
         apiUrl: base,
         sdkRoot: '/fixture',
         toolsRoot: resolve('.'),
@@ -523,8 +523,8 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
     const proxy = await req('/secrets/versions', 'POST', {
       type: 'HTTP_PROXY',
       secretValue: {
-        host: 'proxy.example.test',
-        port: 8080,
+        host: '127.0.0.1',
+        port: Number(new URL(site.url).port),
         username: 'fixture-user',
         password: 'fixture-pass',
       },
@@ -567,7 +567,7 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
         artifactName: 'agent-' + randomBytes(32).toString('hex') + '.tgz',
         sha256: randomBytes(32).toString('hex'),
         manifest: {
-          agentVersion: '0.15.1',
+          agentVersion: '0.17.3',
           features: [
             'DOWNLOAD_V1',
             'REGISTRATION_V1',
@@ -586,7 +586,7 @@ test('P3 complete runs with PostgreSQL, SQLite, real Chromium and a fault-inject
         host: 'p3.example.test',
         deploymentStatus: 'INSTALLED',
         agentReleaseId: release.id,
-        agentVersion: '0.15.1',
+        agentVersion: '0.17.3',
         downloadProtocol: '1.0',
         health: report,
         lastSeenAt: new Date(),

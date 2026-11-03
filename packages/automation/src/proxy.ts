@@ -3,6 +3,7 @@ import { connect as tlsConnect } from 'node:tls';
 import { isIP } from 'node:net';
 import type { Socket } from 'node:net';
 import { NetworkPolicy } from './network.js';
+import { DownloadError } from './common.js';
 import type { ProxyCredential } from './registration-types.js';
 import { RegistrationError } from './registration-types.js';
 const authority = (host: string, port: number) =>
@@ -26,16 +27,24 @@ export async function startProxyBridge(
   credential: ProxyCredential,
   policy = new NetworkPolicy(),
   connectTimeoutMs = 10000,
+  download?: { maxBytes: number; timeoutMs: number },
 ) {
   if (!Number.isInteger(connectTimeoutMs) || connectTimeoutMs < 100 || connectTimeoutMs > 10000)
     throw new RegistrationError('PROXY_CONNECT_FAILED');
-  const upstream = await policy.endpoint('http://' + authority(credential.host, credential.port));
+  const upstream = await policy
+    .endpoint('http://' + authority(credential.host, credential.port))
+    .catch((error: unknown) => {
+      if (error instanceof DownloadError) throw error;
+      throw new RegistrationError('PROXY_CONNECT_FAILED');
+    });
   const authorization =
     'Basic ' + Buffer.from(credential.username + ':' + credential.password).toString('base64');
   const sockets = new Set<Socket>();
   let closed = false,
     generation = 0;
   let failure: string | undefined;
+  let blocked = false;
+  const maxBytes = download?.maxBytes ?? 67108864;
   const failedConnect = (error: NodeJS.ErrnoException) => {
     if (['ECONNREFUSED', 'ENETUNREACH', 'EHOSTUNREACH', 'ETIMEDOUT'].includes(error.code ?? ''))
       failure ??= 'PROXY_CONNECT_FAILED';
@@ -78,11 +87,21 @@ export async function startProxyBridge(
             res.writeHead(502).end();
             return;
           }
+          if (download && Number(response.headers['content-length'] ?? 0) > maxBytes) {
+            failure = 'APK_TOO_LARGE';
+            response.destroy();
+            res.writeHead(413).end();
+            return;
+          }
           res.writeHead(response.statusCode ?? 502, cleanHeaders(response.headers));
           let bytes = 0;
           response.on('data', (b: Buffer) => {
             bytes += b.length;
-            if (bytes > 67108864) response.destroy();
+            if (bytes > maxBytes) {
+              if (download) failure = 'APK_TOO_LARGE';
+              response.destroy();
+              res.destroy();
+            }
           });
           response.on('error', () => res.destroy());
           response.pipe(res);
@@ -94,11 +113,15 @@ export async function startProxyBridge(
         if (!res.headersSent) res.writeHead(502);
         res.end();
       });
-      remote.setTimeout(15000, () => remote.destroy());
+      remote.setTimeout(download?.timeoutMs ?? 15000, () => {
+        if (download) failure ??= 'PROXY_CONNECT_FAILED';
+        remote.destroy();
+      });
       req.on('aborted', () => remote.destroy());
       res.on('close', () => remote.destroy());
       req.pipe(remote);
     })().catch(() => {
+      blocked = true;
       if (!res.headersSent) res.writeHead(403);
       res.end();
     });
@@ -122,10 +145,10 @@ export async function startProxyBridge(
       });
       // Bound the whole CONNECT handshake, including a provider waiting for a residential peer.
       // This target timeout must not masquerade as authentication or TCP connection failure.
-      const deadline = setTimeout(
-        () => remote.destroy(Error('PROXY_TUNNEL_TIMEOUT')),
-        connectTimeoutMs,
-      );
+      const deadline = setTimeout(() => {
+        if (download) failure ??= 'PROXY_CONNECT_FAILED';
+        remote.destroy(Error('PROXY_TUNNEL_TIMEOUT'));
+      }, connectTimeoutMs);
       remote.once('close', () => clearTimeout(deadline));
       client.once('close', () => remote.destroy());
       remote.on('socket', track);
@@ -133,6 +156,7 @@ export async function startProxyBridge(
         clearTimeout(deadline);
         if (response.statusCode !== 200) {
           if (response.statusCode === 407) failure = 'PROXY_AUTH_FAILED';
+          else if (download) failure ??= 'PROXY_CONNECT_FAILED';
           socket.destroy();
           client.end('HTTP/1.1 502 Bad Gateway\r\n\r\n');
           return;
@@ -149,7 +173,8 @@ export async function startProxyBridge(
         let bytes = 0;
         socket.on('data', (b: Buffer) => {
           bytes += b.length;
-          if (bytes > 67108864) socket.destroy();
+          // Browser downloads have their own per-file limit. A CONNECT tunnel may carry many files.
+          if (!download && bytes > maxBytes) socket.destroy();
         });
         socket.on('error', () => client.destroy());
         client.on('error', () => socket.destroy());
@@ -163,7 +188,10 @@ export async function startProxyBridge(
         client.end('HTTP/1.1 502 Bad Gateway\r\n\r\n');
       });
       remote.end();
-    })().catch(() => client.end('HTTP/1.1 403 Forbidden\r\n\r\n'));
+    })().catch(() => {
+      blocked = true;
+      client.end('HTTP/1.1 403 Forbidden\r\n\r\n');
+    });
   });
   await new Promise<void>((ok, no) => {
     server.once('error', no);
@@ -172,6 +200,12 @@ export async function startProxyBridge(
   const port = (server.address() as { port: number }).port;
   return {
     port,
+    wasBlocked: () => blocked,
+    failureCode: () => failure,
+    resetDiagnostics() {
+      failure = undefined;
+      blocked = false;
+    },
     assertHealthy() {
       if (failure) throw new RegistrationError(failure);
     },

@@ -14,6 +14,7 @@ import {
   allocateIdentityModels,
   readyDeviceVariants,
   readyDeviceAbis,
+  preferFileAssetVariants,
 } from './identity.js';
 import type { Prisma, ConfigVersion } from '@prisma/client';
 import type { DailyExecutionPlan, RunInput, TestConfiguration } from '@apk/contracts';
@@ -309,8 +310,11 @@ export async function prepareDailyPlan(
     const node = await tx.node.findUniqueOrThrow({
       where: { id: input.nodeId },
     });
-    const variants = readyDeviceVariants(node.health);
+    const readyVariants = readyDeviceVariants(node.health);
     const abiCatalog = readyDeviceAbis(node.health);
+    const variants = config.execution.appOpen?.randomDeviceProfile
+      ? preferFileAssetVariants(readyVariants, abiCatalog, plan.assets)
+      : readyVariants;
     if (config.execution.appOpen?.randomDeviceProfile && variants.length < 2)
       fault('IDENTITY_POOL_EXHAUSTED', '缺少已验证型号档案', 422);
     const sessions: NonNullable<NonNullable<DailyExecutionPlan['openPolicy']>['sessions']> = [];

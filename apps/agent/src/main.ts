@@ -3,7 +3,7 @@ import { readFile, mkdir, writeFile, rename, chmod } from 'node:fs/promises';
 import { randomBytes, randomUUID, createCipheriv, createDecipheriv } from 'node:crypto';
 import { join, resolve } from 'node:path';
 import { collectHealth } from './health.js';
-import { TaskEngine } from './tasks.js';
+import { HubRequestError, TaskEngine } from './tasks.js';
 import type { ExecutionOptions } from './tasks.js';
 interface Config {
   nodeId: string;
@@ -82,12 +82,7 @@ export async function callHub(
     body: JSON.stringify(body),
   });
   if (response.status === 204) return {};
-  if (!response.ok)
-    throw Error(
-      response.status === 401 || response.status === 410
-        ? 'IDENTITY_REJECTED'
-        : 'HUB_REQUEST_FAILED',
-    );
+  if (!response.ok) throw new HubRequestError(response.status);
   const limit = /^deliveries\/[a-f0-9-]{36}\/config$/.test(path) ? 8 * 1024 * 1024 : 1024 * 1024;
   const chunks: Uint8Array[] = [];
   let size = 0;

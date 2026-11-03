@@ -112,9 +112,14 @@ export async function androidBrowser(
   context.on('page', (page) => {
     void prepare(page).catch(() => {});
   });
-  const confirm = async (page: Page, role: 'SOURCE' | 'LANDING', taskId?: string) => {
+  const confirm = async (
+    page: Page,
+    role: 'SOURCE' | 'LANDING',
+    taskId?: string,
+    fresh = false,
+  ) => {
     await prepare(page);
-    if (confirmed.get(page) === page.url()) return;
+    if (!fresh && confirmed.get(page) === page.url()) return;
     if (!/^https?:/.test(page.url())) return;
     const actual = await page.evaluate(async () => {
       const hints = (

@@ -88,25 +88,16 @@ async function saveProxy() {
 function applyProxy() {
   void action(async () => {
     const body = JSON.parse(props.draftText);
-    if (!proxyId.value) {
-      body.execution.mode = 'DOWNLOAD_ONLY';
-      delete body.execution.proxySecretVersionId;
-      delete body.execution.autoRegistration;
-      delete body.execution.appOpen;
-      body.registrationFlows = [];
-      emit('load', JSON.stringify(body, null, 2));
-      notice.value = '已移除代理，草稿切换为仅下载模式。';
-      return;
-    }
+    if (!proxyId.value) throw Error('请选择用于网页下载的代理');
     if (legacy.value) throw Error('请先明确转换历史流程，再修改代理');
-    body.execution.mode = 'FULL';
-    body.execution.appOpen ??= { dwellMs: 10000, concurrency: 1 };
+    if (body.execution.mode === 'FULL')
+      body.execution.appOpen ??= { dwellMs: 10000, concurrency: 1 };
     body.execution.contentIsolation = true;
     delete body.execution.autoRegistration;
     body.registrationFlows = [];
     body.execution.proxySecretVersionId = proxyId.value;
     emit('load', JSON.stringify(body, null, 2));
-    notice.value = '已将代理应用到 APP 打开测试草稿。保存新版本后生效。';
+    notice.value = '已将网页与 APP 网络代理应用到草稿。保存新版本后生效。';
   });
 }
 async function action(work: () => Promise<void>) {
@@ -218,7 +209,7 @@ watch(
       type="success"
       :closable="false"
     />
-    <label for="scheme-proxy">APP 网络代理</label
+    <label for="scheme-proxy">网页与 APP 网络代理</label
     ><select id="scheme-proxy" v-model="proxyId" @change="applyProxy">
       <option value="">请选择已保存代理</option>
       <option v-for="p in proxies" :key="p.id" :value="p.id">

@@ -23,6 +23,7 @@ export interface LocalDelivery {
   android: AndroidRecord | null;
   androidSlots: { slot: string; record: AndroidRecord }[];
   clean: boolean;
+  reconcilePending: boolean;
 }
 export class AgentStore {
   readonly db: DatabaseSync;
@@ -34,13 +35,13 @@ export class AgentStore {
     this.db.exec(
       'PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; CREATE TABLE IF NOT EXISTS deliveries (id TEXT PRIMARY KEY,payload TEXT NOT NULL,status TEXT NOT NULL,browser TEXT,clean INTEGER NOT NULL DEFAULT 1); CREATE TABLE IF NOT EXISTS outbox (id TEXT PRIMARY KEY,delivery TEXT NOT NULL,seq INTEGER NOT NULL,body TEXT NOT NULL,sent INTEGER NOT NULL DEFAULT 0,UNIQUE(delivery,seq));',
     );
-    if (
-      !this.db
-        .prepare('PRAGMA table_info(deliveries)')
-        .all()
-        .some((r) => r.name === 'android')
-    )
+    const deliveryColumns = this.db.prepare('PRAGMA table_info(deliveries)').all();
+    if (!deliveryColumns.some((r) => r.name === 'android'))
       this.db.exec('ALTER TABLE deliveries ADD COLUMN android TEXT');
+    if (!deliveryColumns.some((r) => r.name === 'reconcile_pending'))
+      this.db.exec(
+        'ALTER TABLE deliveries ADD COLUMN reconcile_pending INTEGER NOT NULL DEFAULT 0',
+      );
     this.db.exec(
       'CREATE TABLE IF NOT EXISTS accounts(task TEXT PRIMARY KEY,delivery TEXT NOT NULL,ref TEXT NOT NULL UNIQUE,sealed BLOB NOT NULL,sent INTEGER NOT NULL DEFAULT 0); CREATE TABLE IF NOT EXISTS submissions(task TEXT PRIMARY KEY,delivery TEXT NOT NULL,id TEXT NOT NULL UNIQUE,ref TEXT NOT NULL,outcome TEXT); CREATE TABLE IF NOT EXISTS evidence(id TEXT PRIMARY KEY,delivery TEXT NOT NULL,task TEXT NOT NULL,sha TEXT NOT NULL,data TEXT NOT NULL,sent INTEGER NOT NULL DEFAULT 0);',
     );
@@ -124,7 +125,14 @@ export class AgentStore {
         android: r.android ? JSON.parse(String(r.android)) : null,
         androidSlots: this.androidSlots(String(r.id)),
         clean: !!r.clean,
+        reconcilePending: !!r.reconcile_pending,
       }));
+  }
+  queueReconcile(id: string) {
+    this.db.prepare("UPDATE deliveries SET status='REVIEW',reconcile_pending=1 WHERE id=?").run(id);
+  }
+  acknowledgeReconcile(id: string) {
+    this.db.prepare('UPDATE deliveries SET reconcile_pending=0 WHERE id=?').run(id);
   }
   add(d: Delivery) {
     this.db

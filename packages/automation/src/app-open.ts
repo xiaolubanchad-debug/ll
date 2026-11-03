@@ -1,4 +1,10 @@
-import { isOwnedTestPackage, deviceVariant, schemaIssues } from '@apk/contracts';
+import {
+  isOwnedTestPackage,
+  deviceVariant,
+  schemaIssues,
+  apkInstallDiagnosticCode,
+  APK_INSTALL_DIAGNOSTIC_PREFIX,
+} from '@apk/contracts';
 import { appObstructions } from './app-readiness.js';
 import { loadIdentityImage } from './identity-images.js';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -110,9 +116,15 @@ export async function openApk(
           : {}),
       },
     });
-    const installed = await timer.measure('APK_INSTALL', () =>
-      session!.install(file, apk.validationPolicy === 'FILE_NAME'),
-    );
+    const installed = await timer
+      .measure('APK_INSTALL', () => session!.install(file, apk.validationPolicy === 'FILE_NAME'))
+      .catch(async (error: unknown) => {
+        const message =
+          error instanceof RegistrationError ? APK_INSTALL_DIAGNOSTIC_PREFIX + error.code : '';
+        if (!signal.aborted && apkInstallDiagnosticCode(message))
+          await emit({ type: 'LOG', taskId: target.taskId, payload: { level: 'INFO', message } });
+        throw error;
+      });
     if (apk.validationPolicy === 'FILE_NAME')
       packageName = typeof installed === 'string' ? installed : undefined;
     if (!packageName) throw new RegistrationError('APP_PACKAGE_UNCONFIRMED');

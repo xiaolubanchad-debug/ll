@@ -10,7 +10,11 @@ import {
   deviceAssignments,
 } from '@apk/contracts';
 import { scheduleDeviceSessions } from '../packages/automation/dist/device-sessions.js';
-import { androidCommand, isAndroidInstallRejection } from '../packages/automation/dist/android.js';
+import {
+  androidCommand,
+  androidInstallFailure,
+  isAndroidInstallRejection,
+} from '../packages/automation/dist/android.js';
 
 async function fixture(n = 6) {
   const config = JSON.parse(
@@ -60,8 +64,10 @@ test('only a completed Android install rejection can confirm that the package in
       undefined,
       (output) => {
         rejected = isAndroidInstallRejection(output);
+        return androidInstallFailure(output);
       },
     ),
+    { code: 'APK_INSTALL_ANDROID_VERSION' },
   );
   assert.equal(rejected, true);
   assert.equal(isAndroidInstallRejection('adb: device offline'), false);
@@ -70,6 +76,48 @@ test('only a completed Android install rejection can confirm that the package in
     false,
   );
   assert.equal(isAndroidInstallRejection('Failure [INSTALL_FAILED_OLDER_SDK'), false);
+  assert.equal(androidInstallFailure('adb: device offline'), 'APK_INSTALL_DEVICE_UNAVAILABLE');
+  assert.equal(
+    androidInstallFailure('Failure [INSTALL_FAILED_NO_MATCHING_ABIS: private fixture]'),
+    'APK_INSTALL_ABI_MISMATCH',
+  );
+  assert.equal(
+    androidInstallFailure('Failure [INSTALL_FAILED_MISSING_SPLIT]'),
+    'APK_INSTALL_SPLIT_REQUIRED',
+  );
+  assert.equal(
+    androidInstallFailure('Failure [INSTALL_PARSE_FAILED_BAD_MANIFEST]'),
+    'APK_INSTALL_INVALID',
+  );
+  assert.equal(
+    androidInstallFailure('Failure [INSTALL_FAILED_UPDATE_INCOMPATIBLE]'),
+    'APK_INSTALL_SIGNATURE_CONFLICT',
+  );
+  assert.equal(
+    androidInstallFailure('Failure [INSTALL_FAILED_UNKNOWN_FIXTURE]'),
+    'APK_INSTALL_REJECTED',
+  );
+  assert.equal(androidInstallFailure('adb: fixture /private/file.apk'), 'APK_INSTALL_UNCONFIRMED');
+  let received = false;
+  await assert.rejects(
+    androidCommand(
+      process.execPath,
+      ['-e', 'setInterval(() => {}, 1000)'],
+      process.env,
+      undefined,
+      100,
+      'APK_INSTALL_UNCONFIRMED',
+      undefined,
+      16384,
+      undefined,
+      () => {
+        received = true;
+      },
+      'APK_INSTALL_TIMEOUT',
+    ),
+    { code: 'APK_INSTALL_TIMEOUT' },
+  );
+  assert.equal(received, false);
 });
 
 test('thirty distinct real model codes and six actual Android API targets; malformed ranges and duplicate packages refused', async () => {

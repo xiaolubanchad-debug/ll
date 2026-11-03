@@ -20,6 +20,7 @@ import {
   parallelAppOpenSupported,
   xpathObservationSupported,
   cachedApkSelectionSupported,
+  knownAgentAtLeast,
 } from '@apk/contracts';
 import { checked } from './secrets.js';
 import { configBody, configSecrets } from './configurations.js';
@@ -50,6 +51,12 @@ const planInclude = {
 };
 type PlanRow = Prisma.ManagedTaskGetPayload<{ include: typeof planInclude }>;
 type CycleRow = ManagedCycle & { runs: Run[] };
+const dailyDownloadWhere = (nodeId: string, configId: string, now = new Date()) => ({
+  nodeId,
+  purpose: 'DOWNLOAD',
+  cacheDay: beijingDay(now),
+  configVersion: { configId },
+});
 function checkedOutput<T>(name: Parameters<typeof schemaIssues>[0], value: T): T {
   if (schemaIssues(name, value).length) fault('INTERNAL_CONTRACT_ERROR', '任务信息暂不可用', 503);
   return value;
@@ -107,6 +114,18 @@ async function readiness(db: PrismaClient, p: PlanRow) {
   const h = node.health as { download?: boolean; android?: boolean; kvm?: boolean } | null;
   if (!h?.download || node.downloadProtocol !== '1.0')
     add('NODE_UPGRADE_REQUIRED', '下载环境尚未就绪', 'nodes');
+  const needsDownload = !(await db.run.count({ where: dailyDownloadWhere(node.id, p.configId) }));
+  if (needsDownload && !knownAgentAtLeast(node.agentVersion, '0.17.3'))
+    add('NODE_UPGRADE_REQUIRED', '网页代理需要 Agent 0.17.3', 'nodes');
+  const proxy = c.execution.proxySecretVersionId;
+  if (
+    (needsDownload || c.execution.mode === 'FULL') &&
+    (!proxy ||
+      !(await db.secretVersion.count({
+        where: { id: proxy, type: 'HTTP_PROXY', revokedAt: null },
+      })))
+  )
+    add('PROXY_REQUIRED', '请选择用于网页下载的有效代理', 'proxies');
   if (node.slot?.quarantined) add('NODE_QUARANTINED', '上次执行需要核验与清理确认', 'runs');
   const own = p.cycles.some((c) => c.runs.some((r) => r.id === node.slot?.runId));
   if (node.slot?.operationId || (node.slot?.runId && !own))
@@ -189,12 +208,6 @@ async function readiness(db: PrismaClient, p: PlanRow) {
       if (!p.enabled && p.attemptLimit > budget.remaining)
         add('DAILY_OPEN_LIMIT', '当日剩余额度不足，请降低目标及尝试上限', 'tasks');
     }
-    const proxy = c.execution.proxySecretVersionId;
-    if (
-      !proxy ||
-      !(await db.secretVersion.count({ where: { id: proxy, type: 'HTTP_PROXY', revokedAt: null } }))
-    )
-      add('PROXY_REQUIRED', '请选择有效代理', 'proxies');
     if (
       c.execution.appOpen &&
       !appOpenSupported(
@@ -573,6 +586,18 @@ export async function controlTaskPlan(
             latest?.runs.some((r) => r.status === 'NEEDS_REVIEW' && !r.reviewResolvedAt)
           )
             fault('REVIEW_REQUIRED', '请先核验未知结果并确认清理');
+          if (
+            input.action === 'RETRY_DOWNLOAD' ||
+            !(await tx.run.count({
+              where: dailyDownloadWhere(node.id, p.configId, now),
+            }))
+          ) {
+            if (!settings.execution.proxySecretVersionId)
+              fault('PROXY_REQUIRED', '网页下载需要配置 HTTP 代理', 422);
+            await configSecrets(tx, settings);
+            if (!knownAgentAtLeast(node.agentVersion, '0.17.3'))
+              fault('NODE_UPGRADE_REQUIRED', '网页代理需要 Agent 0.17.3');
+          }
           if (continueLatest) {
             const prior = await tx.configVersion.findUniqueOrThrow({
               where: { id: latest.configVersionId },

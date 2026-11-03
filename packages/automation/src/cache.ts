@@ -82,28 +82,30 @@ export class ApkCache {
     const rows = this.db
       .prepare('SELECT target,metadata FROM cache WHERE node=? AND day=?')
       .all(node, day);
-    const named =
-      expected.fileName &&
-      rows.find((r) => {
-        const m = JSON.parse(String(r.metadata)) as ApkMetadata;
-        return (
-          m.fileName?.toLowerCase() === expected.fileName!.toLowerCase() &&
-          m.apkSha256 === expected.apkSha256
-        );
-      });
-    const source = named ? String(named.target) : target;
-    const metadata = await this.get(node, day, source, max, signal);
-    if (
-      !metadata ||
-      metadata.apkSha256 !== expected.apkSha256 ||
-      metadata.size !== expected.size ||
-      (expected.fileName &&
-        metadata.fileName &&
-        expected.fileName.toLowerCase() !== metadata.fileName.toLowerCase())
-    )
-      return null;
-    this.pin(node, day, source);
-    return { metadata, file: this.path(this.key(node, day, source)) };
+    const named = expected.fileName
+      ? rows.filter((r) => {
+          const m = JSON.parse(String(r.metadata)) as ApkMetadata;
+          return (
+            m.fileName?.toLowerCase() === expected.fileName!.toLowerCase() &&
+            m.apkSha256 === expected.apkSha256
+          );
+        })
+      : [];
+    for (const source of new Set([target, ...named.map((r) => String(r.target))])) {
+      const metadata = await this.get(node, day, source, max, signal);
+      if (
+        !metadata ||
+        metadata.apkSha256 !== expected.apkSha256 ||
+        metadata.size !== expected.size ||
+        (expected.fileName &&
+          metadata.fileName &&
+          expected.fileName.toLowerCase() !== metadata.fileName.toLowerCase())
+      )
+        continue;
+      this.pin(node, day, source);
+      return { metadata, file: this.path(this.key(node, day, source)) };
+    }
+    return null;
   }
   pin(node: string, day: string, target: string) {
     this.db.prepare('UPDATE cache SET active=1 WHERE key=?').run(this.key(node, day, target));

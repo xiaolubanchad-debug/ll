@@ -126,11 +126,12 @@ const draft = computed(() => {
   };
   v.download.maxTargets = downloadLimit.value;
   v.execution.mode = mode.value;
+  if (proxyId.value) v.execution.proxySecretVersionId = proxyId.value;
+  else delete v.execution.proxySecretVersionId;
   v.execution.contentIsolation = true;
   delete v.execution.autoRegistration;
   v.registrationFlows = [];
   if (mode.value === 'FULL') {
-    v.execution.proxySecretVersionId = proxyId.value;
     v.execution.appOpen = { dwellMs: 10000, concurrency: concurrency.value };
     const selectedFiles = [
       ...new Set(
@@ -150,7 +151,6 @@ const draft = computed(() => {
     if (ownedTestClient.value) v.execution.appOpen.ownedTestClient = true;
   } else {
     delete v.execution.appOpen;
-    delete v.execution.proxySecretVersionId;
   }
   return JSON.stringify(v, null, 2);
 });
@@ -296,8 +296,8 @@ function next() {
     error.value = '请填写任务名称、有效网站地址和 XPath';
     return;
   }
-  if (step.value === 2 && (!nodeId.value || (mode.value === 'FULL' && !proxyId.value))) {
-    error.value = '请选择服务器及 APP 网络代理';
+  if (step.value === 2 && (!nodeId.value || !proxyId.value)) {
+    error.value = '请选择服务器及网页下载代理';
     return;
   }
   step.value++;
@@ -423,28 +423,28 @@ onUnmounted(() => {
           <option value="FULL">下载、安装并启动 APP（停留 10 秒）</option>
           <option value="DOWNLOAD_ONLY">只下载 APK</option>
         </select>
-        <template v-if="mode === 'FULL'"
-          ><label for="task-proxy">APP 网络代理</label
-          ><select id="task-proxy" v-model="proxyId">
-            <option value="">请选择已保存代理</option>
-            <option v-for="p in proxies" :key="p.id" :value="p.id">
-              {{ p.name ?? '历史代理 ' + p.id.slice(0, 8) }}
-            </option>
-          </select>
-          <details>
-            <summary>新增代理</summary>
-            <label for="task-proxy-name">代理名称</label
-            ><input id="task-proxy-name" v-model="proxyName" />
-            <div class="filter-grid">
-              <label>地址<input v-model="host" placeholder="res.proxy-seller.com" /></label
-              ><label>端口<input v-model.number="port" type="number" min="1" max="65535" /></label
-              ><label>认证用户名<input v-model="user" autocomplete="off" /></label
-              ><label
-                >认证密码<input v-model="password" type="password" autocomplete="new-password"
-              /></label>
-            </div>
-            <el-button @click="saveProxy">保存代理并选中</el-button>
-          </details>
+        <label for="task-proxy">网页与 APP 网络代理</label
+        ><select id="task-proxy" v-model="proxyId">
+          <option value="">请选择已保存代理</option>
+          <option v-for="p in proxies" :key="p.id" :value="p.id">
+            {{ p.name ?? '历史代理 ' + p.id.slice(0, 8) }}
+          </option>
+        </select>
+        <details>
+          <summary>新增代理</summary>
+          <label for="task-proxy-name">代理名称</label
+          ><input id="task-proxy-name" v-model="proxyName" />
+          <div class="filter-grid">
+            <label>地址<input v-model="host" placeholder="res.proxy-seller.com" /></label
+            ><label>端口<input v-model.number="port" type="number" min="1" max="65535" /></label
+            ><label>认证用户名<input v-model="user" autocomplete="off" /></label
+            ><label
+              >认证密码<input v-model="password" type="password" autocomplete="new-password"
+            /></label>
+          </div>
+          <el-button @click="saveProxy">保存代理并选中</el-button>
+        </details>
+        <template v-if="mode === 'FULL'">
           <label for="task-concurrency">{{ multiApp ? '同时运行模拟器数' : '同时执行轮数' }}</label
           ><select id="task-concurrency" v-model="concurrency" disabled>
             <option :value="1">1 台（顺序执行，降低 CPU 压力）</option>

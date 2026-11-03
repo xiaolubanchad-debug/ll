@@ -1,5 +1,7 @@
 # APK 自动化测试部署中台
 
+1.23 网页与 APK 下载统一走任务 HTTP 代理，续跑及回执规则见 [网页代理与故障恢复契约](docs/V123_WEB_PROXY_AND_RECOVERY_CONTRACT.md)。
+
 1.22 任务继续时的版本选择、等待原因及已停止记录展示遵循 [恢复契约](docs/V122_TASK_RESUME_CONTRACT.md)。
 
 1.21 人工元素检查配置、定位记录和中台提醒遵循 [检查契约](docs/V121_XPATH_OBSERVATION_CONTRACT.md)，对应 Agent 0.17.0。

@@ -1541,6 +1541,9 @@
             "TARGET_LIMIT",
             "DISCOVERY_FAILED",
             "NETWORK_BLOCKED",
+            "PROXY_AUTH_FAILED",
+            "PROXY_CONNECT_FAILED",
+            "BROWSER_ENVIRONMENT_INVALID",
             "DOWNLOAD_FAILED",
             "APK_INVALID",
             "APK_TOO_LARGE",
@@ -1607,7 +1610,20 @@
             "下载传输：文件已保存，读取启动所需包信息",
             "下载传输：已收到浏览器文件，等待保存与读取包信息",
             "下载传输：文件已保存",
-            "下载传输：已收到浏览器文件，等待保存"
+            "下载传输：已收到浏览器文件，等待保存",
+            "APK 安装诊断：APK_INSTALL_INVALID",
+            "APK 安装诊断：APK_INSTALL_SPLIT_REQUIRED",
+            "APK 安装诊断：APK_INSTALL_ABI_MISMATCH",
+            "APK 安装诊断：APK_INSTALL_ANDROID_VERSION",
+            "APK 安装诊断：APK_INSTALL_SIGNATURE_CONFLICT",
+            "APK 安装诊断：APK_INSTALL_ALREADY_PRESENT",
+            "APK 安装诊断：APK_INSTALL_VERSION_CONFLICT",
+            "APK 安装诊断：APK_INSTALL_NO_SPACE",
+            "APK 安装诊断：APK_INSTALL_RESTRICTED",
+            "APK 安装诊断：APK_INSTALL_REJECTED",
+            "APK 安装诊断：APK_INSTALL_DEVICE_UNAVAILABLE",
+            "APK 安装诊断：APK_INSTALL_TIMEOUT",
+            "APK 安装诊断：APK_INSTALL_UNCONFIRMED"
           ]
         }
       }

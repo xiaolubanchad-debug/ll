@@ -269,6 +269,22 @@ test(
     config.download.landingRules = [{ host: '*', by: 'css', selector: 'a.download' }];
     const stop = new AbortController(),
       events = [];
+    let closeCalls = 0,
+      cleanupReceipts = 0;
+    const observedChromium = {
+      async launchPersistentContext(...args) {
+        const context = await chromium.launchPersistentContext(...args);
+        const browser = context.browser();
+        for (const resource of [context, browser]) {
+          const close = resource.close.bind(resource);
+          resource.close = (...closeArgs) => {
+            closeCalls++;
+            return close(...closeArgs);
+          };
+        }
+        return context;
+      },
+    };
     await assert.rejects(
       () =>
         runDownload(
@@ -281,7 +297,13 @@ test(
             events.push(event);
             if (event.type === 'LOG') stop.abort();
           },
-          { chromium, policy: new NetworkPolicy(new Set([site.url])) },
+          {
+            chromium: observedChromium,
+            policy: new NetworkPolicy(new Set([site.url])),
+            onClosed: async () => {
+              cleanupReceipts++;
+            },
+          },
         ),
       { code: 'CANCELLED' },
     );
@@ -291,6 +313,8 @@ test(
       ),
     );
     assert.equal(site.counts.get('/second.apk') ?? 0, 0);
+    assert.equal(closeCalls, 1);
+    assert.equal(cleanupReceipts, 1);
     assert.deepEqual(await readdir(join(root, 'jobs')), []);
   },
 );

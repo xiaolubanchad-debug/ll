@@ -23,6 +23,8 @@ import {
   appOpenSupported,
   parallelAppOpenSupported,
   xpathObservationSupported,
+  knownAgentAtLeast,
+  apkInstallDiagnosticCode,
 } from '@apk/contracts';
 import { readFunctionalArtifact } from './functional-artifacts.js';
 import { checked, readSecret } from './secrets.js';
@@ -43,6 +45,8 @@ import { dailyOpenUsage, openAdmissionDeadline } from './open-budget.js';
 type Tx = P.TransactionClient;
 export const ACTIVE_RUNS = ['ASSIGNED', 'RUNNING', 'STOP_REQUESTED'] as const;
 export const RUN_END = ['SUCCEEDED', 'PARTIAL_FAILED', 'FAILED', 'CANCELLED', 'NEEDS_REVIEW'];
+const visitsWebsite = (purpose?: string | null) =>
+  purpose !== 'REGISTER' && purpose !== 'PROXY_CHECK';
 export async function nodeAuth(tx: Tx, token: string, nodeId: string, bootId?: string) {
   const auth = await tx.agentCredential.findUnique({ where: { nodeId } });
   if (!auth || auth.revokedAt || auth.tokenHash !== digest(token))
@@ -290,7 +294,7 @@ export async function createRun(
       where: { id: input.releaseId },
     });
     const manifest = release?.manifest as
-      | { features?: string[]; toolchain?: { systemImage?: string } }
+      | { agentVersion?: string; features?: string[]; toolchain?: { systemImage?: string } }
       | undefined;
     const health = node.health as {
       download?: boolean;
@@ -304,6 +308,15 @@ export async function createRun(
     )
       fault('NODE_UPGRADE_REQUIRED', '请部署支持下载任务的 Agent 版本');
     const configuration = config.body as unknown as TestConfiguration;
+    if (visitsWebsite(input.purpose)) {
+      if (!configuration.execution.proxySecretVersionId)
+        fault('PROXY_REQUIRED', '网页下载需要配置 HTTP 代理', 422);
+      if (
+        !knownAgentAtLeast(node.agentVersion, '0.17.3') ||
+        !knownAgentAtLeast(manifest.agentVersion, '0.17.3')
+      )
+        fault('NODE_UPGRADE_REQUIRED', '网页代理需要 Agent 0.17.3');
+    }
     if (
       configuration.execution.appOpen?.assetFileNames?.length &&
       !cachedApkSelectionSupported(manifest?.features, node.agentVersion)
@@ -359,7 +372,7 @@ export async function createRun(
     );
     if (input.purpose === 'PROXY_CHECK')
       await readSecret(tx, input.proxySecretVersionId!, ['HTTP_PROXY']);
-    else if (input.purpose !== 'DOWNLOAD') await configSecrets(tx, configuration);
+    else await configSecrets(tx, configuration);
     if (
       input.purpose === 'REGISTER' ||
       (!input.purpose && configuration.execution.mode === 'FULL')
@@ -473,6 +486,14 @@ export async function claimRun(db: PrismaClient, token: string, body: unknown) {
     )
       fault('NODE_NOT_READY', '节点不满足固定任务版本');
     if (RUN_END.includes(run.status)) return null;
+    if (
+      run.status === 'QUEUED' &&
+      visitsWebsite(run.purpose) &&
+      !knownAgentAtLeast(node.agentVersion, '0.17.3')
+    ) {
+      await closeRun(tx, run, 'FAILED', 'NODE_UPGRADE_REQUIRED');
+      return null;
+    }
     await assertIsolatedRun(tx, run);
     if (run.delivery) {
       if (run.delivery.bootId !== input.bootId) fault('AGENT_RECONCILE_REQUIRED', '旧任务需要核验');
@@ -614,15 +635,21 @@ export async function deliveryConfig(db: PrismaClient, token: string, id: string
       where: { id: d.run.configVersionId! },
     });
     const config = v.body as unknown as TestConfiguration;
-    await configSecrets(tx, config);
     const proxyId =
-      d.run.purpose === 'DOWNLOAD'
-        ? undefined
-        : d.run.purpose === 'PROXY_CHECK'
-          ? d.run.proxySecretVersionId!
-          : config.execution.mode === 'FULL'
-            ? config.execution.proxySecretVersionId
-            : undefined;
+      d.run.purpose === 'PROXY_CHECK'
+        ? d.run.proxySecretVersionId
+        : config.execution.proxySecretVersionId;
+    if (visitsWebsite(d.run.purpose)) {
+      const release = await tx.release.findUnique({ where: { id: d.run.releaseId! } });
+      if (
+        !knownAgentAtLeast(
+          (release?.manifest as { agentVersion?: string } | null)?.agentVersion,
+          '0.17.3',
+        )
+      )
+        fault('NODE_UPGRADE_REQUIRED', '网页代理需要 Agent 0.17.3');
+      if (!proxyId) fault('PROXY_REQUIRED', '网页下载需要配置 HTTP 代理', 422);
+    }
     const secretVersions = proxyId
       ? [
           {
@@ -1001,6 +1028,7 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
   if (event.type === 'LOG') {
     const task = await tx.task.findUnique({ where: { id: event.taskId } });
     const native = String(p.message).startsWith('自有测试 APK：');
+    const install = apkInstallDiagnosticCode(p.message);
     if (
       !task ||
       task.runId !== runId ||
@@ -1012,7 +1040,9 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
             task.status === 'HOLDING' &&
             isOwnedTestPackage((task.apk as { packageName?: string } | null)?.packageName ?? '')
           )
-        : task.status !== 'DOWNLOADING')
+        : install
+          ? !openOnly || task.status !== 'INSTALLING'
+          : task.status !== 'DOWNLOADING')
     )
       fault('EVENT_CONFLICT', '日志与执行阶段不一致');
     if (
@@ -1741,7 +1771,7 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
         assignments &&
         run.taskCycleId &&
         !run.stopRequested &&
-        (run.attemptsStarted > 0 || (preserveQueue && !plan?.openPolicy?.resumeOf)) &&
+        (run.attemptsStarted > 0 || preserveQueue) &&
         !tasks.some((t) => t.status === 'UNKNOWN' || t.submissionId) &&
         [...(await sessionEvents()).values()].some((s) => s.phase === 'FAILED')
       ) {
@@ -2040,11 +2070,12 @@ export async function reconcileAgent(db: PrismaClient, token: string, body: unkn
   const input = checked<AgentReconcileInput>('AgentReconcileInput', body);
   return db.$transaction(async (tx) => {
     await lockNode(tx, input.nodeId);
-    await nodeAuth(tx, token, input.nodeId);
+    const scoped = input.reason === 'EXECUTION_ERROR' || input.reason === 'STOP_RECOVERY';
+    await nodeAuth(tx, token, input.nodeId, scoped ? input.bootId : undefined);
     const slot = await tx.nodeSlot.findUnique({
       where: { nodeId: input.nodeId },
     });
-    if (!input.cleanupComplete && !slot?.runId)
+    if (!scoped && !input.cleanupComplete && !slot?.runId)
       await tx.nodeSlot.update({
         where: { nodeId: input.nodeId },
         data: { quarantined: true },
@@ -2054,6 +2085,14 @@ export async function reconcileAgent(db: PrismaClient, token: string, body: unkn
         where: { id: slot.runId },
         include: { delivery: true },
       });
+      const local = run.delivery
+        ? input.deliveries.find(
+            (d) => d.deliveryId === run.delivery!.id && d.fence === run.delivery!.fence,
+          )
+        : null;
+      // Retried execution receipts describe one delivery, never whichever run now owns the slot.
+      if (scoped && (!local || local.fence !== slot.fence))
+        return { reconciled: true, mayClaim: false };
       if (run.status !== 'QUEUED' && !RUN_END.includes(run.status))
         await reviewRun(
           tx,
@@ -2061,11 +2100,6 @@ export async function reconcileAgent(db: PrismaClient, token: string, body: unkn
           run.delivery?.bootId !== input.bootId ? 'AGENT_RESTARTED' : 'AGENT_EXECUTION_INTERRUPTED',
         );
       if (run.status !== 'QUEUED') {
-        const local = run.delivery
-          ? input.deliveries.find(
-              (d) => d.deliveryId === run.delivery!.id && d.fence === run.delivery!.fence,
-            )
-          : null;
         const clean =
           input.cleanupComplete && (local?.cleanupComplete ?? input.deliveries.length === 0);
         for (const submission of local?.submissions ?? []) {
@@ -2104,19 +2138,21 @@ export async function reconcileAgent(db: PrismaClient, token: string, body: unkn
           },
           data: { status: 'UNKNOWN', errorCode: 'REGISTRATION_UNKNOWN' },
         });
-        await tx.run.update({
-          where: { id: run.id },
-          data: {
-            cleanupConfirmedAt: clean ? new Date() : null,
-            cleanupBootId: clean ? input.bootId : null,
-          },
-        });
+        if (!scoped || (clean && run.cleanupBootId !== input.bootId))
+          await tx.run.update({
+            where: { id: run.id },
+            data: {
+              cleanupConfirmedAt: clean ? new Date() : null,
+              cleanupBootId: clean ? input.bootId : null,
+            },
+          });
       }
     }
-    await tx.agentCredential.update({
-      where: { nodeId: input.nodeId },
-      data: { bootId: input.bootId },
-    });
+    if (!scoped)
+      await tx.agentCredential.update({
+        where: { nodeId: input.nodeId },
+        data: { bootId: input.bootId },
+      });
     return {
       reconciled: true,
       mayClaim: input.cleanupComplete && !slot?.runId && !slot?.quarantined,

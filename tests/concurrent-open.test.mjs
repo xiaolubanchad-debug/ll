@@ -305,6 +305,55 @@ test('concurrent outbox flushes are serialized and preserve durable event sequen
   }
 });
 
+test('a failed cleanup receipt is retried without blocking claims behind an old rejected event', async (t) => {
+  const root = await mkdtemp(join(resolve('.tmp'), 'cleanup-outbox-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  let cleanupCalls = 0,
+    claims = 0;
+  const engine = await TaskEngine.open(
+    root,
+    randomUUID(),
+    randomUUID(),
+    root,
+    async (path, body) => {
+      if (path === 'reconcile') {
+        if (body.reason !== 'STARTUP' && ++cleanupCalls === 1) throw Error('fixture timeout');
+        return { reconciled: true };
+      }
+      if (path === 'events') throw Error('fixture rejects this old event');
+      assert.equal(path, 'claims');
+      claims++;
+      return {};
+    },
+  );
+  try {
+    const old = { deliveryId: randomUUID(), runId: randomUUID(), fence: 1 };
+    engine.store.add(old);
+    engine.store.append(old, { type: 'RUN_STARTED', payload: {} });
+    engine.store.status(old.deliveryId, 'DONE', true);
+    const clean = { deliveryId: randomUUID(), runId: randomUUID(), fence: 2 };
+    engine.store.add(clean);
+    engine.store.queueReconcile(clean.deliveryId);
+    await engine.tick();
+    assert.equal(
+      engine.store.deliveries().find((row) => row.id === clean.deliveryId).reconcilePending,
+      true,
+    );
+    assert.equal(claims, 1);
+    await delay(1100);
+    await engine.tick();
+    assert.equal(cleanupCalls, 2);
+    assert.equal(claims, 2);
+    assert.equal(
+      engine.store.deliveries().find((row) => row.id === clean.deliveryId).reconcilePending,
+      false,
+    );
+    assert.equal(engine.store.pending(old.deliveryId).length, 1);
+  } finally {
+    await engine.close();
+  }
+});
+
 test('restart reports every unclean slot and never claims more work', async (t) => {
   const root = await mkdtemp(join(resolve('.tmp'), 'open-recover-'));
   t.after(() => rm(root, { recursive: true, force: true }));

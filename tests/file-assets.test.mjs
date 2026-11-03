@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, writeFile, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, writeFile, readFile, rm, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -151,6 +151,18 @@ test('cache reuses the named file across source keys; filename conflicts preserv
   );
   assert.ok(found);
   assert.equal(await readFile(found.file, 'utf8'), 'first file');
+  await writeFile(file, 'first file');
+  await cache.put('node', '2026-11-03', 'b'.repeat(64), file, m);
+  await unlink(found.file);
+  const fallback = await cache.asset(
+    'node',
+    '2026-11-03',
+    'a'.repeat(64),
+    m,
+    1000,
+    AbortSignal.timeout(1000),
+  );
+  assert.equal(fallback?.file, cache.path(cache.key('node', '2026-11-03', 'b'.repeat(64))));
   assert.equal(
     await cache.asset('node', '2026-11-04', 'a'.repeat(64), m, 1000, AbortSignal.timeout(1000)),
     null,

@@ -29,6 +29,7 @@ let app,
   release,
   node,
   token,
+  webProxyId,
   agentAbort,
   agentRun,
   config,
@@ -91,7 +92,7 @@ async function body(path = '/source') {
     browserUserAgent: 'Mozilla/5.0 (Linux; Android 13) Chrome/149.0.0.0 Mobile Safari/537.36',
   };
   c.execution.mode = 'DOWNLOAD_ONLY';
-  delete c.execution.proxySecretVersionId;
+  c.execution.proxySecretVersionId = webProxyId;
   c.registrationFlows = [];
   c.download.landingRules = [{ host: '127.0.0.1', by: 'css', selector: 'a.download' }];
   c.download.timeoutMs = 10000;
@@ -135,7 +136,7 @@ async function start() {
     {
       nodeId: node.id,
       releaseId: release.id,
-      agentVersion: '0.3.4',
+      agentVersion: '0.17.3',
       apiUrl: base,
       sdkRoot: '/fixture',
       toolsRoot: resolve('.'),
@@ -176,6 +177,17 @@ test('P2 acceptance with real PostgreSQL, SQLite, Chromium and owned fixture sit
   });
   cookie = login.headers.get('set-cookie').split(';')[0];
   csrf = (await login.json()).csrfToken;
+  const proxy = await req('/secrets/versions', 'POST', {
+    type: 'HTTP_PROXY',
+    secretValue: {
+      host: '127.0.0.1',
+      port: Number(new URL(site.url).port),
+      username: 'fixture',
+      password: 'FixtureWebProxy',
+    },
+  });
+  assert.equal(proxy.status, 201);
+  webProxyId = proxy.data.id;
   try {
     await t.test(
       'immutable versions validate input, bind hashes and retry keys, and reject stale editors',
@@ -229,7 +241,7 @@ test('P2 acceptance with real PostgreSQL, SQLite, Chromium and owned fixture sit
         id: randomUUID(),
         artifactName: 'agent-' + randomBytes(32).toString('hex') + '.tgz',
         sha256: randomBytes(32).toString('hex'),
-        manifest: { agentVersion: '0.3.4', protocolVersion: '1.0', features: ['DOWNLOAD_V1'] },
+        manifest: { agentVersion: '0.17.3', protocolVersion: '1.0', features: ['DOWNLOAD_V1'] },
       },
     });
     token = randomBytes(32).toString('base64url');
@@ -239,7 +251,7 @@ test('P2 acceptance with real PostgreSQL, SQLite, Chromium and owned fixture sit
         host: 'p2.example.test',
         deploymentStatus: 'INSTALLED',
         agentReleaseId: release.id,
-        agentVersion: '0.3.4',
+        agentVersion: '0.17.3',
         health: report,
         lastSeenAt: new Date(),
         slot: { create: {} },
@@ -267,6 +279,26 @@ test('P2 acceptance with real PostgreSQL, SQLite, Chromium and owned fixture sit
       );
       await start();
     });
+    await t.test(
+      'web downloads require a bound proxy and a signed proxy-capable release',
+      async () => {
+        const missing = await body();
+        delete missing.execution.proxySecretVersionId;
+        await save(missing);
+        await assert.rejects(begin(), /PROXY_REQUIRED/);
+        await save(await body());
+        const original = release.manifest;
+        await db.release.update({
+          where: { id: release.id },
+          data: { manifest: { ...original, agentVersion: '0.17.2' } },
+        });
+        try {
+          await assert.rejects(begin(), /NODE_UPGRADE_REQUIRED/);
+        } finally {
+          await db.release.update({ where: { id: release.id }, data: { manifest: original } });
+        }
+      },
+    );
     await t.test(
       'direct, popup and same-page downloads validate APK metadata and merge carousel clones',
       async () => {
@@ -599,14 +631,14 @@ test('P2 acceptance with real PostgreSQL, SQLite, Chromium and owned fixture sit
           data: {
             manifest: {
               ...oldManifest,
-              agentVersion: '0.17.0',
+              agentVersion: '0.17.3',
               features: ['DOWNLOAD_V1', 'XPATH_OBSERVATION_V1'],
             },
           },
         });
         await db.node.update({
           where: { id: node.id },
-          data: { agentVersion: '0.17.0', lastSeenAt: new Date() },
+          data: { agentVersion: '0.17.3', lastSeenAt: new Date() },
         });
         try {
           const id = await begin(),
@@ -692,7 +724,7 @@ test('P2 acceptance with real PostgreSQL, SQLite, Chromium and owned fixture sit
           assert.equal((await endRun(id)).status, 'FAILED');
         } finally {
           await db.release.update({ where: { id: release.id }, data: { manifest: oldManifest } });
-          await db.node.update({ where: { id: node.id }, data: { agentVersion: '0.3.4' } });
+          await db.node.update({ where: { id: node.id }, data: { agentVersion: '0.17.3' } });
         }
       },
     );

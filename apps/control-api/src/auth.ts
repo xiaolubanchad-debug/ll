@@ -43,18 +43,20 @@ export class AuthService {
   }
   private async rateLimit(username: string, ip: string) {
     const now = new Date();
+    const previousWindow = new Date(now.getTime() - 900000);
     for (const [suffix, max] of [
-      [username, settings().loginMaxAttempts],
       ['*', settings().loginMaxAttempts * 5],
+      [username, settings().loginMaxAttempts],
     ] as const) {
       const key = digest(ip + '\0' + suffix);
       const rows = await this.db.$queryRaw<{ attempts: number }[]>`
         INSERT INTO "LoginBucket" ("key","windowStart","attempts") VALUES (${key},${now},1)
         ON CONFLICT ("key") DO UPDATE SET
-          "attempts"=CASE WHEN "LoginBucket"."windowStart" < ${new Date(now.getTime() - 900000)} THEN 1 ELSE "LoginBucket"."attempts"+1 END,
-          "windowStart"=CASE WHEN "LoginBucket"."windowStart" < ${new Date(now.getTime() - 900000)} THEN ${now} ELSE "LoginBucket"."windowStart" END
+          "attempts"=CASE WHEN "LoginBucket"."windowStart" < ${previousWindow} THEN 1 ELSE "LoginBucket"."attempts"+1 END,
+          "windowStart"=CASE WHEN "LoginBucket"."windowStart" < ${previousWindow} THEN ${now} ELSE "LoginBucket"."windowStart" END
+        WHERE "LoginBucket"."windowStart" < ${previousWindow} OR "LoginBucket"."attempts" < ${max}
         RETURNING "attempts"`;
-      if (rows[0].attempts > max)
+      if (!rows.length)
         throw new ApiError(429, 'LOGIN_RATE_LIMITED', '登录尝试过于频繁，请稍后再试');
     }
   }

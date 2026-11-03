@@ -15,6 +15,29 @@ import {
   tickTaskPlans,
 } from '@apk/platform';
 import { beijingDay } from '../packages/platform/dist/daily-plan.js';
+import { preferFileAssetVariants } from '../packages/platform/dist/identity.js';
+
+test('unknown file-name APKs use verified ARM64 and x86_64 device variants when available', () => {
+  const variants = ['phone-01', 'phone-02', 'phone-08', 'phone-09'];
+  const catalog = {
+    'phone-01': ['arm64-v8a', 'x86_64'],
+    'phone-02': ['x86_64', 'arm64-v8a'],
+    'phone-08': ['x86_64'],
+    'phone-09': ['x86', 'x86_64'],
+  };
+  const unknown = [{ apk: { validationPolicy: 'FILE_NAME', abis: [] } }];
+  assert.deepEqual(preferFileAssetVariants(variants, catalog, unknown), ['phone-01', 'phone-02']);
+  assert.deepEqual(
+    preferFileAssetVariants(variants, { 'phone-01': catalog['phone-01'] }, unknown),
+    variants,
+  );
+  assert.deepEqual(
+    preferFileAssetVariants(variants, catalog, [
+      { apk: { validationPolicy: 'FILE_NAME', abis: ['x86'] } },
+    ]),
+    variants,
+  );
+});
 
 for (const scenario of [
   'serial',
@@ -26,11 +49,15 @@ for (const scenario of [
   'preserve',
   'preparation',
   'auto-restart-queue',
+  'resumed-preparation-cleanup',
 ])
   test('database enforces grouped execution and cleanup: ' + scenario, async () => {
     const concurrency = scenario === 'parallel' ? 2 : 1;
-    const managed = ['auto-restart', 'manual-stop', 'auto-restart-queue'].includes(scenario);
-    const preserve = ['preserve', 'preparation', 'auto-restart-queue'].includes(scenario);
+    const zeroAttempts = scenario === 'resumed-preparation-cleanup';
+    const managed =
+      ['auto-restart', 'manual-stop', 'auto-restart-queue'].includes(scenario) || zeroAttempts;
+    const preserve =
+      ['preserve', 'preparation', 'auto-restart-queue'].includes(scenario) || zeroAttempts;
     const agentVersion = preserve ? '0.17.2' : '0.13.0';
     const db = new PrismaClient(),
       nodeId = randomUUID(),
@@ -82,6 +109,7 @@ for (const scenario of [
         admissionDeadline: new Date(Date.now() + 3600000).toISOString(),
         sessions,
         ...(preserve ? { preserveQueue: true } : {}),
+        ...(zeroAttempts ? { resumeOf: randomUUID() } : {}),
       },
     };
     let seq = 1;
@@ -153,6 +181,11 @@ for (const scenario of [
           ...(stage === 'INSTALLING' ? { observation } : {}),
         });
         if (installError && stage === 'INSTALLING') {
+          if (installError === 'APK_INSTALL_ABI_MISMATCH')
+            await send(index, 'LOG', {
+              level: 'INFO',
+              message: 'APK 安装诊断：APK_INSTALL_ABI_MISMATCH',
+            });
           await send(index, 'TASK_FINISHED', {
             status: 'FAILED',
             proof: 'NONE',
@@ -333,6 +366,23 @@ for (const scenario of [
           sourceUrl: config.source.url,
         })),
       });
+      if (zeroAttempts) {
+        await reconcileAgent(db, token, {
+          protocolVersion: '1.0',
+          nodeId,
+          bootId,
+          reason: 'EXECUTION_ERROR',
+          cleanupComplete: true,
+          deliveries: [
+            { deliveryId: randomUUID(), fence: 1, cleanupComplete: true, submissions: [] },
+          ],
+        });
+        assert.equal((await db.run.findUniqueOrThrow({ where: { id: runId } })).status, 'RUNNING');
+        assert.equal(
+          (await db.nodeSlot.findUniqueOrThrow({ where: { nodeId } })).quarantined,
+          false,
+        );
+      }
       await assert.rejects(send(0, 'TASK_STAGE', { stage: 'DOWNLOADING' }));
       await start(sessions[0].id);
       if (concurrency === 2) await start(sessions[1].id);
@@ -354,7 +404,7 @@ for (const scenario of [
         );
         return;
       }
-      await send(0, 'TASK_STAGE', { stage: 'DOWNLOADING' });
+      if (!zeroAttempts) await send(0, 'TASK_STAGE', { stage: 'DOWNLOADING' });
       await assert.rejects(send(1, 'TASK_STAGE', { stage: 'DOWNLOADING' }));
       if (scenario === 'preserve') {
         await finish(0, 1, 'APP_CLEANUP_UNCONFIRMED');
@@ -369,11 +419,17 @@ for (const scenario of [
         await close(sessions[0].id, false, 2);
         await start(sessions[1].id);
         await send(2, 'TASK_STAGE', { stage: 'DOWNLOADING' });
-        await finish(2, 1, 'APK_INSTALL_FAILED');
+        await finish(2, 1, 'APK_INSTALL_ABI_MISMATCH');
         await send(3, 'TASK_STAGE', { stage: 'DOWNLOADING' });
         await finish(3);
         await close(sessions[1].id);
         await send(null, 'RUN_FINISHED', { status: 'PARTIAL_FAILED', errorCode: 'ATTEMPT_LIMIT' });
+        assert.ok(
+          (await runTimeline(db, runId, {})).items.some(
+            (item) =>
+              item.title === 'APK 安装诊断' && item.errorCode === 'APK_INSTALL_ABI_MISMATCH',
+          ),
+        );
         assert.deepEqual((await runSummary(db, runId)).deviceSessions, {
           started: 3,
           closed: 3,
@@ -396,8 +452,10 @@ for (const scenario of [
           errorCode: 'DEVICE_SESSION_SKIPPED',
         };
         await assert.rejects(send(1, 'TASK_FINISHED', skipped));
-        await assert.rejects(close(sessions[0].id, true));
-        await send(0, 'TASK_FINISHED', failed);
+        if (!zeroAttempts) {
+          await assert.rejects(close(sessions[0].id, true));
+          await send(0, 'TASK_FINISHED', failed);
+        }
         await assert.rejects(send(1, 'TASK_STAGE', { stage: 'DOWNLOADING' }));
         await assert.rejects(start(sessions[1].id));
         if (scenario !== 'recover') {
@@ -509,7 +567,7 @@ for (const scenario of [
             assert.equal(restarted.attemptLimit, 4);
             const old = await db.run.findUniqueOrThrow({ where: { id: runId } });
             assert.equal(old.status, 'NEEDS_REVIEW');
-            assert.equal(old.attemptsStarted, 1);
+            assert.equal(old.attemptsStarted, zeroAttempts ? 0 : 1);
             if (scenario === 'auto-restart-queue') {
               await Promise.all([tickTaskPlans(db), tickTaskPlans(db)]);
               const resumed = await db.run.findMany({

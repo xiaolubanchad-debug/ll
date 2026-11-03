@@ -24,6 +24,9 @@ import {
 import { ApkCache, removeOwned } from './cache.js';
 import { describeApkFile, ApkValidationError } from './apk.js';
 import { NetworkPolicy, startEgress } from './network.js';
+import { startProxyBridge } from './proxy.js';
+import { RegistrationError } from './registration-types.js';
+import type { ProxyCredential } from './registration-types.js';
 import { sha, canonical, normalizeUrl, cacheDay, DownloadError } from './common.js';
 import type { RegistrationCompletion } from './registration.js';
 import { androidBrowser } from './mobile-browser.js';
@@ -69,6 +72,7 @@ export interface DownloadOptions {
   beforeAction?: () => void;
   chromium?: BrowserType;
   policy?: NetworkPolicy;
+  webProxy?: ProxyCredential;
   now?: () => Date;
   onBrowser?: (record: BrowserRecord) => Promise<void>;
   onClosed?: () => Promise<void>;
@@ -97,6 +101,22 @@ const pause = (ms: number, signal: AbortSignal) =>
     signal.addEventListener('abort', abort, { once: true });
     if (signal.aborted) abort();
   });
+function targetHref(href: string) {
+  if (!href || href.startsWith('javascript:')) return '';
+  try {
+    return normalizeUrl(href);
+  } catch {
+    return null;
+  }
+}
+async function waitForTargets(page: Page, config: TestConfiguration) {
+  const candidates = page.locator('xpath=' + config.source.xpath);
+  if (!(await candidates.count()))
+    await candidates
+      .first()
+      .waitFor({ state: 'attached', timeout: Math.min(3000, config.download.timeoutMs) })
+      .catch(() => {});
+}
 async function discover(page: Page, config: TestConfiguration): Promise<Target[]> {
   const snapshots = await page.locator('xpath=' + config.source.xpath).evaluateAll(
     (elements, attributeNames) =>
@@ -125,8 +145,8 @@ async function discover(page: Page, config: TestConfiguration): Promise<Target[]
   const seen = new Set<string>(),
     targets: Target[] = [];
   for (const item of snapshots) {
-    let href = '';
-    if (item.href && !item.href.startsWith('javascript:')) href = normalizeUrl(item.href);
+    const href = targetHref(item.href);
+    if (href === null) continue;
     const identity = {
       source: normalizeUrl(config.source.url),
       xpath: config.source.xpath,
@@ -160,7 +180,7 @@ async function locate(page: Page, config: TestConfiguration, target: Target) {
       const href = await candidate.evaluate(
         (e) => (e instanceof HTMLAnchorElement ? e : e.querySelector('a'))?.href ?? '',
       );
-      if (normalizeUrl(href) !== target.href) throw new DownloadError('TARGET_CHANGED');
+      if (targetHref(href) !== target.href) throw new DownloadError('TARGET_CHANGED');
     }
     return candidate;
   }
@@ -175,8 +195,8 @@ async function locate(page: Page, config: TestConfiguration, target: Target) {
         href: anchor?.href ?? '',
       };
     });
-    let href = '';
-    if (data.href && !data.href.startsWith('javascript:')) href = normalizeUrl(data.href);
+    const href = targetHref(data.href);
+    if (href === null) continue;
     if (
       (target.pid ? data.pid === target.pid && href === target.href : i === target.position) &&
       (await candidate.isVisible())
@@ -504,20 +524,27 @@ export async function runDownload(
   const temp = await mkdtemp(join(jobs, 'download-'));
   const profile = join(temp, 'profile');
   const cache = await ApkCache.open(join(root, 'cache'));
-  const egress = await startEgress(policy, max, config.download.timeoutMs);
+  let egress:
+    | Awaited<ReturnType<typeof startEgress>>
+    | Awaited<ReturnType<typeof startProxyBridge>>
+    | undefined;
   let browser: Browser | undefined, context: BrowserContext | undefined;
+  let browserClosing: Promise<void> | undefined;
   let clean = false;
   let limit = false;
   let proxyClosed = false,
     cacheClosed = false;
+  const closeBrowser = () => {
+    if (!context) return Promise.resolve();
+    return (browserClosing ??= context.close());
+  };
   const cleanup = async () => {
     if (clean) return;
-    await context?.close();
+    await closeBrowser();
     context = undefined;
-    await browser?.close();
     browser = undefined;
     if (!proxyClosed) {
-      await egress.close();
+      await egress?.close();
       proxyClosed = true;
     }
     if (!cacheClosed) {
@@ -529,13 +556,26 @@ export async function runDownload(
     await options.onClosed?.();
   };
   const abort = () => {
-    void browser?.close().catch(() => {});
+    void closeBrowser().catch(() => {});
   };
   signal.addEventListener('abort', abort, { once: true });
   try {
     await options.onBrowser?.({ pid: 0, profile });
     beforeAction();
     await policy.endpoint(config.source.url);
+    const bridge = options.webProxy
+      ? await startProxyBridge(
+          options.webProxy,
+          policy,
+          Math.min(config.download.timeoutMs, 10000),
+          {
+            maxBytes: max,
+            timeoutMs: config.download.timeoutMs,
+          },
+        )
+      : undefined;
+    const network = (egress =
+      bridge ?? (await startEgress(policy, max, config.download.timeoutMs)));
     beforeAction();
     const runtime = (await import(
       pathToFileURL(join(resolve(toolsRoot), 'node_modules/playwright/index.mjs')).href
@@ -548,7 +588,7 @@ export async function runDownload(
     context = await chromium.launchPersistentContext(profile, {
       headless: true,
       downloadsPath: join(temp, 'raw'),
-      proxy: { server: egress.url, bypass: '<-loopback>' },
+      proxy: { server: network.url, bypass: '<-loopback>' },
       acceptDownloads: true,
       serviceWorkers: 'block',
       viewport: mobile.viewport,
@@ -595,16 +635,22 @@ export async function runDownload(
     for (let attempt = 0; attempt < 2 && !targets; attempt++) {
       try {
         beforeAction();
-        await source.goto(config.source.url, {
+        bridge?.resetDiagnostics();
+        const response = await source.goto(config.source.url, {
           waitUntil: 'domcontentloaded',
           timeout: config.download.timeoutMs,
         });
-        targets = await discover(source, config);
+        if (!response?.ok()) throw new DownloadError('DISCOVERY_FAILED');
         await mobileBrowser.confirm(source, 'SOURCE');
+        await waitForTargets(source, config);
+        beforeAction();
+        // Discovery is committed only after the mobile environment is confirmed.
+        targets = await discover(source, config);
       } catch (error) {
         if (signal.aborted) throw error;
         if (error instanceof DownloadError && error.code === 'TARGET_LIMIT') throw error;
-        if (attempt === 1) {
+        const proxyFailure = bridge?.failureCode();
+        if (attempt === 1 || proxyFailure === 'PROXY_AUTH_FAILED') {
           await checkConfiguredSourceElements(
             source,
             config.source.elementChecks ?? [],
@@ -617,7 +663,14 @@ export async function runDownload(
             type: 'ELEMENT_OBSERVATION',
             payload: { phase: 'ISSUE', scope: 'DISCOVERY', reason: 'READ_FAILED' },
           });
-          throw new DownloadError(egress.wasBlocked() ? 'NETWORK_BLOCKED' : 'DISCOVERY_FAILED');
+          throw new DownloadError(
+            proxyFailure ??
+              (error instanceof DownloadError && error.code === 'BROWSER_ENVIRONMENT_INVALID'
+                ? error.code
+                : network.wasBlocked()
+                  ? 'NETWORK_BLOCKED'
+                  : 'DISCOVERY_FAILED'),
+          );
         }
       }
     }
@@ -628,6 +681,10 @@ export async function runDownload(
       emit,
       beforeAction,
     );
+    if (config.source.elementChecks?.length) {
+      beforeAction();
+      targets = await discover(source, config);
+    }
     if (!targets!.length)
       await emit({
         type: 'ELEMENT_OBSERVATION',
@@ -685,12 +742,17 @@ export async function runDownload(
             let download: Download | undefined;
             try {
               if (signal.aborted) throw new DownloadError('CANCELLED');
+              bridge?.resetDiagnostics();
               for (const page of context.pages()) if (page !== source) await page.close();
-              if (normalizeUrl(source.url()) !== normalizeUrl(config.source.url))
-                await source.goto(config.source.url, {
+              if (normalizeUrl(source.url()) !== normalizeUrl(config.source.url)) {
+                const response = await source.goto(config.source.url, {
                   waitUntil: 'domcontentloaded',
                   timeout: config.download.timeoutMs,
                 });
+                if (!response?.ok()) throw new DownloadError('DISCOVERY_FAILED');
+                await mobileBrowser.confirm(source, 'SOURCE', undefined, true);
+                await waitForTargets(source, config);
+              }
               limit = false;
               download = await capture(
                 context,
@@ -765,22 +827,24 @@ export async function runDownload(
               if (signal.aborted) throw error;
               errorCode = limit
                 ? 'APK_TOO_LARGE'
-                : error instanceof ApkValidationError
-                  ? 'APK_INVALID_' + error.reason
-                  : error instanceof DownloadError &&
-                      error.code === 'DOWNLOAD_NO_FILE' &&
-                      egress.wasBlocked()
-                    ? 'NETWORK_BLOCKED'
-                    : error instanceof DownloadError && error.code !== 'DOWNLOAD_FAILED'
-                      ? error.code
-                      : egress.wasBlocked()
-                        ? 'NETWORK_BLOCKED'
-                        : 'DOWNLOAD_FAILED';
+                : (bridge?.failureCode() ??
+                  (error instanceof ApkValidationError
+                    ? 'APK_INVALID_' + error.reason
+                    : error instanceof DownloadError &&
+                        error.code === 'DOWNLOAD_NO_FILE' &&
+                        network.wasBlocked()
+                      ? 'NETWORK_BLOCKED'
+                      : error instanceof DownloadError && error.code !== 'DOWNLOAD_FAILED'
+                        ? error.code
+                        : network.wasBlocked()
+                          ? 'NETWORK_BLOCKED'
+                          : 'DOWNLOAD_FAILED'));
               if (
                 [
                   'NAVIGATION_SITE',
                   'DOWNLOAD_SOURCE_UNCONFIRMED',
                   'DOWNLOAD_CONTROL_UNCONFIRMED',
+                  'PROXY_AUTH_FAILED',
                 ].includes(errorCode)
               )
                 break;
@@ -875,7 +939,10 @@ export async function runDownload(
     });
   } catch (error) {
     if (signal.aborted) throw new DownloadError('CANCELLED');
-    const code = error instanceof DownloadError ? error.code : 'DOWNLOAD_FAILED';
+    const code =
+      error instanceof DownloadError || error instanceof RegistrationError
+        ? error.code
+        : 'DOWNLOAD_FAILED';
     await cleanup();
     await emit({
       type: 'RUN_FINISHED',
@@ -885,6 +952,9 @@ export async function runDownload(
           'TARGET_LIMIT',
           'DISCOVERY_FAILED',
           'NETWORK_BLOCKED',
+          'PROXY_AUTH_FAILED',
+          'PROXY_CONNECT_FAILED',
+          'BROWSER_ENVIRONMENT_INVALID',
           'APK_INVALID',
           'APK_METADATA_UNREADABLE',
           'FILE_TRANSFER_MISMATCH',

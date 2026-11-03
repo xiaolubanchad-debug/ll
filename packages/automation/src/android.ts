@@ -1,5 +1,6 @@
 import type { IdentityImage } from './identity-images.js';
 import { isOwnedTestPackage, deviceVariant } from '@apk/contracts';
+import type { ApkInstallFailureCode } from '@apk/contracts';
 import { spawn } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
 import { createServer } from 'node:net';
@@ -47,10 +48,44 @@ export function isForegroundPackage(output: string, pkg: string): boolean {
   const packages = lines.map((line) => /\bu\d+\s+([A-Za-z][A-Za-z0-9_.]*)\//.exec(line)?.[1]);
   return packages.length > 0 && packages.every((p) => p === pkg);
 }
+const installRejection =
+  /^(?:adb: failed to install [^\r\n]+:[ \t]*)?Failure \[(INSTALL_(?:FAILED|PARSE_FAILED)_[A-Z0-9_]+)(?::[^\r\n]*)?\][ \t]*\r?$/m;
+const installCategories: Readonly<Record<string, ApkInstallFailureCode>> = {
+  INSTALL_FAILED_INVALID_APK: 'APK_INSTALL_INVALID',
+  INSTALL_FAILED_BAD_SIGNATURE: 'APK_INSTALL_SIGNATURE_CONFLICT',
+  INSTALL_PARSE_FAILED_NO_CERTIFICATES: 'APK_INSTALL_SIGNATURE_CONFLICT',
+  INSTALL_PARSE_FAILED_INCONSISTENT_CERTIFICATES: 'APK_INSTALL_SIGNATURE_CONFLICT',
+  INSTALL_FAILED_UPDATE_INCOMPATIBLE: 'APK_INSTALL_SIGNATURE_CONFLICT',
+  INSTALL_FAILED_SHARED_USER_INCOMPATIBLE: 'APK_INSTALL_SIGNATURE_CONFLICT',
+  INSTALL_FAILED_MISSING_SPLIT: 'APK_INSTALL_SPLIT_REQUIRED',
+  INSTALL_FAILED_NO_MATCHING_ABIS: 'APK_INSTALL_ABI_MISMATCH',
+  INSTALL_FAILED_CPU_ABI_INCOMPATIBLE: 'APK_INSTALL_ABI_MISMATCH',
+  INSTALL_FAILED_OLDER_SDK: 'APK_INSTALL_ANDROID_VERSION',
+  INSTALL_FAILED_NEWER_SDK: 'APK_INSTALL_ANDROID_VERSION',
+  INSTALL_FAILED_DEPRECATED_SDK_VERSION: 'APK_INSTALL_ANDROID_VERSION',
+  INSTALL_FAILED_ALREADY_EXISTS: 'APK_INSTALL_ALREADY_PRESENT',
+  INSTALL_FAILED_VERSION_DOWNGRADE: 'APK_INSTALL_VERSION_CONFLICT',
+  INSTALL_FAILED_INSUFFICIENT_STORAGE: 'APK_INSTALL_NO_SPACE',
+  INSTALL_FAILED_USER_RESTRICTED: 'APK_INSTALL_RESTRICTED',
+  INSTALL_FAILED_VERIFICATION_FAILURE: 'APK_INSTALL_RESTRICTED',
+};
 export function isAndroidInstallRejection(output: string) {
-  return /^(?:adb: failed to install [^\r\n]+:[ \t]*)?Failure \[INSTALL_(?:FAILED|PARSE_FAILED)_[A-Z0-9_]+(?::[^\r\n]*)?\][ \t]*\r?$/m.test(
-    output,
-  );
+  return installRejection.test(output);
+}
+export function androidInstallFailure(output: string): ApkInstallFailureCode {
+  const reason = installRejection.exec(output)?.[1];
+  if (reason)
+    return (
+      installCategories[reason] ??
+      (reason.startsWith('INSTALL_PARSE_FAILED_') ? 'APK_INSTALL_INVALID' : 'APK_INSTALL_REJECTED')
+    );
+  if (
+    /^(?:(?:adb|error):[ \t]*)*(?:device offline|device unauthorized|no devices\/emulators found|device '[^'\r\n]+' not found)[ \t]*\r?$/im.test(
+      output,
+    )
+  )
+    return 'APK_INSTALL_DEVICE_UNAVAILABLE';
+  return 'APK_INSTALL_UNCONFIRMED';
 }
 export async function androidCommand(
   file: string,
@@ -62,7 +97,8 @@ export async function androidCommand(
   cwd?: string,
   outputLimit = 16384,
   input?: Buffer,
-  onNonzeroExit?: (output: string) => void,
+  onNonzeroExit?: (output: string) => string | void,
+  timeoutCode = code,
 ) {
   return new Promise<string>((ok, no) => {
     const child = spawn(file, args, {
@@ -88,7 +124,7 @@ export async function androidCommand(
     };
     const timer = setTimeout(() => {
       child.kill('SIGKILL');
-      finish(new RegistrationError(code));
+      finish(new RegistrationError(timeoutCode));
     }, timeout);
     child.stdout?.on('data', (b: Buffer) => {
       if (text.length < outputLimit) text += b.toString().slice(0, outputLimit - text.length);
@@ -98,10 +134,14 @@ export async function androidCommand(
     });
     child.on('error', () => finish(new RegistrationError(code)));
     child.on(onNonzeroExit ? 'close' : 'exit', (status: number | null) => {
-      if (!settled && status !== null && status !== 0 && !signal?.aborted)
-        onNonzeroExit?.(text + '\n' + stderr);
+      const reported =
+        !settled && status !== null && status !== 0 && !signal?.aborted
+          ? onNonzeroExit?.(text + '\n' + stderr)
+          : undefined;
       finish(
-        status === 0 ? undefined : new RegistrationError(signal?.aborted ? 'CANCELLED' : code),
+        status === 0
+          ? undefined
+          : new RegistrationError(signal?.aborted ? 'CANCELLED' : (reported ?? code)),
       );
     });
     child.stdin?.on('error', () => {});
@@ -630,15 +670,15 @@ export async function startAndroid(
           env,
           signal,
           120000,
-          'APK_INSTALL_FAILED',
+          'APK_INSTALL_UNCONFIRMED',
           workspace,
           16384,
           undefined,
-          previous
-            ? (output) => {
-                rejected = isAndroidInstallRejection(output);
-              }
-            : undefined,
+          (output) => {
+            rejected = isAndroidInstallRejection(output);
+            return androidInstallFailure(output);
+          },
+          'APK_INSTALL_TIMEOUT',
         ).catch(async (error: unknown) => {
           if (rejected && previous) {
             const current = await packages().catch(() => null);
@@ -647,7 +687,8 @@ export async function startAndroid(
           }
           throw error;
         });
-        if (!/^Success\s*$/m.test(value)) throw new RegistrationError('APK_INSTALL_FAILED');
+        if (!/^Success[ \t]*\r?$/m.test(value) || isAndroidInstallRejection(value))
+          throw new RegistrationError('APK_INSTALL_UNCONFIRMED');
         if (previous) {
           const added = [...(await packages())].filter((pkg) => !previous.has(pkg));
           if (added.length !== 1) throw new RegistrationError('APP_PACKAGE_UNCONFIRMED');
