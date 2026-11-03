@@ -300,22 +300,39 @@ test('1.8 managed tasks: real PostgreSQL, persistent orchestration and browser c
       },
     );
     await t.test(
-      'resume retains global successes and attempts and never replays a submitted run',
+      'start after stop uses a fresh budget and never replays a submitted run',
       async () => {
         await db.run.update({
           where: { id: registerId },
-          data: { successes: 1, attemptsStarted: 2 },
+          data: { successes: 1, attemptsStarted: 7 },
         });
-        await control('START');
+        const stopped = await cycle();
+        const version = (await taskPlanDetail(db, task.id)).task.version;
+        const idem = key();
+        const start = () =>
+          call('/task-plans/' + task.id + '/control', 'POST', { action: 'START' }, version, idem);
+        const starts = await Promise.all([start(), start()]);
+        assert.ok(starts.every((r) => r.status === 200));
+        const fresh = starts[0].data.latestCycle;
+        assert.equal(starts[1].data.latestCycle.id, fresh.id);
+        assert.notEqual(fresh.id, stopped.id);
+        assert.equal(fresh.round, stopped.round + 1);
+        assert.equal(fresh.successes, 0);
+        assert.equal(fresh.attemptsStarted, 0);
         await ticks();
         const c = await cycle();
         await finish(c.proxyRunId);
-        await ticks();
+        await ticks(2);
         const latest = (await cycle()).runs.filter((r) => r.purpose === 'REGISTER').at(-1);
         assert.notEqual(latest.id, registerId);
-        assert.equal(latest.successTarget, 2);
-        assert.equal(latest.attemptLimit, 6);
+        assert.equal(latest.successTarget, 3);
+        assert.equal(latest.attemptLimit, 8);
         assert.equal(latest.sourceDownloadId, downloadId);
+        assert.equal(await db.run.count({ where: { nodeId: node.id, purpose: 'DOWNLOAD' } }), 1);
+        const history = await db.run.findUniqueOrThrow({ where: { id: registerId } });
+        assert.equal(history.status, 'CANCELLED');
+        assert.equal(history.successes, 1);
+        assert.equal(history.attemptsStarted, 7);
         await finish(latest.id, 'NEEDS_REVIEW', {
           attemptsStarted: 1,
           errorCode: 'REGISTRATION_UNKNOWN',
@@ -343,11 +360,13 @@ test('1.8 managed tasks: real PostgreSQL, persistent orchestration and browser c
       },
     );
     await t.test(
-      'resume adopts the edited registration settings and rejects stale generations',
+      'start after stop adopts edited configuration and limits and rejects stale generations',
       async () => {
         const d = await taskPlanDetail(db, task.id);
         const changed = {
           ...input,
+          successTarget: 5,
+          attemptLimit: 6,
           configId: task.configId,
           configuration: {
             ...d.configuration,
@@ -372,6 +391,9 @@ test('1.8 managed tasks: real PostgreSQL, persistent orchestration and browser c
         await control('START');
         const c = await cycle();
         assert.equal(c.configVersionId, saved.currentVersionId);
+        assert.equal(c.successTarget, 5);
+        assert.equal(c.attemptLimit, 6);
+        assert.equal(c.round, d.task.latestCycle.round + 1);
         const common = {
           nodeId: node.id,
           configVersionId: c.configVersionId,
@@ -393,7 +415,7 @@ test('1.8 managed tasks: real PostgreSQL, persistent orchestration and browser c
       },
     );
     await t.test(
-      'resume after an Agent upgrade uses the installed release and preserves counters and old snapshots',
+      'start after stop and active version adoption both use the installed release',
       async () => {
         const before = await cycle(),
           priorRelease = release.id,
@@ -412,19 +434,14 @@ test('1.8 managed tasks: real PostgreSQL, persistent orchestration and browser c
         });
         await control('START');
         const resumed = await cycle();
-        assert.equal(resumed.id, before.id);
+        assert.notEqual(resumed.id, before.id);
         assert.equal(resumed.releaseId, upgraded.id);
-        assert.equal(resumed.generation, before.generation + 1);
-        assert.equal(resumed.downloadRunId, before.downloadRunId);
-        assert.deepEqual(resumed.runs, before.runs);
-        const view = (await taskPlanDetail(db, task.id)).task.latestCycle;
-        assert.equal(
-          view.attemptsStarted,
-          before.runs.reduce((n, r) => n + r.attemptsStarted, 0),
-        );
-        assert.equal(
-          view.successes,
-          before.runs.reduce((n, r) => n + r.successes, 0),
+        assert.deepEqual(
+          await db.managedCycle.findUniqueOrThrow({
+            where: { id: before.id },
+            include: { runs: { orderBy: { createdAt: 'asc' } } },
+          }),
+          before,
         );
         await control('STOP');
         await ticks();
@@ -508,6 +525,7 @@ test('1.8 managed tasks: real PostgreSQL, persistent orchestration and browser c
         await control('STOP');
         await ticks();
         assert.equal((await cycle()).status, 'STOPPING');
+        await assert.rejects(control('START'), (e) => e.code === 'STOP_PENDING');
         assert.equal(
           (await db.nodeSlot.findUniqueOrThrow({ where: { nodeId: node.id } })).runId,
           c.proxyRunId,
@@ -579,8 +597,6 @@ test('1.8 managed tasks: real PostgreSQL, persistent orchestration and browser c
         await ticks();
         assert.equal((await cycle()).downloadRunId, downloadId);
         assert.equal(await db.run.count({ where: { nodeId: node.id, purpose: 'DOWNLOAD' } }), 1);
-        await control('STOP');
-        await ticks();
       },
     );
     await t.test('a completed quota never becomes an extra round on repeated start', async () => {
@@ -590,6 +606,8 @@ test('1.8 managed tasks: real PostgreSQL, persistent orchestration and browser c
         successes: c.successTarget,
         attemptsStarted: c.successTarget,
       });
+      await ticks();
+      assert.equal((await cycle()).status, 'DONE');
       const before = await db.run.count({ where: { nodeId: node.id } }),
         rounds = await db.managedCycle.count({ where: { taskId: task.id } });
       const result = await control('START');

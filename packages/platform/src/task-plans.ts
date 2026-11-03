@@ -539,9 +539,9 @@ export async function controlTaskPlan(
         )
           fault('TASK_ACTIVE', '请先结束当前轮次');
         if (latest?.status === 'STOPPING') fault('STOP_PENDING', '正在等待停止与清理确认');
+        const continueLatest = latest && input.action === 'START' && latest.status !== 'STOPPED';
         if (
-          latest &&
-          input.action === 'START' &&
+          continueLatest &&
           !closed.includes(latest.status) &&
           latest.status !== 'NEEDS_REVIEW' &&
           latest.releaseId === node.agentReleaseId
@@ -557,7 +557,12 @@ export async function controlTaskPlan(
             !node.agentReleaseId
           )
             fault('NODE_NOT_READY', '服务器尚未就绪，请检查服务器');
-          if (latest && input.action === 'START') {
+          if (
+            input.action === 'START' &&
+            latest?.runs.some((r) => r.status === 'NEEDS_REVIEW' && !r.reviewResolvedAt)
+          )
+            fault('REVIEW_REQUIRED', '请先核验未知结果并确认清理');
+          if (continueLatest) {
             const prior = await tx.configVersion.findUniqueOrThrow({
               where: { id: latest.configVersionId },
             });
@@ -568,8 +573,6 @@ export async function controlTaskPlan(
               fault('NEW_ROUND_REQUIRED', '执行模式已变更，请新增一轮，历史计数保留');
             if (latest.nodeId !== p.nodeId)
               fault('NEW_ROUND_REQUIRED', '更换服务器后请显式新增一轮');
-            if (latest.runs.some((r) => r.status === 'NEEDS_REVIEW' && !r.reviewResolvedAt))
-              fault('REVIEW_REQUIRED', '请先核验未知结果并确认清理');
             const totals = counts(latest);
             if (
               totals.successes < latest.successTarget &&
@@ -610,14 +613,14 @@ export async function controlTaskPlan(
           }
         }
         const completed =
-          latest &&
+          continueLatest &&
           closed.includes(latest.status) &&
           (counts(latest).successes >= latest.successTarget ||
             counts(latest).attemptsStarted >= latest.attemptLimit);
         await tx.managedTask.update({
           where: { id },
           data: {
-            enabled: input.action === 'START' && completed ? p.automatic : true,
+            enabled: completed ? p.automatic : true,
             version: { increment: 1 },
           },
         });

@@ -294,6 +294,21 @@ test('waiting without a current batch explains the blocker instead of opening ol
     await expect(row()).toContainText('历史结果和已用次数保留');
   }));
 
+test('a confirmed stop allows direct start even with an exhausted previous quota', async () =>
+  fixture(async ({ page, state, writes, row }) => {
+    state.a.latestCycle = {
+      ...state.cycle(),
+      status: 'STOPPED',
+      attemptsStarted: 20,
+      activeRunId: null,
+    };
+    await open(page);
+    await expect(row()).toContainText('已停止');
+    await row().getByRole('button', { name: '开始', exact: true }).click();
+    await expect.poll(() => writes.length).toBe(1);
+    assert.equal(writes[0].body.action, 'START');
+  }));
+
 test('completed rounds require explicit confirmation; stale and legacy configurations cannot silently start', async () =>
   fixture(async ({ page, state, writes, row }) => {
     state.a.latestCycle = {

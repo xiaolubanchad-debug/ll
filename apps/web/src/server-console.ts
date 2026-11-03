@@ -9,6 +9,7 @@ export const finishedCycle = (task: TaskPlanView) => {
   const c = task.latestCycle;
   return (
     !!c &&
+    c.status !== 'STOPPED' &&
     !activeCycle(task) &&
     (c.successes >= c.successTarget || c.attemptsStarted >= c.attemptLimit)
   );

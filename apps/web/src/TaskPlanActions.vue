@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue';
 import type { TaskPlanView, TaskControlInput } from '@apk/contracts';
 import { mutation } from './api';
+import { activeCycle, finishedCycle } from './server-console';
 const props = defineProps<{ task: TaskPlanView }>(),
   emit = defineEmits<{ changed: []; edit: [] }>();
 const busy = ref(false),
@@ -12,19 +13,8 @@ const busy = ref(false),
 const historical = computed(
   () => props.task.executionKind !== 'APP_OPEN' && props.task.executionKind !== 'DOWNLOAD_ONLY',
 );
-const active = computed(
-  () =>
-    props.task.latestCycle &&
-    !['DONE', 'FAILED', 'STOPPED'].includes(props.task.latestCycle.status),
-);
-const finished = computed(() => {
-  const c = props.task.latestCycle;
-  return (
-    c &&
-    ['DONE', 'FAILED', 'STOPPED'].includes(c.status) &&
-    (c.successes >= c.successTarget || c.attemptsStarted >= c.attemptLimit)
-  );
-});
+const active = computed(() => activeCycle(props.task));
+const finished = computed(() => finishedCycle(props.task));
 async function control(action: TaskControlInput['action']) {
   if (historical.value && ['START', 'NEW_ROUND', 'RETRY_DOWNLOAD'].includes(action)) {
     error.value = '历史账户流程请先转换为 APP 打开测试，原记录保留。';

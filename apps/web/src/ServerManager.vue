@@ -232,10 +232,7 @@ async function startTask(node: NodeView) {
     error.value = startReason(node, task);
     return;
   }
-  if (
-    task.latestCycle?.errorCode === 'TARGET_LIMIT' &&
-    ['FAILED', 'STOPPED'].includes(task.latestCycle.status)
-  ) {
+  if (task.latestCycle?.status === 'FAILED' && task.latestCycle.errorCode === 'TARGET_LIMIT') {
     confirmTaskKind.value = 'RETRY_DOWNLOAD';
     confirmTask.value = task;
     return;
