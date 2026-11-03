@@ -1,6 +1,6 @@
 # HTTP 接口契约
 
-1.24 新增 `GET /apk-assets/workbench`，通过 `nodeId` 与 `configVersionId` 查询。带 `resourceAction` 的 `POST /runs` 创建手动扫描或单入口直链下载。两种操作沿用下载事件、租约和幂等。见 [APK 下载工作台契约](../docs/V124_APK_WORKBENCH_CONTRACT.md)。
+1.24 新增 `GET /apk-assets/workbench`，通过 `nodeId` 与 `configVersionId` 查询。带 `resourceAction` 的 `POST /runs` 创建手动扫描或单入口直链下载。1.24.1 增加资源行的 `overLimit`、`cacheMissing` 状态，以及 `APK_RESPONSE_NOT_FILE` 错误。下载 URL 加密存储，仅对有权查看资源的管理员和已验明租约的执行节点下发。见 [APK 下载工作台契约](../docs/V124_APK_WORKBENCH_CONTRACT.md)。
 
 1.23.5 为 APP 启动停留增加 `phone-31` 至 `phone-55` 档案 ID。Agent 0.17.8 的设备会话发布包含 API 35 主镜像及 API 34、36 附加镜像。旧档案和签名清单继续可读。见 [Android 14–16 设备池](../docs/V123_WEB_PROXY_AND_RECOVERY_CONTRACT.md#1235-android-1416-设备池)。
 

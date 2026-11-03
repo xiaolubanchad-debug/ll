@@ -123,6 +123,7 @@ export class P2Controller {
     await expireRuns(this.db);
     const run = await this.db.run.findUnique({
       where: { id: uuid(id) },
+      omit: { resourceUrlEncrypted: true },
       include: { delivery: true, _count: { select: { tasks: true } } },
     });
     if (!run) fault('NOT_FOUND', '批次不存在', 404);

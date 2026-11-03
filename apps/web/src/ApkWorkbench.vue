@@ -38,7 +38,7 @@ const downloadStatus = (row: ApkWorkbenchView['items'][number]) => {
     case 'STOP_REQUESTED':
       return '停止中';
     case 'SUCCEEDED':
-      return '可用';
+      return row.cacheMissing ? '缓存缺失' : row.overLimit ? '超过上限' : '可用';
     case 'CANCELLED':
       return '已取消';
     case 'NEEDS_REVIEW':
@@ -227,6 +227,8 @@ onUnmounted(() => clearInterval(timer));
                 ></template
               >
               <span v-else>—</span>
+              <small v-if="row.cacheMissing">缓存缺失，请重新下载</small>
+              <small v-if="row.overLimit">超过当前大小上限，调整配置后可复用</small>
             </td>
             <td>
               <el-button

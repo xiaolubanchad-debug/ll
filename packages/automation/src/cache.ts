@@ -1,5 +1,5 @@
 import { DatabaseSync } from 'node:sqlite';
-import { mkdir, lstat, rename, unlink, rm } from 'node:fs/promises';
+import { mkdir, lstat, rename, unlink, rm, link } from 'node:fs/promises';
 import { join, resolve, sep } from 'node:path';
 import type { ApkMetadata } from '@apk/contracts';
 import { schemaIssues } from '@apk/contracts';
@@ -32,11 +32,12 @@ export class ApkCache {
       row = this.db.prepare('SELECT metadata FROM cache WHERE key=?').get(key);
     if (!row) return null;
     try {
-      const info = await lstat(this.path(key));
-      if (info.isSymbolicLink()) throw new Error();
       const expected = JSON.parse(String(row.metadata)) as ApkMetadata;
       if (schemaIssues('ApkMetadata', expected).length || expected.cacheDay !== day)
         throw new DownloadError('CACHE_INVALID');
+      if (expected.size > max) return null;
+      const info = await lstat(this.path(key));
+      if (info.isSymbolicLink()) throw new Error();
       await verifyFileTransfer(this.path(key), expected, max, signal);
       return expected;
     } catch (error) {
@@ -55,6 +56,59 @@ export class ApkCache {
         'INSERT OR REPLACE INTO cache (key,node,day,target,metadata,active) VALUES (?,?,?,?,?,1)',
       )
       .run(key, node, day, target, JSON.stringify(metadata));
+  }
+  async putResource(
+    node: string,
+    day: string,
+    target: string,
+    temp: string,
+    metadata: ApkMetadata,
+    signal: AbortSignal,
+  ) {
+    const key = this.key(node, day, target);
+    const matches = this.db
+      .prepare(
+        "SELECT key, day, target FROM cache WHERE node=? AND json_valid(metadata) AND json_extract(metadata, '$.apkSha256')=? AND json_extract(metadata, '$.size')=?",
+      )
+      .all(node, metadata.apkSha256, metadata.size);
+    let source = temp;
+    for (const match of matches) {
+      const cached = await this.get(
+        node,
+        String(match.day),
+        String(match.target),
+        metadata.size,
+        signal,
+      );
+      if (cached?.apkSha256 === metadata.apkSha256 && cached.size === metadata.size) {
+        source = this.path(String(match.key));
+        break;
+      }
+    }
+    signal.throwIfAborted();
+    const destination = this.path(key);
+    await link(source, destination);
+    try {
+      this.db
+        .prepare('INSERT INTO cache (key,node,day,target,metadata) VALUES (?,?,?,?,?)')
+        .run(key, node, day, target, JSON.stringify(metadata));
+    } catch (error) {
+      await unlink(destination).catch(() => {});
+      throw error;
+    }
+  }
+  async pruneResources(node: string, keep: Set<string>, signal: AbortSignal) {
+    const rows = this.db.prepare('SELECT key,target FROM cache WHERE node=?').all(node);
+    for (const row of rows) {
+      if (signal.aborted) return;
+      if (keep.has(String(row.target))) continue;
+      try {
+        await unlink(this.path(String(row.key)));
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') continue;
+      }
+      this.db.prepare('DELETE FROM cache WHERE key=?').run(row.key);
+    }
   }
   availableName(node: string, day: string, target: string, desired: string, sha: string) {
     const name = apkFileName(desired);
@@ -79,6 +133,7 @@ export class ApkCache {
     max: number,
     signal: AbortSignal,
   ) {
+    if (expected.size > max) return null;
     const rows = this.db
       .prepare('SELECT target,metadata FROM cache WHERE node=? AND day=?')
       .all(node, day);

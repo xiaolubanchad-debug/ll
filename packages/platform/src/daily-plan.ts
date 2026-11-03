@@ -28,7 +28,7 @@ import { digest, canonical } from './security.js';
 import { manualAssetsForRun, assertNoPendingManualApks } from './manual-apks.js';
 import { fault } from './errors.js';
 import { dailyOpenUsage, openAdmissionDeadline } from './open-budget.js';
-import { workbenchAssets, workbenchScope } from './apk-workbench.js';
+import { workbenchAssetIssue, workbenchAssets, workbenchScope } from './apk-workbench.js';
 
 export function beijingDay(now: Date) {
   return new Intl.DateTimeFormat('en-CA', {
@@ -254,9 +254,12 @@ export async function prepareDailyPlan(
     plan.proxySecretVersionId = config.execution.proxySecretVersionId;
     if (input.resourceAssets) {
       plan.resourceAssets = true;
-      plan.assets = await workbenchAssets(tx, input.nodeId, version);
-      if (!plan.assets.length)
-        fault('APK_WORKBENCH_EMPTY', '请先在 APK 资源下载至少一个可用文件', 422);
+      const { assets, oversized } = await workbenchAssets(tx, input.nodeId, version);
+      if (!assets.length) {
+        const { code, message } = workbenchAssetIssue(oversized);
+        fault(code, message, 422);
+      }
+      plan.assets = assets;
     } else {
       const source = await tx.run.findUnique({
         where: { id: input.sourceDownloadId! },

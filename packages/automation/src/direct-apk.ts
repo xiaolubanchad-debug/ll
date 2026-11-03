@@ -23,7 +23,7 @@ async function openDirect(
   let url = normalizeUrl(value);
   for (let redirects = 0; redirects <= 5; redirects++) {
     signal.throwIfAborted();
-    const endpoint = await policy.endpoint(url);
+    const endpoint = await policy.endpoint(url, signal);
     const request = endpoint.url.protocol === 'https:' ? httpsRequest : httpRequest;
     const response = await new Promise<IncomingMessage>((resolve, reject) => {
       request(
@@ -124,8 +124,18 @@ export async function runDirectApk(
       config.source.browserUserAgent,
     );
     response = result.response;
-    if (/^(?:text\/html|application\/xhtml\+xml)\b/i.test(response.headers['content-type'] ?? ''))
+    const contentType = (response.headers['content-type'] ?? '')
+      .split(';', 1)[0]
+      .trim()
+      .toLowerCase();
+    if (['text/html', 'application/xhtml+xml'].includes(contentType))
       throw new DownloadError('APK_RESPONSE_HTML');
+    if (
+      contentType.startsWith('text/') ||
+      /\/(?:[^/]+\+)?(?:json|xml)$/.test(contentType) ||
+      (response.headers['content-encoding'] ?? 'identity').toLowerCase() !== 'identity'
+    )
+      throw new DownloadError('APK_RESPONSE_NOT_FILE');
     const length = response.headers['content-length'];
     const total = length === undefined ? null : Number(length);
     if (total !== null && (!Number.isSafeInteger(total) || total < 1))
@@ -152,8 +162,18 @@ export async function runDirectApk(
           if (total !== null && count > total) throw new DownloadError('FILE_TRANSFER_MISMATCH');
           if (prefix.length < 256) {
             prefix = Buffer.concat([prefix, chunk.subarray(0, 256 - prefix.length)]);
-            if (/^\s*(?:<!doctype\s+html|<html\b|<head\b|<body\b)/i.test(prefix.toString('utf8')))
+            const start = prefix.toString('utf8').trimStart();
+            if (/^(?:<!doctype\s+html|<html\b|<head\b|<body\b)/i.test(start))
               throw new DownloadError('APK_RESPONSE_HTML');
+            if (
+              start.startsWith('{') ||
+              start.startsWith('[') ||
+              /^<(?:\?xml|error)\b/i.test(start) ||
+              /^(?:access[ _-]?denied|(?:request|signature|link|token) (?:has )?expired)\b/i.test(
+                start,
+              )
+            )
+              throw new DownloadError('APK_RESPONSE_NOT_FILE');
           }
           if (Date.now() - lastReport >= 1000) await report();
           yield chunk;
@@ -181,7 +201,11 @@ export async function runDirectApk(
       apk.fileName!,
       apk.apkSha256,
     );
-    await cache.put(nodeId, plan.cacheDay, action.cacheKey, file, apk);
+    await cache.putResource(nodeId, plan.cacheDay, action.cacheKey, file, apk, signal);
+    if (plan.resourceCacheKeep)
+      await cache
+        .pruneResources(nodeId, new Set([...plan.resourceCacheKeep, action.cacheKey]), signal)
+        .catch(() => {});
     await emit({ type: 'TASK_STAGE', taskId, payload: { stage: 'DOWNLOADED', apk } });
   } catch (error) {
     if (signal.aborted) throw error;

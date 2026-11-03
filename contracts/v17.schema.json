@@ -3156,6 +3156,12 @@
               "present": {
                 "type": "boolean"
               },
+              "cacheMissing": {
+                "const": true
+              },
+              "overLimit": {
+                "const": true
+              },
               "url": {
                 "anyOf": [
                   {

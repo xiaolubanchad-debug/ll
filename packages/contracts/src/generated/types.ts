@@ -1446,6 +1446,8 @@ export interface ApkWorkbenchView {
     label: string;
     sourceLocator: string;
     present: boolean;
+    cacheMissing?: true;
+    overLimit?: true;
     url: string | null;
     download: {
       id: string;
@@ -2358,6 +2360,10 @@ export interface DailyExecutionPlan {
         cacheKey: string;
         label: string;
       };
+  /**
+   * @maxItems 20000
+   */
+  resourceCacheKeep?: string[];
   resourceAssets?: true;
   resourceScope?: string;
 }

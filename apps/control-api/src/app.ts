@@ -21,7 +21,7 @@ import { V17Controller } from './v17-controllers.js';
 import { V18Controller } from './v18-controllers.js';
 import { V114Controller } from './v114-controllers.js';
 import { V119Controller } from './v119-controllers.js';
-import { digest } from '@apk/platform';
+import { digest, migrateWorkbenchUrls } from '@apk/platform';
 import { ApiError } from './errors.js';
 
 @Module({
@@ -85,6 +85,7 @@ export async function createApp() {
   app.setGlobalPrefix('api/v1');
   app.useGlobalFilters(new ErrorFilter());
   try {
+    await migrateWorkbenchUrls(app.get(Database));
     await app.init();
     return app;
   } catch (error) {

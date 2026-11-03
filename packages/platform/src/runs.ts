@@ -35,6 +35,7 @@ import { idempotent } from './jobs.js';
 import { configSecrets } from './configurations.js';
 import { fault } from './errors.js';
 import { isIP } from 'node:net';
+import { randomUUID } from 'node:crypto';
 import { beijingDay, prepareDailyPlan, dailyTargetKey } from './daily-plan.js';
 import type { DailyExecutionPlan } from '@apk/contracts';
 import { lockLibrary } from './library-lock.js';
@@ -43,7 +44,15 @@ import { sourceAttributeNames } from '@apk/automation';
 import type { SourceElementObservation } from '@apk/contracts';
 import { cachedApkSelectionSupported } from '@apk/contracts';
 import { dailyOpenUsage, openAdmissionDeadline } from './open-budget.js';
-import { publishWorkbenchScan, workbenchScope, workbenchSupported } from './apk-workbench.js';
+import {
+  decryptWorkbenchRunUrl,
+  encryptWorkbenchEntryUrl,
+  encryptWorkbenchRunUrl,
+  publishWorkbenchScan,
+  workbenchCacheKeep,
+  workbenchScope,
+  workbenchSupported,
+} from './apk-workbench.js';
 type Tx = P.TransactionClient;
 export const ACTIVE_RUNS = ['ASSIGNED', 'RUNNING', 'STOP_REQUESTED'] as const;
 export const RUN_END = ['SUCCEEDED', 'PARTIAL_FAILED', 'FAILED', 'CANCELLED', 'NEEDS_REVIEW'];
@@ -418,8 +427,27 @@ export async function createRun(
       if (!old || !RUN_END.includes(old.status) || old.nodeId !== node.id)
         fault('VALIDATION_FAILED', '关联批次无效', 422);
     }
+    const runId = randomUUID();
+    let entryLink;
+    let resourceUrlEncrypted;
+    let executionPlan = plan as unknown as Prisma.InputJsonValue | null;
+    if (plan?.resourceAction?.kind === 'FETCH') {
+      const { url, ...resourceAction } = plan.resourceAction;
+      const key = { ...workbenchScope(node.id, config), targetKey: resourceAction.targetKey };
+      entryLink = { key, encrypted: encryptWorkbenchEntryUrl(url, key) };
+      resourceUrlEncrypted = encryptWorkbenchRunUrl(url, runId);
+      const keep = knownAgentAtLeast(node.agentVersion, '0.17.10')
+        ? await workbenchCacheKeep(tx, node.id)
+        : undefined;
+      executionPlan = {
+        ...plan,
+        resourceAction,
+        ...(keep ? { resourceCacheKeep: keep } : {}),
+      } as unknown as Prisma.InputJsonValue;
+    }
     const run = await tx.run.create({
       data: {
+        id: runId,
         nodeId: input.nodeId,
         configVersionId: input.configVersionId,
         releaseId: input.releaseId,
@@ -433,22 +461,21 @@ export async function createRun(
         ...(cycleId ? { taskCycleId: cycleId } : {}),
         configHash: config.configHash,
         createdBy: actor,
-        ...(plan
-          ? {
-              executionPlan: plan as unknown as Prisma.InputJsonValue,
-              cacheDay: plan.cacheDay,
-            }
-          : {}),
+        ...(plan ? { executionPlan: executionPlan!, cacheDay: plan.cacheDay } : {}),
+        resourceUrlEncrypted,
         ...(dailyKey ? { dailyKey } : {}),
       },
     });
-    if (plan?.resourceAction?.kind === 'FETCH') {
-      const { targetKey, url } = plan.resourceAction;
+    if (entryLink) {
       await tx.apkWorkbenchEntry.update({
-        where: {
-          nodeId_configId_sourceKey_targetKey: { ...workbenchScope(node.id, config), targetKey },
+        where: { nodeId_configId_sourceKey_targetKey: entryLink.key },
+        data: {
+          latestRunId: run.id,
+          url: null,
+          urlEncrypted: entryLink.encrypted,
+          receivedBytes: 0,
+          totalBytes: null,
         },
-        data: { latestRunId: run.id, url, receivedBytes: 0, totalBytes: null },
       });
     }
     if (plan?.openPolicy?.resumeOf)
@@ -675,7 +702,8 @@ export async function deliveryConfig(db: PrismaClient, token: string, id: string
       where: { id: d.run.configVersionId! },
     });
     const config = v.body as unknown as TestConfiguration;
-    const direct = !!(d.run.executionPlan as DailyExecutionPlan | null)?.resourceAction;
+    const plan = d.run.executionPlan as unknown as DailyExecutionPlan | null;
+    const direct = !!plan?.resourceAction;
     const proxyId = direct
       ? null
       : d.run.purpose === 'PROXY_CHECK'
@@ -706,7 +734,20 @@ export async function deliveryConfig(db: PrismaClient, token: string, id: string
       configHash: v.configHash,
       config,
       secretVersions,
-      ...(d.run.executionPlan ? { executionPlan: d.run.executionPlan } : {}),
+      ...(plan
+        ? {
+            executionPlan:
+              plan.resourceAction?.kind === 'FETCH' && d.run.resourceUrlEncrypted
+                ? {
+                    ...plan,
+                    resourceAction: {
+                      ...plan.resourceAction,
+                      url: decryptWorkbenchRunUrl(d.run.resourceUrlEncrypted, d.run.id),
+                    },
+                  }
+                : plan,
+          }
+        : {}),
     };
   });
 }
@@ -1797,6 +1838,23 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
         ...(p.recognition ? { recognition: p.recognition as Prisma.InputJsonValue } : {}),
       },
     });
+    if (
+      run.purpose === 'REGISTER' &&
+      plan?.resourceAssets &&
+      status === 'FAILED' &&
+      p.errorCode === 'CACHE_MISSING'
+    ) {
+      const asset =
+        plan.assets[assignments?.[task.position]?.assetIndex ?? task.position % plan.assets.length];
+      if (asset && asset.apk.size <= (config.download.maxApkBytes ?? 268435456))
+        await tx.apkWorkbenchEntry.updateMany({
+          where: {
+            nodeId: run.nodeId,
+            readyAsset: { path: ['targetKey'], equals: asset.targetKey },
+          },
+          data: { readyAsset: Prisma.DbNull },
+        });
+    }
     if (run.purpose === 'REGISTER' && status === 'SUCCEEDED')
       await tx.run.update({
         where: { id: runId },

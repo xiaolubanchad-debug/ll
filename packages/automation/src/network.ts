@@ -2,6 +2,7 @@ import { createServer, request as httpRequest } from 'node:http';
 import { connect } from 'node:net';
 import type { Socket } from 'node:net';
 import { lookup } from 'node:dns/promises';
+import { addAbortListener } from 'node:events';
 import ipaddr from 'ipaddr.js';
 import { DownloadError, normalizeUrl } from './common.js';
 export class NetworkPolicy {
@@ -9,13 +10,24 @@ export class NetworkPolicy {
     private readonly testEndpoints: ReadonlySet<string> = new Set(),
     private readonly resolver = lookup,
   ) {}
-  async endpoint(value: string) {
+  async endpoint(value: string, signal?: AbortSignal) {
+    signal?.throwIfAborted();
     const u = new URL(normalizeUrl(value));
     const port = Number(u.port || (u.protocol === 'https:' ? 443 : 80));
     if (!Number.isInteger(port) || port < 1 || port > 65535)
       throw new DownloadError('NETWORK_BLOCKED');
     const host = u.hostname.replace(/^\[|\]$/g, '');
-    const answers = await this.resolver(host, { all: true, verbatim: true });
+    const lookupResult = this.resolver(host, { all: true, verbatim: true });
+    let abort: ReturnType<typeof addAbortListener> | undefined;
+    const answers = await (signal
+      ? Promise.race([
+          lookupResult,
+          new Promise<never>((_, reject) => {
+            abort = addAbortListener(signal, () => reject(signal.reason));
+          }),
+        ]).finally(() => abort?.[Symbol.dispose]())
+      : lookupResult);
+    signal?.throwIfAborted();
     const test = this.testEndpoints.has(u.origin);
     if (
       !answers.length ||

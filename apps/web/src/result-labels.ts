@@ -23,6 +23,8 @@ export const reasonLabels: Record<string, string> = {
   APK_DOWNLOAD_INTERRUPTED: '下载连接中断，请重试',
   APK_DOWNLOAD_TIMEOUT: '下载超时，请重试',
   APK_RESPONSE_HTML: '此地址返回网页，请填写 APK 文件直链',
+  APK_RESPONSE_NOT_FILE: '此链接返回错误信息或文本，请核对链接是否过期',
+  APK_CACHE_LIMIT: '已下载的 APK 超过当前大小上限',
   APK_REDIRECT_LIMIT: '下载地址重定向次数过多',
   NETWORK_BLOCKED: '该地址或重定向目标不允许访问',
   DISCOVERY_FAILED: '目标网页读取失败，请核对网站地址',

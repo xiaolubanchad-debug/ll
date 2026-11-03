@@ -42,7 +42,7 @@ import {
   RUN_END,
 } from './runs.js';
 import { taskSourceWarning } from './source-elements.js';
-import { workbenchAssets, workbenchSupported } from './apk-workbench.js';
+import { workbenchAssetIssue, workbenchAssets, workbenchSupported } from './apk-workbench.js';
 type Tx = Prisma.TransactionClient;
 const closed = ['DONE', 'FAILED', 'STOPPED'];
 const cycleInclude = { runs: { orderBy: { createdAt: 'asc' as const } } };
@@ -125,12 +125,13 @@ async function readiness(db: PrismaClient, p: PlanRow) {
     !workbench && !(await db.run.count({ where: dailyDownloadWhere(node.id, p.configId) }));
   if (workbench && !c.execution.appOpen)
     add('APP_OPEN_REQUIRED', '请选择 APP 启动停留配置', 'tasks');
-  if (
-    workbench &&
-    c.execution.appOpen &&
-    !(await workbenchAssets(db, node.id, p.currentVersion)).length
-  )
-    add('APK_WORKBENCH_EMPTY', '请先在 APK 资源下载至少一个可用文件', 'assets');
+  if (workbench && c.execution.appOpen) {
+    const { assets, oversized } = await workbenchAssets(db, node.id, p.currentVersion);
+    if (!assets.length) {
+      const { code, message } = workbenchAssetIssue(oversized);
+      add(code, message, 'assets');
+    }
+  }
   if (needsDownload && !knownAgentAtLeast(node.agentVersion, '0.17.3'))
     add('NODE_UPGRADE_REQUIRED', '网页代理需要 Agent 0.17.3', 'nodes');
   const proxy = c.execution.proxySecretVersionId;
@@ -570,8 +571,11 @@ export async function controlTaskPlan(
             fault('APK_WORKBENCH_REQUIRED', '请在 APK 资源手动下载', 422);
           if (!settings.execution.appOpen)
             fault('APP_OPEN_REQUIRED', '请选择 APP 启动停留配置', 422);
-          if (!(await workbenchAssets(tx, node.id, selected)).length)
-            fault('APK_WORKBENCH_EMPTY', '请先在 APK 资源下载至少一个可用文件', 422);
+          const { assets, oversized } = await workbenchAssets(tx, node.id, selected);
+          if (!assets.length) {
+            const { code, message } = workbenchAssetIssue(oversized);
+            fault(code, message, 422);
+          }
           await configSecrets(tx, settings);
         } else await assertNoPendingManualApks(tx, p.nodeId, p.configId);
         if (

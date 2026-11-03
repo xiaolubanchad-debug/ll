@@ -474,6 +474,7 @@ const knownAgentVersions: readonly string[] = [
   '0.17.7',
   '0.17.8',
   '0.17.9',
+  '0.17.10',
 ];
 export function knownAgentAtLeast(version: string | null | undefined, minimum: string): boolean {
   const required = knownAgentVersions.indexOf(minimum);

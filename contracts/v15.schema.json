@@ -424,6 +424,15 @@
             }
           ]
         },
+        "resourceCacheKeep": {
+          "type": "array",
+          "maxItems": 20000,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
         "resourceAssets": {
           "const": true
         },
@@ -433,6 +442,28 @@
         }
       },
       "allOf": [
+        {
+          "if": {
+            "required": [
+              "resourceCacheKeep"
+            ]
+          },
+          "then": {
+            "required": [
+              "resourceAction"
+            ],
+            "properties": {
+              "resourceAction": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "const": "FETCH"
+                  }
+                }
+              }
+            }
+          }
+        },
         {
           "if": {
             "required": [

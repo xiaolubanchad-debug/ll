@@ -225,6 +225,7 @@ model Run {
   attemptsStarted      Int            @default(0)
   successes            Int            @default(0)
   executionPlan        Json?
+  resourceUrlEncrypted Json?
   proxyObservation     Json?
   tasks                Task[]
   delivery             Delivery?
@@ -326,6 +327,7 @@ model ApkWorkbenchEntry {
   sourceLocator String        @db.VarChar(640)
   present       Boolean
   url           String?       @db.VarChar(4096)
+  urlEncrypted  Json?
   latestRunId   String?       @db.Uuid
   readyAsset    Json?
   downloadedAt  DateTime?     @db.Timestamptz(3)

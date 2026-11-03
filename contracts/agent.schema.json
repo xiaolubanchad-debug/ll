@@ -1621,6 +1621,7 @@
             "APK_DOWNLOAD_INTERRUPTED",
             "APK_DOWNLOAD_TIMEOUT",
             "APK_RESPONSE_HTML",
+            "APK_RESPONSE_NOT_FILE",
             "APK_REDIRECT_LIMIT"
           ]
         }
