@@ -369,6 +369,29 @@ test('1.22.3 remaining apps can only be skipped with confirmed device closure', 
   event.payload = { status: 'PARTIAL_FAILED', errorCode: 'DEVICE_PLAN_EXHAUSTED' };
   assert.deepEqual(agentIssues(input), []);
 });
+test('1.22.4 replacement requires a confirmed device epoch closure', () => {
+  const input = structuredClone(messages.find((m) => m.kind === 'events'));
+  const event = { ...input.events[0], type: 'DEVICE_SESSION' };
+  delete event.taskId;
+  input.events = [event];
+  event.payload = {
+    sessionId: input.deliveryId,
+    phase: 'CLOSED',
+    elapsedMs: 42,
+    cleanupComplete: true,
+    deviceEpoch: 1,
+    replacementReason: 'APP_CLEANUP_UNCONFIRMED',
+  };
+  assert.deepEqual(agentIssues(input), []);
+  event.payload.deviceEpoch = 0;
+  assert.ok(agentIssues(input).length);
+  event.payload.deviceEpoch = 1;
+  event.payload.cleanupComplete = false;
+  assert.ok(agentIssues(input).length);
+  event.payload.cleanupComplete = true;
+  delete event.payload.deviceEpoch;
+  assert.ok(agentIssues(input).length);
+});
 for (const [name, value] of Object.entries(v15Examples)) {
   test('1.5 valid ' + name, () => assert.deepEqual(schemaIssues(name, value), []));
 }

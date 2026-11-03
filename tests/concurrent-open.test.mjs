@@ -92,6 +92,8 @@ test('legacy two-worker snapshots execute serially with exact quotas, cache pin 
     dirty = false,
     cutoff = false,
     groupClose,
+    preserve = false,
+    failPreparation = false,
   } = {}) {
     const abort = new AbortController(),
       events = [],
@@ -127,6 +129,10 @@ test('legacy two-worker snapshots execute serially with exact quotas, cache pin 
         assetIndexes: [0, 1],
         supportedAbis: ['x86_64'],
       }));
+      if (preserve) {
+        plan.openPolicy.preserveQueue = true;
+        plan.openPolicy.concurrency = 1;
+      }
     }
     const promise = runCachedAppOpens(
       executionConfig,
@@ -140,15 +146,18 @@ test('legacy two-worker snapshots execute serially with exact quotas, cache pin 
       () => {
         abort.signal.throwIfAborted();
       },
-      async (_target, chosen, path, index, signal) => {
+      async (target, chosen, path, index, signal, beginAttempt) => {
         launched.push(index);
         active++;
         peak = Math.max(peak, active);
         const chosenKey = chosen.apkSha256 === apk.apkSha256 ? targetKey : secondKey;
         assert.equal(path, cache.path(cache.key(nodeId, day, chosenKey)));
         try {
+          if (failPreparation && index === 0 && target.deviceEpoch === 1)
+            return { ...failed('APPIUM_FAILED'), preparationFailed: true };
+          await beginAttempt?.();
           if (stop && index === 0) abort.abort();
-          if (dirty && index === 1) {
+          if (dirty && index === 1 && !preserve) {
             while (!signal.aborted) await delay(1);
           } else await delay(index === 0 ? 20 : 3);
           if (cutoff) now = 1000;
@@ -208,6 +217,20 @@ test('legacy two-worker snapshots execute serially with exact quotas, cache pin 
   const groupUnclean = await run({ n: 4, m: 4, dirty: true, groupClose: false });
   assert.deepEqual(groupUnclean.launched, [0]);
   assert.deepEqual(groupUnclean.final, { status: 'NEEDS_REVIEW', errorCode: 'CLEANUP_INCOMPLETE' });
+  const continued = await run({ n: 4, m: 4, dirty: true, groupClose: true, preserve: true });
+  assert.deepEqual(continued.launched, [0, 1, 2, 3]);
+  assert.deepEqual(continued.final, { status: 'PARTIAL_FAILED', errorCode: 'ATTEMPT_LIMIT' });
+  assert.ok(continued.events.some((e) => e.payload.deviceEpoch === 2));
+  const prepared = await run({
+    n: 4,
+    m: 4,
+    groupClose: true,
+    preserve: true,
+    failPreparation: true,
+  });
+  assert.deepEqual(prepared.launched, [0, 0, 1, 2, 3]);
+  assert.equal(prepared.events.filter((e) => e.payload.stage === 'DOWNLOADING').length, 4);
+  assert.deepEqual(prepared.final, { status: 'SUCCEEDED' });
   const ended = await run({ cutoff: true });
   assert.equal(ended.launched.length, 1);
   assert.equal(ended.final.errorCode, 'DAY_CUTOFF');

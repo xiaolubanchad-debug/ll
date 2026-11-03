@@ -5,6 +5,7 @@ import {
   devicePlanIssues,
   EXECUTION_DEVICE_LIMIT,
   executionCapacitySupported,
+  knownAgentAtLeast,
   MAX_DAILY_OPEN_LIMIT,
 } from '@apk/contracts';
 import {
@@ -49,6 +50,7 @@ export async function prepareDailyPlan(
   input: RunInput,
   version: ConfigVersion,
   now: Date,
+  resume?: { runId: string; cycleId: string },
 ): Promise<DailyExecutionPlan | null> {
   if (!input.purpose) {
     if (
@@ -117,6 +119,10 @@ export async function prepareDailyPlan(
             ? { capacityVersion: 1 as const }
             : {}),
           admissionDeadline: deadline,
+          ...(config.execution.appOpen.appsPerDevice &&
+          knownAgentAtLeast(identityNode.agentVersion, '0.17.2')
+            ? { preserveQueue: true as const }
+            : {}),
           ...(config.execution.appOpen.randomDeviceProfile &&
           !config.execution.appOpen.appsPerDevice
             ? {
@@ -131,6 +137,59 @@ export async function prepareDailyPlan(
     }
     if (config.execution.mode !== 'FULL')
       fault('PROXY_CONFIG_INVALID', '请在完整配置中应用代理并保存版本', 422);
+    if (resume) {
+      const old = await tx.run.findUnique({
+        where: { id: resume.runId },
+        include: {
+          tasks: { select: { position: true, attemptStarted: true } },
+        },
+      });
+      const original = old?.executionPlan as unknown as DailyExecutionPlan | undefined;
+      if (
+        !old ||
+        old.taskCycleId !== resume.cycleId ||
+        old.nodeId !== input.nodeId ||
+        old.configVersionId !== version.id ||
+        old.sourceDownloadId !== input.sourceDownloadId ||
+        old.status !== 'NEEDS_REVIEW' ||
+        old.errorCode !== 'CLEANUP_INCOMPLETE' ||
+        !old.reviewResolvedAt ||
+        !old.cleanupConfirmedAt ||
+        !old.stopRequested ||
+        !old.discovered ||
+        original?.cacheDay !== plan.cacheDay ||
+        !original.openPolicy?.preserveQueue ||
+        !original.openPolicy.sessions ||
+        !plan.openPolicy?.preserveQueue ||
+        old.tasks.length !== original.attemptLimit
+      )
+        fault('DEVICE_QUEUE_UNAVAILABLE', '原批次队列或清理回执不完整，暂停续跑', 409);
+      const started = new Set(
+        old.tasks.filter((task) => task.attemptStarted).map((task) => task.position),
+      );
+      let position = 0;
+      const sessions = original.openPolicy.sessions.flatMap((session) => {
+        const assetIndexes = session.assetIndexes.filter(() => !started.has(position++));
+        return assetIndexes.length ? [{ ...session, assetIndexes }] : [];
+      });
+      const remaining: DailyExecutionPlan = {
+        ...original,
+        successTarget: input.successTarget!,
+        attemptLimit: input.attemptLimit!,
+        openPolicy: {
+          ...original.openPolicy,
+          dailyLimit: plan.openPolicy.dailyLimit,
+          resumeOf: old.id,
+          sessions,
+        },
+      };
+      if (
+        schemaIssues('DailyExecutionPlan', remaining).length ||
+        devicePlanIssues(config, remaining).length
+      )
+        fault('DEVICE_QUEUE_UNAVAILABLE', '原批次剩余队列与执行额度不一致，暂停续跑', 409);
+      return remaining;
+    }
     const source = await tx.run.findUnique({
       where: { id: input.sourceDownloadId! },
       include: { configVersion: true, tasks: { orderBy: { position: 'asc' } } },

@@ -1263,6 +1263,11 @@
               "type": "string",
               "format": "uuid"
             },
+            "deviceEpoch": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2001
+            },
             "appIndex": {
               "type": "integer",
               "minimum": 0,
@@ -1545,6 +1550,7 @@
             "ACCOUNT_SYNC_FAILED",
             "ATTEMPT_LIMIT",
             "DEVICE_PLAN_EXHAUSTED",
+            "DEVICE_PREPARATION_FAILED",
             "CACHE_MISSING",
             "NO_ADAPTED_APKS",
             "PROXY_CHECK_FAILED",
@@ -1679,6 +1685,11 @@
         "deviceSessionId": {
           "type": "string",
           "format": "uuid"
+        },
+        "deviceEpoch": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2001
         },
         "appIndex": {
           "type": "integer",
@@ -1987,10 +1998,24 @@
         },
         "skipRemaining": {
           "const": true
+        },
+        "deviceEpoch": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2001
+        },
+        "replacementReason": {
+          "enum": ["APP_CLEANUP_UNCONFIRMED", "DEVICE_PREPARATION_FAILED", "APPIUM_FAILED"]
         }
       },
+      "dependentRequired": {
+        "replacementReason": ["deviceEpoch"]
+      },
       "if": {
-        "required": ["skipRemaining"]
+        "anyOf": [
+          { "required": ["skipRemaining"] },
+          { "required": ["replacementReason"] }
+        ]
       },
       "then": {
         "properties": {

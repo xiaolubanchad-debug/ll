@@ -47,6 +47,7 @@ export interface AutomationEvent {
 export interface Target {
   sourceElement?: SourceElement;
   deviceSessionId?: string;
+  deviceEpoch?: number;
   appIndex?: number;
   variantId?: string;
   taskId: string;
@@ -77,6 +78,7 @@ export interface DownloadOptions {
     file: string,
     index: number,
     signal?: AbortSignal,
+    beginAttempt?: () => Promise<void>,
   ) => Promise<RegistrationCompletion>;
 }
 const pause = (ms: number, signal: AbortSignal) =>

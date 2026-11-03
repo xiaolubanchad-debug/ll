@@ -14,6 +14,7 @@ import { RegistrationError } from './registration-types.js';
 import type { RegistrationCompletion } from './registration.js';
 
 export interface AppOpenHooks extends AndroidOptions {
+  beginAttempt?: () => Promise<void>;
   testBootstrap?: () => Promise<import('@apk/contracts').TestBootstrap>;
   testReceipt?: (signal: AbortSignal) => Promise<import('@apk/contracts').TestClientReceipt>;
   androidFactory?: typeof startAndroid;
@@ -32,7 +33,7 @@ export async function openApk(
   signal: AbortSignal,
   emit: (event: AutomationEvent) => Promise<void>,
   hooks: AppOpenHooks,
-): Promise<RegistrationCompletion> {
+): Promise<RegistrationCompletion & { preparationFailed?: boolean }> {
   let session: AndroidSession | undefined,
     cleanupComplete = true,
     reportUnconfirmed = false;
@@ -64,7 +65,7 @@ export async function openApk(
     action();
     if (config.execution.appOpen?.dwellMs !== 10000)
       throw new RegistrationError('APP_OPEN_CONFIG_INVALID');
-    await stage('PREPARING');
+    if (!hooks.beginAttempt) await stage('PREPARING');
     const baseProfile =
       config.execution.deviceProfiles[index % config.execution.deviceProfiles.length];
     const variant = deviceVariant(target.variantId ?? '');
@@ -88,6 +89,10 @@ export async function openApk(
       measure: timer.measure,
     });
     action();
+    if (hooks.beginAttempt) {
+      await hooks.beginAttempt();
+      await stage('PREPARING');
+    }
     if (apk.abis.length && !apk.abis.some((abi) => session!.supportedAbis.includes(abi)))
       throw new RegistrationError('APK_ABI_UNSUPPORTED');
     await timer.measure('APK_VERIFY', () =>
@@ -100,6 +105,7 @@ export async function openApk(
           ? {
               deviceSessionId: target.deviceSessionId,
               appIndex: target.appIndex,
+              ...(target.deviceEpoch ? { deviceEpoch: target.deviceEpoch } : {}),
             }
           : {}),
       },
@@ -182,6 +188,7 @@ export async function openApk(
                     cleanupScope: 'APP_UNINSTALLED' as const,
                     deviceSessionId: target.deviceSessionId,
                     appIndex: target.appIndex,
+                    ...(target.deviceEpoch ? { deviceEpoch: target.deviceEpoch } : {}),
                   }
                 : {}),
             },
@@ -274,5 +281,10 @@ export async function openApk(
       artifactIds: [],
       errorCode: 'CANCELLED',
     };
-  return { ...result, openTimings: timer.finish(), cleanupComplete };
+  return {
+    ...result,
+    openTimings: timer.finish(),
+    cleanupComplete,
+    ...(hooks.beginAttempt && !session && !signal.aborted ? { preparationFailed: true } : {}),
+  };
 }

@@ -60,6 +60,7 @@ export interface TaskCompletion {
     cleanupComplete: true;
     cleanupScope?: 'APP_UNINSTALLED';
     deviceSessionId?: string;
+    deviceEpoch?: number;
     appIndex?: number;
   };
 }

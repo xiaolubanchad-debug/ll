@@ -14,7 +14,8 @@ export type CachedOpenAction = (
   file: string,
   index: number,
   signal: AbortSignal,
-) => Promise<RegistrationCompletion>;
+  beginAttempt?: () => Promise<void>,
+) => Promise<RegistrationCompletion & { preparationFailed?: boolean }>;
 
 export async function runCachedAppOpens(
   config: TestConfiguration,
@@ -111,20 +112,26 @@ export async function runCachedAppOpens(
   let next = 0,
     successes = 0,
     skipped = 0,
+    preparationFailed = false,
     missing = false,
     dirty = false,
     cutoff = false;
   let fatal: unknown;
-  const round = async (index: number) => {
+  const round = async (index: number, deviceEpoch?: number) => {
     beforeAction();
     attemptSignal.throwIfAborted();
-    const target = targets[index],
+    const target = { ...targets[index], ...(deviceEpoch ? { deviceEpoch } : {}) },
       asset = plan.assets[assignments?.[index].assetIndex ?? index % plan.assets.length];
-    await emit({
-      type: 'TASK_STAGE',
-      taskId: target.taskId,
-      payload: { stage: 'DOWNLOADING' },
-    });
+    let attemptBegan = false;
+    const start = async () => {
+      await emit({
+        type: 'TASK_STAGE',
+        taskId: target.taskId,
+        payload: { stage: 'DOWNLOADING' },
+      });
+      attemptBegan = true;
+    };
+    if (!policy.preserveQueue) await start();
     const found = await cache.asset(
       nodeId,
       plan.cacheDay,
@@ -133,8 +140,9 @@ export async function runCachedAppOpens(
       config.download.maxApkBytes ?? 268435456,
       attemptSignal,
     );
-    let completion: RegistrationCompletion;
+    let completion: RegistrationCompletion & { preparationFailed?: boolean };
     if (!found) {
+      if (policy.preserveQueue) await start();
       missing = true;
       completion = {
         status: 'FAILED',
@@ -145,12 +153,41 @@ export async function runCachedAppOpens(
       };
     } else {
       cache.pin(nodeId, plan.cacheDay, asset.targetKey);
-      await emit({
-        type: 'TASK_STAGE',
-        taskId: target.taskId,
-        payload: { stage: 'DOWNLOADED', cacheHit: true, apk: asset.apk },
-      });
-      completion = await execute(target, asset.apk, found.file, index, attemptSignal);
+      const loaded = () =>
+        emit({
+          type: 'TASK_STAGE',
+          taskId: target.taskId,
+          payload: { stage: 'DOWNLOADED', cacheHit: true, apk: asset.apk },
+        });
+      if (!policy.preserveQueue) await loaded();
+      completion = await execute(
+        target,
+        asset.apk,
+        found.file,
+        index,
+        attemptSignal,
+        policy.preserveQueue
+          ? async () => {
+              if (now() >= deadline) throw new DownloadError('DAY_CUTOFF');
+              await start();
+              await loaded();
+            }
+          : undefined,
+      );
+    }
+    if (completion.preparationFailed)
+      return {
+        success: false,
+        failed: false,
+        missing: false,
+        preparationFailed: true,
+        appiumFailed: completion.errorCode === 'APPIUM_FAILED',
+      };
+    if (!attemptBegan) {
+      attemptSignal.throwIfAborted();
+      if (completion.errorCode === 'DAY_CUTOFF')
+        return { success: false, failed: false, missing: false };
+      throw new DownloadError('DEVICE_SESSION_PLAN_INVALID');
     }
     if (!completion.cleanupComplete) {
       completion = {
@@ -172,6 +209,7 @@ export async function runCachedAppOpens(
     return {
       success: completion.status === 'SUCCEEDED',
       failed: completion.status === 'FAILED' && completion.errorCode !== 'CACHE_MISSING',
+      replaceDevice: !cleanupComplete,
       missing: completion.errorCode === 'CACHE_MISSING',
     };
   };
@@ -190,6 +228,7 @@ export async function runCachedAppOpens(
       );
       successes = result.successes;
       skipped = result.skipped;
+      preparationFailed = result.preparationFailed;
       dirty = result.dirty;
       missing = result.missing;
       cutoff = result.cutoff;
@@ -244,9 +283,11 @@ export async function runCachedAppOpens(
           ? 'NO_ADAPTED_APKS'
           : cutoff
             ? 'DAY_CUTOFF'
-            : skipped
-              ? 'DEVICE_PLAN_EXHAUSTED'
-              : 'ATTEMPT_LIMIT';
+            : preparationFailed
+              ? 'DEVICE_PREPARATION_FAILED'
+              : skipped
+                ? 'DEVICE_PLAN_EXHAUSTED'
+                : 'ATTEMPT_LIMIT';
   await emit({
     type: 'RUN_FINISHED',
     payload: {

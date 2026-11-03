@@ -333,7 +333,18 @@
             },
             "fileAssets": {
               "const": true
+            },
+            "preserveQueue": {
+              "const": true
+            },
+            "resumeOf": {
+              "type": "string",
+              "format": "uuid"
             }
+          },
+          "dependentRequired": {
+            "preserveQueue": ["sessions"],
+            "resumeOf": ["preserveQueue"]
           },
           "allOf": [
             {

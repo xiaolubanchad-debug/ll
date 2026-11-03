@@ -2172,6 +2172,8 @@ export interface DailyExecutionPlan {
     }[];
     capacityVersion?: 1;
     fileAssets?: true;
+    preserveQueue?: true;
+    resumeOf?: string;
   };
 }
 

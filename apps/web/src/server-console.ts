@@ -74,6 +74,11 @@ export function logRun(node: NodeView, task?: TaskPlanView) {
   const c = task?.latestCycle;
   const active = node.activeRunId ?? c?.activeRunId;
   if (active) return active;
+  if (
+    c?.status === 'WAITING' &&
+    ['DEVICE_PREPARATION_FAILED', 'APP_CLEANUP_RESTART_PENDING'].includes(c.errorCode ?? '')
+  )
+    return c.registerRunIds.at(-1) ?? null;
   // A resumed cycle may not have created its new batch yet. Its old runs are history.
   if (c && (['QUEUED', 'WAITING'].includes(c.status) || c.errorCode === 'NODE_RELEASE_CHANGED'))
     return null;

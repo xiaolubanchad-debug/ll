@@ -17,6 +17,11 @@ export function devicePlanIssues(config: TestConfiguration, plan: DailyExecution
   if (plan.openPolicy && openPolicyIssues(plan).length) return ['OPEN_POLICY_INVALID'];
   const range = config.execution.appOpen?.appsPerDevice,
     sessions = plan.openPolicy?.sessions;
+  if (
+    (plan.openPolicy?.preserveQueue && (!sessions || plan.openPolicy.concurrency !== 1)) ||
+    (plan.openPolicy?.resumeOf && !plan.openPolicy.preserveQueue)
+  )
+    return ['DEVICE_QUEUE_POLICY_INVALID'];
   if (!range || plan.purpose !== 'REGISTER') return sessions ? ['UNEXPECTED_DEVICE_SESSIONS'] : [];
   if (plan.openPolicy?.variantIds) return ['MIXED_DEVICE_POLICIES'];
   if (!sessions || !plan.openPolicy || plan.purpose !== 'REGISTER' || !sessions.length)
@@ -28,7 +33,9 @@ export function devicePlanIssues(config: TestConfiguration, plan: DailyExecution
   for (const [i, s] of sessions.entries()) {
     if (
       s.assetIndexes.length > range.max ||
-      (i !== sessions.length - 1 && s.assetIndexes.length < range.min)
+      (i !== sessions.length - 1 &&
+        !(i === 0 && plan.openPolicy.resumeOf) &&
+        s.assetIndexes.length < range.min)
     )
       return ['DEVICE_SESSION_SIZE'];
     if (config.execution.appOpen?.randomDeviceProfile && !deviceVariant(s.variantId ?? ''))

@@ -10,6 +10,7 @@ import {
   deviceAssignments,
 } from '@apk/contracts';
 import { scheduleDeviceSessions } from '../packages/automation/dist/device-sessions.js';
+import { androidCommand, isAndroidInstallRejection } from '../packages/automation/dist/android.js';
 
 async function fixture(n = 6) {
   const config = JSON.parse(
@@ -40,6 +41,36 @@ async function fixture(n = 6) {
   };
   return { config, plan };
 }
+
+test('only a completed Android install rejection can confirm that the package inventory should be checked', async () => {
+  let rejected = false;
+  await assert.rejects(
+    androidCommand(
+      process.execPath,
+      [
+        '-e',
+        "console.error('adb: failed to install sample.apk: Failure [INSTALL_FAILED_OLDER_SDK: fixture]'); process.exitCode=1;",
+      ],
+      process.env,
+      undefined,
+      5000,
+      'APK_INSTALL_FAILED',
+      undefined,
+      16384,
+      undefined,
+      (output) => {
+        rejected = isAndroidInstallRejection(output);
+      },
+    ),
+  );
+  assert.equal(rejected, true);
+  assert.equal(isAndroidInstallRejection('adb: device offline'), false);
+  assert.equal(
+    isAndroidInstallRejection('adb: failed to install sample.apk: Failure [unexpected]'),
+    false,
+  );
+  assert.equal(isAndroidInstallRejection('Failure [INSTALL_FAILED_OLDER_SDK'), false);
+});
 
 test('thirty distinct real model codes and six actual Android API targets; malformed ranges and duplicate packages refused', async () => {
   assert.equal(DEVICE_CATALOG.length, 30);
@@ -209,4 +240,73 @@ test('more than two sessions progress; cleanup failure stops all new admission',
   assert.equal(dirty.dirty, true);
   assert.equal(dirty.skipped, 0);
   assert.equal(count, 1);
+});
+
+test('preserved queue skips only the failed app, replaces a dirty device, and retries preparation once', async () => {
+  const { plan } = await fixture();
+  plan.openPolicy.preserveQueue = true;
+  plan.openPolicy.concurrency = 1;
+  const run = async (attempt, clean = true) => {
+    const events = [],
+      positions = [];
+    const result = await scheduleDeviceSessions(
+      plan,
+      new AbortController().signal,
+      () => {},
+      async (event) => {
+        events.push(event.payload);
+      },
+      async (position, epoch) => {
+        positions.push([position, epoch]);
+        return { success: true, failed: false, missing: false, ...attempt(position, epoch) };
+      },
+      async () => clean,
+    );
+    return { events, positions, result };
+  };
+  const same = await run((i) => (i === 0 ? { success: false, failed: true } : {}));
+  assert.deepEqual(same.positions, [
+    [0, 1],
+    [1, 1],
+    [2, 1],
+    [3, 1],
+    [4, 1],
+    [5, 1],
+  ]);
+  const replacement = await run((i) =>
+    i === 0 ? { success: false, failed: true, replaceDevice: true } : {},
+  );
+  assert.deepEqual(replacement.positions, [
+    [0, 1],
+    [1, 2],
+    [2, 2],
+    [3, 1],
+    [4, 1],
+    [5, 1],
+  ]);
+  assert.equal(replacement.events[1].replacementReason, 'APP_CLEANUP_UNCONFIRMED');
+  assert.equal(replacement.events[2].sessionId, replacement.events[0].sessionId);
+  assert.equal(replacement.events[2].deviceEpoch, 2);
+  assert.equal(
+    replacement.events.some((e) => e.skipRemaining),
+    false,
+  );
+  const preparation = await run((i, epoch) =>
+    i === 0 && epoch === 1 ? { success: false, preparationFailed: true, appiumFailed: true } : {},
+  );
+  assert.deepEqual(preparation.positions.slice(0, 3), [
+    [0, 1],
+    [0, 2],
+    [1, 2],
+  ]);
+  assert.equal(preparation.events[1].replacementReason, 'APPIUM_FAILED');
+  const paused = await run(() => ({ success: false, preparationFailed: true }));
+  assert.deepEqual(paused.positions, [
+    [0, 1],
+    [0, 2],
+  ]);
+  assert.equal(paused.result.preparationFailed, true);
+  const dirty = await run(() => ({ success: false, failed: true, replaceDevice: true }), false);
+  assert.deepEqual(dirty.positions, [[0, 1]]);
+  assert.equal(dirty.result.dirty, true);
 });

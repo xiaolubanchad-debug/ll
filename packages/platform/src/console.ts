@@ -627,8 +627,10 @@ export async function runSummary(db: PrismaClient, id: string): Promise<RunSumma
           : [];
         const states = new Map<string, string>();
         for (const event of events) {
-          const b = event.body as { payload: { sessionId: string; phase: string } };
-          states.set(b.payload.sessionId, b.payload.phase);
+          const { payload } = event.body as {
+            payload: { sessionId: string; phase: string; deviceEpoch?: number };
+          };
+          states.set(payload.sessionId + ':' + (payload.deviceEpoch ?? 1), payload.phase);
         }
         deviceSessions = {
           started: states.size,
@@ -736,12 +738,21 @@ function title(type: string, p: Record<string, unknown>) {
   if (type === 'DEVICE_SESSION')
     return (
       (p.phase === 'STARTED'
-        ? '设备会话开始：准备依次执行随机 APP'
+        ? Number(p.deviceEpoch) > 1
+          ? '替换模拟器启动，继续原 APP 队列'
+          : '设备会话开始：准备依次执行 APP'
         : p.phase === 'CLOSED'
-          ? '设备会话已关闭并完成整机清理'
+          ? p.replacementReason === 'APPIUM_FAILED'
+            ? 'Appium 准备失败，整机已清理，APP 保留待执行'
+            : p.replacementReason === 'DEVICE_PREPARATION_FAILED'
+              ? '设备准备失败，整机已清理，APP 保留待执行'
+              : p.replacementReason
+                ? '设备已清理，剩余 APP 将按原顺序续跑'
+                : '设备会话已关闭并完成整机清理'
           : '设备会话清理失败') +
       ' · ' +
       String(p.sessionId).slice(0, 8) +
+      (p.deviceEpoch ? ' · 第 ' + String(p.deviceEpoch) + ' 台' : '') +
       ' · ' +
       (Number(p.elapsedMs) / 1000).toFixed(2) +
       ' 秒'

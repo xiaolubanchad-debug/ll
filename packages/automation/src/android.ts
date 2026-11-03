@@ -47,6 +47,11 @@ export function isForegroundPackage(output: string, pkg: string): boolean {
   const packages = lines.map((line) => /\bu\d+\s+([A-Za-z][A-Za-z0-9_.]*)\//.exec(line)?.[1]);
   return packages.length > 0 && packages.every((p) => p === pkg);
 }
+export function isAndroidInstallRejection(output: string) {
+  return /^(?:adb: failed to install [^\r\n]+:[ \t]*)?Failure \[INSTALL_(?:FAILED|PARSE_FAILED)_[A-Z0-9_]+(?::[^\r\n]*)?\][ \t]*\r?$/m.test(
+    output,
+  );
+}
 export async function androidCommand(
   file: string,
   args: string[],
@@ -57,16 +62,18 @@ export async function androidCommand(
   cwd?: string,
   outputLimit = 16384,
   input?: Buffer,
+  onNonzeroExit?: (output: string) => void,
 ) {
   return new Promise<string>((ok, no) => {
     const child = spawn(file, args, {
       env,
       cwd,
-      stdio: ['pipe', 'pipe', 'ignore'],
+      stdio: ['pipe', 'pipe', onNonzeroExit ? 'pipe' : 'ignore'],
       windowsHide: true,
       shell: false,
     });
     let text = '',
+      stderr = '',
       settled = false;
     const finish = (error?: Error) => {
       if (settled) return;
@@ -83,17 +90,22 @@ export async function androidCommand(
       child.kill('SIGKILL');
       finish(new RegistrationError(code));
     }, timeout);
-    child.stdout.on('data', (b: Buffer) => {
+    child.stdout?.on('data', (b: Buffer) => {
       if (text.length < outputLimit) text += b.toString().slice(0, outputLimit - text.length);
     });
+    child.stderr?.on('data', (b: Buffer) => {
+      if (stderr.length < outputLimit) stderr += b.toString().slice(0, outputLimit - stderr.length);
+    });
     child.on('error', () => finish(new RegistrationError(code)));
-    child.on('exit', (status) =>
+    child.on(onNonzeroExit ? 'close' : 'exit', (status: number | null) => {
+      if (!settled && status !== null && status !== 0 && !signal?.aborted)
+        onNonzeroExit?.(text + '\n' + stderr);
       finish(
         status === 0 ? undefined : new RegistrationError(signal?.aborted ? 'CANCELLED' : code),
-      ),
-    );
-    child.stdin.on('error', () => {});
-    child.stdin.end(input ?? (file.endsWith('avdmanager') ? 'no\n' : ''));
+      );
+    });
+    child.stdin?.on('error', () => {});
+    child.stdin?.end(input ?? (file.endsWith('avdmanager') ? 'no\n' : ''));
     if (signal?.aborted) abort();
     else signal?.addEventListener('abort', abort, { once: true });
   });
@@ -588,6 +600,7 @@ export async function startAndroid(
       },
       async install(file, resolvePackage = false) {
         options.beforeAction();
+        installedPackage = undefined;
         const packages = async () => {
           const listed = await command(
             adb,
@@ -595,25 +608,45 @@ export async function startAndroid(
             10000,
             'APP_PACKAGE_UNCONFIRMED',
           );
-          return new Set(
-            listed
-              .split(/\r?\n/)
-              .flatMap(
-                (line) =>
-                  /^package:([A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+)$/.exec(
-                    line.trim(),
-                  )?.[1] ?? [],
-              ),
-          );
+          const names = listed
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter(Boolean)
+            .map(
+              (line) =>
+                /^package:([A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+)$/.exec(line)?.[1],
+            );
+          if (names.some((name) => name === undefined))
+            throw new RegistrationError('APP_PACKAGE_UNCONFIRMED');
+          return new Set(names.filter((name) => name !== undefined));
         };
-        const previous = resolvePackage ? await packages() : null;
+        const previous =
+          resolvePackage || options.controlMode === 'DEVICE_SESSION' ? await packages() : null;
         installUnconfirmed = true;
-        const value = await command(
+        let rejected = false;
+        const value = await androidCommand(
           adb,
           ['-s', record.serial!, 'install', '--no-incremental', file],
+          env,
+          signal,
           120000,
           'APK_INSTALL_FAILED',
-        );
+          workspace,
+          16384,
+          undefined,
+          previous
+            ? (output) => {
+                rejected = isAndroidInstallRejection(output);
+              }
+            : undefined,
+        ).catch(async (error: unknown) => {
+          if (rejected && previous) {
+            const current = await packages().catch(() => null);
+            if (current?.size === previous.size && [...current].every((pkg) => previous.has(pkg)))
+              installUnconfirmed = false;
+          }
+          throw error;
+        });
         if (!/^Success\s*$/m.test(value)) throw new RegistrationError('APK_INSTALL_FAILED');
         if (previous) {
           const added = [...(await packages())].filter((pkg) => !previous.has(pkg));
@@ -626,7 +659,11 @@ export async function startAndroid(
       },
       async finishApplication(pkg = installedPackage) {
         if (installUnconfirmed) return false;
-        if (!pkg) return true;
+        if (options.controlMode === 'DEVICE_SESSION') pkg = installedPackage;
+        if (!pkg) {
+          bridge?.resetConnections();
+          return true;
+        }
         if (!/^[A-Za-z][A-Za-z0-9_.]{1,255}$/.test(pkg))
           throw new RegistrationError('CLEANUP_INCOMPLETE');
         const initial = await command(

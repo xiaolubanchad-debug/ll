@@ -63,7 +63,11 @@ export async function reviewRun(tx: Tx, run: Run, code: string) {
   if (run.purpose === 'REGISTER')
     await tx.task.updateMany({
       where: { runId: run.id, status: 'QUEUED', attemptStarted: false },
-      data: { status: 'SKIPPED', errorCode: 'BATCH_NEEDS_REVIEW' },
+      data:
+        code === 'CLEANUP_INCOMPLETE' &&
+        (run.executionPlan as unknown as DailyExecutionPlan | null)?.openPolicy?.preserveQueue
+          ? { errorCode: 'DEVICE_QUEUE_PENDING' }
+          : { status: 'SKIPPED', errorCode: 'BATCH_NEEDS_REVIEW' },
     });
 }
 export const APP_CLEANUP_RESTART_PENDING = 'APP_CLEANUP_RESTART_PENDING';
@@ -162,6 +166,7 @@ export async function createRun(
   scheduleId?: string,
   cycleId?: string,
   cycleGeneration?: number,
+  resumeFromId?: string,
 ) {
   const input = checked<RunInput>('RunInput', body);
   return idempotent(db, actor, 'POST:/runs', key, input, async (tx) => {
@@ -345,7 +350,13 @@ export async function createRun(
       !parallelAppOpenSupported(manifest?.features, node.agentVersion)
     )
       fault('NODE_UPGRADE_REQUIRED', '并发与每日额度需要 Agent 0.11.0');
-    const plan = await prepareDailyPlan(tx, input, config, now);
+    const plan = await prepareDailyPlan(
+      tx,
+      input,
+      config,
+      now,
+      resumeFromId && cycleId ? { runId: resumeFromId, cycleId } : undefined,
+    );
     if (input.purpose === 'PROXY_CHECK')
       await readSecret(tx, input.proxySecretVersionId!, ['HTTP_PROXY']);
     else if (input.purpose !== 'DOWNLOAD') await configSecrets(tx, configuration);
@@ -375,6 +386,7 @@ export async function createRun(
     const run = await tx.run.create({
       data: {
         ...input,
+        ...(plan?.openPolicy?.resumeOf ? { supersedesRunId: plan.openPolicy.resumeOf } : {}),
         ...(cycleId ? { taskCycleId: cycleId } : {}),
         configHash: config.configHash,
         createdBy: actor,
@@ -387,6 +399,19 @@ export async function createRun(
         ...(dailyKey ? { dailyKey } : {}),
       },
     });
+    if (plan?.openPolicy?.resumeOf)
+      await tx.task.updateMany({
+        where: {
+          runId: plan.openPolicy.resumeOf,
+          attemptStarted: false,
+          errorCode: 'DEVICE_QUEUE_PENDING',
+        },
+        data: {
+          status: 'CANCELLED',
+          errorCode: 'DEVICE_QUEUE_TRANSFERRED',
+          finishedAt: new Date(),
+        },
+      });
     if (cycleId)
       await tx.managedCycle.update({
         where: { id: cycleId },
@@ -395,7 +420,7 @@ export async function createRun(
             ? { downloadRunId: run.id, status: 'DOWNLOADING' }
             : input.purpose === 'PROXY_CHECK'
               ? { proxyRunId: run.id, status: 'CHECKING_PROXY' }
-              : { status: 'REGISTERING' },
+              : { status: 'REGISTERING', errorCode: null },
       });
     await tx.nodeSlot.update({
       where: { nodeId: node.id },
@@ -701,10 +726,22 @@ export async function resolveStoppedRun(tx: Tx, nodeId: string) {
     })
   )
     return false;
+  const restarting =
+    plan?.openPolicy?.preserveQueue &&
+    run.taskCycleId &&
+    (await tx.managedCycle.count({
+      where: {
+        id: run.taskCycleId,
+        stopRequested: false,
+        errorCode: APP_CLEANUP_RESTART_PENDING,
+        task: { enabled: true },
+      },
+    }));
   await tx.task.updateMany({
     where: {
       runId: run.id,
       status: { notIn: ['SUCCEEDED', 'FAILED', 'SKIPPED', 'CANCELLED', 'UNKNOWN'] },
+      ...(restarting ? { attemptStarted: true } : {}),
     },
     data: { status: 'CANCELLED', finishedAt: new Date() },
   });
@@ -755,6 +792,7 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
   const plan = run.executionPlan as unknown as DailyExecutionPlan | null;
   const p = event.payload as Record<string, unknown>;
   const assignments = deviceAssignments(plan);
+  const preserveQueue = plan?.openPolicy?.preserveQueue === true;
   if (event.type === 'ELEMENT_OBSERVATION') {
     if (run.purpose === 'REGISTER' || run.purpose === 'PROXY_CHECK')
       fault('EVENT_CONFLICT', '来源元素检查只能属于网页下载阶段');
@@ -815,13 +853,52 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
       },
       orderBy: { sequence: 'asc' },
     });
-    const states = new Map<string, { phase: string }>();
+    const states = new Map<
+      string,
+      {
+        phase: string;
+        deviceEpoch?: number;
+        replacementReason?: string;
+        sequence: number;
+        preparationFailures: number;
+      }
+    >();
     for (const row of rows) {
-      const b = row.body as { payload: { sessionId: string; phase: string } };
-      states.set(b.payload.sessionId, b.payload);
+      const b = row.body as {
+        payload: {
+          sessionId: string;
+          phase: string;
+          deviceEpoch?: number;
+          replacementReason?: string;
+        };
+      };
+      const data = b.payload;
+      const previous = states.get(data.sessionId)?.preparationFailures ?? 0;
+      states.set(data.sessionId, {
+        ...data,
+        sequence: row.sequence,
+        preparationFailures:
+          data.phase === 'STARTED'
+            ? previous
+            : ['DEVICE_PREPARATION_FAILED', 'APPIUM_FAILED'].includes(data.replacementReason ?? '')
+              ? previous + 1
+              : 0,
+      });
     }
     return states;
   };
+  const sessionEventCount = (start: number, type: string, field: string, value: string) =>
+    tx.runEvent.count({
+      where: {
+        delivery: { runId },
+        sequence: { gt: start, lt: event.sequence },
+        recordedForReview: false,
+        AND: [
+          { body: { path: ['type'], equals: type } },
+          { body: { path: ['payload', field], equals: value } },
+        ],
+      },
+    });
   if (plan && config && devicePlanIssues(config, plan).length)
     fault('EVENT_CONFLICT', '设备会话计划无效');
   if (
@@ -840,9 +917,32 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
     const states = await sessionEvents(),
       prior = states.get(group.id);
     const active = Array.from(states.entries()).filter(([, s]) => s.phase === 'STARTED');
+    if (
+      preserveQueue !== (typeof p.deviceEpoch === 'number') ||
+      (preserveQueue && p.skipRemaining) ||
+      (p.replacementReason && p.phase !== 'CLOSED')
+    )
+      fault('EVENT_CONFLICT', '设备清理回执与队列规则不一致');
     if (p.phase === 'STARTED') {
+      if (preserveQueue) {
+        const next = await tx.task.findFirst({
+          where: { runId, status: 'QUEUED' },
+          orderBy: { position: 'asc' },
+          select: { position: true },
+        });
+        if (
+          !next ||
+          assignments[next.position]?.sessionId !== group.id ||
+          p.deviceEpoch !== (prior?.deviceEpoch ?? 0) + 1 ||
+          (prior &&
+            (prior.phase !== 'CLOSED' ||
+              !prior.replacementReason ||
+              prior.preparationFailures >= 2))
+        )
+          fault('EVENT_CONFLICT', '替换设备必须继续原队列，并等待旧设备清理');
+      }
       if (
-        prior ||
+        (!preserveQueue && prior) ||
         p.cleanupComplete !== false ||
         p.elapsedMs !== 0 ||
         [...states.values()].some((s) => s.phase === 'FAILED') ||
@@ -866,10 +966,21 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
       });
       if (
         prior?.phase !== 'STARTED' ||
+        prior.deviceEpoch !== p.deviceEpoch ||
         busy ||
         (p.phase === 'CLOSED') !== (p.cleanupComplete === true)
       )
         fault('EVENT_CONFLICT', '设备会话尚未结束或清理不完整');
+      if (
+        p.replacementReason === 'APP_CLEANUP_UNCONFIRMED' &&
+        !(await sessionEventCount(
+          prior.sequence,
+          'TASK_FINISHED',
+          'errorCode',
+          'APP_CLEANUP_UNCONFIRMED',
+        ))
+      )
+        fault('EVENT_CONFLICT', '缺少当前设备的 APP 清理异常记录');
       if (p.skipRemaining === true) {
         const lastAttempt = await tx.task.findFirst({
           where: { runId, position: { in: positions }, attemptStarted: true },
@@ -1173,8 +1284,19 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
           fault('EVENT_CONFLICT', '上一轮尚未结束或已达到注册配额');
         if (assignments) {
           const assignment = assignments[task.position];
-          if (!assignment || (await sessionEvents()).get(assignment.sessionId)?.phase !== 'STARTED')
+          const device = (await sessionEvents()).get(assignment?.sessionId ?? '');
+          if (!assignment || device?.phase !== 'STARTED')
             fault('EVENT_CONFLICT', '设备会话尚未开始');
+          if (
+            preserveQueue &&
+            (await sessionEventCount(
+              device.sequence,
+              'TASK_FINISHED',
+              'errorCode',
+              'APP_CLEANUP_UNCONFIRMED',
+            ))
+          )
+            fault('EVENT_CONFLICT', '当前设备需清理后才能执行下一个 APP');
           const priorPositions = assignments.flatMap((a, i) =>
             a.sessionId === assignment.sessionId && a.appIndex < assignment.appIndex ? [i] : [],
           );
@@ -1184,10 +1306,14 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
               position: { in: priorPositions },
               OR: [
                 { status: { notIn: ['SUCCEEDED', 'FAILED', 'CANCELLED', 'SKIPPED'] } },
-                {
-                  status: 'FAILED',
-                  errorCode: { in: ['CLEANUP_INCOMPLETE', 'APP_CLEANUP_UNCONFIRMED'] },
-                },
+                ...(!preserveQueue
+                  ? [
+                      {
+                        status: 'FAILED',
+                        errorCode: { in: ['CLEANUP_INCOMPLETE', 'APP_CLEANUP_UNCONFIRMED'] },
+                      },
+                    ]
+                  : []),
               ],
             },
           });
@@ -1256,6 +1382,7 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
               model?: string;
               systemImageSha256?: string;
               deviceSessionId?: string;
+              deviceEpoch?: number;
               appIndex?: number;
               apiLevel?: number;
             }
@@ -1269,6 +1396,12 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
           fault('EVENT_CONFLICT', '缺少设备及代理配置证据');
         if (assignments) {
           const current = assignments[task.position];
+          if (preserveQueue) {
+            const device = (await sessionEvents()).get(current.sessionId);
+            if (device?.phase !== 'STARTED' || observation.deviceEpoch !== device.deviceEpoch)
+              fault('EVENT_CONFLICT', '设备证据不属于当前模拟器');
+          } else if (observation.deviceEpoch !== undefined)
+            fault('EVENT_CONFLICT', '设备证据与执行计划不一致');
           const positions = assignments.flatMap((a, i) =>
             a.sessionId === current.sessionId ? [i] : [],
           );
@@ -1282,10 +1415,14 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
           });
           const actual = observation as Record<string, unknown>;
           if (
-            prior.some((t) =>
-              ['avdName', 'model', 'apiLevel', 'shellAndroidIdHash'].some(
-                (key) => (t.observation as Record<string, unknown>)[key] !== actual[key],
-              ),
+            prior.some(
+              (t) =>
+                (!preserveQueue ||
+                  (t.observation as Record<string, unknown>).deviceEpoch ===
+                    observation.deviceEpoch) &&
+                ['avdName', 'model', 'apiLevel', 'shellAndroidIdHash'].some(
+                  (key) => (t.observation as Record<string, unknown>)[key] !== actual[key],
+                ),
             )
           )
             fault('EVENT_CONFLICT', '同设备内系统身份发生变化');
@@ -1295,8 +1432,22 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
             (await tx.task.count({
               where: {
                 runId,
-                position: { notIn: positions },
                 observation: { path: ['avdName'], equals: avd },
+                NOT: {
+                  AND: [
+                    { position: { in: positions } },
+                    ...(preserveQueue
+                      ? [
+                          {
+                            observation: {
+                              path: ['deviceEpoch'],
+                              equals: observation.deviceEpoch!,
+                            },
+                          },
+                        ]
+                      : []),
+                  ],
+                },
               },
             }))
           )
@@ -1400,6 +1551,7 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
     if (p.proof === 'APP_OPEN' && assignments) {
       const o = p.openObservation as {
         deviceSessionId?: string;
+        deviceEpoch?: number;
         appIndex?: number;
         cleanupScope?: string;
       };
@@ -1408,6 +1560,7 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
         !o ||
         o.deviceSessionId !== a.sessionId ||
         o.appIndex !== a.appIndex ||
+        o.deviceEpoch !== (task.observation as { deviceEpoch?: number } | null)?.deviceEpoch ||
         o.cleanupScope !== 'APP_UNINSTALLED'
       )
         fault('EVENT_CONFLICT', '缺少应用卸载及会话回执');
@@ -1588,7 +1741,7 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
         assignments &&
         run.taskCycleId &&
         !run.stopRequested &&
-        run.attemptsStarted > 0 &&
+        (run.attemptsStarted > 0 || (preserveQueue && !plan?.openPolicy?.resumeOf)) &&
         !tasks.some((t) => t.status === 'UNKNOWN' || t.submissionId) &&
         [...(await sessionEvents()).values()].some((s) => s.phase === 'FAILED')
       ) {
@@ -1630,6 +1783,10 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
           ).length
         : 0;
       const devicesExhausted = skipped > 0 && run.attemptsStarted + skipped === run.attemptLimit;
+      const preparationFailed =
+        preserveQueue &&
+        p.errorCode === 'DEVICE_PREPARATION_FAILED' &&
+        [...(await sessionEvents()).values()].some((s) => s.preparationFailures >= 2);
       const cutoff =
         openOnly &&
         !!plan?.openPolicy &&
@@ -1676,6 +1833,7 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
           !noRegisterable &&
           !cutoff &&
           !devicesExhausted &&
+          !preparationFailed &&
           run.attemptsStarted < run.attemptLimit)
       )
         fault('EVENT_CONFLICT', '注册循环尚未达到终止条件');
@@ -1694,17 +1852,21 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
                   ? 'CACHE_MISSING'
                   : cutoff
                     ? 'DAY_CUTOFF'
-                    : devicesExhausted
-                      ? 'DEVICE_PLAN_EXHAUSTED'
-                      : 'ATTEMPT_LIMIT';
+                    : preparationFailed
+                      ? 'DEVICE_PREPARATION_FAILED'
+                      : devicesExhausted
+                        ? 'DEVICE_PLAN_EXHAUSTED'
+                        : 'ATTEMPT_LIMIT';
       if (p.status !== expected || p.errorCode !== code)
         fault('EVENT_CONFLICT', '配额结果或原因不一致');
       await tx.task.updateMany({
         where: { runId, status: 'QUEUED', attemptStarted: false },
-        data: {
-          status: 'SKIPPED',
-          errorCode: reached ? 'QUOTA_NOT_USED' : 'BATCH_ENDED',
-        },
+        data: preparationFailed
+          ? { errorCode: 'DEVICE_QUEUE_PENDING' }
+          : {
+              status: 'SKIPPED',
+              errorCode: reached ? 'QUOTA_NOT_USED' : 'BATCH_ENDED',
+            },
       });
       await closeRun(tx, run, expected, code);
       return;

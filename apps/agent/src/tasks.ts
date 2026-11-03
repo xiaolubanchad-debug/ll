@@ -430,7 +430,14 @@ export class TaskEngine {
         beforeAction,
         ...(plan?.purpose === 'REGISTER' || (!plan && config.execution.mode === 'FULL')
           ? {
-              afterDownload: async (target, apk, file, index, attemptSignal = signal) => {
+              afterDownload: async (
+                target,
+                apk,
+                file,
+                index,
+                attemptSignal = signal,
+                beginAttempt,
+              ) => {
                 if (config.execution.appOpen) {
                   await this.flush(d);
                   beforeAction();
@@ -443,6 +450,13 @@ export class TaskEngine {
                       proxy: proxy!,
                       policy: this.options.policy,
                       proxyCheckUrl: this.options.proxyCheckUrl,
+                      beginAttempt: beginAttempt
+                        ? async () => {
+                            await beginAttempt();
+                            await this.flush(d);
+                            beforeAction();
+                          }
+                        : undefined,
                       androidFactory: target.deviceSessionId
                         ? async (profile, s, hooks) => {
                             const id = target.deviceSessionId!;

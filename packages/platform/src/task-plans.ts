@@ -548,6 +548,8 @@ export async function controlTaskPlan(
         if (latest?.status === 'STOPPING') fault('STOP_PENDING', '正在等待停止与清理确认');
         if (latest?.status === 'WAITING' && latest.errorCode === APP_CLEANUP_RESTART_PENDING)
           fault('STOP_PENDING', '正在等待清理确认与自动恢复');
+        if (latest?.status === 'WAITING' && latest.errorCode === 'DEVICE_PREPARATION_FAILED')
+          fault('STOP_PENDING', '设备准备连续失败，需先停止当前任务');
         const continueLatest = latest && input.action === 'START' && latest.status !== 'STOPPED';
         if (
           continueLatest &&
@@ -769,9 +771,20 @@ async function advance(db: PrismaClient, p: ManagedTask, c: CycleRow, now: Date)
         data: { status: 'NEEDS_REVIEW', errorCode: 'REVIEW_REQUIRED' },
       });
     else if (all.every((r) => RUN_END.includes(r.status)))
-      await db.managedCycle.updateMany({
-        where: { id: c.id, generation: c.generation, stopRequested: true },
-        data: { status: 'STOPPED' },
+      await db.$transaction(async (tx) => {
+        const stopped = await tx.managedCycle.updateMany({
+          where: { id: c.id, generation: c.generation, stopRequested: true },
+          data: { status: 'STOPPED' },
+        });
+        if (stopped.count)
+          await tx.task.updateMany({
+            where: {
+              run: { taskCycleId: c.id },
+              attemptStarted: false,
+              errorCode: 'DEVICE_QUEUE_PENDING',
+            },
+            data: { status: 'CANCELLED', errorCode: 'BATCH_ENDED', finishedAt: new Date() },
+          });
       });
     return;
   }
@@ -820,6 +833,7 @@ async function advance(db: PrismaClient, p: ManagedTask, c: CycleRow, now: Date)
     return;
   }
   if (['DONE', 'STOPPED', 'FAILED', 'NEEDS_REVIEW'].includes(c.status)) return;
+  if (c.status === 'WAITING' && c.errorCode === 'DEVICE_PREPARATION_FAILED') return;
   if (c.runs.some((r) => r.status === 'NEEDS_REVIEW' && !r.reviewResolvedAt)) {
     await updateCycle(db, c, 'NEEDS_REVIEW', 'REVIEW_REQUIRED');
     return;
@@ -939,11 +953,22 @@ async function advance(db: PrismaClient, p: ManagedTask, c: CycleRow, now: Date)
         ? 'DONE'
         : previous.status === 'NEEDS_REVIEW'
           ? 'NEEDS_REVIEW'
-          : 'FAILED',
+          : previous.errorCode === 'DEVICE_PREPARATION_FAILED'
+            ? 'WAITING'
+            : 'FAILED',
       previous.errorCode,
     );
     return;
   }
+  const priorRun = c.runs.filter((run) => run.purpose === 'REGISTER').at(-1);
+  const resumeFromId =
+    priorRun?.status === 'NEEDS_REVIEW' &&
+    priorRun.errorCode === 'CLEANUP_INCOMPLETE' &&
+    priorRun.stopRequested &&
+    (priorRun.executionPlan as unknown as { openPolicy?: { preserveQueue?: boolean } } | null)
+      ?.openPolicy?.preserveQueue
+      ? priorRun.id
+      : undefined;
   await createRun(
     db,
     {
@@ -962,6 +987,7 @@ async function advance(db: PrismaClient, p: ManagedTask, c: CycleRow, now: Date)
     undefined,
     c.id,
     c.generation,
+    resumeFromId,
   );
 }
 export async function tickTaskPlans(db: PrismaClient, now = new Date()) {

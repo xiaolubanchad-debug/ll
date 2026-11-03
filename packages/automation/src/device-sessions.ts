@@ -1,155 +1,107 @@
-import { EXECUTION_DEVICE_LIMIT, type DailyExecutionPlan } from '@apk/contracts';
+import type { DailyExecutionPlan } from '@apk/contracts';
 import type { AutomationEvent } from './download.js';
 import { DownloadError } from './common.js';
 
-// A device must close before the next session is admitted; N/M still count APP attempts.
+interface DeviceRoundResult {
+  success: boolean;
+  failed: boolean;
+  missing: boolean;
+  replaceDevice?: boolean;
+  preparationFailed?: boolean;
+  appiumFailed?: boolean;
+}
+
 export async function scheduleDeviceSessions(
   plan: DailyExecutionPlan,
   signal: AbortSignal,
   beforeAction: () => void,
   emit: (event: AutomationEvent) => Promise<void>,
-  round: (position: number) => Promise<{ success: boolean; failed: boolean; missing: boolean }>,
+  round: (position: number, epoch?: number) => Promise<DeviceRoundResult>,
   close: (id: string) => Promise<boolean>,
   now: () => number = Date.now,
   cancelOthers: () => void = () => {},
 ) {
-  const policy = plan.openPolicy!,
-    sessions = policy.sessions!;
-  const groups = sessions.map((s) => ({
-    ...s,
-    positions: [] as number[],
-    next: 0,
-  }));
-  let position = 0;
-  for (const group of groups)
-    for (let i = 0; i < group.assetIndexes.length; i++) group.positions.push(position++);
-  if (position !== plan.attemptLimit) throw new DownloadError('DEVICE_SESSION_PLAN_INVALID');
-  const active = new Map<
-    string,
-    { group: (typeof groups)[number]; began: number; busy: boolean; failed: boolean }
-  >();
-  const used = new Set<string>(),
-    jobs = new Set<Promise<void>>();
-  let successes = 0,
-    skipped = 0,
-    dirty = false,
-    missing = false,
-    fatal: unknown;
-  const finish = async (id: string) => {
-    const state = active.get(id)!;
-    const clean = await close(id).catch(() => false);
-    const remaining = clean && state.failed ? state.group.positions.length - state.group.next : 0;
-    if (!clean) {
-      dirty = true;
-      cancelOthers();
-    }
-    skipped += remaining;
-    await emit({
-      type: 'DEVICE_SESSION',
-      payload: {
-        sessionId: id,
-        phase: clean ? 'CLOSED' : 'FAILED',
-        elapsedMs: Math.max(0, now() - state.began),
-        cleanupComplete: clean,
-        ...(remaining ? { skipRemaining: true } : {}),
-      },
-    });
-    active.delete(id);
-  };
-  try {
-    while (true) {
+  const policy = plan.openPolicy!;
+  const sessions = policy.sessions!;
+  const deadline = Date.parse(policy.admissionDeadline);
+  if (sessions.reduce((total, group) => total + group.assetIndexes.length, 0) !== plan.attemptLimit)
+    throw new DownloadError('DEVICE_SESSION_PLAN_INVALID');
+  let successes = 0;
+  let skipped = 0;
+  let dirty = false;
+  let missing = false;
+  let preparationFailed = false;
+  const canContinue = () =>
+    !dirty && !missing && !preparationFailed && successes < plan.successTarget && now() < deadline;
+  let offset = 0;
+  for (const group of sessions) {
+    let cursor = 0;
+    let epoch = 0;
+    let retryingPreparation = false;
+    while (cursor < group.assetIndexes.length && canContinue()) {
       beforeAction();
       signal.throwIfAborted();
-      const cutoff = now() >= Date.parse(policy.admissionDeadline);
-      if (!fatal && !dirty && !missing && !cutoff && successes < plan.successTarget) {
-        while (active.size < Math.min(EXECUTION_DEVICE_LIMIT, plan.successTarget - successes)) {
-          const candidate = groups.find((g) => !used.has(g.id));
-          if (
-            candidate?.variantId &&
-            Array.from(active.values()).some((s) => s.group.variantId === candidate.variantId)
-          )
+      epoch++;
+      const began = now();
+      const session = {
+        sessionId: group.id,
+        ...(policy.preserveQueue ? { deviceEpoch: epoch } : {}),
+      };
+      await emit({
+        type: 'DEVICE_SESSION',
+        payload: { ...session, phase: 'STARTED', elapsedMs: 0, cleanupComplete: false },
+      });
+      let replacementReason:
+        | 'APP_CLEANUP_UNCONFIRMED'
+        | 'DEVICE_PREPARATION_FAILED'
+        | 'APPIUM_FAILED'
+        | undefined;
+      let skipRemaining = false;
+      try {
+        while (cursor < group.assetIndexes.length && canContinue()) {
+          beforeAction();
+          signal.throwIfAborted();
+          const result = await round(offset + cursor, policy.preserveQueue ? epoch : undefined);
+          if (policy.preserveQueue && result.preparationFailed) {
+            replacementReason = result.appiumFailed ? 'APPIUM_FAILED' : 'DEVICE_PREPARATION_FAILED';
+            preparationFailed = retryingPreparation;
+            retryingPreparation = true;
             break;
-          if (!candidate) break;
-          used.add(candidate.id);
-          active.set(candidate.id, {
-            group: candidate,
-            began: now(),
-            busy: false,
-            failed: false,
-          });
-          await emit({
-            type: 'DEVICE_SESSION',
-            payload: {
-              sessionId: candidate.id,
-              phase: 'STARTED',
-              elapsedMs: 0,
-              cleanupComplete: false,
-            },
-          });
+          }
+          cursor++;
+          if (result.success) successes++;
+          missing = result.missing;
+          if (policy.preserveQueue && result.replaceDevice) {
+            retryingPreparation = false;
+            if (cursor < group.assetIndexes.length) replacementReason = 'APP_CLEANUP_UNCONFIRMED';
+            break;
+          }
+          if (!policy.preserveQueue && result.failed) {
+            skipRemaining = cursor < group.assetIndexes.length;
+            break;
+          }
         }
-        for (const state of active.values()) {
-          if (
-            state.busy ||
-            state.failed ||
-            state.group.next >= state.group.positions.length ||
-            successes + jobs.size >= plan.successTarget
-          )
-            continue;
-          const index = state.group.positions[state.group.next++];
-          state.busy = true;
-          const job = round(index)
-            .then((r) => {
-              if (r.success) successes++;
-              state.failed = r.failed;
-              missing ||= r.missing;
-            })
-            .catch((e: unknown) => {
-              fatal ??= e;
-              cancelOthers();
-            })
-            .finally(() => {
-              state.busy = false;
-              jobs.delete(job);
-            });
-          jobs.add(job);
-        }
+      } finally {
+        const clean = await close(group.id).catch(() => false);
+        dirty = !clean;
+        if (!clean) cancelOthers();
+        if (clean && skipRemaining) skipped += group.assetIndexes.length - cursor;
+        await emit({
+          type: 'DEVICE_SESSION',
+          payload: {
+            ...session,
+            phase: clean ? 'CLOSED' : 'FAILED',
+            elapsedMs: Math.max(0, now() - began),
+            cleanupComplete: clean,
+            ...(clean && skipRemaining ? { skipRemaining: true } : {}),
+            ...(clean && replacementReason ? { replacementReason } : {}),
+          },
+        });
       }
-      for (const [id, state] of active)
-        if (
-          !state.busy &&
-          (state.failed ||
-            state.group.next >= state.group.positions.length ||
-            successes >= plan.successTarget ||
-            fatal ||
-            dirty ||
-            missing ||
-            cutoff)
-        )
-          await finish(id);
-      if (!jobs.size) {
-        if (
-          !fatal &&
-          !dirty &&
-          !missing &&
-          !cutoff &&
-          successes < plan.successTarget &&
-          groups.some((g) => !used.has(g.id))
-        )
-          continue;
-        break;
-      }
-      await Promise.race(jobs);
+      if (!replacementReason) break;
     }
-  } finally {
-    await Promise.allSettled(jobs);
-    for (const id of active.keys()) await finish(id);
+    offset += group.assetIndexes.length;
+    if (!canContinue()) break;
   }
-  if (fatal) throw fatal;
-  return {
-    successes,
-    skipped,
-    dirty,
-    missing,
-    cutoff: now() >= Date.parse(policy.admissionDeadline),
-  };
+  return { successes, skipped, dirty, missing, preparationFailed, cutoff: now() >= deadline };
 }
