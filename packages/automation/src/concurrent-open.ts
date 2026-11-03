@@ -110,6 +110,7 @@ export async function runCachedAppOpens(
   const running = new Map<number, Promise<unknown>>();
   let next = 0,
     successes = 0,
+    skipped = 0,
     missing = false,
     dirty = false,
     cutoff = false;
@@ -152,12 +153,11 @@ export async function runCachedAppOpens(
       completion = await execute(target, asset.apk, found.file, index, attemptSignal);
     }
     if (!completion.cleanupComplete) {
-      dirty = true;
       completion = {
         status: 'FAILED',
         proof: 'NONE',
         artifactIds: [],
-        errorCode: 'CLEANUP_INCOMPLETE',
+        errorCode: policy.sessions ? 'APP_CLEANUP_UNCONFIRMED' : 'CLEANUP_INCOMPLETE',
         cleanupComplete: false,
         ...(completion.openTimings ? { openTimings: completion.openTimings } : {}),
       };
@@ -165,10 +165,13 @@ export async function runCachedAppOpens(
     const { cleanupComplete, ...payload } = completion;
     await emit({ type: 'TASK_FINISHED', taskId: target.taskId, payload });
     if (completion.status === 'SUCCEEDED') successes++;
-    if (!cleanupComplete) drain.abort();
+    if (!cleanupComplete && !policy.sessions) {
+      dirty = true;
+      drain.abort();
+    }
     return {
       success: completion.status === 'SUCCEEDED',
-      clean: cleanupComplete,
+      failed: completion.status === 'FAILED' && completion.errorCode !== 'CACHE_MISSING',
       missing: completion.errorCode === 'CACHE_MISSING',
     };
   };
@@ -186,6 +189,7 @@ export async function runCachedAppOpens(
         () => drain.abort(),
       );
       successes = result.successes;
+      skipped = result.skipped;
       dirty = result.dirty;
       missing = result.missing;
       cutoff = result.cutoff;
@@ -240,7 +244,9 @@ export async function runCachedAppOpens(
           ? 'NO_ADAPTED_APKS'
           : cutoff
             ? 'DAY_CUTOFF'
-            : 'ATTEMPT_LIMIT';
+            : skipped
+              ? 'DEVICE_PLAN_EXHAUSTED'
+              : 'ATTEMPT_LIMIT';
   await emit({
     type: 'RUN_FINISHED',
     payload: {

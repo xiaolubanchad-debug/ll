@@ -401,12 +401,27 @@ export class TaskEngine {
     };
     const deviceOwners = new Map<string, string>();
     const deviceSessions = new Map<string, Awaited<ReturnType<typeof startAndroid>>>();
-    const closeDeviceSession = async (id: string) => {
+    const failedDeviceCleanups = new Set<string>();
+    const closeDeviceSession = async (id: string, retry = false) => {
       const session = deviceSessions.get(id);
-      if (!session)
-        return !this.store.androidSlots(d.deliveryId).some((r) => r.slot === deviceOwners.get(id));
-      const clean = await session.close().catch(() => false);
-      if (clean) deviceSessions.delete(id);
+      let clean: boolean;
+      if (session) clean = await session.close().catch(() => false);
+      else {
+        const slot = this.store
+          .androidSlots(d.deliveryId)
+          .find((r) => r.slot === deviceOwners.get(id));
+        clean =
+          !slot ||
+          (retry &&
+            (await cleanupAndroid(join(this.store.root, 'android/jobs'), slot.record).catch(
+              () => false,
+            )));
+        if (slot && clean) this.store.androidSlot(d.deliveryId, slot.slot, null);
+      }
+      if (clean) {
+        deviceSessions.delete(id);
+        failedDeviceCleanups.delete(id);
+      } else failedDeviceCleanups.add(id);
       return clean;
     };
     try {
@@ -577,6 +592,7 @@ export class TaskEngine {
       if (review || this.control === 'REVIEW') {
         this.store.status(d.deliveryId, 'REVIEW');
         await this.flush(d).catch(() => {});
+        for (const id of failedDeviceCleanups) await closeDeviceSession(id, true);
         await this.reconcile(d);
         return;
       }

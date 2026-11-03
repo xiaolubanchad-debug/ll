@@ -66,6 +66,8 @@ export async function reviewRun(tx: Tx, run: Run, code: string) {
       data: { status: 'SKIPPED', errorCode: 'BATCH_NEEDS_REVIEW' },
     });
 }
+export const APP_CLEANUP_RESTART_PENDING = 'APP_CLEANUP_RESTART_PENDING';
+
 export async function expireNodeRun(tx: Tx, nodeId: string) {
   const slot = await tx.nodeSlot.findUnique({ where: { nodeId } });
   if (!slot?.runId) return;
@@ -843,6 +845,7 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
         prior ||
         p.cleanupComplete !== false ||
         p.elapsedMs !== 0 ||
+        [...states.values()].some((s) => s.phase === 'FAILED') ||
         active.length >= plan!.openPolicy!.concurrency ||
         active.some(
           ([id]) =>
@@ -867,6 +870,20 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
         (p.phase === 'CLOSED') !== (p.cleanupComplete === true)
       )
         fault('EVENT_CONFLICT', '设备会话尚未结束或清理不完整');
+      if (p.skipRemaining === true) {
+        const lastAttempt = await tx.task.findFirst({
+          where: { runId, position: { in: positions }, attemptStarted: true },
+          orderBy: { position: 'desc' },
+          select: { status: true, errorCode: true },
+        });
+        if (lastAttempt?.status !== 'FAILED' || lastAttempt.errorCode === 'CACHE_MISSING')
+          fault('EVENT_CONFLICT', '没有失败的 APP，不能跳过设备剩余目标');
+        const retired = await tx.task.updateMany({
+          where: { runId, position: { in: positions }, status: 'QUEUED', attemptStarted: false },
+          data: { status: 'SKIPPED', errorCode: 'DEVICE_SESSION_SKIPPED' },
+        });
+        if (!retired.count) fault('EVENT_CONFLICT', '设备没有可跳过的剩余目标');
+      }
     }
     return;
   }
@@ -1165,9 +1182,13 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
             where: {
               runId,
               position: { in: priorPositions },
-              status: {
-                notIn: ['SUCCEEDED', 'FAILED', 'CANCELLED', 'SKIPPED'],
-              },
+              OR: [
+                { status: { notIn: ['SUCCEEDED', 'FAILED', 'CANCELLED', 'SKIPPED'] } },
+                {
+                  status: 'FAILED',
+                  errorCode: { in: ['CLEANUP_INCOMPLETE', 'APP_CLEANUP_UNCONFIRMED'] },
+                },
+              ],
             },
           });
           if (unfinished) fault('EVENT_CONFLICT', '同设备必须按抽取顺序串行执行');
@@ -1354,6 +1375,8 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
     }
     if (['SUCCEEDED', 'FAILED', 'SKIPPED', 'CANCELLED', 'UNKNOWN'].includes(task.status))
       fault('EVENT_CONFLICT', '目标已结束');
+    if (p.errorCode === 'DEVICE_SESSION_SKIPPED')
+      fault('EVENT_CONFLICT', '跳过剩余目标需要整机清理回执');
     const status = String(p.status);
     if (
       !full &&
@@ -1559,6 +1582,28 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
         run,
         p.errorCode === 'CLEANUP_INCOMPLETE' ? 'CLEANUP_INCOMPLETE' : 'REGISTRATION_UNKNOWN',
       );
+      if (
+        p.errorCode === 'CLEANUP_INCOMPLETE' &&
+        openOnly &&
+        assignments &&
+        run.taskCycleId &&
+        !run.stopRequested &&
+        run.attemptsStarted > 0 &&
+        !tasks.some((t) => t.status === 'UNKNOWN' || t.submissionId) &&
+        [...(await sessionEvents()).values()].some((s) => s.phase === 'FAILED')
+      ) {
+        const pending = await tx.managedCycle.updateMany({
+          where: {
+            id: run.taskCycleId,
+            status: 'REGISTERING',
+            stopRequested: false,
+            task: { enabled: true },
+          },
+          data: { status: 'WAITING', errorCode: APP_CLEANUP_RESTART_PENDING },
+        });
+        if (pending.count)
+          await tx.run.update({ where: { id: run.id }, data: { stopRequested: true } });
+      }
       return;
     }
     if (run.stopRequested) return; // Acknowledge the race, but only STOP_ACK can release this slot.
@@ -1576,6 +1621,15 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
           t.attemptStarted && !['SUCCEEDED', 'FAILED', 'SKIPPED', 'CANCELLED'].includes(t.status),
       );
       const reached = run.successes >= run.successTarget;
+      const skipped = assignments
+        ? tasks.filter(
+            (t) =>
+              !t.attemptStarted &&
+              t.status === 'SKIPPED' &&
+              t.errorCode === 'DEVICE_SESSION_SKIPPED',
+          ).length
+        : 0;
+      const devicesExhausted = skipped > 0 && run.attemptsStarted + skipped === run.attemptLimit;
       const cutoff =
         openOnly &&
         !!plan?.openPolicy &&
@@ -1621,6 +1675,7 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
           !adaptation &&
           !noRegisterable &&
           !cutoff &&
+          !devicesExhausted &&
           run.attemptsStarted < run.attemptLimit)
       )
         fault('EVENT_CONFLICT', '注册循环尚未达到终止条件');
@@ -1639,7 +1694,9 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
                   ? 'CACHE_MISSING'
                   : cutoff
                     ? 'DAY_CUTOFF'
-                    : 'ATTEMPT_LIMIT';
+                    : devicesExhausted
+                      ? 'DEVICE_PLAN_EXHAUSTED'
+                      : 'ATTEMPT_LIMIT';
       if (p.status !== expected || p.errorCode !== code)
         fault('EVENT_CONFLICT', '配额结果或原因不一致');
       await tx.task.updateMany({

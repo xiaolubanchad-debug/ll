@@ -100,7 +100,7 @@ test('two successive devices each run three apps sequentially and close once, wi
       seen.set(a.sessionId, apps);
       await delay(a.appIndex === 0 ? 12 : 3);
       busy.delete(a.sessionId);
-      return { success: true, clean: true, missing: false };
+      return { success: true, failed: false, missing: false };
     },
     async (id) => {
       assert.ok(!busy.has(id));
@@ -118,19 +118,24 @@ test('two successive devices each run three apps sequentially and close once, wi
   );
 });
 
-test('failure uses next different app, final quota prevents extra launches, all sessions close on stop', async () => {
+test('failure retires its device before continuing, and all sessions close on stop', async () => {
   const { plan } = await fixture(3);
   const seen = [],
-    closed = [];
+    closed = [],
+    events = [];
   const r = await scheduleDeviceSessions(
     plan,
     new AbortController().signal,
     () => {},
-    async () => {},
+    async (event) => {
+      if (event.payload.phase === 'STARTED' && events.length)
+        assert.equal(events.at(-1).payload.phase, 'CLOSED');
+      events.push(event);
+    },
     async (i) => {
       seen.push(i);
       await delay(1);
-      return { success: i !== 0, clean: true, missing: false };
+      return { success: i !== 0, failed: i === 0, missing: false };
     },
     async (id) => {
       closed.push(id);
@@ -138,8 +143,9 @@ test('failure uses next different app, final quota prevents extra launches, all 
     },
   );
   assert.equal(r.successes, 3);
-  assert.equal(seen.length, 4);
-  assert.equal(new Set(seen).size, 4);
+  assert.deepEqual(seen, [0, 3, 4, 5]);
+  assert.equal(r.skipped, 2);
+  assert.equal(events[1].payload.skipRemaining, true);
   assert.equal(closed.length, 2);
   const abort = new AbortController(),
     cleanup = [];
@@ -152,7 +158,7 @@ test('failure uses next different app, final quota prevents extra launches, all 
       async () => {
         abort.abort();
         await delay(1);
-        return { success: false, clean: true, missing: false };
+        return { success: false, failed: false, missing: false };
       },
       async (id) => {
         cleanup.push(id);
@@ -181,7 +187,7 @@ test('more than two sessions progress; cleanup failure stops all new admission',
     async () => {
       count++;
       await delay(1);
-      return { success: true, clean: true, missing: false };
+      return { success: true, failed: false, missing: false };
     },
     async () => true,
   );
@@ -196,10 +202,11 @@ test('more than two sessions progress; cleanup failure stops all new admission',
     async () => {
       count++;
       await delay(1);
-      return { success: true, clean: true, missing: false };
+      return { success: false, failed: true, missing: false };
     },
     async () => false,
   );
   assert.equal(dirty.dirty, true);
-  assert.equal(count, 3);
+  assert.equal(dirty.skipped, 0);
+  assert.equal(count, 1);
 });

@@ -1544,6 +1544,7 @@
             "ANDROID_FAILED",
             "ACCOUNT_SYNC_FAILED",
             "ATTEMPT_LIMIT",
+            "DEVICE_PLAN_EXHAUSTED",
             "CACHE_MISSING",
             "NO_ADAPTED_APKS",
             "PROXY_CHECK_FAILED",
@@ -1983,6 +1984,18 @@
         },
         "cleanupComplete": {
           "type": "boolean"
+        },
+        "skipRemaining": {
+          "const": true
+        }
+      },
+      "if": {
+        "required": ["skipRemaining"]
+      },
+      "then": {
+        "properties": {
+          "phase": { "const": "CLOSED" },
+          "cleanupComplete": { "const": true }
         }
       }
     },

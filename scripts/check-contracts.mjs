@@ -345,6 +345,30 @@ test('1.6 adaptation stop is an allowed terminal event', () => {
   delete input.events[0].taskId;
   assert.deepEqual(agentIssues(input), []);
 });
+test('1.22.3 remaining apps can only be skipped with confirmed device closure', () => {
+  const input = structuredClone(messages.find((m) => m.kind === 'events'));
+  const event = { ...input.events[0], type: 'DEVICE_SESSION' };
+  delete event.taskId;
+  input.events = [event];
+  const sessionId = input.deliveryId;
+  event.payload = {
+    sessionId,
+    phase: 'CLOSED',
+    cleanupComplete: true,
+    elapsedMs: 50,
+    skipRemaining: true,
+  };
+  assert.deepEqual(agentIssues(input), []);
+  event.payload.cleanupComplete = false;
+  assert.ok(agentIssues(input).length);
+  event.payload.phase = 'FAILED';
+  assert.ok(agentIssues(input).length);
+  delete event.payload.skipRemaining;
+  assert.deepEqual(agentIssues(input), []);
+  event.type = 'RUN_FINISHED';
+  event.payload = { status: 'PARTIAL_FAILED', errorCode: 'DEVICE_PLAN_EXHAUSTED' };
+  assert.deepEqual(agentIssues(input), []);
+});
 for (const [name, value] of Object.entries(v15Examples)) {
   test('1.5 valid ' + name, () => assert.deepEqual(schemaIssues(name, value), []));
 }

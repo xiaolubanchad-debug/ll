@@ -8,7 +8,7 @@ export async function scheduleDeviceSessions(
   signal: AbortSignal,
   beforeAction: () => void,
   emit: (event: AutomationEvent) => Promise<void>,
-  round: (position: number) => Promise<{ success: boolean; clean: boolean; missing: boolean }>,
+  round: (position: number) => Promise<{ success: boolean; failed: boolean; missing: boolean }>,
   close: (id: string) => Promise<boolean>,
   now: () => number = Date.now,
   cancelOthers: () => void = () => {},
@@ -26,21 +26,24 @@ export async function scheduleDeviceSessions(
   if (position !== plan.attemptLimit) throw new DownloadError('DEVICE_SESSION_PLAN_INVALID');
   const active = new Map<
     string,
-    { group: (typeof groups)[number]; began: number; busy: boolean }
+    { group: (typeof groups)[number]; began: number; busy: boolean; failed: boolean }
   >();
   const used = new Set<string>(),
     jobs = new Set<Promise<void>>();
   let successes = 0,
+    skipped = 0,
     dirty = false,
     missing = false,
     fatal: unknown;
   const finish = async (id: string) => {
     const state = active.get(id)!;
     const clean = await close(id).catch(() => false);
+    const remaining = clean && state.failed ? state.group.positions.length - state.group.next : 0;
     if (!clean) {
       dirty = true;
       cancelOthers();
     }
+    skipped += remaining;
     await emit({
       type: 'DEVICE_SESSION',
       payload: {
@@ -48,6 +51,7 @@ export async function scheduleDeviceSessions(
         phase: clean ? 'CLOSED' : 'FAILED',
         elapsedMs: Math.max(0, now() - state.began),
         cleanupComplete: clean,
+        ...(remaining ? { skipRemaining: true } : {}),
       },
     });
     active.delete(id);
@@ -71,6 +75,7 @@ export async function scheduleDeviceSessions(
             group: candidate,
             began: now(),
             busy: false,
+            failed: false,
           });
           await emit({
             type: 'DEVICE_SESSION',
@@ -85,6 +90,7 @@ export async function scheduleDeviceSessions(
         for (const state of active.values()) {
           if (
             state.busy ||
+            state.failed ||
             state.group.next >= state.group.positions.length ||
             successes + jobs.size >= plan.successTarget
           )
@@ -94,9 +100,8 @@ export async function scheduleDeviceSessions(
           const job = round(index)
             .then((r) => {
               if (r.success) successes++;
-              dirty ||= !r.clean;
+              state.failed = r.failed;
               missing ||= r.missing;
-              if (!r.clean) cancelOthers();
             })
             .catch((e: unknown) => {
               fatal ??= e;
@@ -112,7 +117,8 @@ export async function scheduleDeviceSessions(
       for (const [id, state] of active)
         if (
           !state.busy &&
-          (state.group.next >= state.group.positions.length ||
+          (state.failed ||
+            state.group.next >= state.group.positions.length ||
             successes >= plan.successTarget ||
             fatal ||
             dirty ||
@@ -141,6 +147,7 @@ export async function scheduleDeviceSessions(
   if (fatal) throw fatal;
   return {
     successes,
+    skipped,
     dirty,
     missing,
     cutoff: now() >= Date.parse(policy.admissionDeadline),

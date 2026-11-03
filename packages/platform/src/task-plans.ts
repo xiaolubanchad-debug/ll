@@ -31,7 +31,14 @@ import { fault, PlatformError } from './errors.js';
 import { dailyOpenUsage } from './open-budget.js';
 import { manualAssetsForRun, assertNoPendingManualApks } from './manual-apks.js';
 import { beijingDay, validateBudget } from './daily-plan.js';
-import { createRun, stopRun, requestRunStop, downloadRetryParent, RUN_END } from './runs.js';
+import {
+  createRun,
+  stopRun,
+  requestRunStop,
+  downloadRetryParent,
+  APP_CLEANUP_RESTART_PENDING,
+  RUN_END,
+} from './runs.js';
 import { taskSourceWarning } from './source-elements.js';
 type Tx = Prisma.TransactionClient;
 const closed = ['DONE', 'FAILED', 'STOPPED'];
@@ -539,6 +546,8 @@ export async function controlTaskPlan(
         )
           fault('TASK_ACTIVE', '请先结束当前轮次');
         if (latest?.status === 'STOPPING') fault('STOP_PENDING', '正在等待停止与清理确认');
+        if (latest?.status === 'WAITING' && latest.errorCode === APP_CLEANUP_RESTART_PENDING)
+          fault('STOP_PENDING', '正在等待清理确认与自动恢复');
         const continueLatest = latest && input.action === 'START' && latest.status !== 'STOPPED';
         if (
           continueLatest &&
@@ -766,6 +775,50 @@ async function advance(db: PrismaClient, p: ManagedTask, c: CycleRow, now: Date)
       });
     return;
   }
+  if (c.errorCode === APP_CLEANUP_RESTART_PENDING) {
+    const failed = c.runs.filter((r) => r.purpose === 'REGISTER').at(-1);
+    if (
+      !failed?.reviewResolvedAt ||
+      !failed.finishedAt ||
+      now.getTime() - failed.finishedAt.getTime() < 30000
+    )
+      return;
+    await db.$transaction(async (tx) => {
+      await lockLibrary(tx);
+      const node = await lockNode(tx, c.nodeId);
+      const slot = await tx.nodeSlot.findUnique({ where: { nodeId: c.nodeId } });
+      if (
+        !slot ||
+        slot.runId ||
+        slot.operationId ||
+        slot.quarantined ||
+        node.currentDeliveryId ||
+        !node.lastSeenAt ||
+        Date.now() - node.lastSeenAt.getTime() > 45000 ||
+        node.archivedAt ||
+        node.deploymentStatus !== 'INSTALLED' ||
+        !node.agentReleaseId
+      )
+        return;
+      await tx.managedCycle.updateMany({
+        where: {
+          id: c.id,
+          generation: c.generation,
+          stopRequested: false,
+          status: 'WAITING',
+          errorCode: APP_CLEANUP_RESTART_PENDING,
+          task: { enabled: true, archivedAt: null },
+        },
+        data: {
+          status: 'QUEUED',
+          errorCode: null,
+          generation: { increment: 1 },
+          releaseId: node.agentReleaseId,
+        },
+      });
+    });
+    return;
+  }
   if (['DONE', 'STOPPED', 'FAILED', 'NEEDS_REVIEW'].includes(c.status)) return;
   if (c.runs.some((r) => r.status === 'NEEDS_REVIEW' && !r.reviewResolvedAt)) {
     await updateCycle(db, c, 'NEEDS_REVIEW', 'REVIEW_REQUIRED');
@@ -897,7 +950,9 @@ async function advance(db: PrismaClient, p: ManagedTask, c: CycleRow, now: Date)
       ...common,
       purpose: 'REGISTER',
       sourceDownloadId: c.downloadRunId,
-      successTarget: c.successTarget - total.successes,
+      successTarget: config.execution.appOpen
+        ? Math.min(c.successTarget - total.successes, c.attemptLimit - total.attemptsStarted)
+        : c.successTarget - total.successes,
       attemptLimit: c.attemptLimit - total.attemptsStarted,
     },
     p.createdBy,

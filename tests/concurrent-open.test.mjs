@@ -75,8 +75,13 @@ test('legacy two-worker snapshots execute serially with exact quotas, cache pin 
     day = '2026-10-30';
   await writeFile(file, fixtureApk());
   const apk = await inspectApk(file, 268435456, day, new AbortController().signal);
+  const secondFile = join(root, 'owned-second.apk'),
+    secondKey = 'b'.repeat(64);
+  await writeFile(secondFile, fixtureApk('com.example.second'));
+  const secondApk = await inspectApk(secondFile, 268435456, day, new AbortController().signal);
   const cache = await ApkCache.open(join(root, 'cache'));
   await cache.put(nodeId, day, targetKey, file, apk);
+  await cache.put(nodeId, day, secondKey, secondFile, secondApk);
   cache.releasePins();
   cache.close();
   async function run({
@@ -86,6 +91,7 @@ test('legacy two-worker snapshots execute serially with exact quotas, cache pin 
     stop = false,
     dirty = false,
     cutoff = false,
+    groupClose,
   } = {}) {
     const abort = new AbortController(),
       events = [],
@@ -106,8 +112,24 @@ test('legacy two-worker snapshots execute serially with exact quotas, cache pin 
         admissionDeadline: new Date(1000).toISOString(),
       },
     };
+    const executionConfig = structuredClone(config);
+    if (groupClose !== undefined) {
+      executionConfig.execution.appOpen.appsPerDevice = { min: 2, max: 2 };
+      plan.openPolicy.fileAssets = true;
+      plan.assets.push({
+        targetKey: secondKey,
+        label: 'Owned second',
+        sourceUrl: config.source.url,
+        apk: secondApk,
+      });
+      plan.openPolicy.sessions = [0, 1].map(() => ({
+        id: randomUUID(),
+        assetIndexes: [0, 1],
+        supportedAbis: ['x86_64'],
+      }));
+    }
     const promise = runCachedAppOpens(
-      config,
+      executionConfig,
       plan,
       nodeId,
       root,
@@ -118,11 +140,12 @@ test('legacy two-worker snapshots execute serially with exact quotas, cache pin 
       () => {
         abort.signal.throwIfAborted();
       },
-      async (_target, _apk, path, index, signal) => {
+      async (_target, chosen, path, index, signal) => {
         launched.push(index);
         active++;
         peak = Math.max(peak, active);
-        assert.equal(path, cache.path(cache.key(nodeId, day, targetKey)));
+        const chosenKey = chosen.apkSha256 === apk.apkSha256 ? targetKey : secondKey;
+        assert.equal(path, cache.path(cache.key(nodeId, day, chosenKey)));
         try {
           if (stop && index === 0) abort.abort();
           if (dirty && index === 1) {
@@ -139,6 +162,7 @@ test('legacy two-worker snapshots execute serially with exact quotas, cache pin 
         }
       },
       () => now,
+      groupClose === undefined ? undefined : async () => groupClose,
     );
     if (stop) await assert.rejects(promise);
     else await promise;
@@ -171,6 +195,19 @@ test('legacy two-worker snapshots execute serially with exact quotas, cache pin 
   assert.equal(unclean.launched.length, 1);
   assert.equal(unclean.final.errorCode, 'CLEANUP_INCOMPLETE');
   assert.equal(unclean.final.status, 'NEEDS_REVIEW');
+  const recovered = await run({ n: 4, m: 4, dirty: true, groupClose: true });
+  assert.deepEqual(recovered.launched, [0, 2, 3]);
+  assert.equal(
+    recovered.events.find((e) => e.type === 'TASK_FINISHED').payload.errorCode,
+    'APP_CLEANUP_UNCONFIRMED',
+  );
+  assert.deepEqual(recovered.final, {
+    status: 'PARTIAL_FAILED',
+    errorCode: 'DEVICE_PLAN_EXHAUSTED',
+  });
+  const groupUnclean = await run({ n: 4, m: 4, dirty: true, groupClose: false });
+  assert.deepEqual(groupUnclean.launched, [0]);
+  assert.deepEqual(groupUnclean.final, { status: 'NEEDS_REVIEW', errorCode: 'CLEANUP_INCOMPLETE' });
   const ended = await run({ cutoff: true });
   assert.equal(ended.launched.length, 1);
   assert.equal(ended.final.errorCode, 'DAY_CUTOFF');

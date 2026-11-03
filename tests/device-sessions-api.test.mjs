@@ -3,11 +3,29 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { randomUUID, randomBytes } from 'node:crypto';
 import { PrismaClient } from '@prisma/client';
-import { runEvents, digest, runTimeline, runSummary } from '@apk/platform';
+import {
+  agentHeartbeat,
+  controlTaskPlan,
+  digest,
+  reconcileAgent,
+  runEvents,
+  runSummary,
+  runTimeline,
+  tickTaskPlans,
+} from '@apk/platform';
 import { beijingDay } from '../packages/platform/dist/daily-plan.js';
 
-for (const concurrency of [1, 2])
-  test('database enforces grouped app order, allocated identity, uninstall scope and whole-device cleanup', async () => {
+for (const scenario of [
+  'serial',
+  'parallel',
+  'recover',
+  'quarantine',
+  'auto-restart',
+  'manual-stop',
+])
+  test('database enforces grouped execution and cleanup: ' + scenario, async () => {
+    const concurrency = scenario === 'parallel' ? 2 : 1;
+    const managed = ['auto-restart', 'manual-stop'].includes(scenario);
     const db = new PrismaClient(),
       nodeId = randomUUID(),
       releaseId = randomUUID(),
@@ -16,6 +34,8 @@ for (const concurrency of [1, 2])
       runId = randomUUID(),
       deliveryId = randomUUID(),
       bootId = randomUUID(),
+      managedId = randomUUID(),
+      cycleId = randomUUID(),
       token = randomBytes(32).toString('base64url');
     const config = JSON.parse(
       await readFile('contracts/fixtures/config.concurrent-open.valid.json', 'utf8'),
@@ -85,12 +105,13 @@ for (const concurrency of [1, 2])
         elapsedMs: 0,
         cleanupComplete: false,
       });
-    const close = (id) =>
+    const close = (id, skipRemaining = false) =>
       send(null, 'DEVICE_SESSION', {
         sessionId: id,
         phase: 'CLOSED',
         elapsedMs: 100000,
         cleanupComplete: true,
+        ...(skipRemaining ? { skipRemaining: true } : {}),
       });
     async function finish(index) {
       const group = sessions[Math.floor(index / 2)],
@@ -139,6 +160,7 @@ for (const concurrency of [1, 2])
       await send(index, 'TASK_FINISHED', payload);
     }
     try {
+      const admin = await db.admin.findFirstOrThrow();
       await db.release.create({
         data: {
           id: releaseId,
@@ -165,6 +187,7 @@ for (const concurrency of [1, 2])
           host: '192.0.2.115',
           agentVersion: '0.13.0',
           agentReleaseId: releaseId,
+          deploymentStatus: 'INSTALLED',
           health: { versions: { identityModels: '30' } },
           slot: { create: { fence: 1 } },
         },
@@ -185,6 +208,34 @@ for (const concurrency of [1, 2])
           createdBy: randomUUID(),
         },
       });
+      if (managed) {
+        await db.managedTask.create({
+          data: {
+            id: managedId,
+            name: 'Managed cleanup test',
+            nodeId,
+            configId,
+            currentVersionId: versionId,
+            enabled: true,
+            successTarget: 4,
+            attemptLimit: 4,
+            createdBy: admin.id,
+          },
+        });
+        await db.managedCycle.create({
+          data: {
+            id: cycleId,
+            taskId: managedId,
+            nodeId,
+            configVersionId: versionId,
+            releaseId,
+            day,
+            status: 'REGISTERING',
+            successTarget: 4,
+            attemptLimit: 4,
+          },
+        });
+      }
       await db.run.create({
         data: {
           id: runId,
@@ -199,6 +250,7 @@ for (const concurrency of [1, 2])
           successTarget: 4,
           attemptLimit: 4,
           executionPlan: plan,
+          ...(managed ? { taskCycleId: cycleId, createdBy: admin.id } : {}),
         },
       });
       await db.nodeSlot.update({ where: { nodeId }, data: { runId } });
@@ -230,6 +282,148 @@ for (const concurrency of [1, 2])
       await assert.rejects(start(sessions[0].id));
       await send(0, 'TASK_STAGE', { stage: 'DOWNLOADING' });
       await assert.rejects(send(1, 'TASK_STAGE', { stage: 'DOWNLOADING' }));
+      if (scenario === 'recover' || scenario === 'quarantine' || managed) {
+        const failed = {
+          status: 'FAILED',
+          proof: 'NONE',
+          artifactIds: [],
+          errorCode: 'APP_CLEANUP_UNCONFIRMED',
+        };
+        const skipped = {
+          status: 'SKIPPED',
+          proof: 'NONE',
+          artifactIds: [],
+          errorCode: 'DEVICE_SESSION_SKIPPED',
+        };
+        await assert.rejects(send(1, 'TASK_FINISHED', skipped));
+        await assert.rejects(close(sessions[0].id, true));
+        await send(0, 'TASK_FINISHED', failed);
+        await assert.rejects(send(1, 'TASK_STAGE', { stage: 'DOWNLOADING' }));
+        await assert.rejects(start(sessions[1].id));
+        if (scenario !== 'recover') {
+          await send(null, 'DEVICE_SESSION', {
+            sessionId: sessions[0].id,
+            phase: 'FAILED',
+            elapsedMs: 100000,
+            cleanupComplete: false,
+          });
+          await assert.rejects(start(sessions[1].id));
+          await send(null, 'RUN_FINISHED', {
+            status: 'NEEDS_REVIEW',
+            errorCode: 'CLEANUP_INCOMPLETE',
+          });
+          const slot = await db.nodeSlot.findUniqueOrThrow({ where: { nodeId } });
+          assert.equal(slot.quarantined, true);
+          const pending = await db.task.findUniqueOrThrow({ where: { id: tasks[1] } });
+          assert.equal(pending.status, 'SKIPPED');
+          assert.equal(pending.errorCode, 'BATCH_NEEDS_REVIEW');
+          if (!managed) return;
+          const cycle = () => db.managedCycle.findUniqueOrThrow({ where: { id: cycleId } });
+          const original = await db.run.findUniqueOrThrow({ where: { id: runId } });
+          assert.equal(original.stopRequested, true);
+          assert.equal((await cycle()).errorCode, 'APP_CLEANUP_RESTART_PENDING');
+          await assert.rejects(
+            controlTaskPlan(
+              db,
+              managedId,
+              { action: 'START' },
+              1,
+              admin.id,
+              'fixture',
+              randomUUID(),
+            ),
+            (e) => e.code === 'STOP_PENDING',
+          );
+          const finishedAt = new Date(Date.now() - 31000);
+          await db.run.update({ where: { id: runId }, data: { finishedAt } });
+          await tickTaskPlans(db);
+          assert.equal((await cycle()).generation, 1, 'time alone cannot release the device');
+          await db.run.update({ where: { id: runId }, data: { finishedAt: original.finishedAt } });
+          if (scenario === 'manual-stop')
+            await controlTaskPlan(
+              db,
+              managedId,
+              { action: 'STOP' },
+              1,
+              admin.id,
+              'fixture',
+              randomUUID(),
+            );
+          await reconcileAgent(db, token, {
+            protocolVersion: '1.0',
+            nodeId,
+            bootId,
+            reason: 'EXECUTION_ERROR',
+            cleanupComplete: true,
+            deliveries: [{ deliveryId, fence: 1, cleanupComplete: true, submissions: [] }],
+          });
+          await db.run.update({ where: { id: runId }, data: { finishedAt } });
+          await tickTaskPlans(db);
+          assert.equal(
+            (await cycle()).generation,
+            1,
+            'a cleanup receipt needs a new idle heartbeat',
+          );
+          const heartbeat = JSON.parse(
+            await readFile('contracts/fixtures/agent.valid.json', 'utf8'),
+          ).find((m) => m.kind === 'heartbeat');
+          await agentHeartbeat(db, token, {
+            ...heartbeat,
+            nodeId,
+            releaseId,
+            bootId,
+            agentVersion: '0.13.0',
+            sentAt: new Date().toISOString(),
+            currentDelivery: null,
+          });
+          if (scenario === 'manual-stop') {
+            await tickTaskPlans(db);
+            assert.equal((await cycle()).status, 'STOPPED');
+            assert.equal((await cycle()).generation, 1);
+          } else {
+            await db.run.update({ where: { id: runId }, data: { finishedAt: new Date() } });
+            await tickTaskPlans(db);
+            assert.equal(
+              (await cycle()).generation,
+              1,
+              'restart cannot occur before thirty seconds',
+            );
+            await db.run.update({ where: { id: runId }, data: { finishedAt } });
+            await tickTaskPlans(db);
+            const restarted = await cycle();
+            assert.equal(restarted.generation, 2);
+            assert.equal(restarted.status, 'QUEUED');
+            assert.equal(restarted.attemptLimit, 4);
+            const old = await db.run.findUniqueOrThrow({ where: { id: runId } });
+            assert.equal(old.status, 'NEEDS_REVIEW');
+            assert.equal(old.attemptsStarted, 1);
+          }
+          return;
+        }
+        await close(sessions[0].id, true);
+        const retired = await db.task.findUniqueOrThrow({ where: { id: tasks[1] } });
+        assert.equal(retired.status, 'SKIPPED');
+        assert.equal(retired.errorCode, 'DEVICE_SESSION_SKIPPED');
+        assert.equal(retired.attemptStarted, false);
+        const exhausted = { status: 'PARTIAL_FAILED', errorCode: 'DEVICE_PLAN_EXHAUSTED' };
+        await assert.rejects(send(null, 'RUN_FINISHED', exhausted));
+        await start(sessions[1].id);
+        for (const index of [2, 3]) {
+          await send(index, 'TASK_STAGE', { stage: 'DOWNLOADING' });
+          await finish(index);
+        }
+        await assert.rejects(close(sessions[1].id, true));
+        await close(sessions[1].id);
+        await send(null, 'RUN_FINISHED', exhausted);
+        const run = await db.run.findUniqueOrThrow({ where: { id: runId } });
+        assert.equal(run.attemptsStarted, 3);
+        assert.equal(run.successes, 2);
+        assert.equal(run.status, 'PARTIAL_FAILED');
+        const slot = await db.nodeSlot.findUniqueOrThrow({ where: { nodeId } });
+        assert.equal(slot.runId, null);
+        assert.equal(slot.quarantined, false);
+        return;
+      }
       if (concurrency === 2) await send(2, 'TASK_STAGE', { stage: 'DOWNLOADING' });
       await assert.rejects(close(sessions[0].id));
       if (concurrency === 2) await finish(2);
@@ -267,6 +461,10 @@ for (const concurrency of [1, 2])
       await db.nodeSlot.deleteMany({ where: { nodeId } });
       await db.agentCredential.deleteMany({ where: { nodeId } });
       await db.run.deleteMany({ where: { nodeId } });
+      if (managed) {
+        await db.managedCycle.deleteMany({ where: { id: cycleId } });
+        await db.managedTask.deleteMany({ where: { id: managedId } });
+      }
       await db.configVersion.deleteMany({ where: { configId } });
       await db.configuration.deleteMany({ where: { id: configId } });
       await db.node.deleteMany({ where: { id: nodeId } });
