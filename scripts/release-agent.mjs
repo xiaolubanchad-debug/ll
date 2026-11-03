@@ -171,7 +171,7 @@ export async function publishAgent(options = {}) {
       uiautomator2Version: dependencies['appium-uiautomator2-driver'],
       npmLockSha256: hash(await readFile(join(npmDir, 'package-lock.json'))),
       systemImage: 'system-images;android-35;google_apis;x86_64',
-      extraSystemImages: [29, 31, 33, 34, 36].map((apiLevel) => ({
+      extraSystemImages: [34, 36].map((apiLevel) => ({
         ...sdkArchive(
           imageXml,
           'system-images;android-' + apiLevel + ';google_apis;x86_64',
@@ -203,7 +203,14 @@ export async function publishAgent(options = {}) {
       ],
     };
   }
-  const toolchain = base?.toolchain ?? refreshedToolchain;
+  const toolchain = base
+    ? {
+        ...base.toolchain,
+        extraSystemImages: base.toolchain.extraSystemImages?.filter(
+          (image) => image.apiLevel === 34 || image.apiLevel === 36,
+        ),
+      }
+    : refreshedToolchain;
   const recipeSha256 = await environmentRecipe(root);
   const environment = {
     version: 1,
@@ -263,7 +270,7 @@ export async function publishAgent(options = {}) {
   const body = {
     id: randomUUID(),
     gitCommit,
-    agentVersion: '0.17.7',
+    agentVersion: '0.17.8',
     protocolVersion: '1.0',
     features: [
       'DOWNLOAD_V1',

@@ -57,7 +57,11 @@ export function validManifest(body: unknown): ReleaseInput {
         (feature) => !m.features?.includes(feature as NonNullable<typeof m.features>[number]),
       ) ||
       !m.toolchain.extraSystemImages ||
-      new Set(m.toolchain.extraSystemImages.map((a) => a.apiLevel)).size !== 5)
+      (knownAgentAtLeast(m.agentVersion, '0.17.8')
+        ? m.toolchain.extraSystemImages.length !== 2 ||
+          !m.toolchain.extraSystemImages.some((a) => a.apiLevel === 34) ||
+          !m.toolchain.extraSystemImages.some((a) => a.apiLevel === 36)
+        : new Set(m.toolchain.extraSystemImages.map((a) => a.apiLevel)).size !== 5))
   )
     fault('RELEASE_INVALID', '多 APP 发布必须包含固定多版本系统镜像', 422);
   if (

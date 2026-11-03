@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { randomUUID, randomBytes } from 'node:crypto';
 import { PrismaClient } from '@prisma/client';
+import { deviceVariant } from '@apk/contracts';
 import {
   agentHeartbeat,
   controlTaskPlan,
@@ -85,6 +86,9 @@ for (const scenario of [
       token = randomBytes(32).toString('base64url');
     const config = JSON.parse(
       await readFile('contracts/fixtures/config.concurrent-open.valid.json', 'utf8'),
+    );
+    const recoveryHealth = JSON.parse(
+      await readFile('contracts/fixtures/health.incremental.valid.json', 'utf8'),
     );
     config.execution.appOpen.appsPerDevice = { min: 2, max: 2 };
     config.execution.appOpen.randomDeviceProfile = true;
@@ -578,9 +582,18 @@ for (const scenario of [
                     downloadProtocol: '1.0',
                     registrationProtocol: '1.0',
                   },
-                  report: JSON.parse(
-                    await readFile('contracts/fixtures/health.incremental.valid.json', 'utf8'),
-                  ),
+                  report: {
+                    ...recoveryHealth,
+                    versions: {
+                      ...recoveryHealth.versions,
+                      identityCatalog: JSON.stringify(['phone-01', 'phone-12', 'phone-52']),
+                      identityAbis: JSON.stringify({
+                        'phone-01': ['x86_64'],
+                        'phone-12': ['x86_64'],
+                        'phone-52': ['x86_64'],
+                      }),
+                    },
+                  },
                 }
               : {}),
             sentAt: new Date().toISOString(),
@@ -621,6 +634,11 @@ for (const scenario of [
               assert.deepEqual(
                 resumed[0].executionPlan.openPolicy.sessions.map((g) => g.assetIndexes),
                 [[0], [0, 1]],
+              );
+              assert.ok(
+                resumed[0].executionPlan.openPolicy.sessions.every(
+                  (group) => deviceVariant(group.variantId).apiLevel >= 34,
+                ),
               );
               assert.equal(await db.run.count({ where: { nodeId, purpose: 'DOWNLOAD' } }), 1);
               assert.equal(

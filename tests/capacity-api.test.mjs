@@ -13,7 +13,7 @@ import {
   createSecret,
 } from '@apk/platform';
 import { prepareDailyPlan, beijingDay } from '../packages/platform/dist/daily-plan.js';
-import { DEVICE_CATALOG, devicePlanIssues, schemaIssues } from '@apk/contracts';
+import { DEVICE_CATALOG, devicePlanIssues, deviceVariant, schemaIssues } from '@apk/contracts';
 import { createApp } from '../apps/control-api/dist/app.js';
 import { passwordHash } from '../apps/control-api/dist/auth.js';
 
@@ -70,7 +70,12 @@ test('capacity uses applied serial receipts, freezes shared daily usage and prot
           download: true,
           versions: {
             identityModels: '30',
-            identityCatalog: JSON.stringify(DEVICE_CATALOG.map((x) => x.id)),
+            identityCatalog: JSON.stringify([
+              'phone-01',
+              'phone-08',
+              'phone-25',
+              ...DEVICE_CATALOG.map((x) => x.id),
+            ]),
             identityAbis: JSON.stringify(
               Object.fromEntries(DEVICE_CATALOG.map((x) => [x.id, ['x86_64']])),
             ),
@@ -290,6 +295,10 @@ test('capacity uses applied serial receipts, freezes shared daily usage and prot
     assert.equal(plan.openPolicy.capacityVersion, 1);
     assert.equal(plan.openPolicy.dailyLimit, 2500);
     assert.deepEqual(devicePlanIssues(config, plan), []);
+    assert.deepEqual(
+      [...new Set(plan.openPolicy.sessions.map((s) => deviceVariant(s.variantId).apiLevel))].sort(),
+      [34, 35, 36],
+    );
     assert.ok(
       plan.openPolicy.sessions.every(
         (s) =>

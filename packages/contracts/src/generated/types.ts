@@ -1790,7 +1790,7 @@ export interface ReleaseInput {
     }[];
     npmLockSha256: string;
     /**
-     * @minItems 5
+     * @minItems 2
      * @maxItems 5
      */
     extraSystemImages?: {

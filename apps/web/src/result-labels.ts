@@ -123,6 +123,8 @@ export const reasonLabels: Record<string, string> = {
   NODE_NOT_READY: '服务器或发布尚未就绪',
   NODE_RELEASE_CHANGED: '正在衔接服务器当前版本；历史结果和已用次数保留',
   APK_SELECTION_UNAVAILABLE: '所选 APK 文件当天不可用，请核对缓存文件名',
+  APP_OPEN_ANDROID_UNSUPPORTED: 'APP 启动停留仅支持 Android 14、15、16',
+  APP_OPEN_IMAGE_POOL_UNAVAILABLE: '可用的 Android 14–16 档案不足或与 APK 不兼容',
   NODE_UPGRADE_REQUIRED: '请升级服务器到支持当前配置的 Agent 版本',
   PROXY_CONFIG_INVALID: '请应用已保存代理并保存完整配置版本',
   DOWNLOAD_SOURCE_INVALID: '需要本服务器、本配置当天的有效下载批次',

@@ -1,5 +1,5 @@
 // Model codes checked against Google Play supported devices; QA system images, not OEM ROMs.
-export const DEVICE_CATALOG = [
+const LEGACY_DEVICE_CATALOG = [
   {
     id: 'phone-01',
     name: 'Xiaomi 11T',
@@ -391,7 +391,73 @@ export const DEVICE_CATALOG = [
     source: 'https://storage.googleapis.com/play_public/supported_devices.csv',
   },
 ] as const;
-export const deviceVariant = (id: string) => DEVICE_CATALOG.find((v) => v.id === id);
+export const APP_OPEN_ANDROID_APIS = [34, 35, 36] as const;
+export const supportsAppOpenAndroid = (api: number) =>
+  APP_OPEN_ANDROID_APIS.some((supported) => supported === api);
+
+type DeviceProfile = {
+  [K in keyof (typeof LEGACY_DEVICE_CATALOG)[number]]: (typeof LEGACY_DEVICE_CATALOG)[number][K] extends number
+    ? number
+    : string;
+};
+function updateProfile(id: string, model: string, apiLevel: number): DeviceProfile {
+  const profile = LEGACY_DEVICE_CATALOG.find((variant) => variant.model === model);
+  if (!profile) throw Error('UNKNOWN_DEVICE_PROFILE');
+  return { ...profile, id, apiLevel };
+}
+function android16Profile(
+  id: string,
+  name: string,
+  model: string,
+  manufacturer: string,
+  width: number,
+  height: number,
+): DeviceProfile {
+  return {
+    id,
+    name,
+    model,
+    manufacturer,
+    brand: manufacturer,
+    apiLevel: 36,
+    width,
+    height,
+    density: 420,
+    screenSource: 'QA viewport based on published resolution; density is a test setting',
+    source: 'https://storage.googleapis.com/play_public/supported_devices.csv',
+  };
+}
+
+export const DEVICE_CATALOG: readonly DeviceProfile[] = [
+  ...LEGACY_DEVICE_CATALOG.filter((profile) => supportsAppOpenAndroid(profile.apiLevel)),
+  updateProfile('phone-31', '21081111RG', 34),
+  updateProfile('phone-32', '2107113SG', 34),
+  updateProfile('phone-33', '2203129G', 34),
+  updateProfile('phone-34', '22071212AG', 34),
+  updateProfile('phone-35', 'SM-S901B', 34),
+  updateProfile('phone-36', 'SM-S906B', 34),
+  updateProfile('phone-37', 'SM-A346B', 34),
+  updateProfile('phone-38', 'SM-A536B', 34),
+  updateProfile('phone-39', '2201123G', 35),
+  updateProfile('phone-40', '2201122G', 35),
+  updateProfile('phone-41', '22081212UG', 35),
+  updateProfile('phone-42', '2211133G', 35),
+  updateProfile('phone-43', '2210132G', 35),
+  updateProfile('phone-44', '2306EPN60G', 35),
+  updateProfile('phone-45', 'SM-S911B', 35),
+  updateProfile('phone-46', 'SM-S916B', 35),
+  updateProfile('phone-47', 'SM-A546B', 35),
+  android16Profile('phone-48', 'Xiaomi 14T Pro', '2407FPN8EG', 'Xiaomi', 1220, 2712),
+  android16Profile('phone-49', 'Xiaomi 15', '24129PN74G', 'Xiaomi', 1200, 2670),
+  android16Profile('phone-50', 'Xiaomi 15 Ultra', '25010PN30G', 'Xiaomi', 1440, 3200),
+  android16Profile('phone-51', 'Xiaomi 15T Pro', '2506BPN68G', 'Xiaomi', 1280, 2772),
+  android16Profile('phone-52', 'Galaxy S25', 'SM-S931B', 'samsung', 1080, 2340),
+  android16Profile('phone-53', 'Galaxy S25+', 'SM-S936B', 'samsung', 1440, 3120),
+  android16Profile('phone-54', 'Galaxy S25 Ultra', 'SM-S938B', 'samsung', 1440, 3120),
+  android16Profile('phone-55', 'Galaxy A56 5G', 'SM-A566B', 'samsung', 1080, 2340),
+];
+export const deviceVariant = (id: string) =>
+  DEVICE_CATALOG.find((v) => v.id === id) ?? LEGACY_DEVICE_CATALOG.find((v) => v.id === id);
 export const TEST_CLIENT_PACKAGES: readonly string[] = [
   'com.apkplatform.testclient',
   ...Array.from({ length: 10 }, (_, i) => 'com.apkplatform.testclient.app' + (i + 1)),

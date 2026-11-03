@@ -302,7 +302,7 @@
                   },
                   "variantId": {
                     "type": "string",
-                    "pattern": "^(qa-model-(0[1-3])|phone-(0[1-9]|[12][0-9]|30))$"
+                    "pattern": "^(qa-model-0[1-3]|phone-(0[1-9]|[1-4][0-9]|5[0-5]))$"
                   },
                   "assetIndexes": {
                     "type": "array",

@@ -57,7 +57,7 @@ export async function phoneManifest(
     m.version !== 3 ||
     m.sdkRoot !== resolve(sdk) ||
     !Array.isArray(m.images) ||
-    m.images.length !== 30
+    m.images.length !== DEVICE_CATALOG.length
   )
     throw new RegistrationError('IDENTITY_IMAGE_INVALID');
   const result: IdentityImage[] = [];
@@ -158,7 +158,8 @@ export async function loadIdentityImage(sdk: string, id: string): Promise<Identi
     throw new RegistrationError('IDENTITY_IMAGE_INVALID');
   const image = (await (deviceVariant(id) ? phoneManifest(sdk) : identityManifest(sdk))).find(
     (x) => x.id === id,
-  )!;
+  );
+  if (!image) throw new RegistrationError('IDENTITY_IMAGE_INVALID');
   for (const [name, expected] of [
     ['system.img', image.sha256],
     ...(image.vendorSha256 ? [['vendor.img', image.vendorSha256]] : []),

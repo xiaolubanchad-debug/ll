@@ -398,6 +398,8 @@ export type {
 } from './generated/types.js';
 
 export {
+  APP_OPEN_ANDROID_APIS,
+  supportsAppOpenAndroid,
   DEVICE_CATALOG,
   deviceVariant,
   TEST_CLIENT_PACKAGES,
@@ -469,6 +471,7 @@ const knownAgentVersions: readonly string[] = [
   '0.17.5',
   '0.17.6',
   '0.17.7',
+  '0.17.8',
 ];
 export function knownAgentAtLeast(version: string | null | undefined, minimum: string): boolean {
   const required = knownAgentVersions.indexOf(minimum);

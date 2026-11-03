@@ -169,9 +169,33 @@ export async function prepareDailyPlan(
         old.tasks.filter((task) => task.attemptStarted).map((task) => task.position),
       );
       let position = 0;
+      const variants = readyDeviceVariants(identityNode.health);
+      const abiCatalog = readyDeviceAbis(identityNode.health);
+      const matchesAbi = groupedAssetAbiMatcher(variants, abiCatalog);
       const sessions = original.openPolicy.sessions.flatMap((session) => {
         const assetIndexes = session.assetIndexes.filter(() => !started.has(position++));
-        return assetIndexes.length ? [{ ...session, assetIndexes }] : [];
+        if (!assetIndexes.length) return [];
+        if (!session.variantId) return [{ ...session, assetIndexes }];
+        const compatible = (id: string) =>
+          assetIndexes.every((index) => {
+            const apk = original.assets[index]?.apk;
+            return (
+              apk &&
+              (apk.minSdkVersion ?? 1) <= deviceVariant(id)!.apiLevel &&
+              matchesAbi(apk.abis, abiCatalog[id] ?? [], id)
+            );
+          });
+        if (variants.includes(session.variantId) && compatible(session.variantId))
+          return [{ ...session, assetIndexes, supportedAbis: abiCatalog[session.variantId] }];
+        const replacements = variants.filter(compatible);
+        if (!replacements.length)
+          fault(
+            'APP_OPEN_IMAGE_POOL_UNAVAILABLE',
+            '剩余 APK 没有共同兼容的已验证 Android 14–16 档案',
+            409,
+          );
+        const variantId = replacements[randomInt(replacements.length)];
+        return [{ ...session, assetIndexes, variantId, supportedAbis: abiCatalog[variantId] }];
       });
       const remaining: DailyExecutionPlan = {
         ...original,
@@ -323,7 +347,7 @@ export async function prepareDailyPlan(
       variants.map((id) => [id, indexesFor(deviceVariant(id)!.apiLevel, abiCatalog[id] ?? [], id)]),
     );
     if (config.execution.appOpen?.randomDeviceProfile && variants.length < 2)
-      fault('IDENTITY_POOL_EXHAUSTED', '缺少已验证型号档案', 422);
+      fault('APP_OPEN_IMAGE_POOL_UNAVAILABLE', '缺少已验证的 Android 14–16 型号档案', 422);
     const sessions: NonNullable<NonNullable<DailyExecutionPlan['openPolicy']>['sessions']> = [];
     let left = plan.attemptLimit;
     let modelBag = variants.slice();

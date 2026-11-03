@@ -46,7 +46,7 @@ test('the actual publisher version and capability list pass manifest and runtime
       checksum: 'sha256:' + sha256,
       revision: '1.0.0',
     })),
-    extraSystemImages: [29, 31, 33, 34, 36].map((apiLevel) => ({
+    extraSystemImages: [34, 36].map((apiLevel) => ({
       role: 'systemImage',
       apiLevel,
       url: `https://dl.google.com/android/repository/sys-img/google_apis/fixture-${apiLevel}.zip`,
@@ -73,6 +73,24 @@ test('the actual publisher version and capability list pass manifest and runtime
     signature: Buffer.alloc(64).toString('base64'),
   };
   assert.equal(validManifest(manifest).agentVersion, agentVersion);
+  const legacyToolchain = {
+    ...toolchain,
+    extraSystemImages: [
+      ...toolchain.extraSystemImages,
+      ...[29, 31, 33].map((apiLevel) => ({ ...toolchain.extraSystemImages[0], apiLevel })),
+    ],
+  };
+  const legacy = {
+    ...manifest,
+    agentVersion: '0.17.7',
+    toolchain: legacyToolchain,
+    environment: {
+      ...manifest.environment,
+      fingerprint: digest(canonical({ version: 1, toolchain: legacyToolchain, recipeSha256 })),
+    },
+  };
+  assert.equal(validManifest(legacy).agentVersion, '0.17.7');
+  assert.throws(() => validManifest({ ...legacy, agentVersion }), /多版本系统镜像/);
   assert.deepEqual(agentProtocolsForVersion(agentVersion), { download: true, registration: true });
   assert.equal(cachedApkSelectionSupported(features, agentVersion), true);
   assert.equal(deviceSessionsSupported(features, agentVersion), true);

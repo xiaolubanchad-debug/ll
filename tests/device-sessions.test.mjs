@@ -8,6 +8,7 @@ import {
   configurationIssues,
   DEVICE_CATALOG,
   deviceAssignments,
+  schemaIssues,
 } from '@apk/contracts';
 import { scheduleDeviceSessions } from '../packages/automation/dist/device-sessions.js';
 import {
@@ -31,7 +32,16 @@ async function fixture(n = 6) {
       targetKey: String(i).repeat(64),
       label: 'APP ' + i,
       sourceUrl: 'https://example.com/',
-      apk: { packageName: 'com.example.app' + i, abis: [], minSdkVersion: 26 },
+      apk: {
+        packageName: 'com.example.app' + i,
+        abis: [],
+        minSdkVersion: 26,
+        versionName: '1',
+        versionCode: 1,
+        size: 1,
+        apkSha256: String(i).repeat(64),
+        cacheDay: '2026-10-31',
+      },
     })),
     openPolicy: {
       concurrency: 2,
@@ -120,16 +130,26 @@ test('only a completed Android install rejection can confirm that the package in
   assert.equal(received, false);
 });
 
-test('thirty distinct real model codes and six actual Android API targets; malformed ranges and duplicate packages refused', async () => {
+test('thirty distinct profiles split across Android 14–16; malformed ranges and duplicate packages refused', async () => {
   assert.equal(DEVICE_CATALOG.length, 30);
   assert.equal(new Set(DEVICE_CATALOG.map((d) => d.model)).size, 30);
   assert.deepEqual(
-    [...new Set(DEVICE_CATALOG.map((d) => d.apiLevel))].sort(),
-    [29, 31, 33, 34, 35, 36],
+    Object.fromEntries(
+      [34, 35, 36].map((api) => [
+        api,
+        DEVICE_CATALOG.filter((profile) => profile.apiLevel === api).length,
+      ]),
+    ),
+    { 34: 10, 35: 10, 36: 10 },
   );
   const { config, plan } = await fixture();
   assert.deepEqual(configurationIssues(config), []);
   assert.deepEqual(devicePlanIssues(config, plan), []);
+  const modern = structuredClone(plan);
+  modern.openPolicy.sessions[0].variantId = 'phone-55';
+  assert.deepEqual(schemaIssues('DailyExecutionPlan', modern), []);
+  modern.openPolicy.sessions[0].variantId = 'phone-56';
+  assert.ok(schemaIssues('DailyExecutionPlan', modern).length);
   for (const [min, max] of [
     [0, 3],
     [4, 3],

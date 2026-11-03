@@ -1,5 +1,7 @@
 # HTTP 接口契约
 
+1.23.5 为 APP 启动停留增加 `phone-31` 至 `phone-55` 档案 ID。Agent 0.17.8 的设备会话发布包含 API 35 主镜像及 API 34、36 附加镜像。旧档案和签名清单继续可读。见 [Android 14–16 设备池](../docs/V123_WEB_PROXY_AND_RECOVERY_CONTRACT.md#1235-android-1416-设备池)。
+
 1.23.4 的 `appForeground` 可携带 `launchReceipt`，进程事件可携带受限的 `trigger` 和 `exitReason`。见 [启动回执与前台判定](../docs/V123_WEB_PROXY_AND_RECOVERY_CONTRACT.md#1234-启动回执与前台判定分离)。
 
 1.23.3 在 `appForeground` 中增加可选的 `process` 证据，`POLL` 可覆盖启动回执期间的窗口采样。见 [启动期间证据](../docs/V123_WEB_PROXY_AND_RECOVERY_CONTRACT.md#1233-启动期间的进程和窗口证据)。

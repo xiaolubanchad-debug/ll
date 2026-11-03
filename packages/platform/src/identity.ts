@@ -6,6 +6,7 @@ import {
   ownedTestSupported,
   deviceSessionsSupported,
   deviceVariant,
+  supportsAppOpenAndroid,
 } from '@apk/contracts';
 import { randomInt } from 'node:crypto';
 import { fault } from './errors.js';
@@ -22,6 +23,14 @@ export function assertIdentityReady(
   health: unknown,
   attempts: number,
 ) {
+  const open = config.execution.appOpen;
+  const profile = config.execution.deviceProfiles[0];
+  if (
+    open &&
+    !(open.randomDeviceProfile && open.appsPerDevice) &&
+    !supportsAppOpenAndroid(Number(profile?.systemImage.match(/;android-(\d+);/)?.[1]))
+  )
+    fault('APP_OPEN_ANDROID_UNSUPPORTED', 'APP 启动停留仅支持 Android 14、15、16', 422);
   if (
     config.execution.appOpen &&
     ((config.execution.appOpen.appsPerDevice?.max ?? 1) > 10 || attempts > 800) &&
@@ -62,7 +71,7 @@ export function readyDeviceVariants(health: unknown): string[] {
     return Array.isArray(ids) &&
       ids.every((x) => typeof x === 'string' && deviceVariant(x)) &&
       new Set(ids).size === ids.length
-      ? ids
+      ? ids.filter((id: string) => supportsAppOpenAndroid(deviceVariant(id)!.apiLevel))
       : [];
   } catch {
     return [];
