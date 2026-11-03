@@ -106,6 +106,13 @@ test('module dependency expansion and conservative fallback', () => {
   for (const name of ['file-assets', 'mobile-download', 'download-discovery'])
     assert.ok(downloadTests.includes(name));
   assert.ok(planChanges(['apps/agent/src/tasks.ts']).tests.includes('concurrent-open'));
+  const abiPlan = planChanges([
+    'packages/platform/src/daily-plan.ts',
+    'packages/platform/src/identity.ts',
+  ]);
+  assert.ok(abiPlan.tests.includes('device-sessions-api'));
+  assert.ok(abiPlan.tests.includes('manual-apk'));
+  assert.ok(!abiPlan.tests.includes('ALL'));
   assert.deepEqual(planChanges(['scripts/release-plan.mjs', 'apps/agent/src/health.ts']).modules, [
     'agent',
     'tools',

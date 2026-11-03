@@ -14,7 +14,7 @@ import {
   allocateIdentityModels,
   readyDeviceVariants,
   readyDeviceAbis,
-  preferFileAssetVariants,
+  groupedAssetAbiMatcher,
 } from './identity.js';
 import type { Prisma, ConfigVersion } from '@prisma/client';
 import type { DailyExecutionPlan, RunInput, TestConfiguration } from '@apk/contracts';
@@ -310,11 +310,18 @@ export async function prepareDailyPlan(
     const node = await tx.node.findUniqueOrThrow({
       where: { id: input.nodeId },
     });
-    const readyVariants = readyDeviceVariants(node.health);
+    const variants = readyDeviceVariants(node.health);
     const abiCatalog = readyDeviceAbis(node.health);
-    const variants = config.execution.appOpen?.randomDeviceProfile
-      ? preferFileAssetVariants(readyVariants, abiCatalog, plan.assets)
-      : readyVariants;
+    const matchesAbi = groupedAssetAbiMatcher(variants, abiCatalog);
+    const indexesFor = (api: number, supported: string[], id?: string) =>
+      plan.assets.flatMap((asset, i) =>
+        (asset.apk.minSdkVersion ?? 1) <= api && matchesAbi(asset.apk.abis, supported, id)
+          ? [i]
+          : [],
+      );
+    const variantAssets = new Map(
+      variants.map((id) => [id, indexesFor(deviceVariant(id)!.apiLevel, abiCatalog[id] ?? [], id)]),
+    );
     if (config.execution.appOpen?.randomDeviceProfile && variants.length < 2)
       fault('IDENTITY_POOL_EXHAUSTED', '缺少已验证型号档案', 422);
     const sessions: NonNullable<NonNullable<DailyExecutionPlan['openPolicy']>['sessions']> = [];
@@ -323,12 +330,7 @@ export async function prepareDailyPlan(
     while (left > 0) {
       const compatibleVariants = variants.filter(
         (id) =>
-          id !== sessions.at(-1)?.variantId &&
-          plan.assets.filter(
-            (a) =>
-              (a.apk.minSdkVersion ?? 1) <= (deviceVariant(id)?.apiLevel ?? 0) &&
-              (!a.apk.abis.length || a.apk.abis.some((abi) => abiCatalog[id]?.includes(abi))),
-          ).length >= required,
+          id !== sessions.at(-1)?.variantId && (variantAssets.get(id)?.length ?? 0) >= required,
       );
       let available = modelBag.filter((id) => compatibleVariants.includes(id));
       if (!available.length) {
@@ -347,12 +349,9 @@ export async function prepareDailyPlan(
       const supportedAbis =
         abiCatalog[variantId ?? variants.find((id) => deviceVariant(id)?.apiLevel === api) ?? ''] ??
         [];
-      const indexes = plan.assets.flatMap((a, i) =>
-        (a.apk.minSdkVersion ?? 1) <= api &&
-        (!a.apk.abis.length || a.apk.abis.some((abi) => supportedAbis.includes(abi)))
-          ? [i]
-          : [],
-      );
+      const indexes = variantId
+        ? [...(variantAssets.get(variantId) ?? [])]
+        : indexesFor(api, supportedAbis);
       if (indexes.length < required) fault('APK_POOL_INSUFFICIENT', '兼容 APK 数量不足', 422);
       const count = Math.min(
         left,

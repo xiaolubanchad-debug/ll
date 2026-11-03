@@ -15,9 +15,9 @@ import {
   tickTaskPlans,
 } from '@apk/platform';
 import { beijingDay } from '../packages/platform/dist/daily-plan.js';
-import { preferFileAssetVariants } from '../packages/platform/dist/identity.js';
+import { groupedAssetAbiMatcher } from '../packages/platform/dist/identity.js';
 
-test('unknown file-name APKs use verified ARM64 and x86_64 device variants when available', () => {
+test('mixed APKs assign unknown architecture to dual-architecture variants and respect known x86', () => {
   const variants = ['phone-01', 'phone-02', 'phone-08', 'phone-09'];
   const catalog = {
     'phone-01': ['arm64-v8a', 'x86_64'],
@@ -25,17 +25,29 @@ test('unknown file-name APKs use verified ARM64 and x86_64 device variants when 
     'phone-08': ['x86_64'],
     'phone-09': ['x86', 'x86_64'],
   };
-  const unknown = [{ apk: { validationPolicy: 'FILE_NAME', abis: [] } }];
-  assert.deepEqual(preferFileAssetVariants(variants, catalog, unknown), ['phone-01', 'phone-02']);
+  const matches = groupedAssetAbiMatcher(variants, catalog);
+  const mixed = [[], ['arm64-v8a'], ['x86']];
   assert.deepEqual(
-    preferFileAssetVariants(variants, { 'phone-01': catalog['phone-01'] }, unknown),
-    variants,
+    mixed.filter((abis) => matches(abis, catalog['phone-01'], 'phone-01')),
+    [[], ['arm64-v8a']],
   );
   assert.deepEqual(
-    preferFileAssetVariants(variants, catalog, [
-      { apk: { validationPolicy: 'FILE_NAME', abis: ['x86'] } },
-    ]),
-    variants,
+    mixed.filter((abis) => matches(abis, catalog['phone-09'], 'phone-09')),
+    [['x86']],
+  );
+  assert.equal(matches([], catalog['phone-08'], 'phone-08'), false);
+  assert.equal(
+    matches([], catalog['phone-08']),
+    true,
+    'fixed profile keeps its explicit ABI policy',
+  );
+  assert.equal(
+    groupedAssetAbiMatcher(variants, { 'phone-01': catalog['phone-01'] })(
+      [],
+      catalog['phone-08'],
+      'phone-08',
+    ),
+    true,
   );
 });
 

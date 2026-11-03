@@ -22,6 +22,16 @@ const platformTests = {
   'task-plans.ts': ['v18', 'v181', 'server-console-api', 'server-console-web'],
   'schedules.ts': ['p3', 'v18', 'v181'],
   'open-budget.ts': ['app-open-api', 'concurrent-open-api'],
+  'daily-plan.ts': [
+    'app-open-api',
+    'concurrent-open-api',
+    'device-sessions-api',
+    'capacity-api',
+    'manual-apk',
+    'v18',
+    'v181',
+  ],
+  'identity.ts': ['device-sessions-api', 'capacity-api', 'test-data', 'v18'],
   'test-data.ts': ['test-data', 'test-data-web'],
 };
 export function planChanges(files) {
