@@ -459,10 +459,11 @@ const knownAgentVersions: readonly string[] = [
   '0.15.1',
   '0.16.0',
   '0.17.0',
+  '0.17.1',
 ];
-function knownAgentAtLeast(version: string | null | undefined, minimum: string): boolean {
-  const index = knownAgentVersions.indexOf(version ?? '');
-  return index >= knownAgentVersions.indexOf(minimum);
+export function knownAgentAtLeast(version: string | null | undefined, minimum: string): boolean {
+  const required = knownAgentVersions.indexOf(minimum);
+  return required >= 0 && knownAgentVersions.indexOf(version ?? '') >= required;
 }
 export function agentProtocolsForVersion(version: string | null | undefined) {
   return {

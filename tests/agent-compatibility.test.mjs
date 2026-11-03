@@ -1,9 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import Ajv2020 from 'ajv/dist/2020.js';
+import { canonical, digest, validManifest } from '@apk/platform';
 import {
+  agentProtocolsForVersion,
+  cachedApkSelectionSupported,
   dailySupported,
+  deviceSessionsSupported,
   autoRegistrationSupported,
   appOpenSupported,
   parallelAppOpenSupported,
@@ -12,7 +17,7 @@ import {
   requiredAgentProtocolsReady,
 } from '@apk/contracts';
 
-test('the actual publisher capability list fits the signed manifest schema while unknown and duplicate capabilities fail', async () => {
+test('the actual publisher version and capability list pass manifest and runtime gates', async () => {
   const schema = JSON.parse(await readFile('contracts/p1.schema.json', 'utf8'));
   const publisher = await readFile('scripts/release-agent.mjs', 'utf8');
   const body = publisher.match(/features:\s*\[([\s\S]*?)\]/)[1];
@@ -23,6 +28,60 @@ test('the actual publisher capability list fits the signed manifest schema while
   assert.equal(validate(features), true, JSON.stringify(validate.errors));
   assert.equal(validate([...features, 'UNRECOGNIZED_FEATURE']), false);
   assert.equal(validate([...features.slice(0, -1), features[0]]), false);
+
+  const agentVersion = publisher.match(/agentVersion:\s*'([0-9.]+)'/)[1];
+  const sha256 = 'a'.repeat(64);
+  const toolchain = {
+    nodeVersion: '24.18.0',
+    nodeUrl: 'https://nodejs.org/dist/v24.18.0/node-v24.18.0-linux-x64.tar.xz',
+    nodeSha256: sha256,
+    playwrightVersion: '1.56.1',
+    appiumVersion: '3.9.0',
+    uiautomator2Version: '8.7.2',
+    npmLockSha256: sha256,
+    systemImage: 'system-images;android-35;google_apis;x86_64',
+    archives: ['cmdlineTools', 'emulator', 'platformTools', 'systemImage'].map((role) => ({
+      role,
+      url: `https://dl.google.com/android/repository/${role}.zip`,
+      checksum: 'sha256:' + sha256,
+      revision: '1.0.0',
+    })),
+    extraSystemImages: [29, 31, 33, 34, 36].map((apiLevel) => ({
+      role: 'systemImage',
+      apiLevel,
+      url: `https://dl.google.com/android/repository/sys-img/google_apis/fixture-${apiLevel}.zip`,
+      checksum: 'sha256:' + sha256,
+      revision: '1.0.0',
+    })),
+  };
+  const recipeSha256 = 'b'.repeat(64);
+  const manifest = {
+    id: randomUUID(),
+    gitCommit: 'c'.repeat(40),
+    agentVersion,
+    protocolVersion: '1.0',
+    features,
+    artifactName: 'agent-' + sha256 + '.tgz',
+    sha256,
+    playbookSha256: sha256,
+    toolchain,
+    environment: {
+      version: 1,
+      recipeSha256,
+      fingerprint: digest(canonical({ version: 1, toolchain, recipeSha256 })),
+    },
+    signature: Buffer.alloc(64).toString('base64'),
+  };
+  assert.equal(validManifest(manifest).agentVersion, agentVersion);
+  assert.deepEqual(agentProtocolsForVersion(agentVersion), { download: true, registration: true });
+  assert.equal(cachedApkSelectionSupported(features, agentVersion), true);
+  assert.equal(deviceSessionsSupported(features, agentVersion), true);
+  assert.throws(() => validManifest({ ...manifest, agentVersion: '0.17.99' }), /XPath/);
+  assert.throws(
+    () =>
+      validManifest({ ...manifest, environment: { ...manifest.environment, fingerprint: sha256 } }),
+    /环境摘要/,
+  );
 });
 
 test('signed 0.12 releases retain all managed-task gates, while missing features and unknown versions fail closed', () => {
