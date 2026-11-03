@@ -221,6 +221,11 @@ for (const scenario of [
           switchCount: 0,
           samples: [sample],
           last: sample,
+          process: {
+            availability: 'OBSERVED',
+            truncated: false,
+            events: [{ kind: 'STARTED', process: 'MAIN', pid: 512, offsetMs: 80 }],
+          },
         };
         await send(index, 'LOG', { level: 'INFO', message: 'APP 前台观察', appForeground });
         assert.deepEqual(

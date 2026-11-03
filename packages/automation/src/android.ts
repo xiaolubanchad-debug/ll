@@ -13,6 +13,11 @@ import { NetworkPolicy } from './network.js';
 import { recognizeRegistrationScreenshot } from './ocr.js';
 import { removeOwned } from './cache.js';
 import { deviceProperties, waitForAndroidNetwork } from './android-preparation.js';
+import {
+  androidLaunchMarker,
+  processLogLimit,
+  readAndroidProcessEvents,
+} from './android-process.js';
 import type { MeasureOpenStep } from './open-timings.js';
 import type {
   Profile,
@@ -844,7 +849,7 @@ export async function startAndroid(
           Buffer.from(JSON.stringify(bootstrap)),
         );
       },
-      async launch(pkg, activity) {
+      async launch(pkg, activity, onIssued) {
         options.beforeAction();
         const opening = options.controlMode !== undefined;
         const launchCommand = (args: string[], timeout: number, timeoutCode: string) =>
@@ -894,6 +899,17 @@ export async function startAndroid(
             );
           component = found;
         }
+        if (onIssued) {
+          const marker = await command(
+            adb,
+            ['-s', record.serial!, 'shell', 'pidof system_server; date +%s.%N'],
+            1000,
+            'APP_PROCESS_OBSERVATION_UNAVAILABLE',
+          ).then(androidLaunchMarker, () => undefined);
+          signal.throwIfAborted();
+          options.beforeAction();
+          onIssued(marker);
+        }
         const value = await launchCommand(
           [
             'am',
@@ -941,6 +957,37 @@ export async function startAndroid(
           128 * 1024,
         );
         return androidForegroundSample(output, pkg);
+      },
+      async processEvents(pkg, marker, observationSignal) {
+        options.beforeAction();
+        const output = await androidCommand(
+          adb,
+          [
+            '-s',
+            record.serial!,
+            'shell',
+            'logcat',
+            '-b',
+            'events',
+            '-v',
+            'threadtime',
+            '-v',
+            'epoch',
+            '-t',
+            '2000',
+            'am_proc_start:I',
+            'am_proc_died:I',
+            'am_crash:I',
+            "'*:S'",
+          ],
+          env,
+          observationSignal,
+          2000,
+          'APP_PROCESS_OBSERVATION_UNAVAILABLE',
+          workspace,
+          processLogLimit,
+        );
+        return readAndroidProcessEvents(output, pkg, marker);
       },
       find: (l, t, s) => rpc().find(l, t, s),
       click: (id, t) => rpc().click(id, t),

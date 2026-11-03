@@ -6,7 +6,8 @@ import {
   APK_INSTALL_DIAGNOSTIC_PREFIX,
   APP_FOREGROUND_LOG,
 } from '@apk/contracts';
-import { foregroundTrace, holdAppInForeground } from './app-open-foreground.js';
+import { foregroundTrace, holdAppInForeground, watchLaunchWindows } from './app-open-foreground.js';
+import { unavailableProcessObservation, type AndroidLaunchMarker } from './android-process.js';
 import { loadIdentityImage } from './identity-images.js';
 import { setTimeout as delay } from 'node:timers/promises';
 import type { ApkMetadata, TestConfiguration } from '@apk/contracts';
@@ -47,6 +48,7 @@ export async function openApk(
   let packageName = apk.packageName;
   let result: TaskCompletion;
   let trace: ReturnType<typeof foregroundTrace> | undefined;
+  let launchMarker: AndroidLaunchMarker | undefined;
   let launchConfirmed = false;
   const stage = (name: string, extra: Record<string, unknown> = {}) =>
     emit({
@@ -139,7 +141,23 @@ export async function openApk(
     }
     action();
     trace = foregroundTrace(clock.now);
-    await timer.measure('APP_LAUNCH', () => session!.launch(packageName!, '@launcher'));
+    await timer.measure('APP_LAUNCH', async () => {
+      let stopWatching: (() => Promise<void>) | undefined;
+      try {
+        await session!.launch(packageName!, '@launcher', (marker) => {
+          launchMarker = marker;
+          trace = foregroundTrace(clock.now);
+          if ('foregroundWindow' in session! && session!.foregroundWindow)
+            stopWatching = watchLaunchWindows(
+              (bounded) => session!.foregroundWindow!(packageName!, bounded),
+              trace.record,
+              signal,
+            );
+        });
+      } finally {
+        await stopWatching?.();
+      }
+    });
     launchConfirmed = true;
     action();
     const foreground = await holdAppInForeground(
@@ -211,6 +229,7 @@ export async function openApk(
       cleanupComplete = false;
   } finally {
     if (trace && session && packageName && !signal.aborted) {
+      const scope = launchConfirmed || trace.hasSamples ? 'POLL' : 'AFTER_LAUNCH_ERROR';
       if (!launchConfirmed && 'foregroundWindow' in session && session.foregroundWindow) {
         const probe = AbortSignal.any([signal, AbortSignal.timeout(1500)]);
         try {
@@ -220,6 +239,16 @@ export async function openApk(
           // No sample is also a useful distinction from an observed external window.
         }
       }
+      let process = unavailableProcessObservation;
+      if (launchMarker && 'processEvents' in session && session.processEvents && !signal.aborted) {
+        try {
+          action();
+          const probe = AbortSignal.any([signal, AbortSignal.timeout(2000)]);
+          process = await session.processEvents(packageName, launchMarker, probe);
+        } catch {
+          // Window evidence and the original task result still apply.
+        }
+      }
       if (!signal.aborted)
         await emit({
           type: 'LOG',
@@ -227,7 +256,7 @@ export async function openApk(
           payload: {
             level: 'INFO',
             message: APP_FOREGROUND_LOG,
-            appForeground: trace.snapshot(launchConfirmed ? 'POLL' : 'AFTER_LAUNCH_ERROR'),
+            appForeground: { ...trace.snapshot(scope), process },
           },
         }).catch(() => {});
     }

@@ -53,6 +53,11 @@ test('timeline displays measured step durations and keeps old events without inv
                   { kind: 'BROWSER', packageName: 'com.android.chrome', offsetMs: 2300 },
                 ],
                 last: { kind: 'BROWSER', packageName: 'com.android.chrome', offsetMs: 20000 },
+                process: {
+                  availability: 'OBSERVED',
+                  truncated: false,
+                  events: [{ kind: 'CRASH', process: 'MAIN', pid: 512, offsetMs: 1700 }],
+                },
               },
             },
           ],
@@ -80,6 +85,10 @@ test('timeline displays measured step durations and keeps old events without inv
     await expect(page.getByText('已观察到目标 APP 获得焦点 · 最后窗口 浏览器')).toBeVisible();
     await page.getByText('查看窗口切换时间（1 次）').click();
     await expect(page.getByText('启动后 2.30 秒 · 浏览器', { exact: false })).toBeVisible();
+    await page.getByText('查看目标进程事件（1 条）').click();
+    await expect(
+      page.getByText('主进程 Android 确认崩溃 · PID 512', { exact: false }),
+    ).toBeVisible();
     assert.equal(await page.locator('img,video,audio,iframe').count(), 0);
     assert.deepEqual(errors, []);
   } finally {

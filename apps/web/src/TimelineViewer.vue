@@ -37,6 +37,7 @@ const windowLabels = {
   UNKNOWN: '无法确认',
   CRASH: '崩溃窗口',
 };
+const processLabels = { STARTED: '启动', EXITED: '退出', CRASH: 'Android 确认崩溃' };
 const selectedSession = ref('');
 const sessions = computed(() => [
   ...new Set(items.value.map((e) => e.deviceSessionId).filter((id): id is string => !!id)),
@@ -196,6 +197,23 @@ onUnmounted(() => {
             <p v-if="event.appForeground.last" class="muted">
               最后采样于启动后 {{ seconds(event.appForeground.last.offsetMs) }}
             </p>
+          </details>
+          <details v-if="event.appForeground.process">
+            <summary>
+              查看目标进程事件（{{ event.appForeground.process.events.length }} 条）
+            </summary>
+            <p v-if="event.appForeground.process.availability === 'UNAVAILABLE'" class="muted">
+              本次无法读取 Android 进程事件。
+            </p>
+            <p v-else-if="!event.appForeground.process.events.length" class="muted">
+              本次采集未记录目标进程的启动、退出或崩溃事件。
+            </p>
+            <p v-for="(process, i) in event.appForeground.process.events" :key="i">
+              启动后 {{ seconds(process.offsetMs) }} ·
+              {{ process.process === 'MAIN' ? '主进程' : '子进程' }}
+              {{ processLabels[process.kind] }} · PID {{ process.pid }}
+            </p>
+            <p v-if="event.appForeground.process.truncated" class="muted">部分进程事件已截断。</p>
           </details>
         </template>
         <details v-if="event.locator">

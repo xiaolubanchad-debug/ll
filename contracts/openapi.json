@@ -9253,6 +9253,65 @@
           }
         }
       },
+      "AppProcessObservation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "availability",
+          "truncated",
+          "events"
+        ],
+        "properties": {
+          "availability": {
+            "enum": [
+              "OBSERVED",
+              "UNAVAILABLE"
+            ]
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "events": {
+            "type": "array",
+            "maxItems": 16,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "process",
+                "pid",
+                "offsetMs"
+              ],
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "STARTED",
+                    "EXITED",
+                    "CRASH"
+                  ]
+                },
+                "process": {
+                  "enum": [
+                    "MAIN",
+                    "CHILD"
+                  ]
+                },
+                "pid": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 4194304
+                },
+                "offsetMs": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 120000
+                }
+              }
+            }
+          }
+        }
+      },
       "AppForegroundDiagnostic": {
         "type": "object",
         "additionalProperties": false,
@@ -9298,6 +9357,9 @@
                 "type": "null"
               }
             ]
+          },
+          "process": {
+            "$ref": "#/components/schemas/AppProcessObservation"
           }
         }
       },

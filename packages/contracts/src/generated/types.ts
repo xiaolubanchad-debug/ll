@@ -1165,6 +1165,19 @@ export interface TimelinePage {
         packageName?: string;
         offsetMs: number;
       } | null;
+      process?: {
+        availability: 'OBSERVED' | 'UNAVAILABLE';
+        truncated: boolean;
+        /**
+         * @maxItems 16
+         */
+        events: {
+          kind: 'STARTED' | 'EXITED' | 'CRASH';
+          process: 'MAIN' | 'CHILD';
+          pid: number;
+          offsetMs: number;
+        }[];
+      };
     };
     errorCode: string | null;
     recordedForReview: boolean;
@@ -1297,6 +1310,20 @@ export interface AppForegroundSample {
   offsetMs: number;
 }
 
+export interface AppProcessObservation {
+  availability: 'OBSERVED' | 'UNAVAILABLE';
+  truncated: boolean;
+  /**
+   * @maxItems 16
+   */
+  events: {
+    kind: 'STARTED' | 'EXITED' | 'CRASH';
+    process: 'MAIN' | 'CHILD';
+    pid: number;
+    offsetMs: number;
+  }[];
+}
+
 export interface AppForegroundDiagnostic {
   scope: 'POLL' | 'AFTER_LAUNCH_ERROR';
   targetFocus: 'SEEN' | 'NOT_SEEN' | 'UNOBSERVED';
@@ -1314,6 +1341,19 @@ export interface AppForegroundDiagnostic {
     packageName?: string;
     offsetMs: number;
   } | null;
+  process?: {
+    availability: 'OBSERVED' | 'UNAVAILABLE';
+    truncated: boolean;
+    /**
+     * @maxItems 16
+     */
+    events: {
+      kind: 'STARTED' | 'EXITED' | 'CRASH';
+      process: 'MAIN' | 'CHILD';
+      pid: number;
+      offsetMs: number;
+    }[];
+  };
 }
 
 export interface AppOpenTimings {

@@ -4,6 +4,7 @@ import { mkdtemp, writeFile, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
+import { setImmediate as nextTurn } from 'node:timers/promises';
 import {
   openApk,
   inspectApk,
@@ -13,6 +14,10 @@ import {
   RegistrationError,
 } from '@apk/automation';
 import { appOpenSupported, agentIssues, APP_FOREGROUND_LOG } from '@apk/contracts';
+import {
+  androidLaunchMarker,
+  readAndroidProcessEvents,
+} from '../packages/automation/dist/android-process.js';
 import { fixtureApk } from './p2-fixtures.mjs';
 
 test('foreground uses resumed package only and rejects missing, ambiguous or foreign activity', () => {
@@ -81,6 +86,36 @@ test('focused window separates target, splash, system overlays, external apps an
       'com.example.app',
     ),
     'UNKNOWN',
+  );
+});
+
+test('Android process evidence is bounded to the target launch and trusted system writer', () => {
+  const marker = androidLaunchMarker('831\n1793700000.100782113\n');
+  assert.deepEqual(marker, { systemPid: 831, startedAtMs: 1793700000100 });
+  assert.equal(androidLaunchMarker('831\n1793700000.N\n'), undefined);
+  const output = [
+    '1793700000.099 831  12 I am_crash: [0,512,com.example.app,0,old,old,old,1]',
+    '1793700000.101 666  12 I am_crash: [0,512,com.example.app,0,spoof,spoof,spoof,1]',
+    '1793700000.120 831  12 I am_proc_start: [0,512,10444,com.example.app,activity,com.example.app/.Home]',
+    '1793700000.121 831  12 I am_proc_start: [0,789,10444,com.example.app2,activity,com.example.app2/.Home]',
+    '1793700000.150 831  12 I am_proc_start: [0,513,10444,com.example.app:worker,service,worker]',
+    '1793700000.870 831  12 I am_crash: [0,512,com.example.app,0,Native crash,PRIVATE DETAIL,file,3]',
+    '1793700000.910 831  12 I am_proc_died: [0,512,com.example.app,0,5]',
+    '1793700000.912 831  12 I am_kill: [0,513,com.example.app:worker,0,reason]',
+  ].join('\n');
+  assert.deepEqual(readAndroidProcessEvents(output, 'com.example.app', marker), {
+    availability: 'OBSERVED',
+    truncated: false,
+    events: [
+      { kind: 'STARTED', process: 'MAIN', pid: 512, offsetMs: 20 },
+      { kind: 'STARTED', process: 'CHILD', pid: 513, offsetMs: 50 },
+      { kind: 'CRASH', process: 'MAIN', pid: 512, offsetMs: 770 },
+      { kind: 'EXITED', process: 'MAIN', pid: 512, offsetMs: 810 },
+    ],
+  });
+  assert.equal(
+    readAndroidProcessEvents(Array(6).fill(output).join('\n'), 'com.example.app', marker).truncated,
+    true,
   );
 });
 
@@ -188,10 +223,14 @@ test('open-only completion follows measured foreground dwell and cleanup, withou
                   testClientStatus: async () => variant.report,
                 }
               : {}),
-            launch: async (pkg, activity) => {
+            launch: async (pkg, activity, issued) => {
               order.push('launch');
               assert.equal(pkg, apk.packageName);
               assert.equal(activity, '@launcher');
+              if (variant.captureDuringLaunch) {
+                issued({ startedAtMs: 1793700000100, systemPid: 831 });
+                await nextTurn();
+              }
               if (variant.launchTimeout) {
                 now += 10400;
                 throw new RegistrationError('APP_LAUNCH_TIMEOUT');
@@ -211,6 +250,19 @@ test('open-only completion follows measured foreground dwell and cleanup, withou
                       ...(kind === 'BROWSER' ? { packageName: 'com.android.chrome' } : {}),
                     };
                   },
+                  ...(variant.captureDuringLaunch
+                    ? {
+                        processEvents: async (_pkg, marker) => {
+                          assert.equal(closed, false);
+                          assert.equal(marker.systemPid, 831);
+                          return {
+                            availability: 'OBSERVED',
+                            truncated: false,
+                            events: [{ kind: 'STARTED', process: 'MAIN', pid: 512, offsetMs: 80 }],
+                          };
+                        },
+                      }
+                    : {}),
                   source: async () => {
                     const pkg = apk.packageName;
                     const text = variant.countdown?.(now)
@@ -312,6 +364,23 @@ test('open-only completion follows measured foreground dwell and cleanup, withou
     [['AFTER_LAUNCH_ERROR', 'NOT_SEEN', 10400, 'BROWSER']],
   );
   assert.equal((await run({ diagnosticUnavailable: true })).result.status, 'SUCCEEDED');
+  const watched = await run({
+    grouped: true,
+    captureDuringLaunch: true,
+    launchTimeout: true,
+    window: (ms) => (ms < 1000 ? 'TARGET' : 'LAUNCHER'),
+  });
+  assert.equal(watched.result.errorCode, 'APP_LAUNCH_TIMEOUT');
+  assert.equal(watched.foregroundLogs[0].scope, 'POLL');
+  assert.equal(watched.foregroundLogs[0].targetFocus, 'SEEN');
+  assert.deepEqual(
+    watched.foregroundLogs[0].samples.map((s) => [s.kind, s.offsetMs]),
+    [
+      ['TARGET', 0],
+      ['LAUNCHER', 10400],
+    ],
+  );
+  assert.equal(watched.foregroundLogs[0].process.events[0].kind, 'STARTED');
   for (const [variant, code] of [
     [{ window: () => 'SYSTEM' }, 'APP_SYSTEM_WINDOW_BLOCKED'],
     [{ window: () => 'OTHER' }, 'APP_EXTERNAL_WINDOW_TIMEOUT'],

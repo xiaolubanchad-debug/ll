@@ -3,7 +3,9 @@ import type {
   RegistrationRecognition,
   AppOpenTimings,
   AppForegroundSample,
+  AppProcessObservation,
 } from '@apk/contracts';
+import type { AndroidLaunchMarker } from './android-process.js';
 export type Locator = TestConfiguration['registrationFlows'][number]['success']['locator'];
 export type Profile = TestConfiguration['execution']['deviceProfiles'][number];
 export interface Account {
@@ -81,7 +83,16 @@ export interface AndroidSession {
     packageName?: string,
   ): Promise<void>;
   testClientStatus?(packageName?: string): Promise<string>;
-  launch(packageName: string, activity: string): Promise<void>;
+  launch(
+    packageName: string,
+    activity: string,
+    onIssued?: (marker?: AndroidLaunchMarker) => void,
+  ): Promise<void>;
+  processEvents?(
+    packageName: string,
+    marker: AndroidLaunchMarker,
+    signal: AbortSignal,
+  ): Promise<AppProcessObservation>;
   foreground?(packageName: string): Promise<boolean>;
   foregroundWindow?(packageName: string, signal: AbortSignal): Promise<ForegroundSample>;
   find(locator: Locator, timeout: number, signal?: AbortSignal): Promise<string>;

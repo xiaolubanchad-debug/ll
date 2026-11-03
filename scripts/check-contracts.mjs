@@ -23,7 +23,7 @@ const ajv = new Ajv2020({
 addFormats(ajv);
 const configCheck = ajv.compile(read('contracts/config.schema.json'));
 const foregroundContracts = read('contracts/v17.schema.json');
-for (const name of ['AppForegroundSample', 'AppForegroundDiagnostic'])
+for (const name of ['AppForegroundSample', 'AppProcessObservation', 'AppForegroundDiagnostic'])
   ajv.addSchema({ ...foregroundContracts.$defs[name], $id: foregroundContracts.$id + '/' + name });
 const agentCheck = ajv.compile(read('contracts/agent.schema.json'));
 const config = read('contracts/fixtures/config.valid.json');
@@ -1238,12 +1238,20 @@ test('1.23.2 binds foreground diagnostics to their log and rejects private windo
   };
   envelope.events[0].payload = { level: 'INFO', message: 'APP 前台观察', appForeground };
   assert.deepEqual(agentIssues(envelope), []);
+  appForeground.process = {
+    availability: 'OBSERVED',
+    truncated: false,
+    events: [{ kind: 'CRASH', process: 'MAIN', pid: 512, offsetMs: 115 }],
+  };
+  assert.deepEqual(agentIssues(envelope), []);
   for (const change of [
     (p) => delete p.appForeground,
     (p) => (p.message = 'APK 安装诊断：APK_INSTALL_TIMEOUT'),
     (p) => (p.appForeground.samples[0].packageName = 'https://private.invalid/'),
     (p) => (p.appForeground.samples[0].title = '原始窗口标题'),
     (p) => (p.appForeground.samples = Array(9).fill(sample)),
+    (p) => (p.appForeground.process.events[0].exception = 'private Android details'),
+    (p) => (p.appForeground.process.events[0].pid = 0),
   ]) {
     const bad = structuredClone(envelope);
     change(bad.events[0].payload);

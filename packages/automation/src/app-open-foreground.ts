@@ -11,6 +11,7 @@ import {
   type ForegroundSample,
 } from './registration-types.js';
 import type { MeasureOpenStep } from './open-timings.js';
+import { setTimeout as delay } from 'node:timers/promises';
 
 const dwellMs = 10000;
 const waitingMs = 20000;
@@ -40,6 +41,32 @@ export function foregroundTrace(now: () => number) {
     snapshot(scope: AppForegroundDiagnostic['scope']): AppForegroundDiagnostic {
       return { scope, targetFocus, switchCount, samples, last };
     },
+    get hasSamples() {
+      return last !== null;
+    },
+  };
+}
+
+export function watchLaunchWindows(
+  read: (signal: AbortSignal) => Promise<ForegroundSample>,
+  record: (sample: ForegroundSample) => void,
+  signal: AbortSignal,
+) {
+  const stop = new AbortController();
+  const bounded = AbortSignal.any([signal, stop.signal]);
+  const watching = Promise.resolve()
+    .then(async () => {
+      while (!bounded.aborted) {
+        const sample = await read(bounded).catch((): ForegroundSample => ({ kind: 'UNKNOWN' }));
+        if (bounded.aborted) return;
+        record(sample);
+        await delay(250, undefined, { signal: bounded });
+      }
+    })
+    .catch(() => {});
+  return async () => {
+    stop.abort();
+    await watching;
   };
 }
 

@@ -48,6 +48,7 @@ export type {
   TimelinePage,
   AppForegroundSample,
   AppForegroundDiagnostic,
+  AppProcessObservation,
   AppOpenTimings,
   AssetListView,
   ValidationListView,
@@ -466,6 +467,7 @@ const knownAgentVersions: readonly string[] = [
   '0.17.3',
   '0.17.4',
   '0.17.5',
+  '0.17.6',
 ];
 export function knownAgentAtLeast(version: string | null | undefined, minimum: string): boolean {
   const required = knownAgentVersions.indexOf(minimum);
