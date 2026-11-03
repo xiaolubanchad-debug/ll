@@ -14,6 +14,7 @@ import { recognizeRegistrationScreenshot } from './ocr.js';
 import { removeOwned } from './cache.js';
 import { deviceProperties, waitForAndroidNetwork } from './android-preparation.js';
 import {
+  addAndroidExitReasons,
   androidLaunchMarker,
   processLogLimit,
   readAndroidProcessEvents,
@@ -902,7 +903,7 @@ export async function startAndroid(
         if (onIssued) {
           const marker = await command(
             adb,
-            ['-s', record.serial!, 'shell', 'pidof system_server; date +%s.%N'],
+            ['-s', record.serial!, 'shell', "pidof system_server; date '+%s.%N %z'"],
             1000,
             'APP_PROCESS_OBSERVATION_UNAVAILABLE',
           ).then(androidLaunchMarker, () => undefined);
@@ -911,25 +912,15 @@ export async function startAndroid(
           onIssued(marker);
         }
         const value = await launchCommand(
-          [
-            'am',
-            'start',
-            ...(options.controlMode === 'LAUNCH_ONLY' ? [] : ['-W']),
-            '-n',
-            "'" + component + "'",
-          ],
-          30000,
+          ['am', 'start', ...(opening ? [] : ['-W']), '-n', "'" + component + "'"],
+          opening ? 3000 : 30000,
           'APP_LAUNCH_TIMEOUT',
         );
         if (opening && /^\s*Status: timeout\s*$/im.test(value))
           throw new RegistrationError('APP_LAUNCH_TIMEOUT');
         if (/Error:|Error type/.test(value))
           throw new RegistrationError(opening ? 'APP_LAUNCH_REJECTED' : 'APP_LAUNCH_FAILED');
-        if (
-          !(options.controlMode === 'LAUNCH_ONLY'
-            ? /^Starting: Intent /m.test(value)
-            : /Status: ok/.test(value))
-        )
+        if (!(opening ? /^Starting: Intent /m.test(value) : /Status: ok/.test(value)))
           throw new RegistrationError(opening ? 'APP_LAUNCH_UNCONFIRMED' : 'APP_LAUNCH_FAILED');
       },
       async foreground(pkg) {
@@ -987,7 +978,26 @@ export async function startAndroid(
           workspace,
           processLogLimit,
         );
-        return readAndroidProcessEvents(output, pkg, marker);
+        const process = readAndroidProcessEvents(output, pkg, marker);
+        if (
+          api < 30 ||
+          !marker.utcOffset ||
+          !process.events.some((event) => event.kind === 'EXITED') ||
+          !/^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+$/.test(pkg) ||
+          observationSignal.aborted
+        )
+          return process;
+        const exits = await androidCommand(
+          adb,
+          ['-s', record.serial!, 'shell', 'dumpsys', 'activity', 'exit-info', pkg],
+          env,
+          observationSignal,
+          1500,
+          'APP_PROCESS_OBSERVATION_UNAVAILABLE',
+          workspace,
+          processLogLimit,
+        ).catch(() => '');
+        return addAndroidExitReasons(exits, pkg, marker, process);
       },
       find: (l, t, s) => rpc().find(l, t, s),
       click: (id, t) => rpc().click(id, t),

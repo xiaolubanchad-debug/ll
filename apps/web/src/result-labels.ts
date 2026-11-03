@@ -44,6 +44,8 @@ export const reasonLabels: Record<string, string> = {
   APP_STARTUP_UI_UNAVAILABLE: '等待结束，无法确认 APP 启动画面',
   APP_SYSTEM_WINDOW_BLOCKED: '等待结束，系统窗口仍阻挡目标 APP',
   APP_EXTERNAL_WINDOW_TIMEOUT: '等待结束，前台仍是其他应用',
+  APP_LAUNCHER_TIMEOUT: '等待结束，前台仍是 Android 桌面',
+  APP_PROCESS_WITHOUT_WINDOW: '目标进程已启动，等待结束时未确认目标窗口',
   APP_STARTUP_CRASH: 'Android 显示目标 APP 崩溃窗口',
   APP_LAUNCH_FAILED: 'APP 启动失败（旧记录未保留具体原因）',
   APP_LAUNCH_ENTRY_UNRESOLVED: 'Android 未解析到目标 APP 的启动入口',

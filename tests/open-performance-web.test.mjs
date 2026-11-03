@@ -46,6 +46,7 @@ test('timeline displays measured step durations and keeps old events without inv
               title: 'APP 前台观察',
               appForeground: {
                 scope: 'POLL',
+                launchReceipt: 'TIMEOUT',
                 targetFocus: 'SEEN',
                 switchCount: 1,
                 samples: [
@@ -83,6 +84,7 @@ test('timeline displays measured step durations and keeps old events without inv
     await expect(details.getByText('3.00 秒', { exact: true })).toBeVisible();
     await expect(details.getByText('准备步骤可能重叠', { exact: false })).toBeVisible();
     await expect(page.getByText('已观察到目标 APP 获得焦点 · 最后窗口 浏览器')).toBeVisible();
+    await expect(page.getByText('启动回执超时，按前台观察判定')).toBeVisible();
     await page.getByText('查看窗口切换时间（1 次）').click();
     await expect(page.getByText('启动后 2.30 秒 · 浏览器', { exact: false })).toBeVisible();
     await page.getByText('查看目标进程事件（1 条）').click();

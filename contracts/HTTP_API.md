@@ -1,5 +1,7 @@
 # HTTP 接口契约
 
+1.23.4 的 `appForeground` 可携带 `launchReceipt`，进程事件可携带受限的 `trigger` 和 `exitReason`。见 [启动回执与前台判定](../docs/V123_WEB_PROXY_AND_RECOVERY_CONTRACT.md#1234-启动回执与前台判定分离)。
+
 1.23.3 在 `appForeground` 中增加可选的 `process` 证据，`POLL` 可覆盖启动回执期间的窗口采样。见 [启动期间证据](../docs/V123_WEB_PROXY_AND_RECOVERY_CONTRACT.md#1233-启动期间的进程和窗口证据)。
 
 1.23.2 增加启动停留 `LOG` 的前台观察摘要，`TimelinePage.items[].appForeground` 可选，详情见 [APP 前台观察日志](../docs/V123_WEB_PROXY_AND_RECOVERY_CONTRACT.md#1232-app-前台观察日志)。

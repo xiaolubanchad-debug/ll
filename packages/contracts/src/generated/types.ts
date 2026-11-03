@@ -1150,6 +1150,7 @@ export interface TimelinePage {
     title: string;
     appForeground?: {
       scope: 'POLL' | 'AFTER_LAUNCH_ERROR';
+      launchReceipt?: 'ACCEPTED' | 'TIMEOUT' | 'UNCONFIRMED' | 'REJECTED' | 'NOT_ISSUED';
       targetFocus: 'SEEN' | 'NOT_SEEN' | 'UNOBSERVED';
       switchCount: number;
       /**
@@ -1176,6 +1177,19 @@ export interface TimelinePage {
           process: 'MAIN' | 'CHILD';
           pid: number;
           offsetMs: number;
+          trigger?: 'ACTIVITY' | 'SERVICE' | 'BROADCAST' | 'PROVIDER' | 'OTHER' | 'UNKNOWN';
+          exitReason?:
+            | 'EXIT_SELF'
+            | 'SIGNALED'
+            | 'LOW_MEMORY'
+            | 'CRASH'
+            | 'NATIVE_CRASH'
+            | 'ANR'
+            | 'INITIALIZATION_FAILURE'
+            | 'SYSTEM_STOP'
+            | 'DEPENDENCY_DIED'
+            | 'OTHER'
+            | 'UNKNOWN';
         }[];
       };
     };
@@ -1321,11 +1335,25 @@ export interface AppProcessObservation {
     process: 'MAIN' | 'CHILD';
     pid: number;
     offsetMs: number;
+    trigger?: 'ACTIVITY' | 'SERVICE' | 'BROADCAST' | 'PROVIDER' | 'OTHER' | 'UNKNOWN';
+    exitReason?:
+      | 'EXIT_SELF'
+      | 'SIGNALED'
+      | 'LOW_MEMORY'
+      | 'CRASH'
+      | 'NATIVE_CRASH'
+      | 'ANR'
+      | 'INITIALIZATION_FAILURE'
+      | 'SYSTEM_STOP'
+      | 'DEPENDENCY_DIED'
+      | 'OTHER'
+      | 'UNKNOWN';
   }[];
 }
 
 export interface AppForegroundDiagnostic {
   scope: 'POLL' | 'AFTER_LAUNCH_ERROR';
+  launchReceipt?: 'ACCEPTED' | 'TIMEOUT' | 'UNCONFIRMED' | 'REJECTED' | 'NOT_ISSUED';
   targetFocus: 'SEEN' | 'NOT_SEEN' | 'UNOBSERVED';
   switchCount: number;
   /**
@@ -1352,6 +1380,19 @@ export interface AppForegroundDiagnostic {
       process: 'MAIN' | 'CHILD';
       pid: number;
       offsetMs: number;
+      trigger?: 'ACTIVITY' | 'SERVICE' | 'BROADCAST' | 'PROVIDER' | 'OTHER' | 'UNKNOWN';
+      exitReason?:
+        | 'EXIT_SELF'
+        | 'SIGNALED'
+        | 'LOW_MEMORY'
+        | 'CRASH'
+        | 'NATIVE_CRASH'
+        | 'ANR'
+        | 'INITIALIZATION_FAILURE'
+        | 'SYSTEM_STOP'
+        | 'DEPENDENCY_DIED'
+        | 'OTHER'
+        | 'UNKNOWN';
     }[];
   };
 }

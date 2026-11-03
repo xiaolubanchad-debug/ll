@@ -2802,8 +2802,14 @@
               "kind": { "enum": ["STARTED", "EXITED", "CRASH"] },
               "process": { "enum": ["MAIN", "CHILD"] },
               "pid": { "type": "integer", "minimum": 1, "maximum": 4194304 },
-              "offsetMs": { "type": "integer", "minimum": 0, "maximum": 120000 }
-            }
+              "offsetMs": { "type": "integer", "minimum": 0, "maximum": 120000 },
+              "trigger": { "enum": ["ACTIVITY", "SERVICE", "BROADCAST", "PROVIDER", "OTHER", "UNKNOWN"] },
+              "exitReason": { "enum": ["EXIT_SELF", "SIGNALED", "LOW_MEMORY", "CRASH", "NATIVE_CRASH", "ANR", "INITIALIZATION_FAILURE", "SYSTEM_STOP", "DEPENDENCY_DIED", "OTHER", "UNKNOWN"] }
+            },
+            "allOf": [
+              { "if": { "properties": { "kind": { "const": "STARTED" } } }, "else": { "not": { "required": ["trigger"] } } },
+              { "if": { "properties": { "kind": { "const": "EXITED" } } }, "else": { "not": { "required": ["exitReason"] } } }
+            ]
           }
         }
       }
@@ -2814,6 +2820,7 @@
       "required": ["scope", "targetFocus", "switchCount", "samples", "last"],
       "properties": {
         "scope": { "enum": ["POLL", "AFTER_LAUNCH_ERROR"] },
+        "launchReceipt": { "enum": ["ACCEPTED", "TIMEOUT", "UNCONFIRMED", "REJECTED", "NOT_ISSUED"] },
         "targetFocus": { "enum": ["SEEN", "NOT_SEEN", "UNOBSERVED"] },
         "switchCount": { "type": "integer", "minimum": 0, "maximum": 256 },
         "samples": {

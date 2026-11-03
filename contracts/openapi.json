@@ -9306,8 +9306,67 @@
                   "type": "integer",
                   "minimum": 0,
                   "maximum": 120000
+                },
+                "trigger": {
+                  "enum": [
+                    "ACTIVITY",
+                    "SERVICE",
+                    "BROADCAST",
+                    "PROVIDER",
+                    "OTHER",
+                    "UNKNOWN"
+                  ]
+                },
+                "exitReason": {
+                  "enum": [
+                    "EXIT_SELF",
+                    "SIGNALED",
+                    "LOW_MEMORY",
+                    "CRASH",
+                    "NATIVE_CRASH",
+                    "ANR",
+                    "INITIALIZATION_FAILURE",
+                    "SYSTEM_STOP",
+                    "DEPENDENCY_DIED",
+                    "OTHER",
+                    "UNKNOWN"
+                  ]
                 }
-              }
+              },
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "kind": {
+                        "const": "STARTED"
+                      }
+                    }
+                  },
+                  "else": {
+                    "not": {
+                      "required": [
+                        "trigger"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "kind": {
+                        "const": "EXITED"
+                      }
+                    }
+                  },
+                  "else": {
+                    "not": {
+                      "required": [
+                        "exitReason"
+                      ]
+                    }
+                  }
+                }
+              ]
             }
           }
         }
@@ -9327,6 +9386,15 @@
             "enum": [
               "POLL",
               "AFTER_LAUNCH_ERROR"
+            ]
+          },
+          "launchReceipt": {
+            "enum": [
+              "ACCEPTED",
+              "TIMEOUT",
+              "UNCONFIRMED",
+              "REJECTED",
+              "NOT_ISSUED"
             ]
           },
           "targetFocus": {

@@ -1244,6 +1244,15 @@ test('1.23.2 binds foreground diagnostics to their log and rejects private windo
     events: [{ kind: 'CRASH', process: 'MAIN', pid: 512, offsetMs: 115 }],
   };
   assert.deepEqual(agentIssues(envelope), []);
+  appForeground.launchReceipt = 'TIMEOUT';
+  appForeground.process.events.push({
+    kind: 'EXITED',
+    process: 'MAIN',
+    pid: 512,
+    offsetMs: 150,
+    exitReason: 'CRASH',
+  });
+  assert.deepEqual(agentIssues(envelope), []);
   for (const change of [
     (p) => delete p.appForeground,
     (p) => (p.message = 'APK 安装诊断：APK_INSTALL_TIMEOUT'),
@@ -1252,6 +1261,8 @@ test('1.23.2 binds foreground diagnostics to their log and rejects private windo
     (p) => (p.appForeground.samples = Array(9).fill(sample)),
     (p) => (p.appForeground.process.events[0].exception = 'private Android details'),
     (p) => (p.appForeground.process.events[0].pid = 0),
+    (p) => (p.appForeground.process.events[0].trigger = 'ACTIVITY'),
+    (p) => (p.appForeground.launchReceipt = 'RAW_OUTPUT'),
   ]) {
     const bad = structuredClone(envelope);
     change(bad.events[0].payload);

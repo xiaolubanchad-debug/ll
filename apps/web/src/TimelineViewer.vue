@@ -38,6 +38,34 @@ const windowLabels = {
   CRASH: '崩溃窗口',
 };
 const processLabels = { STARTED: '启动', EXITED: '退出', CRASH: 'Android 确认崩溃' };
+const receiptLabels = {
+  ACCEPTED: 'Android 已接受启动请求',
+  TIMEOUT: '启动回执超时，按前台观察判定',
+  UNCONFIRMED: '启动回执无法确认，按前台观察判定',
+  REJECTED: 'Android 明确拒绝启动',
+  NOT_ISSUED: '启动命令未发出',
+};
+const triggerLabels = {
+  ACTIVITY: '界面',
+  SERVICE: '服务',
+  BROADCAST: '广播',
+  PROVIDER: '内容提供程序',
+  OTHER: '其他组件',
+  UNKNOWN: '触发类别未确认',
+};
+const exitLabels = {
+  EXIT_SELF: '进程自行退出',
+  SIGNALED: '收到系统信号',
+  LOW_MEMORY: '内存不足',
+  CRASH: '应用崩溃',
+  NATIVE_CRASH: '原生代码崩溃',
+  ANR: '应用无响应',
+  INITIALIZATION_FAILURE: '初始化失败',
+  SYSTEM_STOP: '系统记录停止',
+  DEPENDENCY_DIED: '依赖进程退出',
+  OTHER: '其他系统原因',
+  UNKNOWN: '退出原因未确认',
+};
 const selectedSession = ref('');
 const sessions = computed(() => [
   ...new Set(items.value.map((e) => e.deviceSessionId).filter((id): id is string => !!id)),
@@ -182,6 +210,9 @@ onUnmounted(() => {
           <p v-if="event.appForeground.scope === 'AFTER_LAUNCH_ERROR'" class="muted">
             启动回执失败后的快照
           </p>
+          <p v-if="event.appForeground.launchReceipt" class="muted">
+            {{ receiptLabels[event.appForeground.launchReceipt] }}
+          </p>
           <details v-if="event.appForeground.samples.length">
             <summary>查看窗口切换时间（{{ event.appForeground.switchCount }} 次）</summary>
             <p v-for="(sample, i) in event.appForeground.samples" :key="i">
@@ -212,6 +243,8 @@ onUnmounted(() => {
               启动后 {{ seconds(process.offsetMs) }} ·
               {{ process.process === 'MAIN' ? '主进程' : '子进程' }}
               {{ processLabels[process.kind] }} · PID {{ process.pid }}
+              <span v-if="process.trigger"> · {{ triggerLabels[process.trigger] }}</span>
+              <span v-if="process.exitReason"> · {{ exitLabels[process.exitReason] }}</span>
             </p>
             <p v-if="event.appForeground.process.truncated" class="muted">部分进程事件已截断。</p>
           </details>

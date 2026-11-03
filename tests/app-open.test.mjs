@@ -16,6 +16,7 @@ import {
 import { appOpenSupported, agentIssues, APP_FOREGROUND_LOG } from '@apk/contracts';
 import {
   androidLaunchMarker,
+  addAndroidExitReasons,
   readAndroidProcessEvents,
 } from '../packages/automation/dist/android-process.js';
 import { fixtureApk } from './p2-fixtures.mjs';
@@ -90,8 +91,8 @@ test('focused window separates target, splash, system overlays, external apps an
 });
 
 test('Android process evidence is bounded to the target launch and trusted system writer', () => {
-  const marker = androidLaunchMarker('831\n1793700000.100782113\n');
-  assert.deepEqual(marker, { systemPid: 831, startedAtMs: 1793700000100 });
+  const marker = androidLaunchMarker('831\n1793700000.100782113 +0800\n');
+  assert.deepEqual(marker, { systemPid: 831, startedAtMs: 1793700000100, utcOffset: '+0800' });
   assert.equal(androidLaunchMarker('831\n1793700000.N\n'), undefined);
   const output = [
     '1793700000.099 831  12 I am_crash: [0,512,com.example.app,0,old,old,old,1]',
@@ -103,16 +104,30 @@ test('Android process evidence is bounded to the target launch and trusted syste
     '1793700000.910 831  12 I am_proc_died: [0,512,com.example.app,0,5]',
     '1793700000.912 831  12 I am_kill: [0,513,com.example.app:worker,0,reason]',
   ].join('\n');
-  assert.deepEqual(readAndroidProcessEvents(output, 'com.example.app', marker), {
+  const process = readAndroidProcessEvents(output, 'com.example.app', marker);
+  assert.deepEqual(process, {
     availability: 'OBSERVED',
     truncated: false,
     events: [
-      { kind: 'STARTED', process: 'MAIN', pid: 512, offsetMs: 20 },
-      { kind: 'STARTED', process: 'CHILD', pid: 513, offsetMs: 50 },
+      { kind: 'STARTED', process: 'MAIN', pid: 512, offsetMs: 20, trigger: 'ACTIVITY' },
+      { kind: 'STARTED', process: 'CHILD', pid: 513, offsetMs: 50, trigger: 'SERVICE' },
       { kind: 'CRASH', process: 'MAIN', pid: 512, offsetMs: 770 },
-      { kind: 'EXITED', process: 'MAIN', pid: 512, offsetMs: 810 },
+      { kind: 'EXITED', process: 'MAIN', pid: 512, offsetMs: 810, exitReason: 'UNKNOWN' },
     ],
   });
+  const local = (offset) =>
+    new Date(marker.startedAtMs + offset + 8 * 3600000)
+      .toISOString()
+      .slice(0, -1)
+      .replace('T', ' ');
+  const exits =
+    `ApplicationExitInfo #0:\n timestamp=${local(810)} pid=512\n process=com.example.app reason=1 (EXIT_SELF)\n description=private\n` +
+    `ApplicationExitInfo #1:\n timestamp=${local(-100)} pid=512\n process=com.example.app reason=4 (CRASH)\n` +
+    `ApplicationExitInfo #2:\n timestamp=${local(810)} pid=512\n process=com.other.app reason=4 (CRASH)\n`;
+  assert.equal(
+    addAndroidExitReasons(exits, 'com.example.app', marker, process).events.at(-1).exitReason,
+    'EXIT_SELF',
+  );
   assert.equal(
     readAndroidProcessEvents(Array(6).fill(output).join('\n'), 'com.example.app', marker).truncated,
     true,
@@ -235,6 +250,7 @@ test('open-only completion follows measured foreground dwell and cleanup, withou
                 now += 10400;
                 throw new RegistrationError('APP_LAUNCH_TIMEOUT');
               }
+              if (variant.launchRejected) throw new RegistrationError('APP_LAUNCH_REJECTED');
             },
             foreground: async () => {
               samples++;
@@ -258,7 +274,20 @@ test('open-only completion follows measured foreground dwell and cleanup, withou
                           return {
                             availability: 'OBSERVED',
                             truncated: false,
-                            events: [{ kind: 'STARTED', process: 'MAIN', pid: 512, offsetMs: 80 }],
+                            events: [
+                              { kind: 'STARTED', process: 'MAIN', pid: 512, offsetMs: 80 },
+                              ...(variant.processCrash
+                                ? [
+                                    {
+                                      kind: 'EXITED',
+                                      process: 'MAIN',
+                                      pid: 512,
+                                      offsetMs: 200,
+                                      exitReason: 'NATIVE_CRASH',
+                                    },
+                                  ]
+                                : []),
+                            ],
                           };
                         },
                       }
@@ -370,7 +399,9 @@ test('open-only completion follows measured foreground dwell and cleanup, withou
     launchTimeout: true,
     window: (ms) => (ms < 1000 ? 'TARGET' : 'LAUNCHER'),
   });
-  assert.equal(watched.result.errorCode, 'APP_LAUNCH_TIMEOUT');
+  assert.equal(watched.result.errorCode, 'APP_LAUNCHER_TIMEOUT');
+  assert.equal(watched.foregroundLogs[0].launchReceipt, 'TIMEOUT');
+  assert.equal(watched.now, 20000);
   assert.equal(watched.foregroundLogs[0].scope, 'POLL');
   assert.equal(watched.foregroundLogs[0].targetFocus, 'SEEN');
   assert.deepEqual(
@@ -381,6 +412,35 @@ test('open-only completion follows measured foreground dwell and cleanup, withou
     ],
   );
   assert.equal(watched.foregroundLogs[0].process.events[0].kind, 'STARTED');
+  const late = await run({
+    grouped: true,
+    captureDuringLaunch: true,
+    launchTimeout: true,
+    window: (ms) => (ms < 12000 ? 'UNKNOWN' : 'TARGET'),
+  });
+  assert.equal(late.result.status, 'SUCCEEDED');
+  assert.equal(late.result.openObservation.elapsedMs, 10000);
+  assert.equal(late.foregroundLogs[0].launchReceipt, 'TIMEOUT');
+  assert.equal(late.order.filter((item) => item === 'launch').length, 1);
+  const withoutWindow = await run({
+    grouped: true,
+    captureDuringLaunch: true,
+    launchTimeout: true,
+    window: () => 'UNKNOWN',
+  });
+  assert.equal(withoutWindow.result.errorCode, 'APP_PROCESS_WITHOUT_WINDOW');
+  assert.equal(withoutWindow.now, 20000);
+  const rejected = await run({ grouped: true, captureDuringLaunch: true, launchRejected: true });
+  assert.equal(rejected.result.errorCode, 'APP_LAUNCH_REJECTED');
+  assert.equal(rejected.foregroundLogs[0].launchReceipt, 'REJECTED');
+  assert.equal(rejected.now, 0);
+  const crashed = await run({
+    grouped: true,
+    captureDuringLaunch: true,
+    processCrash: true,
+    window: () => 'UNKNOWN',
+  });
+  assert.equal(crashed.result.errorCode, 'APP_STARTUP_CRASH');
   for (const [variant, code] of [
     [{ window: () => 'SYSTEM' }, 'APP_SYSTEM_WINDOW_BLOCKED'],
     [{ window: () => 'OTHER' }, 'APP_EXTERNAL_WINDOW_TIMEOUT'],

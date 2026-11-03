@@ -24,6 +24,7 @@ export function foregroundTrace(now: () => number) {
   let targetFocus: AppForegroundDiagnostic['targetFocus'] = 'UNOBSERVED';
   let last: AppForegroundSample | null = null;
   let switchCount = 0;
+  let crashSeen = false;
   return {
     record(sample: ForegroundSample) {
       const next = {
@@ -37,12 +38,19 @@ export function foregroundTrace(now: () => number) {
         if (samples.length < 8) samples.push(next);
       }
       last = next;
+      if (sample.kind === 'CRASH') crashSeen = true;
     },
     snapshot(scope: AppForegroundDiagnostic['scope']): AppForegroundDiagnostic {
       return { scope, targetFocus, switchCount, samples, last };
     },
     get hasSamples() {
       return last !== null;
+    },
+    get lastKind() {
+      return last?.kind;
+    },
+    get crashSeen() {
+      return crashSeen;
     },
   };
 }
@@ -81,9 +89,11 @@ export async function holdAppInForeground(
   holding: () => Promise<void>,
   note: (value: ObstructionNote) => Promise<void>,
   record: (value: ForegroundSample) => void,
+  launch: { startedAt?: number; lastKind?: ForegroundSample['kind'] } = {},
 ) {
-  const deadline = clock.now() + totalMs;
-  let waitLeft = waitingMs;
+  const startedAt = launch.startedAt ?? clock.now();
+  const deadline = startedAt + totalMs;
+  let waitLeft = Math.max(0, waitingMs - (clock.now() - startedAt));
   const clicked = new Set<string>();
   const observe = async (bounded: AbortSignal) => {
     action();
@@ -99,19 +109,21 @@ export async function holdAppInForeground(
           ? { kind: 'TARGET' }
           : { kind: 'UNKNOWN' };
     record(sample);
-    const { kind } = sample;
-    return kind === 'BROWSER' || kind === 'STORE' || kind === 'LAUNCHER' ? 'OTHER' : kind;
+    if (sample.kind === 'CRASH') throw new RegistrationError('APP_STARTUP_CRASH');
+    return sample.kind;
   };
-  const reasonFor = (window: Awaited<ReturnType<typeof observe>>) =>
+  const reasonFor = (window: ForegroundSample['kind'] | undefined) =>
     window === 'SPLASH'
       ? 'APP_SPLASH_TIMEOUT'
       : window === 'SYSTEM'
         ? 'APP_SYSTEM_WINDOW_BLOCKED'
-        : window === 'OTHER'
-          ? 'APP_EXTERNAL_WINDOW_TIMEOUT'
-          : 'foregroundWindow' in session
-            ? 'APP_FOREGROUND_UNCONFIRMED'
-            : 'APP_NOT_FOREGROUND';
+        : window === 'LAUNCHER'
+          ? 'APP_LAUNCHER_TIMEOUT'
+          : window === 'OTHER' || window === 'BROWSER' || window === 'STORE'
+            ? 'APP_EXTERNAL_WINDOW_TIMEOUT'
+            : 'foregroundWindow' in session
+              ? 'APP_FOREGROUND_UNCONFIRMED'
+              : 'APP_NOT_FOREGROUND';
 
   const ready = async (initialReason = 'APP_NOT_FOREGROUND') => {
     const started = clock.now();
@@ -124,8 +136,8 @@ export async function holdAppInForeground(
     try {
       while (clock.now() < until) {
         const window = await observe(bounded);
-        if (window === 'CRASH') throw new RegistrationError('APP_STARTUP_CRASH');
         reason = reasonFor(window);
+        if (clock.now() >= until) break;
         if (window === 'TARGET') {
           if (!inspectStartup) return;
           try {
@@ -201,7 +213,6 @@ export async function holdAppInForeground(
             } else {
               if (stable) {
                 const verified = await observe(bounded);
-                if (verified === 'CRASH') throw new RegistrationError('APP_STARTUP_CRASH');
                 if (verified === 'TARGET' && clock.now() < until) return;
                 reason = reasonFor(verified);
                 stable = false;
@@ -234,7 +245,9 @@ export async function holdAppInForeground(
     throw new RegistrationError(reason);
   };
 
-  await measure(inspectStartup ? 'STARTUP_ADS' : 'FOREGROUND_CHECK', () => ready());
+  await measure(inspectStartup ? 'STARTUP_ADS' : 'FOREGROUND_CHECK', () =>
+    ready(reasonFor(launch.lastKind)),
+  );
   return measure('FOREGROUND_DWELL', async () => {
     await holding();
     const bounded = AbortSignal.any([
@@ -247,7 +260,6 @@ export async function holdAppInForeground(
       while (clock.now() < deadline) {
         await clock.sleep(Math.min(1000, Math.max(1, dwellMs - (clock.now() - began))), bounded);
         const window = await observe(bounded);
-        if (window === 'CRASH') throw new RegistrationError('APP_STARTUP_CRASH');
         if (window !== 'TARGET') {
           await ready(reasonFor(window));
           began = clock.now();

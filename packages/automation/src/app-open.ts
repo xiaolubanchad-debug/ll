@@ -10,7 +10,7 @@ import { foregroundTrace, holdAppInForeground, watchLaunchWindows } from './app-
 import { unavailableProcessObservation, type AndroidLaunchMarker } from './android-process.js';
 import { loadIdentityImage } from './identity-images.js';
 import { setTimeout as delay } from 'node:timers/promises';
-import type { ApkMetadata, TestConfiguration } from '@apk/contracts';
+import type { ApkMetadata, AppForegroundDiagnostic, TestConfiguration } from '@apk/contracts';
 import { verifyFileTransfer } from './apk.js';
 import { DownloadError } from './common.js';
 import { openTimer } from './open-timings.js';
@@ -49,7 +49,11 @@ export async function openApk(
   let result: TaskCompletion;
   let trace: ReturnType<typeof foregroundTrace> | undefined;
   let launchMarker: AndroidLaunchMarker | undefined;
-  let launchConfirmed = false;
+  let launchStartedAt: number | undefined;
+  let launchReceipt: AppForegroundDiagnostic['launchReceipt'] = 'NOT_ISSUED';
+  let foregroundCheckStarted = false;
+  let confirmedCrash = false;
+  let processWithoutWindow = false;
   const stage = (name: string, extra: Record<string, unknown> = {}) =>
     emit({
       type: 'TASK_STAGE',
@@ -141,25 +145,38 @@ export async function openApk(
     }
     action();
     trace = foregroundTrace(clock.now);
-    await timer.measure('APP_LAUNCH', async () => {
-      let stopWatching: (() => Promise<void>) | undefined;
-      try {
-        await session!.launch(packageName!, '@launcher', (marker) => {
-          launchMarker = marker;
-          trace = foregroundTrace(clock.now);
-          if ('foregroundWindow' in session! && session!.foregroundWindow)
-            stopWatching = watchLaunchWindows(
-              (bounded) => session!.foregroundWindow!(packageName!, bounded),
-              trace.record,
-              signal,
-            );
-        });
-      } finally {
-        await stopWatching?.();
-      }
-    });
-    launchConfirmed = true;
+    try {
+      await timer.measure('APP_LAUNCH', async () => {
+        let stopWatching: (() => Promise<void>) | undefined;
+        try {
+          await session!.launch(packageName!, '@launcher', (marker) => {
+            launchMarker = marker;
+            launchStartedAt = clock.now();
+            trace = foregroundTrace(clock.now);
+            if ('foregroundWindow' in session! && session!.foregroundWindow)
+              stopWatching = watchLaunchWindows(
+                (bounded) => session!.foregroundWindow!(packageName!, bounded),
+                trace.record,
+                signal,
+              );
+          });
+        } finally {
+          await stopWatching?.();
+        }
+      });
+      launchReceipt = 'ACCEPTED';
+    } catch (error) {
+      if (!(error instanceof RegistrationError) || signal.aborted) throw error;
+      if (error.code === 'APP_LAUNCH_REJECTED') launchReceipt = 'REJECTED';
+      if (launchStartedAt === undefined) throw error;
+      if (error.code === 'APP_LAUNCH_TIMEOUT') launchReceipt = 'TIMEOUT';
+      else if (['APP_LAUNCH_UNCONFIRMED', 'APP_LAUNCH_COMMAND_FAILED'].includes(error.code))
+        launchReceipt = 'UNCONFIRMED';
+      else throw error;
+    }
     action();
+    if (trace.crashSeen) throw new RegistrationError('APP_STARTUP_CRASH');
+    foregroundCheckStarted = true;
     const foreground = await holdAppInForeground(
       session,
       packageName,
@@ -172,6 +189,7 @@ export async function openApk(
       async (note) =>
         emit({ type: 'APP_OBSTRUCTION', taskId: target.taskId, payload: { ...note } }),
       trace.record,
+      { startedAt: launchStartedAt, lastKind: trace.lastKind },
     );
     result = {
       status: 'SUCCEEDED',
@@ -229,8 +247,8 @@ export async function openApk(
       cleanupComplete = false;
   } finally {
     if (trace && session && packageName && !signal.aborted) {
-      const scope = launchConfirmed || trace.hasSamples ? 'POLL' : 'AFTER_LAUNCH_ERROR';
-      if (!launchConfirmed && 'foregroundWindow' in session && session.foregroundWindow) {
+      const scope = foregroundCheckStarted || trace.hasSamples ? 'POLL' : 'AFTER_LAUNCH_ERROR';
+      if (!foregroundCheckStarted && 'foregroundWindow' in session && session.foregroundWindow) {
         const probe = AbortSignal.any([signal, AbortSignal.timeout(1500)]);
         try {
           action();
@@ -249,6 +267,17 @@ export async function openApk(
           // Window evidence and the original task result still apply.
         }
       }
+      const snapshot = trace.snapshot(scope);
+      confirmedCrash =
+        trace.crashSeen ||
+        process.events.some(
+          (e) =>
+            e.process === 'MAIN' &&
+            (e.kind === 'CRASH' || e.exitReason === 'CRASH' || e.exitReason === 'NATIVE_CRASH'),
+        );
+      processWithoutWindow =
+        snapshot.targetFocus !== 'SEEN' &&
+        process.events.some((e) => e.process === 'MAIN' && e.kind === 'STARTED');
       if (!signal.aborted)
         await emit({
           type: 'LOG',
@@ -256,13 +285,20 @@ export async function openApk(
           payload: {
             level: 'INFO',
             message: APP_FOREGROUND_LOG,
-            appForeground: { ...trace.snapshot(scope), process },
+            appForeground: { ...snapshot, launchReceipt, process },
           },
         }).catch(() => {});
     }
     if (session)
       cleanupComplete = await timer.measure('CLEANUP', () => session!.close()).catch(() => false);
   }
+  if (confirmedCrash && result.errorCode !== 'CLEANUP_INCOMPLETE')
+    result = { status: 'FAILED', proof: 'NONE', artifactIds: [], errorCode: 'APP_STARTUP_CRASH' };
+  else if (
+    processWithoutWindow &&
+    ['APP_FOREGROUND_UNCONFIRMED', 'APP_NOT_FOREGROUND'].includes(result.errorCode ?? '')
+  )
+    result.errorCode = 'APP_PROCESS_WITHOUT_WINDOW';
   if (cleanupComplete && !signal.aborted && reportUnconfirmed && hooks.testReceipt) {
     const deadline = new AbortController();
     const timeout = setTimeout(() => deadline.abort(), 2000);
