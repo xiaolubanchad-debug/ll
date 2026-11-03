@@ -105,6 +105,21 @@ test('Android process evidence is bounded to the target launch and trusted syste
     '1793700000.912 831  12 I am_kill: [0,513,com.example.app:worker,0,reason]',
   ].join('\n');
   const process = readAndroidProcessEvents(output, 'com.example.app', marker);
+  for (const trigger of ['next-top-activity', 'pre-activity', 'pre-top-activity']) {
+    assert.equal(
+      readAndroidProcessEvents(
+        output.replace(',activity,', ',' + trigger + ','),
+        'com.example.app',
+        marker,
+      ).events[0].trigger,
+      'ACTIVITY',
+    );
+  }
+  assert.equal(
+    readAndroidProcessEvents(output.replace(',activity,', ',restart,'), 'com.example.app', marker)
+      .events[0].trigger,
+    'OTHER',
+  );
   assert.deepEqual(process, {
     availability: 'OBSERVED',
     truncated: false,

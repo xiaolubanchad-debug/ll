@@ -40,8 +40,18 @@ type ProcessEvent = AppProcessObservation['events'][number];
 
 function launchTrigger(value?: string): ProcessEvent['trigger'] {
   if (!value) return 'UNKNOWN';
-  if (['activity', 'top-activity', 'next-activity'].includes(value)) return 'ACTIVITY';
-  if (value === 'service' || value === 'restart') return 'SERVICE';
+  if (
+    [
+      'activity',
+      'top-activity',
+      'next-activity',
+      'next-top-activity',
+      'pre-activity',
+      'pre-top-activity',
+    ].includes(value)
+  )
+    return 'ACTIVITY';
+  if (value === 'service') return 'SERVICE';
   if (value === 'broadcast') return 'BROADCAST';
   if (value === 'content provider' || value === 'provider') return 'PROVIDER';
   return 'OTHER';
