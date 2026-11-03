@@ -105,7 +105,7 @@ export async function runCachedAppOpens(
       },
     });
   }
-  const cache = await ApkCache.open(join(root, 'cache'));
+  const cache = await ApkCache.open(join(root, plan.resourceAssets ? 'resources' : 'cache'));
   const drain = new AbortController(),
     attemptSignal = AbortSignal.any([signal, drain.signal]);
   const running = new Map<number, Promise<unknown>>();
@@ -134,7 +134,7 @@ export async function runCachedAppOpens(
     if (!policy.preserveQueue) await start();
     const found = await cache.asset(
       nodeId,
-      plan.cacheDay,
+      asset.apk.cacheDay,
       asset.targetKey,
       asset.apk,
       config.download.maxApkBytes ?? 268435456,
@@ -152,7 +152,7 @@ export async function runCachedAppOpens(
         cleanupComplete: true,
       };
     } else {
-      cache.pin(nodeId, plan.cacheDay, asset.targetKey);
+      cache.pin(nodeId, asset.apk.cacheDay, asset.targetKey);
       const loaded = () =>
         emit({
           type: 'TASK_STAGE',

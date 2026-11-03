@@ -3558,6 +3558,59 @@
         "parameters": []
       }
     },
+    "/api/v1/apk-assets/workbench": {
+      "get": {
+        "operationId": "apkWorkbench",
+        "x-phase": "1.7",
+        "security": [
+          {
+            "AdminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApkWorkbenchView"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "统一错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "query",
+            "name": "nodeId",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true
+          },
+          {
+            "in": "query",
+            "name": "configVersionId",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true
+          }
+        ]
+      }
+    },
     "/api/v1/task-plans": {
       "get": {
         "operationId": "taskPlanList",
@@ -6184,6 +6237,9 @@
                 "minimum": 1
               }
             }
+          },
+          "apkWorkbench": {
+            "const": true
           }
         },
         "required": [
@@ -9500,6 +9556,235 @@
           }
         }
       },
+      "ApkWorkbenchQuery": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "nodeId",
+          "configVersionId"
+        ],
+        "properties": {
+          "nodeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "configVersionId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "ApkWorkbenchView": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "releaseId",
+          "supported",
+          "scan",
+          "items"
+        ],
+        "properties": {
+          "releaseId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "supported": {
+            "type": "boolean"
+          },
+          "scan": {
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "status",
+                  "errorCode",
+                  "createdAt"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "status": {
+                    "type": "string",
+                    "maxLength": 32
+                  },
+                  "errorCode": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 100
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "createdAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "targetKey",
+                "label",
+                "sourceLocator",
+                "present",
+                "url",
+                "download",
+                "fileName",
+                "size",
+                "downloadedAt",
+                "receivedBytes",
+                "totalBytes"
+              ],
+              "properties": {
+                "targetKey": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "label": {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                "sourceLocator": {
+                  "type": "string",
+                  "maxLength": 640
+                },
+                "present": {
+                  "type": "boolean"
+                },
+                "url": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uri",
+                      "pattern": "^https?://",
+                      "maxLength": 4096
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "download": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "id",
+                        "status",
+                        "errorCode",
+                        "createdAt"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "status": {
+                          "type": "string",
+                          "maxLength": 32
+                        },
+                        "errorCode": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "maxLength": 100
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "fileName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "maxLength": 200
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "size": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 536870912
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "downloadedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "receivedBytes": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 536870912
+                },
+                "totalBytes": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 536870912
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
       "TestConfiguration": {
         "title": "APK test configuration version 1.0",
         "type": "object",
@@ -10801,7 +11086,8 @@
                   "BROWSER_ENVIRONMENT",
                   "APP_OBSTRUCTION",
                   "DEVICE_SESSION",
-                  "ELEMENT_OBSERVATION"
+                  "ELEMENT_OBSERVATION",
+                  "RESOURCE_PROGRESS"
                 ]
               },
               "payload": {
@@ -11070,6 +11356,52 @@
                     }
                   }
                 }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "type": {
+                      "const": "RESOURCE_PROGRESS"
+                    }
+                  },
+                  "required": [
+                    "type"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "taskId"
+                  ],
+                  "properties": {
+                    "payload": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "receivedBytes",
+                        "totalBytes"
+                      ],
+                      "properties": {
+                        "receivedBytes": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 536870912
+                        },
+                        "totalBytes": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 536870912
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
               }
             ]
           },
@@ -11128,6 +11460,10 @@
                     "entryId": {
                       "type": "string",
                       "pattern": "^[A-Za-z0-9._:-]{1,100}$"
+                    },
+                    "sourceLocator": {
+                      "type": "string",
+                      "maxLength": 640
                     }
                   }
                 }
@@ -11815,7 +12151,14 @@
                   "NO_REGISTERABLE_APK",
                   "DAY_CUTOFF",
                   "APK_METADATA_UNREADABLE",
-                  "FILE_TRANSFER_MISMATCH"
+                  "FILE_TRANSFER_MISMATCH",
+                  "APK_LINK_REJECTED",
+                  "APK_LINK_NOT_FOUND",
+                  "APK_DOWNLOAD_HTTP_FAILED",
+                  "APK_DOWNLOAD_INTERRUPTED",
+                  "APK_DOWNLOAD_TIMEOUT",
+                  "APK_RESPONSE_HTML",
+                  "APK_REDIRECT_LIMIT"
                 ]
               }
             }
@@ -13775,6 +14118,49 @@
           "proxySecretVersionId": {
             "type": "string",
             "format": "uuid"
+          },
+          "resourceAction": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "SCAN"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "targetKey",
+                  "url"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "FETCH"
+                  },
+                  "targetKey": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "url": {
+                    "type": "string",
+                    "format": "uri",
+                    "pattern": "^https?://",
+                    "maxLength": 4096
+                  }
+                }
+              }
+            ]
+          },
+          "resourceAssets": {
+            "const": true
           }
         },
         "allOf": [
@@ -13791,9 +14177,24 @@
             },
             "then": {
               "required": [
-                "sourceDownloadId",
                 "successTarget",
                 "attemptLimit"
+              ],
+              "allOf": [
+                {
+                  "if": {
+                    "not": {
+                      "required": [
+                        "resourceAssets"
+                      ]
+                    }
+                  },
+                  "then": {
+                    "required": [
+                      "sourceDownloadId"
+                    ]
+                  }
+                }
               ]
             }
           },
@@ -15413,6 +15814,63 @@
                 }
               }
             ]
+          },
+          "resourceAction": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "SCAN"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "targetKey",
+                  "url",
+                  "cacheKey",
+                  "label"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "FETCH"
+                  },
+                  "targetKey": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "url": {
+                    "type": "string",
+                    "format": "uri",
+                    "pattern": "^https?://",
+                    "maxLength": 4096
+                  },
+                  "cacheKey": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "label": {
+                    "type": "string",
+                    "maxLength": 200
+                  }
+                }
+              }
+            ]
+          },
+          "resourceAssets": {
+            "const": true
+          },
+          "resourceScope": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
           }
         },
         "allOf": [

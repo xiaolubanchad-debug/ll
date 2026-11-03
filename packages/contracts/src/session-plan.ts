@@ -45,9 +45,11 @@ export function devicePlanIssues(config: TestConfiguration, plan: DailyExecution
       assets.some((a) => !a) ||
       new Set(
         assets.map((a) =>
-          plan.openPolicy?.fileAssets
-            ? (a?.apk.fileName?.toLowerCase() ?? a?.targetKey)
-            : a?.apk.packageName,
+          plan.resourceAssets
+            ? a?.apk.apkSha256
+            : plan.openPolicy?.fileAssets
+              ? (a?.apk.fileName?.toLowerCase() ?? a?.targetKey)
+              : a?.apk.packageName,
         ),
       ).size !== assets.length
     )

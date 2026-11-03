@@ -1,5 +1,7 @@
 # APK 测试部署中台实施方案
 
+1.24 以 APK 资源工作台替代日常自动下载及上传补包。网页扫描和 APK 直链使用节点公网连接。见 [APK 下载工作台契约](V124_APK_WORKBENCH_CONTRACT.md)。
+
 1.23 网页、落地页及 APK 下载使用任务配置的 HTTP 代理，见 [网页代理与故障恢复契约](V123_WEB_PROXY_AND_RECOVERY_CONTRACT.md)。
 
 1.22 任务继续时的版本选择、等待原因及已停止记录展示遵循 [恢复契约](V122_TASK_RESUME_CONTRACT.md)。

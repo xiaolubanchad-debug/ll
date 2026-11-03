@@ -61,6 +61,14 @@
       "operationId": "consoleValidations",
       "response": "ValidationListView",
       "status": 200
+    },
+    {
+      "method": "get",
+      "path": "/apk-assets/workbench",
+      "operationId": "apkWorkbench",
+      "response": "ApkWorkbenchView",
+      "status": 200,
+      "query": "ApkWorkbenchQuery"
     }
   ]
 }

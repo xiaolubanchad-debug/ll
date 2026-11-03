@@ -1,5 +1,7 @@
 # APK 自动化测试部署中台
 
+1.24 的 APK 资源工作台手动扫描入口并直连下载，任务复用已下载文件。见 [APK 下载工作台契约](docs/V124_APK_WORKBENCH_CONTRACT.md)。
+
 1.23 网页与 APK 下载统一走任务 HTTP 代理，续跑及回执规则见 [网页代理与故障恢复契约](docs/V123_WEB_PROXY_AND_RECOVERY_CONTRACT.md)。
 
 1.22 任务继续时的版本选择、等待原因及已停止记录展示遵循 [恢复契约](docs/V122_TASK_RESUME_CONTRACT.md)。

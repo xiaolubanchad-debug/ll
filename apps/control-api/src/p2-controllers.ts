@@ -126,6 +126,17 @@ export class P2Controller {
       include: { delivery: true, _count: { select: { tasks: true } } },
     });
     if (!run) fault('NOT_FOUND', '批次不存在', 404);
+    const plan = run.executionPlan as {
+      resourceAction?: { kind: string; targetKey?: string };
+    } | null;
+    if (plan?.resourceAction?.kind === 'FETCH')
+      return {
+        ...run,
+        executionPlan: {
+          ...plan,
+          resourceAction: { kind: 'FETCH', targetKey: plan.resourceAction.targetKey },
+        },
+      };
     return run;
   }
   @Get('runs/:id/tasks') async tasks(

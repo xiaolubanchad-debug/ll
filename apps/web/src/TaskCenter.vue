@@ -99,6 +99,7 @@ function fix(task: TaskPlanView, section: string, code?: string) {
     });
   else if (section === 'runs' && task.latestCycle && logId(task.latestCycle))
     navigate('runs', logId(task.latestCycle)!);
+  else if (section === 'assets') navigate('assets', '', { task: task.id });
   else navigate(section as Section);
 }
 watch(

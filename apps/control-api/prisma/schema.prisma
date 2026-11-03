@@ -53,6 +53,7 @@ model LoginBucket {
 
 model Node {
   manualApks              ManualApkUpload[]
+  apkWorkbenchEntries     ApkWorkbenchEntry[]
   dailyOpenLimitOverride  Int?
   managedTasks            ManagedTask[]
   id                      String            @id @default(uuid()) @db.Uuid
@@ -233,6 +234,7 @@ model Run {
 }
 
 model Configuration {
+  apkWorkbenchEntries ApkWorkbenchEntry[]
   archivedAt  DateTime?       @db.Timestamptz(3)
   revision    Int             @default(1)
   managedTask ManagedTask?
@@ -289,6 +291,7 @@ model Task {
   run                   Run              @relation(fields: [runId], references: [id], onDelete: Restrict)
   targetKey             String           @db.Char(64)
   entryId               String?          @db.VarChar(100)
+  sourceLocator         String?          @db.VarChar(640)
   label                 String           @db.VarChar(200)
   sourceUrl             String           @db.VarChar(4096)
   position              Int
@@ -310,6 +313,27 @@ model Task {
   @@unique([runId, targetKey])
   @@unique([runId, position])
   @@index([registrationStartedAt, id])
+}
+
+model ApkWorkbenchEntry {
+  nodeId        String        @db.Uuid
+  node          Node          @relation(fields: [nodeId], references: [id], onDelete: Restrict)
+  configId      String        @db.Uuid
+  config        Configuration @relation(fields: [configId], references: [id], onDelete: Restrict)
+  sourceKey     String        @db.Char(64)
+  targetKey     String        @db.Char(64)
+  label         String        @db.VarChar(200)
+  sourceLocator String        @db.VarChar(640)
+  present       Boolean
+  url           String?       @db.VarChar(4096)
+  latestRunId   String?       @db.Uuid
+  readyAsset    Json?
+  downloadedAt  DateTime?     @db.Timestamptz(3)
+  receivedBytes Int           @default(0)
+  totalBytes    Int?
+
+  @@id([nodeId, configId, sourceKey, targetKey])
+  @@index([latestRunId])
 }
 
 model TestEnrollment {

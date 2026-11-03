@@ -268,6 +268,7 @@ try {
   await run(['--test', 'tests/device-sessions-web.test.mjs'], env);
   await run(['--test', 'tests/capacity-web.test.mjs'], { ...env, P0_SCREENSHOT_DIR: dir });
   await run(['--test', 'tests/server-console-web.test.mjs'], { ...env, P0_SCREENSHOT_DIR: dir });
+  await run(['--test', '--test-concurrency=1', 'tests/apk-workbench.test.mjs'], env);
   if (selectedTests && [...selectedTests].some((x) => !executedTests.has(x)))
     throw Error('TEST_SELECTION_NOT_EXECUTED');
   console.log(

@@ -65,6 +65,49 @@
         "proxySecretVersionId": {
           "type": "string",
           "format": "uuid"
+        },
+        "resourceAction": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "SCAN"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "targetKey",
+                "url"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "FETCH"
+                },
+                "targetKey": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "url": {
+                  "type": "string",
+                  "format": "uri",
+                  "pattern": "^https?://",
+                  "maxLength": 4096
+                }
+              }
+            }
+          ]
+        },
+        "resourceAssets": {
+          "const": true
         }
       },
       "allOf": [
@@ -81,9 +124,24 @@
           },
           "then": {
             "required": [
-              "sourceDownloadId",
               "successTarget",
               "attemptLimit"
+            ],
+            "allOf": [
+              {
+                "if": {
+                  "not": {
+                    "required": [
+                      "resourceAssets"
+                    ]
+                  }
+                },
+                "then": {
+                  "required": [
+                    "sourceDownloadId"
+                  ]
+                }
+              }
             ]
           }
         },

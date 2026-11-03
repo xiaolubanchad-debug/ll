@@ -74,6 +74,7 @@ export type {
 import type { FunctionalEvidence } from './generated/types.js';
 import type { AppOpenTimings } from './generated/types.js';
 export type { ScheduleInput, DailyExecutionPlan, ProxyObservation } from './generated/types.js';
+export type { ApkWorkbenchQuery, ApkWorkbenchView } from './generated/types.js';
 export type {
   AutoRegistration,
   StartupPolicy,
@@ -472,6 +473,7 @@ const knownAgentVersions: readonly string[] = [
   '0.17.6',
   '0.17.7',
   '0.17.8',
+  '0.17.9',
 ];
 export function knownAgentAtLeast(version: string | null | undefined, minimum: string): boolean {
   const required = knownAgentVersions.indexOf(minimum);

@@ -1,5 +1,7 @@
 # 开发契约
 
+1.24 的手动 XPath 扫描、直链下载和跨日文件引用见 [APK 下载工作台契约](V124_APK_WORKBENCH_CONTRACT.md)。
+
 1.23 下载代理、回执补传和重复清理故障规则见 [网页代理与故障恢复契约](V123_WEB_PROXY_AND_RECOVERY_CONTRACT.md)。
 
 1.22 任务继续时的版本选择、等待原因及已停止记录展示遵循 [恢复契约](V122_TASK_RESUME_CONTRACT.md)。

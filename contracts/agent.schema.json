@@ -549,7 +549,8 @@
             "BROWSER_ENVIRONMENT",
             "APP_OBSTRUCTION",
             "DEVICE_SESSION",
-            "ELEMENT_OBSERVATION"
+            "ELEMENT_OBSERVATION",
+            "RESOURCE_PROGRESS"
           ]
         },
         "payload": {
@@ -818,6 +819,52 @@
               }
             }
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "RESOURCE_PROGRESS"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "taskId"
+            ],
+            "properties": {
+              "payload": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "receivedBytes",
+                  "totalBytes"
+                ],
+                "properties": {
+                  "receivedBytes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 536870912
+                  },
+                  "totalBytes": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 536870912
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
         }
       ]
     },
@@ -876,6 +923,10 @@
               "entryId": {
                 "type": "string",
                 "pattern": "^[A-Za-z0-9._:-]{1,100}$"
+              },
+              "sourceLocator": {
+                "type": "string",
+                "maxLength": 640
               }
             }
           }
@@ -1563,7 +1614,14 @@
             "NO_REGISTERABLE_APK",
             "DAY_CUTOFF",
             "APK_METADATA_UNREADABLE",
-            "FILE_TRANSFER_MISMATCH"
+            "FILE_TRANSFER_MISMATCH",
+            "APK_LINK_REJECTED",
+            "APK_LINK_NOT_FOUND",
+            "APK_DOWNLOAD_HTTP_FAILED",
+            "APK_DOWNLOAD_INTERRUPTED",
+            "APK_DOWNLOAD_TIMEOUT",
+            "APK_RESPONSE_HTML",
+            "APK_REDIRECT_LIMIT"
           ]
         }
       }
@@ -1583,7 +1641,10 @@
     "log": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["level", "message"],
+      "required": [
+        "level",
+        "message"
+      ],
       "properties": {
         "level": {
           "const": "INFO"
@@ -1628,9 +1689,25 @@
           "$ref": "https://contracts.apk-platform.example/v1/v17.schema.json/AppForegroundDiagnostic"
         }
       },
-      "if": { "properties": { "message": { "const": "APP 前台观察" } } },
-      "then": { "required": ["appForeground"] },
-      "else": { "not": { "required": ["appForeground"] } }
+      "if": {
+        "properties": {
+          "message": {
+            "const": "APP 前台观察"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "appForeground"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "appForeground"
+          ]
+        }
+      }
     },
     "deviceObservation": {
       "type": "object",
@@ -2025,22 +2102,40 @@
           "maximum": 2001
         },
         "replacementReason": {
-          "enum": ["APP_CLEANUP_UNCONFIRMED", "DEVICE_PREPARATION_FAILED", "APPIUM_FAILED"]
+          "enum": [
+            "APP_CLEANUP_UNCONFIRMED",
+            "DEVICE_PREPARATION_FAILED",
+            "APPIUM_FAILED"
+          ]
         }
       },
       "dependentRequired": {
-        "replacementReason": ["deviceEpoch"]
+        "replacementReason": [
+          "deviceEpoch"
+        ]
       },
       "if": {
         "anyOf": [
-          { "required": ["skipRemaining"] },
-          { "required": ["replacementReason"] }
+          {
+            "required": [
+              "skipRemaining"
+            ]
+          },
+          {
+            "required": [
+              "replacementReason"
+            ]
+          }
         ]
       },
       "then": {
         "properties": {
-          "phase": { "const": "CLOSED" },
-          "cleanupComplete": { "const": true }
+          "phase": {
+            "const": "CLOSED"
+          },
+          "cleanupComplete": {
+            "const": true
+          }
         }
       }
     },

@@ -1,4 +1,4 @@
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomBytes, randomInt, randomUUID } from 'node:crypto';
 import {
   isOwnedTestPackage,
   deviceVariant,
@@ -28,6 +28,7 @@ import { digest, canonical } from './security.js';
 import { manualAssetsForRun, assertNoPendingManualApks } from './manual-apks.js';
 import { fault } from './errors.js';
 import { dailyOpenUsage, openAdmissionDeadline } from './open-budget.js';
+import { workbenchAssets, workbenchScope } from './apk-workbench.js';
 
 export function beijingDay(now: Date) {
   return new Intl.DateTimeFormat('en-CA', {
@@ -53,6 +54,11 @@ export async function prepareDailyPlan(
   now: Date,
   resume?: { runId: string; cycleId: string },
 ): Promise<DailyExecutionPlan | null> {
+  if (
+    (input.resourceAction && input.purpose !== 'DOWNLOAD') ||
+    (input.resourceAssets && input.purpose !== 'REGISTER')
+  )
+    fault('VALIDATION_FAILED', '工作台操作与任务类型不一致', 422);
   if (!input.purpose) {
     if (
       [
@@ -81,6 +87,34 @@ export async function prepareDailyPlan(
   if (input.purpose !== 'PROXY_CHECK' && input.proxySecretVersionId)
     fault('VALIDATION_FAILED', '独立代理引用只用于代理检查', 422);
   if (input.purpose === 'PROXY_CHECK') plan.proxySecretVersionId = input.proxySecretVersionId;
+  if (input.resourceAction) {
+    if (input.purpose !== 'DOWNLOAD' || input.supersedesRunId || input.resourceAssets)
+      fault('VALIDATION_FAILED', '工作台操作只接受独立的扫描或下载请求', 422);
+    const scope = workbenchScope(input.nodeId, version);
+    plan.resourceScope = scope.sourceKey;
+    if (input.resourceAction.kind === 'SCAN') plan.resourceAction = input.resourceAction;
+    else {
+      const { targetKey, url } = input.resourceAction;
+      const parsed = new URL(url);
+      if (!['https:', 'http:'].includes(parsed.protocol) || parsed.username || parsed.password)
+        fault('APK_LINK_INVALID', '请填写公网 HTTP(S) APK 下载地址', 422);
+      const entry = await tx.apkWorkbenchEntry.findUnique({
+        where: { nodeId_configId_sourceKey_targetKey: { ...scope, targetKey } },
+      });
+      if (!entry?.present) fault('APK_ENTRY_MISSING', '入口未找到，请重新扫描 XPath', 422);
+      plan.resourceAction = {
+        ...input.resourceAction,
+        label: entry.label,
+        cacheKey: randomBytes(32).toString('hex'),
+      };
+    }
+    return plan;
+  }
+  if (
+    input.resourceAssets &&
+    (input.purpose !== 'REGISTER' || input.sourceDownloadId || !config.execution.appOpen)
+  )
+    fault('VALIDATION_FAILED', '工作台资源仅用于 APP 启动停留', 422);
   if (input.purpose === 'REGISTER') {
     validateBudget(
       input.successTarget!,
@@ -151,7 +185,7 @@ export async function prepareDailyPlan(
         old.taskCycleId !== resume.cycleId ||
         old.nodeId !== input.nodeId ||
         old.configVersionId !== version.id ||
-        old.sourceDownloadId !== input.sourceDownloadId ||
+        old.sourceDownloadId !== (input.sourceDownloadId ?? null) ||
         old.status !== 'NEEDS_REVIEW' ||
         old.errorCode !== 'CLEANUP_INCOMPLETE' ||
         !old.reviewResolvedAt ||
@@ -215,59 +249,69 @@ export async function prepareDailyPlan(
         fault('DEVICE_QUEUE_UNAVAILABLE', '原批次剩余队列与执行额度不一致，暂停续跑', 409);
       return remaining;
     }
-    const source = await tx.run.findUnique({
-      where: { id: input.sourceDownloadId! },
-      include: { configVersion: true, tasks: { orderBy: { position: 'asc' } } },
-    });
-    if (
-      !source ||
-      source.nodeId !== input.nodeId ||
-      source.purpose !== 'DOWNLOAD' ||
-      source.cacheDay !== plan.cacheDay ||
-      !['SUCCEEDED', 'PARTIAL_FAILED', 'FAILED', 'CANCELLED'].includes(source.status) ||
-      source.configVersion?.configId !== version.configId
-    )
-      fault('DOWNLOAD_SOURCE_INVALID', '请选择本服务器、本配置当天已结束的下载批次', 422);
-    const original = source.configVersion.body as unknown as TestConfiguration;
-    await assertNoPendingManualApks(tx, input.nodeId, version.configId);
-    const manual = new Map((await manualAssetsForRun(tx, source.id)).map((m) => [m.taskId, m]));
-    if (!['SUCCEEDED', 'PARTIAL_FAILED'].includes(source.status) && !manual.size)
-      fault('DOWNLOAD_SOURCE_INVALID', '下载失败且尚无已确认的补包', 422);
-    if (original.source.url !== config.source.url || original.source.xpath !== config.source.xpath)
-      fault('DOWNLOAD_SOURCE_INVALID', '来源网站和 XPath 与下载批次不一致', 422);
     plan.successTarget = input.successTarget!;
     plan.attemptLimit = input.attemptLimit!;
     plan.proxySecretVersionId = config.execution.proxySecretVersionId;
-    for (const task of source.tasks) {
-      const candidate = task.status === 'SUCCEEDED' ? task.apk : manual.get(task.id)?.apk;
-      if (schemaIssues('ApkMetadata', candidate).length) continue;
-      const apk = candidate as unknown as DailyExecutionPlan['assets'][number]['apk'];
-      if (!config.execution.appOpen && !apk.packageName) continue;
-      if (apk.cacheDay !== plan.cacheDay)
-        fault('DOWNLOAD_SOURCE_INVALID', '文件日期与当天批次不一致', 422);
-      if (!registrationAvailable(config, apk.packageName ?? '', task.entryId ?? undefined))
-        continue;
-      if (
-        config.execution.appOpen?.ownedTestClient &&
-        apk.packageName &&
-        !isOwnedTestPackage(apk.packageName)
-      )
-        continue;
-      plan.assets.push({
-        targetKey: task.targetKey,
-        label: task.label,
-        sourceUrl: task.sourceUrl,
-        apk:
-          config.execution.appOpen &&
-          !apk.fileName &&
-          apkFileAssetsSupported(
-            (identityRelease?.manifest as { features?: string[] } | null)?.features,
-            identityNode.agentVersion,
-          )
-            ? { ...apk, fileName: 'history-' + task.targetKey.slice(0, 12) + '.apk' }
-            : apk,
-        ...(task.entryId ? { entryId: task.entryId } : {}),
+    if (input.resourceAssets) {
+      plan.resourceAssets = true;
+      plan.assets = await workbenchAssets(tx, input.nodeId, version);
+      if (!plan.assets.length)
+        fault('APK_WORKBENCH_EMPTY', '请先在 APK 资源下载至少一个可用文件', 422);
+    } else {
+      const source = await tx.run.findUnique({
+        where: { id: input.sourceDownloadId! },
+        include: { configVersion: true, tasks: { orderBy: { position: 'asc' } } },
       });
+      if (
+        !source ||
+        source.nodeId !== input.nodeId ||
+        source.purpose !== 'DOWNLOAD' ||
+        source.cacheDay !== plan.cacheDay ||
+        !['SUCCEEDED', 'PARTIAL_FAILED', 'FAILED', 'CANCELLED'].includes(source.status) ||
+        source.configVersion?.configId !== version.configId
+      )
+        fault('DOWNLOAD_SOURCE_INVALID', '请选择本服务器、本配置当天已结束的下载批次', 422);
+      const original = source.configVersion.body as unknown as TestConfiguration;
+      await assertNoPendingManualApks(tx, input.nodeId, version.configId);
+      const manual = new Map((await manualAssetsForRun(tx, source.id)).map((m) => [m.taskId, m]));
+      if (!['SUCCEEDED', 'PARTIAL_FAILED'].includes(source.status) && !manual.size)
+        fault('DOWNLOAD_SOURCE_INVALID', '下载失败且尚无已确认的补包', 422);
+      if (
+        original.source.url !== config.source.url ||
+        original.source.xpath !== config.source.xpath
+      )
+        fault('DOWNLOAD_SOURCE_INVALID', '来源网站和 XPath 与下载批次不一致', 422);
+      for (const task of source.tasks) {
+        const candidate = task.status === 'SUCCEEDED' ? task.apk : manual.get(task.id)?.apk;
+        if (schemaIssues('ApkMetadata', candidate).length) continue;
+        const apk = candidate as unknown as DailyExecutionPlan['assets'][number]['apk'];
+        if (!config.execution.appOpen && !apk.packageName) continue;
+        if (apk.cacheDay !== plan.cacheDay)
+          fault('DOWNLOAD_SOURCE_INVALID', '文件日期与当天批次不一致', 422);
+        if (!registrationAvailable(config, apk.packageName ?? '', task.entryId ?? undefined))
+          continue;
+        if (
+          config.execution.appOpen?.ownedTestClient &&
+          apk.packageName &&
+          !isOwnedTestPackage(apk.packageName)
+        )
+          continue;
+        plan.assets.push({
+          targetKey: task.targetKey,
+          label: task.label,
+          sourceUrl: task.sourceUrl,
+          apk:
+            config.execution.appOpen &&
+            !apk.fileName &&
+            apkFileAssetsSupported(
+              (identityRelease?.manifest as { features?: string[] } | null)?.features,
+              identityNode.agentVersion,
+            )
+              ? { ...apk, fileName: 'history-' + task.targetKey.slice(0, 12) + '.apk' }
+              : apk,
+          ...(task.entryId ? { entryId: task.entryId } : {}),
+        });
+      }
     }
     if (
       plan.assets.some((a) => a.apk.validationPolicy === 'FILE_NAME') &&
@@ -304,7 +348,13 @@ export async function prepareDailyPlan(
           ),
       )
     )
-      fault('APK_SELECTION_UNAVAILABLE', '所选 APK 文件当天不可用，请核对缓存文件名', 422);
+      fault(
+        'APK_SELECTION_UNAVAILABLE',
+        plan.resourceAssets
+          ? '所选 APK 文件不可用，请核对 APK 资源文件名'
+          : '所选 APK 文件当天不可用，请核对缓存文件名',
+        422,
+      );
   }
   const groupPolicy = config.execution.appOpen?.appsPerDevice;
   if (groupPolicy && plan.purpose === 'REGISTER') {
@@ -320,9 +370,11 @@ export async function prepareDailyPlan(
     else plan.assets = plan.assets.filter((a) => a.apk.minSdkVersion !== undefined);
     const seen = new Set<string>();
     plan.assets = plan.assets.filter((a) => {
-      const key = files
-        ? (a.apk.fileName?.toLowerCase() ?? a.targetKey)
-        : (a.apk.packageName ?? a.targetKey);
+      const key = plan.resourceAssets
+        ? a.apk.apkSha256
+        : files
+          ? (a.apk.fileName?.toLowerCase() ?? a.targetKey)
+          : (a.apk.packageName ?? a.targetKey);
       if (seen.has(key)) return false;
       seen.add(key);
       return true;

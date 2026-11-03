@@ -15,6 +15,7 @@ import { idempotent, stopJob } from './jobs.js';
 import { lockLibrary } from './library-lock.js';
 import { lockNode, idle } from './nodes.js';
 import { fault, PlatformError } from './errors.js';
+import { workbenchSupported } from './apk-workbench.js';
 
 type Db = Prisma.TransactionClient;
 export const MANUAL_FEATURE = 'MANUAL_APK_IMPORT_V1';
@@ -47,9 +48,13 @@ export function manualApkView(row: ManualApkUpload): ManualApkView {
 export async function uploadEligibility(db: Db, taskId: string, now = new Date()) {
   const task = await db.task.findUnique({
     where: { id: taskId },
-    include: { run: { include: { configVersion: true } } },
+    include: {
+      run: { include: { configVersion: true, node: { select: { agentVersion: true } } } },
+    },
   });
   if (!task || task.run.purpose !== 'DOWNLOAD') return { task, reason: '只能为下载入口补包' };
+  if (workbenchSupported(task.run.node.agentVersion))
+    return { task, reason: '请在 APK 资源手动输入下载地址' };
   if (task.run.cacheDay !== manualDay(now))
     return { task, reason: '历史日期只保留记录，请为当天入口补包' };
   if (!['FAILED', 'CANCELLED'].includes(task.status))

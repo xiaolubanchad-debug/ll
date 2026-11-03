@@ -7,6 +7,7 @@ import {
   runSummary,
   runTimeline,
   apkAssets,
+  apkWorkbench,
   fault,
 } from '@apk/platform';
 import { schemaIssues } from '@apk/contracts';
@@ -38,6 +39,9 @@ export class V17Controller {
   }
   @Get('apk-assets') assets(@Query() q: Record<string, unknown>) {
     return apkAssets(this.db, q);
+  }
+  @Get('apk-assets/workbench') workbench(@Query() q: Record<string, unknown>) {
+    return apkWorkbench(this.db, q);
   }
   @Get('console/validations') async validations(@Query() q: Record<string, unknown>) {
     const { limit, ...args } = pageArgs(q);

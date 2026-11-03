@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import type { TaskPlanView, TaskControlInput } from '@apk/contracts';
 import { mutation } from './api';
 import { activeCycle, finishedCycle } from './server-console';
+import { href } from './navigation';
 const props = defineProps<{ task: TaskPlanView }>(),
   emit = defineEmits<{ changed: []; edit: [] }>();
 const busy = ref(false),
@@ -35,7 +36,9 @@ async function control(action: TaskControlInput['action']) {
       action === 'STOP'
         ? '停止意图已保存：后续自动执行已关闭，正在等待节点停止与清理确认。'
         : ['START', 'NEW_ROUND', 'RETRY_DOWNLOAD'].includes(action)
-          ? '任务已开启，准备当天 APK 后按当前配置执行。'
+          ? props.task.apkWorkbench
+            ? '任务已开启，使用 APK 资源中的可用文件执行。'
+            : '任务已开启，准备当天 APK 后按当前配置执行。'
           : '任务设置已更新。';
     emit('changed');
   } catch (e) {
@@ -81,6 +84,7 @@ async function control(action: TaskControlInput['action']) {
         historical ? '转换为 APP 测试' : '编辑任务'
       }}</el-button>
       <el-button v-else :disabled="busy" @click="control('RESTORE')">恢复任务</el-button>
+      <a v-if="task.apkWorkbench" :href="href('assets', '', { task: task.id })">APK 资源</a>
     </div>
     <details v-if="!task.archivedAt" class="task-more">
       <summary>更多操作</summary>
@@ -96,7 +100,7 @@ async function control(action: TaskControlInput['action']) {
           >归档任务</el-button
         >
         <el-button
-          v-if="task.latestCycle?.downloadRunId"
+          v-if="!task.apkWorkbench && task.latestCycle?.downloadRunId"
           :disabled="busy || historical || !!active || task.readiness.length > 0"
           @click="
             confirmRetry = true;
@@ -111,8 +115,9 @@ async function control(action: TaskControlInput['action']) {
         新增独立一轮：{{
           task.executionKind === 'APP_OPEN' ? '将执行启动停留，完成目标' : '将再注册，成功账户目标'
         }}
-        {{ task.successTarget }}，最多尝试 {{ task.attemptLimit }} 次。复用当天
-        APK，前一轮计数仍保留。
+        {{ task.successTarget }}，最多尝试 {{ task.attemptLimit }} 次。{{
+          task.apkWorkbench ? '使用当前可用 APK' : '复用当天 APK'
+        }}，前一轮计数仍保留。
       </p>
       <el-button :disabled="busy" type="primary" @click="control('NEW_ROUND')"
         >确认新增一轮</el-button

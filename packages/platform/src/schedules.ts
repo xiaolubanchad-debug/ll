@@ -7,6 +7,7 @@ import { fault, PlatformError } from './errors.js';
 import { beijingDay, validateBudget } from './daily-plan.js';
 import { createRun, stopRun, RUN_END } from './runs.js';
 import { lockLibrary } from './library-lock.js';
+import { workbenchSupported } from './apk-workbench.js';
 
 export async function saveSchedule(
   db: PrismaClient,
@@ -28,6 +29,8 @@ export async function saveSchedule(
     async (tx) => {
       await lockLibrary(tx);
       const node = await lockNode(tx, input.nodeId);
+      if (input.enabled && workbenchSupported(node.agentVersion))
+        fault('APK_WORKBENCH_REQUIRED', '下载请在 APK 资源手动操作', 422);
       const previous = await tx.dailySchedule.findUnique({
         where: id ? { id } : { nodeId: input.nodeId },
       });
@@ -128,6 +131,7 @@ export async function tickSchedules(db: PrismaClient, now = new Date()) {
   for (const schedule of await db.dailySchedule.findMany({
     take: 100,
     orderBy: { createdAt: 'asc' },
+    include: { node: { select: { agentVersion: true } } },
   })) {
     let occurrence: { id: string } | undefined;
     try {
@@ -143,7 +147,8 @@ export async function tickSchedules(db: PrismaClient, now = new Date()) {
         });
         for (const row of old) await stopOccurrence(db, row, schedule.createdBy);
       }
-      if (!schedule.enabled || time < body.time) continue;
+      if (!schedule.enabled || time < body.time || workbenchSupported(schedule.node.agentVersion))
+        continue;
       let row = await db.dailyOccurrence.upsert({
         where: { scheduleId_day: { scheduleId: schedule.id, day } },
         create: { scheduleId: schedule.id, day, snapshot: schedule.body as Prisma.InputJsonValue },

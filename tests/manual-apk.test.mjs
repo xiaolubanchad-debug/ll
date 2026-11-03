@@ -487,7 +487,7 @@ test('manual APK: real authenticated upload, durable results, idle import, daily
       },
     );
     await t.test(
-      'browser shows success, failure and supplement; query error does not claim no downloads',
+      'browser shows read-only APK history and submits the exact direct link from the workbench',
       async () => {
         process.env.API_PROXY_URL = base;
         vite = await createVite({
@@ -506,40 +506,61 @@ test('manual APK: real authenticated upload, durable results, idle import, daily
         await page.getByLabel('用户名', { exact: true }).fill('p0admin');
         await page.getByLabel('密码', { exact: true }).fill(process.env.P0_TEST_PASSWORD);
         await page.getByRole('button', { name: '登录中台' }).click();
-        await expect(page.getByRole('heading', { name: 'APK 下载与补包' })).toBeVisible();
+        await expect(page.getByRole('heading', { name: 'APK 下载工作台' })).toBeVisible();
+        const history = page
+          .locator('section')
+          .filter({ has: page.getByRole('heading', { name: '历史 APK 记录' }) });
         await expect(page.locator('tbody').getByText('下载成功', { exact: true })).toBeVisible();
         await expect(page.getByText('补包已就绪', { exact: true })).toBeVisible();
-        const browserTask = await db.task.create({
-          data: {
-            runId: run.id,
-            position: 2,
-            id: randomUUID(),
-            targetKey: digest('browser-upload'),
-            label: '浏览器补包入口',
-            sourceUrl: 'https://owned.example.test/',
-            status: 'FAILED',
-            errorCode: 'DOWNLOAD_FAILED',
-          },
-        });
-        await page.getByRole('button', { name: '刷新', exact: true }).click();
-        const browserRow = page.locator('tbody tr').filter({ hasText: '浏览器补包入口' });
-        await browserRow.locator('input[type=file]').setInputFiles({
-          name: 'owned.apk',
-          mimeType: 'application/vnd.android.package-archive',
-          buffer: bytes,
-        });
-        await expect(browserRow).toContainText('等待下发');
-        await expect(
-          page.getByText('APK 文件已接收，等待服务器空闲后下发。补包就绪后，请手动开始任务。', {
-            exact: true,
+        await expect(history.locator('input[type=file]')).toHaveCount(0);
+        const targetKey = digest('browser-workbench');
+        const selected = {
+          id: randomUUID(),
+          nodeId: node.id,
+          nodeName: node.name,
+          name: '工作台配置',
+          configId: randomUUID(),
+          currentVersionId: randomUUID(),
+        };
+        await page.route('**/api/v1/task-plans?**', (r) =>
+          r.fulfill({ json: { items: [selected], nextCursor: null } }),
+        );
+        await page.route('**/api/v1/apk-assets/workbench?**', (r) =>
+          r.fulfill({
+            json: {
+              releaseId: randomUUID(),
+              supported: true,
+              scan: null,
+              items: [
+                {
+                  targetKey,
+                  label: '浏览器测试应用',
+                  sourceLocator: 'name=demo',
+                  present: true,
+                  url: null,
+                  download: null,
+                  fileName: null,
+                  size: null,
+                  downloadedAt: null,
+                  receivedBytes: 0,
+                  totalBytes: null,
+                },
+              ],
+            },
           }),
-        ).toBeVisible();
-        const browserUpload = await db.manualApkUpload.findUniqueOrThrow({
-          where: { taskId: browserTask.id },
+        );
+        let submitted;
+        await page.route('**/api/v1/runs', (r) => {
+          submitted = r.request().postDataJSON();
+          return r.fulfill({ status: 202, json: { resourceId: randomUUID(), status: 'QUEUED' } });
         });
-        assert.equal(browserUpload.apk.fileName, 'owned.apk');
-        assert.equal(browserUpload.apk.packageName, undefined);
-        await request('/apk-uploads/' + browserUpload.id + '/cancel', 'POST', {});
+        await page.reload();
+        const url = 'https://owned.example.test/fixture.apk?t=123&auth_key=test%2Bvalue&k=x+y';
+        await page.getByLabel('浏览器测试应用 APK 直链').fill(url);
+        await page.getByRole('button', { name: '下载', exact: true }).click();
+        await expect
+          .poll(() => submitted?.resourceAction)
+          .toEqual({ kind: 'FETCH', targetKey, url });
         await page.screenshot({ path: join(dir, 'manual-assets.png'), fullPage: true });
         await page.route('**/api/v1/apk-assets?**', (route) =>
           route.fulfill({
@@ -548,7 +569,7 @@ test('manual APK: real authenticated upload, durable results, idle import, daily
             body: JSON.stringify({ error: { message: '测试查询错误' } }),
           }),
         );
-        await page.getByRole('button', { name: '刷新', exact: true }).click();
+        await history.getByRole('button', { name: '刷新', exact: true }).click();
         await expect(page.getByText('测试查询错误', { exact: true })).toBeVisible();
         await expect(
           page.getByText('所选日期和筛选条件下暂无下载记录。', { exact: true }),

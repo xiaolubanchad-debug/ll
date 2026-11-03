@@ -9,6 +9,7 @@ import type {
   TaskPlanDetail,
   TaskControlInput,
   TestConfiguration,
+  DailyExecutionPlan,
 } from '@apk/contracts';
 import {
   schemaIssues,
@@ -41,6 +42,7 @@ import {
   RUN_END,
 } from './runs.js';
 import { taskSourceWarning } from './source-elements.js';
+import { workbenchAssets, workbenchSupported } from './apk-workbench.js';
 type Tx = Prisma.TransactionClient;
 const closed = ['DONE', 'FAILED', 'STOPPED'];
 const cycleInclude = { runs: { orderBy: { createdAt: 'asc' as const } } };
@@ -71,11 +73,15 @@ function counts(c: CycleRow) {
 async function cycleView(db: PrismaClient, c: CycleRow): Promise<TaskCycleView> {
   const snapshot = (await db.configVersion.findUniqueOrThrow({ where: { id: c.configVersionId } }))
     .body as unknown as TestConfiguration;
+  const execution = c.runs.filter((run) => run.purpose === 'REGISTER').at(-1)
+    ?.executionPlan as DailyExecutionPlan | null;
   const apkCount = c.downloadRunId
     ? await db.task.count({
         where: { runId: c.downloadRunId, status: 'SUCCEEDED', proof: 'FILE_VALIDATION' },
       })
-    : 0;
+    : execution?.resourceAssets && Array.isArray(execution.assets)
+      ? execution.assets.length
+      : 0;
   return {
     id: c.id,
     executionKind: snapshot.execution.appOpen
@@ -106,6 +112,7 @@ async function readiness(db: PrismaClient, p: PlanRow) {
       result.push({ code, message, section });
   const node = p.node,
     c = p.currentVersion.body as unknown as TestConfiguration;
+  const workbench = workbenchSupported(node.agentVersion);
   if (p.archivedAt) add('ARCHIVED', '任务已归档，请先恢复', 'tasks');
   if (!node.lastSeenAt || Date.now() - node.lastSeenAt.getTime() > 45000)
     add('NODE_OFFLINE', '服务器离线，请检查服务器', 'nodes');
@@ -114,7 +121,16 @@ async function readiness(db: PrismaClient, p: PlanRow) {
   const h = node.health as { download?: boolean; android?: boolean; kvm?: boolean } | null;
   if (!h?.download || node.downloadProtocol !== '1.0')
     add('NODE_UPGRADE_REQUIRED', '下载环境尚未就绪', 'nodes');
-  const needsDownload = !(await db.run.count({ where: dailyDownloadWhere(node.id, p.configId) }));
+  const needsDownload =
+    !workbench && !(await db.run.count({ where: dailyDownloadWhere(node.id, p.configId) }));
+  if (workbench && !c.execution.appOpen)
+    add('APP_OPEN_REQUIRED', '请选择 APP 启动停留配置', 'tasks');
+  if (
+    workbench &&
+    c.execution.appOpen &&
+    !(await workbenchAssets(db, node.id, p.currentVersion)).length
+  )
+    add('APK_WORKBENCH_EMPTY', '请先在 APK 资源下载至少一个可用文件', 'assets');
   if (needsDownload && !knownAgentAtLeast(node.agentVersion, '0.17.3'))
     add('NODE_UPGRADE_REQUIRED', '网页代理需要 Agent 0.17.3', 'nodes');
   const proxy = c.execution.proxySecretVersionId;
@@ -125,12 +141,16 @@ async function readiness(db: PrismaClient, p: PlanRow) {
         where: { id: proxy, type: 'HTTP_PROXY', revokedAt: null },
       })))
   )
-    add('PROXY_REQUIRED', '请选择用于网页下载的有效代理', 'proxies');
+    add(
+      'PROXY_REQUIRED',
+      workbench ? '请选择用于模拟器打开 APP 的有效代理' : '请选择用于网页下载的有效代理',
+      'proxies',
+    );
   if (node.slot?.quarantined) add('NODE_QUARANTINED', '上次执行需要核验与清理确认', 'runs');
   const own = p.cycles.some((c) => c.runs.some((r) => r.id === node.slot?.runId));
   if (node.slot?.operationId || (node.slot?.runId && !own))
     add('NODE_BUSY', '服务器正在执行其他任务', 'nodes');
-  if (await db.dailySchedule.count({ where: { nodeId: p.nodeId, enabled: true } }))
+  if (!workbench && (await db.dailySchedule.count({ where: { nodeId: p.nodeId, enabled: true } })))
     add('LEGACY_PLAN_ENABLED', '此服务器的旧每日计划仍开启，请先关闭', 'runs');
   if (await db.managedTask.count({ where: { id: { not: p.id }, nodeId: p.nodeId, enabled: true } }))
     add('NODE_BUSY', '此服务器已有其他开启的任务', 'tasks');
@@ -242,6 +262,7 @@ async function view(db: PrismaClient, p: PlanRow): Promise<TaskPlanView> {
   const sourceWarning = await taskSourceWarning(db, p.cycles[0]?.downloadRunId);
   return checkedOutput('TaskPlanView', {
     ...(sourceWarning ? { sourceWarning } : {}),
+    ...(workbenchSupported(p.node.agentVersion) ? { apkWorkbench: true as const } : {}),
     id: p.id,
     executionKind: (p.currentVersion.body as unknown as TestConfiguration).execution.appOpen
       ? 'APP_OPEN'
@@ -395,9 +416,16 @@ export async function saveTaskPlan(
   );
   return (await taskPlanDetail(db, result.id)).task;
 }
-async function effectiveVersion(tx: Tx, p: ManagedTask, nodeId: string, now: Date) {
+async function effectiveVersion(
+  tx: Tx,
+  p: ManagedTask,
+  nodeId: string,
+  now: Date,
+  workbench = false,
+) {
   let version = await tx.configVersion.findUniqueOrThrow({ where: { id: p.currentVersionId } }),
     deferred = false;
+  if (workbench) return { version, deferred };
   const downloaded = await tx.run.findFirst({
     where: {
       nodeId: nodeId,
@@ -429,7 +457,7 @@ async function effectiveVersion(tx: Tx, p: ManagedTask, nodeId: string, now: Dat
 async function createCycle(
   tx: Tx,
   p: ManagedTask,
-  node: { id: string; agentReleaseId: string | null },
+  node: { id: string; agentReleaseId: string | null; agentVersion: string | null },
   now: Date,
   round: number,
   retryOf?: string,
@@ -440,7 +468,7 @@ async function createCycle(
         version: await tx.configVersion.findUniqueOrThrow({ where: { id: p.currentVersionId } }),
         deferred: false,
       }
-    : await effectiveVersion(tx, p, node.id, now);
+    : await effectiveVersion(tx, p, node.id, now, workbenchSupported(node.agentVersion));
   const full = (version.body as unknown as TestConfiguration).execution.mode === 'FULL';
   return tx.managedCycle.create({
     data: {
@@ -536,7 +564,16 @@ export async function controlTaskPlan(
         if (selected.archivedAt || selected.config.archivedAt)
           fault('VERSION_ARCHIVED', '当前配置已归档，请恢复后开始');
         const settings = selected.body as unknown as TestConfiguration;
-        await assertNoPendingManualApks(tx, p.nodeId, p.configId);
+        const workbench = workbenchSupported(node.agentVersion);
+        if (workbench) {
+          if (input.action === 'RETRY_DOWNLOAD')
+            fault('APK_WORKBENCH_REQUIRED', '请在 APK 资源手动下载', 422);
+          if (!settings.execution.appOpen)
+            fault('APP_OPEN_REQUIRED', '请选择 APP 启动停留配置', 422);
+          if (!(await workbenchAssets(tx, node.id, selected)).length)
+            fault('APK_WORKBENCH_EMPTY', '请先在 APK 资源下载至少一个可用文件', 422);
+          await configSecrets(tx, settings);
+        } else await assertNoPendingManualApks(tx, p.nodeId, p.configId);
         if (
           settings.execution.mode === 'FULL' &&
           !settings.execution.appOpen &&
@@ -544,7 +581,10 @@ export async function controlTaskPlan(
           !settings.registrationFlows.some((f) => f.enabled)
         )
           fault('NEEDS_ADAPTATION', '请选择自动识别或补充注册规则');
-        if (await tx.dailySchedule.count({ where: { nodeId: p.nodeId, enabled: true } }))
+        if (
+          !workbench &&
+          (await tx.dailySchedule.count({ where: { nodeId: p.nodeId, enabled: true } }))
+        )
           fault('LEGACY_PLAN_ENABLED', '请先关闭旧每日计划');
         if (
           await tx.managedTask.count({
@@ -587,10 +627,11 @@ export async function controlTaskPlan(
           )
             fault('REVIEW_REQUIRED', '请先核验未知结果并确认清理');
           if (
-            input.action === 'RETRY_DOWNLOAD' ||
-            !(await tx.run.count({
-              where: dailyDownloadWhere(node.id, p.configId, now),
-            }))
+            !workbench &&
+            (input.action === 'RETRY_DOWNLOAD' ||
+              !(await tx.run.count({
+                where: dailyDownloadWhere(node.id, p.configId, now),
+              })))
           ) {
             if (!settings.execution.proxySecretVersionId)
               fault('PROXY_REQUIRED', '网页下载需要配置 HTTP 代理', 422);
@@ -614,7 +655,7 @@ export async function controlTaskPlan(
               totals.successes < latest.successTarget &&
               totals.attemptsStarted < latest.attemptLimit
             ) {
-              const effective = await effectiveVersion(tx, p, node.id, now);
+              const effective = await effectiveVersion(tx, p, node.id, now, workbench);
               await tx.managedCycle.update({
                 where: { id: latest.id },
                 data: {
@@ -869,6 +910,17 @@ async function advance(db: PrismaClient, p: ManagedTask, c: CycleRow, now: Date)
     config = (await db.configVersion.findUniqueOrThrow({ where: { id: c.configVersionId } }))
       .body as unknown as TestConfiguration;
   const common = { nodeId: c.nodeId, configVersionId: c.configVersionId, releaseId: c.releaseId };
+  const release = await db.release.findUnique({
+    where: { id: c.releaseId },
+    select: { manifest: true },
+  });
+  const workbench = workbenchSupported(
+    (release?.manifest as { agentVersion?: string } | null)?.agentVersion,
+  );
+  if (workbench && !config.execution.appOpen) {
+    await updateCycle(db, c, 'FAILED', 'APP_OPEN_REQUIRED');
+    return;
+  }
   if (config.execution.mode === 'FULL' && !config.execution.appOpen && !c.proxyRunId) {
     await createRun(
       db,
@@ -895,54 +947,56 @@ async function advance(db: PrismaClient, p: ManagedTask, c: CycleRow, now: Date)
       return;
     }
   }
-  if (!c.downloadRunId) {
-    await createRun(
-      db,
-      {
-        ...common,
-        purpose: 'DOWNLOAD',
-        ...(c.downloadRetryOf ? { supersedesRunId: c.downloadRetryOf } : {}),
-      },
-      p.createdBy,
-      'task-center',
-      'task:' + c.id + ':download',
-      now,
-      undefined,
-      c.id,
-      c.generation,
-    );
-    return;
-  }
-  const downloaded = await db.run.findUniqueOrThrow({ where: { id: c.downloadRunId } });
-  if (!RUN_END.includes(downloaded.status)) return;
-  const manual = await manualAssetsForRun(db, downloaded.id);
-  const latestImport = Math.max(0, ...manual.map((m) => m.updatedAt.getTime()));
-  if (
-    c.runs.some(
-      (r) =>
-        RUN_END.includes(r.status) &&
-        r.errorCode === 'NO_REGISTERABLE_APK' &&
-        r.createdAt.getTime() >= latestImport,
-    )
-  ) {
-    await updateCycle(db, c, 'DONE', 'NO_REGISTERABLE_APK');
-    return;
-  }
-  if (!['SUCCEEDED', 'PARTIAL_FAILED'].includes(downloaded.status) && !manual.length) {
-    await updateCycle(
-      db,
-      c,
-      downloaded.errorCode === 'NO_APK_AVAILABLE'
-        ? 'DONE'
-        : downloaded.status === 'NEEDS_REVIEW'
-          ? 'NEEDS_REVIEW'
-          : downloaded.status === 'CANCELLED'
-            ? 'STOPPED'
-            : 'FAILED',
-      downloaded.errorCode ??
-        (downloaded.status === 'CANCELLED' ? 'DOWNLOAD_STOPPED' : 'DOWNLOAD_FAILED'),
-    );
-    return;
+  if (!workbench) {
+    if (!c.downloadRunId) {
+      await createRun(
+        db,
+        {
+          ...common,
+          purpose: 'DOWNLOAD',
+          ...(c.downloadRetryOf ? { supersedesRunId: c.downloadRetryOf } : {}),
+        },
+        p.createdBy,
+        'task-center',
+        'task:' + c.id + ':download',
+        now,
+        undefined,
+        c.id,
+        c.generation,
+      );
+      return;
+    }
+    const downloaded = await db.run.findUniqueOrThrow({ where: { id: c.downloadRunId } });
+    if (!RUN_END.includes(downloaded.status)) return;
+    const manual = await manualAssetsForRun(db, downloaded.id);
+    const latestImport = Math.max(0, ...manual.map((m) => m.updatedAt.getTime()));
+    if (
+      c.runs.some(
+        (r) =>
+          RUN_END.includes(r.status) &&
+          r.errorCode === 'NO_REGISTERABLE_APK' &&
+          r.createdAt.getTime() >= latestImport,
+      )
+    ) {
+      await updateCycle(db, c, 'DONE', 'NO_REGISTERABLE_APK');
+      return;
+    }
+    if (!['SUCCEEDED', 'PARTIAL_FAILED'].includes(downloaded.status) && !manual.length) {
+      await updateCycle(
+        db,
+        c,
+        downloaded.errorCode === 'NO_APK_AVAILABLE'
+          ? 'DONE'
+          : downloaded.status === 'NEEDS_REVIEW'
+            ? 'NEEDS_REVIEW'
+            : downloaded.status === 'CANCELLED'
+              ? 'STOPPED'
+              : 'FAILED',
+        downloaded.errorCode ??
+          (downloaded.status === 'CANCELLED' ? 'DOWNLOAD_STOPPED' : 'DOWNLOAD_FAILED'),
+      );
+      return;
+    }
   }
   if (
     config.execution.mode !== 'FULL' ||
@@ -999,7 +1053,7 @@ async function advance(db: PrismaClient, p: ManagedTask, c: CycleRow, now: Date)
     {
       ...common,
       purpose: 'REGISTER',
-      sourceDownloadId: c.downloadRunId,
+      ...(workbench ? { resourceAssets: true } : { sourceDownloadId: c.downloadRunId }),
       successTarget: config.execution.appOpen
         ? Math.min(c.successTarget - total.successes, c.attemptLimit - total.attemptsStarted)
         : c.successTarget - total.successes,

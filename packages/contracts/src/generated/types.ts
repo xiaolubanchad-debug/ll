@@ -420,6 +420,7 @@ export interface TaskPlanView {
     day: string;
     count: number;
   };
+  apkWorkbench?: true;
 }
 
 export interface TaskPlanDetail {
@@ -475,6 +476,7 @@ export interface TaskPlanDetail {
       day: string;
       count: number;
     };
+    apkWorkbench?: true;
   };
   configuration: APKTestConfigurationVersion10;
   cycles: {
@@ -688,6 +690,7 @@ export interface TaskPlanList {
       day: string;
       count: number;
     };
+    apkWorkbench?: true;
   }[];
   nextCursor: string | null;
 }
@@ -1424,6 +1427,40 @@ export interface AppOpenTimings {
   }[];
 }
 
+export interface ApkWorkbenchQuery {
+  nodeId: string;
+  configVersionId: string;
+}
+
+export interface ApkWorkbenchView {
+  releaseId: string | null;
+  supported: boolean;
+  scan: {
+    id: string;
+    status: string;
+    errorCode: string | null;
+    createdAt: string;
+  } | null;
+  items: {
+    targetKey: string;
+    label: string;
+    sourceLocator: string;
+    present: boolean;
+    url: string | null;
+    download: {
+      id: string;
+      status: string;
+      errorCode: string | null;
+      createdAt: string;
+    } | null;
+    fileName: string | null;
+    size: number | null;
+    downloadedAt: string | null;
+    receivedBytes: number;
+    totalBytes: number | null;
+  }[];
+}
+
 export interface TestConfiguration {
   schemaVersion: '1.0';
   name: string;
@@ -1690,7 +1727,8 @@ export type AgentMessage =
           | 'BROWSER_ENVIRONMENT'
           | 'APP_OBSTRUCTION'
           | 'DEVICE_SESSION'
-          | 'ELEMENT_OBSERVATION';
+          | 'ELEMENT_OBSERVATION'
+          | 'RESOURCE_PROGRESS';
         payload: {
           [k: string]: unknown;
         };
@@ -1995,6 +2033,16 @@ export interface RunInput {
   successTarget?: number;
   attemptLimit?: number;
   proxySecretVersionId?: string;
+  resourceAction?:
+    | {
+        kind: 'SCAN';
+      }
+    | {
+        kind: 'FETCH';
+        targetKey: string;
+        url: string;
+      };
+  resourceAssets?: true;
 }
 
 export interface RunReconcileInput {
@@ -2299,6 +2347,19 @@ export interface DailyExecutionPlan {
     preserveQueue?: true;
     resumeOf?: string;
   };
+  resourceAction?:
+    | {
+        kind: 'SCAN';
+      }
+    | {
+        kind: 'FETCH';
+        targetKey: string;
+        url: string;
+        cacheKey: string;
+        label: string;
+      };
+  resourceAssets?: true;
+  resourceScope?: string;
 }
 
 export interface AutoRegistration {

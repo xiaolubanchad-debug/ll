@@ -10,6 +10,7 @@ import {
   canonical,
   sha,
   runDownload,
+  runDirectApk,
   cleanupBrowser,
   cleanupAndroid,
   removeOwned,
@@ -342,7 +343,9 @@ export class TaskEngine {
         (plan.purpose === 'REGISTER' &&
           (plan.successTarget < 1 ||
             plan.attemptLimit < plan.successTarget ||
-            plan.assets.some((a) => a.apk.cacheDay !== plan.cacheDay))))
+            (!plan.resourceAssets && plan.assets.some((a) => a.apk.cacheDay !== plan.cacheDay)))) ||
+        (plan.resourceAssets && plan.purpose !== 'REGISTER') ||
+        (plan.resourceAction && (plan.purpose !== 'DOWNLOAD' || !plan.resourceScope)))
     )
       throw Error('EXECUTION_PLAN_INVALID');
     if (
@@ -358,22 +361,24 @@ export class TaskEngine {
     )
       throw Error('OPEN_POLICY_INVALID');
     const versions = snapshot.secretVersions;
+    const direct = !!plan?.resourceAction;
     if (
       (!this.options.sdkRoot &&
         (plan?.purpose === 'REGISTER' || (!plan && config.execution.mode === 'FULL'))) ||
       !Array.isArray(versions) ||
-      versions.length !== 1
+      versions.length !== (direct ? 0 : 1)
     )
       throw Error('PROXY_CONFIG_INVALID');
     const secret = versions[0] as { id?: unknown; type?: unknown; secretValue?: unknown } | null;
     if (
-      !secret ||
-      secret.id !== (plan?.proxySecretVersionId ?? config.execution.proxySecretVersionId) ||
-      secret.type !== 'HTTP_PROXY' ||
-      schemaIssues('SecretInput', { type: 'HTTP_PROXY', secretValue: secret.secretValue }).length
+      !direct &&
+      (!secret ||
+        secret.id !== (plan?.proxySecretVersionId ?? config.execution.proxySecretVersionId) ||
+        secret.type !== 'HTTP_PROXY' ||
+        schemaIssues('SecretInput', { type: 'HTTP_PROXY', secretValue: secret.secretValue }).length)
     )
       throw Error('PROXY_CONFIG_INVALID');
-    const proxy = secret.secretValue as ProxyCredential;
+    const proxy = secret?.secretValue as ProxyCredential;
     this.store.status(d.deliveryId, 'RUNNING');
     this.store.append(d, {
       type: 'RUN_STARTED',
@@ -584,7 +589,17 @@ export class TaskEngine {
       else if (plan?.purpose === 'PROXY_CHECK') {
         beforeAction();
         await runProxyCheck(proxy, signal, emit, this.options.policy, this.options.proxyCheckUrl);
-      } else
+      } else if (plan?.resourceAction?.kind === 'FETCH')
+        await runDirectApk(
+          config,
+          plan,
+          this.nodeId,
+          join(this.store.root, 'downloads'),
+          signal,
+          emit,
+          runOptions,
+        );
+      else
         await runDownload(
           plan
             ? {
@@ -599,8 +614,8 @@ export class TaskEngine {
           emit,
           {
             ...runOptions,
-            webProxy: proxy,
-            ...(plan ? { dailyDownload: true, fixedCacheDay: plan.cacheDay } : {}),
+            ...(direct ? { scanOnly: true } : { webProxy: proxy }),
+            ...(plan && !direct ? { dailyDownload: true, fixedCacheDay: plan.cacheDay } : {}),
           },
         );
       if (review || this.control === 'REVIEW') {

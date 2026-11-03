@@ -1016,6 +1016,7 @@ export async function apkAssets(db: PrismaClient, query: unknown): Promise<Asset
     n = Number(limit);
   const rows = await db.task.findMany({
     where: {
+      sourceLocator: null,
       AND: [
         {
           run: {

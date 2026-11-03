@@ -79,7 +79,7 @@ export async function runCachedRegistrations(
       },
     });
   }
-  const cache = await ApkCache.open(join(root, 'cache'));
+  const cache = await ApkCache.open(join(root, plan.resourceAssets ? 'resources' : 'cache'));
   let successes = 0,
     review = false,
     cleanupIncomplete = false,
@@ -100,7 +100,7 @@ export async function runCachedRegistrations(
       });
       const found = await cache.get(
         nodeId,
-        plan.cacheDay,
+        asset.apk.cacheDay,
         asset.targetKey,
         config.download.maxApkBytes ?? 268435456,
         signal,
@@ -121,7 +121,7 @@ export async function runCachedRegistrations(
           cleanupComplete: true,
         };
       } else {
-        cache.pin(nodeId, plan.cacheDay, asset.targetKey);
+        cache.pin(nodeId, asset.apk.cacheDay, asset.targetKey);
         await emit({
           type: 'TASK_STAGE',
           taskId: target.taskId,
@@ -130,7 +130,7 @@ export async function runCachedRegistrations(
         completion = await register(
           target,
           asset.apk,
-          cache.path(cache.key(nodeId, plan.cacheDay, asset.targetKey)),
+          cache.path(cache.key(nodeId, asset.apk.cacheDay, asset.targetKey)),
           index,
           signal,
         );

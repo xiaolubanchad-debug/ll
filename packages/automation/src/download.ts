@@ -43,12 +43,14 @@ export interface AutomationEvent {
     | 'APP_OBSTRUCTION'
     | 'LOG'
     | 'DEVICE_SESSION'
-    | 'ELEMENT_OBSERVATION';
+    | 'ELEMENT_OBSERVATION'
+    | 'RESOURCE_PROGRESS';
   taskId?: string;
   payload: Record<string, unknown>;
 }
 export interface Target {
   sourceElement?: SourceElement;
+  sourceLocator?: string;
   deviceSessionId?: string;
   deviceEpoch?: number;
   appIndex?: number;
@@ -67,6 +69,7 @@ export interface BrowserRecord {
   profile: string;
 }
 export interface DownloadOptions {
+  scanOnly?: boolean;
   dailyDownload?: boolean;
   fixedCacheDay?: string;
   beforeAction?: () => void;
@@ -117,7 +120,12 @@ async function waitForTargets(page: Page, config: TestConfiguration) {
       .waitFor({ state: 'attached', timeout: Math.min(3000, config.download.timeoutMs) })
       .catch(() => {});
 }
-async function discover(page: Page, config: TestConfiguration): Promise<Target[]> {
+async function discover(
+  page: Page,
+  config: TestConfiguration,
+  scanOnly?: boolean,
+): Promise<Target[]> {
+  const attributeNames = sourceAttributeNames(config.source.xpath);
   const snapshots = await page.locator('xpath=' + config.source.xpath).evaluateAll(
     (elements, attributeNames) =>
       elements.map((element, position) => {
@@ -134,14 +142,62 @@ async function discover(page: Page, config: TestConfiguration): Promise<Target[]
           }),
           pid: element.getAttribute('pid') ?? element.closest('[pid]')?.getAttribute('pid') ?? '',
           href: anchor?.href ?? '',
-          label: (element.getAttribute('aria-label') ?? element.textContent ?? '')
+          label: (
+            element.getAttribute('aria-label') ??
+            (element.textContent?.trim() ||
+              element.getAttribute('title') ||
+              element.querySelector('img[alt]')?.getAttribute('alt') ||
+              element.closest('a')?.getAttribute('aria-label') ||
+              '')
+          )
             .trim()
             .slice(0, 200),
           position,
         };
       }),
-    sourceAttributeNames(config.source.xpath),
+    scanOnly
+      ? [
+          ...new Set([
+            'pid',
+            'id',
+            'name',
+            ...attributeNames.filter((name) => !/^(class|aria-label|title)$/i.test(name)),
+          ]),
+        ]
+      : attributeNames,
   );
+  if (scanOnly) {
+    if (snapshots.length > config.download.maxTargets) throw new DownloadError('TARGET_LIMIT');
+    const descriptions = describeSourceElements(snapshots);
+    const labels = new Map<string, number>();
+    for (const item of snapshots) {
+      const key = canonical([item.tag, item.label]);
+      labels.set(key, (labels.get(key) ?? 0) + 1);
+    }
+    return snapshots.map((item, index) => {
+      const element = descriptions[index];
+      const labelKey = canonical([item.tag, item.label]);
+      const identity =
+        element.scope === 'ATTRIBUTE'
+          ? ['attributes', item.tag, element.attributes]
+          : item.label && labels.get(labelKey) === 1
+            ? ['label', item.tag, item.label]
+            : ['ambiguous', randomUUID()];
+      return {
+        ...item,
+        label: item.label || '入口 ' + (item.position + 1),
+        taskId: randomUUID(),
+        targetKey: sha(canonical(identity)),
+        sourceUrl: normalizeUrl(config.source.url),
+        sourceLocator: element.attributes.length
+          ? element.attributes
+              .map(({ name, value }) => name + '=' + value)
+              .join(' · ')
+              .slice(0, 640)
+          : item.tag + ' #' + (item.position + 1),
+      };
+    });
+  }
   const seen = new Set<string>(),
     targets: Target[] = [];
   for (const item of snapshots) {
@@ -563,17 +619,18 @@ export async function runDownload(
     await options.onBrowser?.({ pid: 0, profile });
     beforeAction();
     await policy.endpoint(config.source.url);
-    const bridge = options.webProxy
-      ? await startProxyBridge(
-          options.webProxy,
-          policy,
-          Math.min(config.download.timeoutMs, 10000),
-          {
-            maxBytes: max,
-            timeoutMs: config.download.timeoutMs,
-          },
-        )
-      : undefined;
+    const bridge =
+      options.webProxy && !options.scanOnly
+        ? await startProxyBridge(
+            options.webProxy,
+            policy,
+            Math.min(config.download.timeoutMs, 10000),
+            {
+              maxBytes: max,
+              timeoutMs: config.download.timeoutMs,
+            },
+          )
+        : undefined;
     const network = (egress =
       bridge ?? (await startEgress(policy, max, config.download.timeoutMs)));
     beforeAction();
@@ -589,7 +646,7 @@ export async function runDownload(
       headless: true,
       downloadsPath: join(temp, 'raw'),
       proxy: { server: network.url, bypass: '<-loopback>' },
-      acceptDownloads: true,
+      acceptDownloads: !options.scanOnly,
       serviceWorkers: 'block',
       viewport: mobile.viewport,
       screen: { width: 412, height: 915 },
@@ -611,6 +668,10 @@ export async function runDownload(
     );
     await context.route('**/*', async (route) => {
       try {
+        if (options.scanOnly && !['GET', 'HEAD'].includes(route.request().method())) {
+          await route.abort('blockedbyclient');
+          return;
+        }
         normalizeUrl(route.request().url());
         await route.continue();
       } catch {
@@ -618,11 +679,16 @@ export async function runDownload(
       }
     });
     const cdp = await browser.newBrowserCDPSession();
-    await cdp.send('Browser.setDownloadBehavior', {
-      behavior: 'allowAndName',
-      downloadPath: join(temp, 'raw'),
-      eventsEnabled: true,
-    });
+    await cdp.send(
+      'Browser.setDownloadBehavior',
+      options.scanOnly
+        ? { behavior: 'deny' }
+        : {
+            behavior: 'allowAndName',
+            downloadPath: join(temp, 'raw'),
+            eventsEnabled: true,
+          },
+    );
     cdp.on('Browser.downloadProgress', (e) => {
       if (e.receivedBytes > max) {
         limit = true;
@@ -645,7 +711,7 @@ export async function runDownload(
         await waitForTargets(source, config);
         beforeAction();
         // Discovery is committed only after the mobile environment is confirmed.
-        targets = await discover(source, config);
+        targets = await discover(source, config, options.scanOnly);
       } catch (error) {
         if (signal.aborted) throw error;
         if (error instanceof DownloadError && error.code === 'TARGET_LIMIT') throw error;
@@ -683,7 +749,7 @@ export async function runDownload(
     );
     if (config.source.elementChecks?.length) {
       beforeAction();
-      targets = await discover(source, config);
+      targets = await discover(source, config, options.scanOnly);
     }
     if (!targets!.length)
       await emit({
@@ -701,17 +767,23 @@ export async function runDownload(
         payload: {
           targets: targets!
             .slice(start, start + 20)
-            .map(({ taskId, targetKey, label, sourceUrl, entryId }) => ({
+            .map(({ taskId, targetKey, label, sourceUrl, entryId, sourceLocator }) => ({
               taskId,
               targetKey,
               label,
               sourceUrl,
               ...(entryId ? { entryId } : {}),
+              ...(sourceLocator ? { sourceLocator } : {}),
             })),
           startIndex: start,
           complete: start + 20 >= targets!.length,
         },
       });
+    if (options.scanOnly) {
+      await cleanup();
+      await emit({ type: 'RUN_FINISHED', payload: { status: 'SUCCEEDED' } });
+      return;
+    }
     let succeeded = 0,
       navigationSkipped = 0,
       review = false,

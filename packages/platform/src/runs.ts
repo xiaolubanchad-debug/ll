@@ -43,6 +43,7 @@ import { sourceAttributeNames } from '@apk/automation';
 import type { SourceElementObservation } from '@apk/contracts';
 import { cachedApkSelectionSupported } from '@apk/contracts';
 import { dailyOpenUsage, openAdmissionDeadline } from './open-budget.js';
+import { publishWorkbenchScan, workbenchScope, workbenchSupported } from './apk-workbench.js';
 type Tx = P.TransactionClient;
 export const ACTIVE_RUNS = ['ASSIGNED', 'RUNNING', 'STOP_REQUESTED'] as const;
 export const RUN_END = ['SUCCEEDED', 'PARTIAL_FAILED', 'FAILED', 'CANCELLED', 'NEEDS_REVIEW'];
@@ -178,7 +179,22 @@ export async function createRun(
     await lockLibrary(tx);
     const node = await lockNode(tx, input.nodeId);
     if (
+      workbenchSupported(node.agentVersion) &&
+      !input.resourceAction &&
+      visitsWebsite(input.purpose)
+    )
+      fault('APK_WORKBENCH_REQUIRED', '请在 APK 资源手动扫描或下载', 422);
+    if ((input.resourceAction || input.resourceAssets) && !workbenchSupported(node.agentVersion))
+      fault('NODE_UPGRADE_REQUIRED', 'APK 资源工作台需要 Agent 0.17.9', 422);
+    if (
+      workbenchSupported(node.agentVersion) &&
+      input.purpose === 'REGISTER' &&
+      !input.resourceAssets
+    )
+      fault('APK_WORKBENCH_REQUIRED', '请选择 APK 资源工作台中的可用文件', 422);
+    if (
       !cycleId &&
+      !input.resourceAction &&
       (await tx.managedTask.count({
         where: { nodeId: node.id, enabled: true },
       }))
@@ -236,7 +252,7 @@ export async function createRun(
     if (config.archivedAt || container.archivedAt)
       fault('VERSION_ARCHIVED', '配置已归档，请恢复后使用');
     const dailyKey =
-      input.purpose === 'DOWNLOAD'
+      input.purpose === 'DOWNLOAD' && !input.resourceAction
         ? digest(
             canonical([
               node.id,
@@ -297,6 +313,11 @@ export async function createRun(
     const manifest = release?.manifest as
       | { agentVersion?: string; features?: string[]; toolchain?: { systemImage?: string } }
       | undefined;
+    if (
+      (input.resourceAction || input.resourceAssets) &&
+      !workbenchSupported(manifest?.agentVersion)
+    )
+      fault('NODE_UPGRADE_REQUIRED', '请部署支持 APK 资源工作台的签名 Agent', 422);
     const health = node.health as {
       download?: boolean;
       android?: boolean;
@@ -309,7 +330,7 @@ export async function createRun(
     )
       fault('NODE_UPGRADE_REQUIRED', '请部署支持下载任务的 Agent 版本');
     const configuration = config.body as unknown as TestConfiguration;
-    if (visitsWebsite(input.purpose)) {
+    if (visitsWebsite(input.purpose) && !input.resourceAction) {
       if (!configuration.execution.proxySecretVersionId)
         fault('PROXY_REQUIRED', '网页下载需要配置 HTTP 代理', 422);
       if (
@@ -373,7 +394,7 @@ export async function createRun(
     );
     if (input.purpose === 'PROXY_CHECK')
       await readSecret(tx, input.proxySecretVersionId!, ['HTTP_PROXY']);
-    else await configSecrets(tx, configuration);
+    else if (!input.resourceAction) await configSecrets(tx, configuration);
     if (
       input.purpose === 'REGISTER' ||
       (!input.purpose && configuration.execution.mode === 'FULL')
@@ -399,7 +420,15 @@ export async function createRun(
     }
     const run = await tx.run.create({
       data: {
-        ...input,
+        nodeId: input.nodeId,
+        configVersionId: input.configVersionId,
+        releaseId: input.releaseId,
+        supersedesRunId: input.supersedesRunId,
+        purpose: input.purpose,
+        sourceDownloadId: input.sourceDownloadId,
+        successTarget: input.successTarget,
+        attemptLimit: input.attemptLimit,
+        proxySecretVersionId: input.proxySecretVersionId,
         ...(plan?.openPolicy?.resumeOf ? { supersedesRunId: plan.openPolicy.resumeOf } : {}),
         ...(cycleId ? { taskCycleId: cycleId } : {}),
         configHash: config.configHash,
@@ -413,6 +442,15 @@ export async function createRun(
         ...(dailyKey ? { dailyKey } : {}),
       },
     });
+    if (plan?.resourceAction?.kind === 'FETCH') {
+      const { targetKey, url } = plan.resourceAction;
+      await tx.apkWorkbenchEntry.update({
+        where: {
+          nodeId_configId_sourceKey_targetKey: { ...workbenchScope(node.id, config), targetKey },
+        },
+        data: { latestRunId: run.id, url, receivedBytes: 0, totalBytes: null },
+      });
+    }
     if (plan?.openPolicy?.resumeOf)
       await tx.task.updateMany({
         where: {
@@ -490,6 +528,7 @@ export async function claimRun(db: PrismaClient, token: string, body: unknown) {
     if (
       run.status === 'QUEUED' &&
       visitsWebsite(run.purpose) &&
+      !(run.executionPlan as DailyExecutionPlan | null)?.resourceAction &&
       !knownAgentAtLeast(node.agentVersion, '0.17.3')
     ) {
       await closeRun(tx, run, 'FAILED', 'NODE_UPGRADE_REQUIRED');
@@ -636,11 +675,13 @@ export async function deliveryConfig(db: PrismaClient, token: string, id: string
       where: { id: d.run.configVersionId! },
     });
     const config = v.body as unknown as TestConfiguration;
-    const proxyId =
-      d.run.purpose === 'PROXY_CHECK'
+    const direct = !!(d.run.executionPlan as DailyExecutionPlan | null)?.resourceAction;
+    const proxyId = direct
+      ? null
+      : d.run.purpose === 'PROXY_CHECK'
         ? d.run.proxySecretVersionId
         : config.execution.proxySecretVersionId;
-    if (visitsWebsite(d.run.purpose)) {
+    if (visitsWebsite(d.run.purpose) && !direct) {
       const release = await tx.release.findUnique({ where: { id: d.run.releaseId! } });
       if (
         !knownAgentAtLeast(
@@ -1171,6 +1212,7 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
       label: string;
       sourceUrl: string;
       entryId?: string;
+      sourceLocator?: string;
     }[];
     const config = await tx.configVersion.findUniqueOrThrow({
       where: { id: run.configVersionId! },
@@ -1178,7 +1220,9 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
     const max =
       run.purpose === 'REGISTER'
         ? run.attemptLimit
-        : (config.body as unknown as TestConfiguration).download.maxTargets;
+        : plan?.resourceAction?.kind === 'FETCH'
+          ? 1
+          : (config.body as unknown as TestConfiguration).download.maxTargets;
     const start = await tx.task.count({ where: { runId } });
     if (
       (p.startIndex ?? 0) !== start ||
@@ -1188,6 +1232,12 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
     )
       fault('EVENT_CONFLICT', '目标数量或编号冲突');
     for (const [offset, t] of targets.entries()) {
+      if (
+        !!t.sourceLocator !== (plan?.resourceAction?.kind === 'SCAN') ||
+        (plan?.resourceAction?.kind === 'FETCH' &&
+          (t.targetKey !== plan.resourceAction.cacheKey || t.label !== plan.resourceAction.label))
+      )
+        fault('EVENT_CONFLICT', '工作台入口与冻结请求不一致');
       if (run.purpose === 'REGISTER') {
         const asset =
           plan?.assets[
@@ -1212,6 +1262,7 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
           label: t.label,
           sourceUrl: t.sourceUrl,
           position: start + offset,
+          ...(t.sourceLocator ? { sourceLocator: t.sourceLocator } : {}),
           ...(t.entryId ? { entryId: t.entryId } : {}),
         },
       });
@@ -1221,8 +1272,29 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
       where: { id: runId },
       data: {
         discovered: complete,
-        ...(complete && !targets.length && !start ? { errorCode: 'NO_TARGETS' } : {}),
+        ...(complete && !targets.length && !start && plan?.resourceAction?.kind !== 'SCAN'
+          ? { errorCode: 'NO_TARGETS' }
+          : {}),
       },
+    });
+    return;
+  }
+  if (event.type === 'RESOURCE_PROGRESS') {
+    const task = await tx.task.findUnique({ where: { id: event.taskId! } });
+    const max = config.download.maxApkBytes ?? 268435456;
+    const received = Number(p.receivedBytes);
+    const total = p.totalBytes === null ? null : Number(p.totalBytes);
+    if (
+      plan?.resourceAction?.kind !== 'FETCH' ||
+      task?.runId !== runId ||
+      task.status !== 'DOWNLOADING' ||
+      received > max ||
+      (total !== null && (total > max || total < received))
+    )
+      fault('EVENT_CONFLICT', '直链传输进度无效');
+    await tx.apkWorkbenchEntry.updateMany({
+      where: { latestRunId: runId, receivedBytes: { lte: received } },
+      data: { receivedBytes: received, totalBytes: total },
     });
     return;
   }
@@ -1402,6 +1474,16 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
         fault('EVENT_CONFLICT', '任务阶段不能跳过或倒退');
       if (stage === 'DOWNLOADED' && schemaIssues('ApkMetadata', p.apk).length)
         fault('EVENT_CONFLICT', '缺少 APK 校验元数据');
+      if (stage === 'DOWNLOADED' && plan?.resourceAction?.kind === 'FETCH') {
+        const apk = p.apk as DailyExecutionPlan['assets'][number]['apk'];
+        if (
+          apk.cacheDay !== plan.cacheDay ||
+          apk.validationPolicy !== 'FILE_NAME' ||
+          !apk.fileName ||
+          apk.size > (config.download.maxApkBytes ?? 268435456)
+        )
+          fault('EVENT_CONFLICT', '直链下载文件回执无效');
+      }
       if (stage === 'DOWNLOADED' && run.purpose === 'REGISTER') {
         const expected =
           plan?.assets[
@@ -1798,6 +1880,27 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
       return;
     }
     if (run.stopRequested) return; // Acknowledge the race, but only STOP_ACK can release this slot.
+    if (plan?.resourceAction?.kind === 'SCAN') {
+      if (
+        !plan.resourceScope ||
+        tasks.some((task) => task.status !== 'QUEUED' || !task.sourceLocator) ||
+        (p.status !== 'SUCCEEDED' && p.status !== 'FAILED') ||
+        (p.status === 'SUCCEEDED' && !run.discovered)
+      )
+        fault('EVENT_CONFLICT', 'XPath 扫描回执无效');
+      if (p.status === 'SUCCEEDED') await publishWorkbenchScan(tx, run, plan.resourceScope, tasks);
+      await tx.task.updateMany({
+        where: { runId },
+        data: { status: 'SKIPPED', finishedAt: new Date() },
+      });
+      await closeRun(
+        tx,
+        run,
+        p.status,
+        p.status === 'FAILED' ? String(p.errorCode ?? 'DISCOVERY_FAILED') : undefined,
+      );
+      return;
+    }
     if (run.purpose === 'PROXY_CHECK') {
       const observation = run.proxyObservation as { status?: string } | null;
       const expected = observation?.status === 'SUCCEEDED' ? 'SUCCEEDED' : 'FAILED';
@@ -1926,6 +2029,25 @@ async function applyEvent(tx: Tx, runId: string, event: Event) {
             ? 'PARTIAL_FAILED'
             : 'FAILED';
     if (p.status !== status) fault('EVENT_CONFLICT', '批次汇总不一致');
+    if (status === 'SUCCEEDED' && plan?.resourceAction?.kind === 'FETCH') {
+      const task = tasks[0];
+      const apk = task.apk as unknown as DailyExecutionPlan['assets'][number]['apk'];
+      const published = await tx.apkWorkbenchEntry.updateMany({
+        where: { latestRunId: runId },
+        data: {
+          readyAsset: {
+            targetKey: task.targetKey,
+            label: task.label,
+            sourceUrl: task.sourceUrl,
+            apk,
+          },
+          downloadedAt: new Date(),
+          receivedBytes: apk.size,
+          totalBytes: apk.size,
+        },
+      });
+      if (published.count !== 1) fault('EVENT_CONFLICT', '工作台入口已变更');
+    }
     await closeRun(
       tx,
       run,
@@ -1966,6 +2088,7 @@ export async function runEvents(db: PrismaClient, token: string, body: unknown) 
             'APP_OBSTRUCTION',
             'DEVICE_SESSION',
             'ELEMENT_OBSERVATION',
+            'RESOURCE_PROGRESS',
             'LOG',
           ].includes(event.type)
         )

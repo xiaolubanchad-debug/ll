@@ -232,7 +232,11 @@ async function startTask(node: NodeView) {
     error.value = startReason(node, task);
     return;
   }
-  if (task.latestCycle?.status === 'FAILED' && task.latestCycle.errorCode === 'TARGET_LIMIT') {
+  if (
+    !task.apkWorkbench &&
+    task.latestCycle?.status === 'FAILED' &&
+    task.latestCycle.errorCode === 'TARGET_LIMIT'
+  ) {
     confirmTaskKind.value = 'RETRY_DOWNLOAD';
     confirmTask.value = task;
     return;

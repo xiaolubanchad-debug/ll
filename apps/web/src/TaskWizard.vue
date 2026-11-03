@@ -10,7 +10,12 @@ import type {
 import NodeCapacitySettings from './NodeCapacitySettings.vue';
 import SourceChecksEditor from './SourceChecksEditor.vue';
 import type { NodeCapacityView } from '@apk/contracts';
-import { configurationIssues, MAX_DAILY_OPEN_LIMIT, MAX_DEVICE_APPS } from '@apk/contracts';
+import {
+  configurationIssues,
+  knownAgentAtLeast,
+  MAX_DAILY_OPEN_LIMIT,
+  MAX_DEVICE_APPS,
+} from '@apk/contracts';
 import example from '../../../contracts/fixtures/config.valid.json';
 import { api, mutation } from './api';
 const props = defineProps<{
@@ -81,6 +86,11 @@ const nodes = ref<NodeView[]>([]),
     }[]
   >([]),
   configs = ref<{ id: string; name: string }[]>([]);
+const workbench = computed(
+  () =>
+    !!props.initial?.task.apkWorkbench ||
+    knownAgentAtLeast(nodes.value.find((node) => node.id === nodeId.value)?.agentVersion, '0.17.9'),
+);
 const proxyName = ref(''),
   host = ref(''),
   port = ref(10000),
@@ -296,8 +306,11 @@ function next() {
     error.value = '请填写任务名称、有效网站地址和 XPath';
     return;
   }
-  if (step.value === 2 && (!nodeId.value || !proxyId.value)) {
-    error.value = '请选择服务器及网页下载代理';
+  if (
+    step.value === 2 &&
+    (!nodeId.value || (!proxyId.value && (!workbench.value || mode.value === 'FULL')))
+  ) {
+    error.value = workbench.value ? '请选择服务器及模拟器代理' : '请选择服务器及网页下载代理';
     return;
   }
   step.value++;
@@ -382,7 +395,9 @@ onUnmounted(() => {
             }}
           </p>
         </details>
-        <label for="task-download-limit">每日下载入口上限</label
+        <label for="task-download-limit">{{
+          workbench ? 'XPath 扫描入口上限' : '每日下载入口上限'
+        }}</label
         ><input
           id="task-download-limit"
           v-model.number="downloadLimit"
@@ -391,8 +406,11 @@ onUnmounted(() => {
           :max="MAX_DEVICE_APPS"
         />
         <p class="muted">
-          单次下载最多处理多少个图标入口；与 APP 复用次数分别设置。复制方案会保留原上限，请按当前
-          XPath 核对。
+          {{
+            workbench
+              ? '单次扫描允许的最多匹配入口。'
+              : '单次下载最多处理多少个图标入口；与 APP 复用次数分别设置。'
+          }}
         </p>
         <label for="task-name">任务名称</label
         ><input
@@ -407,7 +425,11 @@ onUnmounted(() => {
         ><textarea id="task-xpath" v-model="xpath" rows="3" />
         <SourceChecksEditor v-model="elementChecks" />
         <p class="muted">
-          执行时依次处理匹配的全部图标，支持直接下载、落地页下载及自动下载。保存不会访问网站。
+          {{
+            workbench
+              ? '在 APK 资源扫描匹配入口并手动填写下载地址。'
+              : '执行时依次处理匹配的全部图标，支持直接下载、落地页下载及自动下载。'
+          }}
         </p>
       </template>
       <template v-if="compact || step === 2">
@@ -420,30 +442,34 @@ onUnmounted(() => {
         </select>
         <label for="task-mode">执行内容</label
         ><select id="task-mode" v-model="mode">
-          <option value="FULL">下载、安装并启动 APP（停留 10 秒）</option>
-          <option value="DOWNLOAD_ONLY">只下载 APK</option>
-        </select>
-        <label for="task-proxy">网页与 APP 网络代理</label
-        ><select id="task-proxy" v-model="proxyId">
-          <option value="">请选择已保存代理</option>
-          <option v-for="p in proxies" :key="p.id" :value="p.id">
-            {{ p.name ?? '历史代理 ' + p.id.slice(0, 8) }}
+          <option value="FULL">
+            {{ workbench ? '安装并启动 APP（停留 10 秒）' : '下载、安装并启动 APP（停留 10 秒）' }}
           </option>
+          <option value="DOWNLOAD_ONLY">{{ workbench ? '只准备 APK 资源' : '只下载 APK' }}</option>
         </select>
-        <details>
-          <summary>新增代理</summary>
-          <label for="task-proxy-name">代理名称</label
-          ><input id="task-proxy-name" v-model="proxyName" />
-          <div class="filter-grid">
-            <label>地址<input v-model="host" placeholder="res.proxy-seller.com" /></label
-            ><label>端口<input v-model.number="port" type="number" min="1" max="65535" /></label
-            ><label>认证用户名<input v-model="user" autocomplete="off" /></label
-            ><label
-              >认证密码<input v-model="password" type="password" autocomplete="new-password"
-            /></label>
-          </div>
-          <el-button @click="saveProxy">保存代理并选中</el-button>
-        </details>
+        <template v-if="!workbench || mode === 'FULL'">
+          <label for="task-proxy">{{ workbench ? '模拟器网络代理' : '网页与 APP 网络代理' }}</label
+          ><select id="task-proxy" v-model="proxyId">
+            <option value="">请选择已保存代理</option>
+            <option v-for="p in proxies" :key="p.id" :value="p.id">
+              {{ p.name ?? '历史代理 ' + p.id.slice(0, 8) }}
+            </option>
+          </select>
+          <details>
+            <summary>新增代理</summary>
+            <label for="task-proxy-name">代理名称</label
+            ><input id="task-proxy-name" v-model="proxyName" />
+            <div class="filter-grid">
+              <label>地址<input v-model="host" placeholder="res.proxy-seller.com" /></label
+              ><label>端口<input v-model.number="port" type="number" min="1" max="65535" /></label
+              ><label>认证用户名<input v-model="user" autocomplete="off" /></label
+              ><label
+                >认证密码<input v-model="password" type="password" autocomplete="new-password"
+              /></label>
+            </div>
+            <el-button @click="saveProxy">保存代理并选中</el-button>
+          </details>
+        </template>
         <template v-if="mode === 'FULL'">
           <label for="task-concurrency">{{ multiApp ? '同时运行模拟器数' : '同时执行轮数' }}</label
           ><select id="task-concurrency" v-model="concurrency" disabled>
@@ -534,7 +560,9 @@ onUnmounted(() => {
               :max="MAX_DAILY_OPEN_LIMIT"
           /></label>
         </div>
-        <p v-if="mode === 'DOWNLOAD_ONLY'" class="muted">本任务只下载 APK，不打开 APP。</p>
+        <p v-if="mode === 'DOWNLOAD_ONLY'" class="muted">
+          {{ workbench ? '保存后请在 APK 资源扫描和下载。' : '本任务只下载 APK，不打开 APP。' }}
+        </p>
         <label class="inline-check"
           ><input v-model="automatic" type="checkbox" />开始后每天自动执行</label
         ><label v-if="automatic" for="task-time"
@@ -572,7 +600,10 @@ onUnmounted(() => {
             >应用高级配置</el-button
           >
         </details>
-        <p v-if="initial" class="muted">
+        <p v-if="initial && workbench" class="muted">
+          任务使用 APK 资源中已下载的文件。修改网站或 XPath 后，请到 APK 资源重新扫描。
+        </p>
+        <p v-else-if="initial" class="muted">
           保存不影响正在执行的批次。下载规则通常次日生效；当天下载失败后，可在任务详情明确选择“重新下载”使用新规则。调整前请先停止并确认清理。
         </p>
       </template>

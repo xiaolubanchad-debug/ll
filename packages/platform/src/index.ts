@@ -1,5 +1,6 @@
 export * from './errors.js';
 export * from './security.js';
+export * from './apk-workbench.js';
 export * from './secrets.js';
 export * from './types.js';
 export * from './configurations.js';
