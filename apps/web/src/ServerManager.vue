@@ -20,6 +20,7 @@ import {
   executionLabel,
   executionMessage,
   startReason,
+  stopPending,
   logRun,
 } from './server-console';
 import TaskWizard from './TaskWizard.vue';
@@ -690,15 +691,10 @@ onUnmounted(() => {
                         taskFor(node)?.enabled ||
                         (taskFor(node) && activeCycle(taskFor(node)!))
                       ) ||
-                      node.activeStopRequested ||
-                      taskFor(node)?.latestCycle?.status === 'STOPPING'
+                      stopPending(node, taskFor(node))
                     "
                     @click="stopServer(node)"
-                    >{{
-                      node.activeStopRequested || taskFor(node)?.latestCycle?.status === 'STOPPING'
-                        ? '等待清理'
-                        : '停止'
-                    }}</el-button
+                    >{{ stopPending(node, taskFor(node)) ? '等待清理' : '停止' }}</el-button
                   >
                   <el-button
                     :disabled="busy || node.occupancy === 'BUSY'"

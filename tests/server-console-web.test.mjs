@@ -294,6 +294,26 @@ test('waiting without a current batch explains the blocker instead of opening ol
     await expect(row()).toContainText('历史结果和已用次数保留');
   }));
 
+test('automatic recovery keeps manual STOP available for the task that owns the batch', async () =>
+  fixture(async ({ page, state, writes, row }) => {
+    state.node.occupancy = 'QUARANTINED';
+    state.node.activeRunId = state.runA;
+    state.node.activeStopRequested = true;
+    state.a.enabled = true;
+    state.a.latestCycle = {
+      ...state.cycle(state.runA, 'WAITING'),
+      errorCode: 'APP_CLEANUP_RESTART_PENDING',
+    };
+    await open(page);
+    await expect(row()).toContainText('恢复中 · 等待清理确认');
+    await expect(row().getByRole('button', { name: '开始', exact: true })).toBeDisabled();
+    await row().getByRole('button', { name: '停止', exact: true }).click();
+    await expect.poll(() => writes.length).toBe(1);
+    assert.equal(writes[0].path, '/task-plans/' + state.a.id + '/control');
+    assert.equal(writes[0].body.action, 'STOP');
+    await expect(row().getByRole('button', { name: '等待清理', exact: true })).toBeDisabled();
+  }));
+
 test('a confirmed stop allows direct start even with an exhausted previous quota', async () =>
   fixture(async ({ page, state, writes, row }) => {
     state.a.latestCycle = {

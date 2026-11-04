@@ -29,13 +29,24 @@ export function preferredTask(node: NodeView, tasks: TaskPlanView[], chosen?: st
     candidates[0]
   );
 }
+const awaitingRecovery = (task?: TaskPlanView) =>
+  task?.enabled === true &&
+  task.latestCycle?.status === 'WAITING' &&
+  task.latestCycle.errorCode === 'APP_CLEANUP_RESTART_PENDING';
+export function stopPending(node: NodeView, task?: TaskPlanView) {
+  return (
+    task?.latestCycle?.status === 'STOPPING' ||
+    (node.activeStopRequested &&
+      !(task && awaitingRecovery(task) && ownsRun(task, node.activeRunId)))
+  );
+}
 export function executionLabel(node: NodeView, task?: TaskPlanView) {
-  if (node.activeStopRequested) return '停止中 · 等待清理确认';
+  if (stopPending(node, task)) return '停止中 · 等待清理确认';
+  if (awaitingRecovery(task)) return '恢复中 · 等待清理确认';
   if (node.occupancy === 'QUARANTINED') return '待核验';
   if (node.activeOperationId) return '部署 / 检查中';
   if (node.connection === 'OFFLINE') return node.occupancy === 'BUSY' ? '离线 · 等待确认' : '离线';
   const c = task?.latestCycle;
-  if (c?.status === 'STOPPING') return '等待清理';
   if (task && activeCycle(task))
     return (
       (
@@ -57,11 +68,12 @@ export function executionLabel(node: NodeView, task?: TaskPlanView) {
 }
 export function executionMessage(task?: TaskPlanView) {
   const c = task?.latestCycle;
-  if (!c?.errorCode || ['DONE', 'STOPPED'].includes(c.status)) return '';
+  if (!c?.errorCode || ['DONE', 'STOPPING', 'STOPPED'].includes(c.status)) return '';
   return reasonLabels[c.errorCode] ?? '任务暂未继续，请查看执行记录';
 }
 export function startReason(node: NodeView, task?: TaskPlanView) {
-  if (node.activeStopRequested) return '停止要求已保存，等待执行端清理确认';
+  if (stopPending(node, task)) return '停止要求已保存，等待执行端清理确认';
+  if (awaitingRecovery(task)) return '任务正在等待整机清理，可手动停止';
   if (!task) return '请先配置任务';
   if (!currentFlow(task)) return '历史流程，请先在配置中转换为 APP 打开测试';
   if (node.connection !== 'ONLINE') return '服务器离线';

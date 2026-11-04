@@ -48,6 +48,7 @@ export class TaskEngine {
   private busy = false;
   private closed = false;
   private recoveryBlocked = false;
+  private cleanupInProgress: Promise<boolean> | null = null;
   private pendingFlush: Promise<void> = Promise.resolve();
   private readonly retryDelivery = new Map<string, { delay: number; after: number }>();
   private constructor(
@@ -78,43 +79,31 @@ export class TaskEngine {
       throw error;
     }
   }
+  private async cleanupDelivery(row: LocalDelivery) {
+    const base = join(this.store.root, 'android/jobs');
+    if (row.android && (await cleanupAndroid(base, row.android))) this.store.android(row.id, null);
+    for (const { slot, record } of row.androidSlots) {
+      if (await cleanupAndroid(base, record)) this.store.androidSlot(row.id, slot, null);
+    }
+    if (
+      row.browser &&
+      (await cleanupBrowser(join(this.store.root, 'downloads'), row.browser.profile))
+    ) {
+      try {
+        await removeOwned(join(this.store.root, 'downloads/jobs'), dirname(row.browser.profile));
+        this.store.browser(row.id, null);
+      } catch {
+        return false;
+      }
+    }
+    return this.store.deliveries().find((r) => r.id === row.id)?.clean === true;
+  }
   private async recover() {
     const previous = this.store.deliveries();
     const deliveries = [];
     let clean = true;
     for (const row of previous) {
-      let cleared = row.clean;
-      if (row.android) {
-        cleared = await cleanupAndroid(join(this.store.root, 'android/jobs'), row.android);
-        if (cleared) this.store.android(row.id, null);
-      }
-      if (row.androidSlots.length) {
-        let slotsClean = true;
-        for (const { slot, record } of row.androidSlots) {
-          const ok = await cleanupAndroid(join(this.store.root, 'android/jobs'), record);
-          if (ok) this.store.androidSlot(row.id, slot, null);
-          else slotsClean = false;
-        }
-        cleared = slotsClean && (!row.android || cleared);
-      }
-      if (row.browser) {
-        let browserClean = await cleanupBrowser(
-          join(this.store.root, 'downloads'),
-          row.browser.profile,
-        );
-        if (browserClean)
-          try {
-            await removeOwned(
-              join(this.store.root, 'downloads/jobs'),
-              dirname(row.browser.profile),
-            );
-          } catch {
-            browserClean = false;
-          }
-        if (browserClean) this.store.browser(row.id, null);
-        cleared = browserClean && ((!row.android && !row.androidSlots.length) || cleared);
-      }
-      cleared = cleared && this.store.deliveries().find((r) => r.id === row.id)?.clean === true;
+      const cleared = await this.cleanupDelivery(row);
       if (!cleared) clean = false;
       if (cleared) this.store.browser(row.id, null);
       if (row.status !== 'DONE') this.store.status(row.id, 'REVIEW', cleared);
@@ -270,13 +259,23 @@ export class TaskEngine {
         const retry = this.retryDelivery.get(row.id);
         if (retry && retry.after > Date.now()) continue;
         try {
-          await this.syncDelivery(row);
+          if (row.status === 'REVIEW' && !row.clean) {
+            this.cleanupInProgress = this.cleanupDelivery(row);
+            const cleaned = await this.cleanupInProgress.finally(() => {
+              this.cleanupInProgress = null;
+            });
+            if (this.closed) return;
+            if (!cleaned) throw Error('CLEANUP_INCOMPLETE');
+            this.store.queueReconcile(row.id);
+            await this.syncDelivery({ ...row, clean: true, reconcilePending: true });
+          } else await this.syncDelivery(row);
           this.retryDelivery.delete(row.id);
         } catch {
           const delay = Math.min(retry ? retry.delay * 2 : 1000, 30000);
           this.retryDelivery.set(row.id, { delay, after: Date.now() + delay });
         }
       }
+      if (this.store.deliveries().some((row) => row.status === 'REVIEW' && !row.clean)) return;
       const response = await this.hub('claims', {
         kind: 'claim',
         protocolVersion: '1.0',
@@ -671,6 +670,7 @@ export class TaskEngine {
     this.control = 'REVIEW';
     this.abort?.abort();
     await this.running;
+    await this.cleanupInProgress?.catch(() => {});
     await this.pendingFlush.catch(() => {});
     this.store.close();
     await this.unlock();

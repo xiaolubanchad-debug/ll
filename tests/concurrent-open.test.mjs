@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, writeFile, readFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, writeFile, readFile, rm } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -349,6 +349,58 @@ test('a failed cleanup receipt is retried without blocking claims behind an old 
       false,
     );
     assert.equal(engine.store.pending(old.deliveryId).length, 1);
+  } finally {
+    await engine.close();
+  }
+});
+
+test('runtime retries dirty device cleanup with backoff and blocks claims until confirmed', async (t) => {
+  const root = await mkdtemp(join(resolve('.tmp'), 'runtime-cleanup-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const delivery = { deliveryId: randomUUID(), runId: randomUUID(), fence: 1 },
+    slot = randomUUID(),
+    workspace = join(root, 'android', 'jobs', 'fixture'),
+    record = {
+      workspace,
+      avdName: 'p3_' + 'a'.repeat(32),
+      appiumTmp: join(workspace, 'appium-tmp'),
+    };
+  await mkdir(workspace, { recursive: true });
+  const calls = [];
+  const engine = await TaskEngine.open(
+    root,
+    randomUUID(),
+    randomUUID(),
+    root,
+    async (path, body) => {
+      if (body.reason !== 'STARTUP') calls.push({ path, body });
+      return { reconciled: true };
+    },
+  );
+  try {
+    engine.store.add(delivery);
+    engine.store.androidSlot(delivery.deliveryId, slot, { ...record, avdName: 'invalid' });
+    engine.store.queueReconcile(delivery.deliveryId);
+    await engine.tick();
+    assert.deepEqual(calls, []);
+    assert.equal(engine.store.deliveries()[0].clean, false);
+    engine.store.androidSlot(delivery.deliveryId, slot, record);
+    await engine.tick();
+    assert.deepEqual(calls, []);
+    await delay(1100);
+    await engine.tick();
+    if (process.platform === 'linux') {
+      assert.deepEqual(
+        calls.map(({ path }) => path),
+        ['reconcile', 'claims'],
+      );
+      assert.equal(calls[0].body.cleanupComplete, true);
+      assert.equal(calls[0].body.deliveries[0].deliveryId, delivery.deliveryId);
+      assert.equal(engine.store.deliveries()[0].reconcilePending, false);
+    } else {
+      assert.deepEqual(calls, []);
+      assert.equal(engine.store.deliveries()[0].clean, false);
+    }
   } finally {
     await engine.close();
   }
